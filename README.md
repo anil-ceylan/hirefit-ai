@@ -1,29 +1,67 @@
-# HireFit – AI Resume Alignment Analyzer
+# HireFit – AI Resume Intelligence
 
-HireFit is an AI-powered tool that analyzes a candidate CV against a job description.
+HireFit is an AI-powered tool that analyzes how well a candidate's CV matches a job description.
 
-It calculates alignment scores, detects missing skills, extracts keywords, and generates an optimized CV suggestion.
+It simulates an ATS-style analysis by extracting keywords, detecting missing skills, and generating improvement suggestions.
+
+## The Problem
+
+Many candidates submit CVs that are not aligned with job descriptions.  
+Recruiters and ATS systems filter resumes based on keywords, skills, and formatting.
+
+Candidates often don't know:
+
+- why their CV is rejected
+- which skills they are missing
+- how to improve their resume
+
+## The Solution
+
+HireFit analyzes a CV against a job description and generates:
+
+- Alignment score
+- ATS-style evaluation
+- Skill gap detection
+- Keyword extraction
+- CV optimization suggestions
+- Learning roadmap
 
 ## Features
 
-- ATS Score Engine
-- Skill Gap Detection
-- Keyword Extraction
-- AI CV Optimization
-- Learning Roadmap
-- Analysis Dashboard
+- CV vs Job Description analysis
+- ATS scoring engine
+- Skill gap detection
+- Keyword intelligence
+- AI-powered CV optimization
+- Learning roadmap generation
+- Analysis dashboard
 
 ## Tech Stack
 
-- React
-- Vite
-- Gemini API
-- Vercel Deployment
+Frontend  
+React + Vite
+
+AI  
+Google Gemini API
+
+Deployment  
+Vercel
 
 ## Live Demo
 
 https://hirefit-ai.vercel.app
 
-## GitHub Repository
+## Screenshots
 
-https://github.com/anil-ceylan/hirefit-ai
+Landing page  
+Dashboard  
+Analysis report
+
+## Future Roadmap
+
+- user authentication
+- saved reports database
+- recruiter mode
+- public shareable reports
+- Stripe SaaS plan
+- team collaboration features
