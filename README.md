@@ -1,16 +1,29 @@
-# React + Vite
+# HireFit – AI Resume Alignment Analyzer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+HireFit is an AI-powered tool that analyzes a candidate CV against a job description.
 
-Currently, two official plugins are available:
+It calculates alignment scores, detects missing skills, extracts keywords, and generates an optimized CV suggestion.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## React Compiler
+- ATS Score Engine
+- Skill Gap Detection
+- Keyword Extraction
+- AI CV Optimization
+- Learning Roadmap
+- Analysis Dashboard
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the ESLint configuration
+- React
+- Vite
+- Gemini API
+- Vercel Deployment
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Live Demo
+
+https://hirefit-ai.vercel.app
+
+## GitHub Repository
+
+https://github.com/anil-ceylan/hirefit-ai
