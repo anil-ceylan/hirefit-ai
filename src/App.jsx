@@ -1,3 +1,5 @@
+import { supabase } from "./supabaseClient"
+import { useState } from "react"
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Sparkles,
@@ -679,7 +681,7 @@ ${seniority || "Not specified"}
                 {user.email}
               </button>
             ) : (
-              <button style={styles.buttonPrimary} onClick={() => setView("login")}>
+              <button style={styles.buttonPrimary} onClick={handleLogin}>
                 <LogIn size={16} />
                 Login
               </button>
@@ -1619,4 +1621,23 @@ ${seniority || "Not specified"}
       </div>
     </div>
   );
+}
+
+const [email, setEmail] = useState("")
+const [password, setPassword] = useState("")
+
+async function handleLogin() {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email,
+    password: "password123"
+  })
+
+  if (error) {
+    alert(error.message)
+  } else {
+    alert("Login successful")
+    console.log(data)
+    setUser(data.user)
+    setView("dashboard")
+  }
 }
