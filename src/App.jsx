@@ -1,5 +1,6 @@
-import { supabase } from "./supabaseClient"
+import { supabase } from "./supabaseClient";
 import React, { useEffect, useMemo, useState } from "react";
+import {
   Sparkles,
   FileText,
   Briefcase,
@@ -20,8 +21,9 @@ import React, { useEffect, useMemo, useState } from "react";
   LogIn,
   LogOut,
   Download,
-  Mail,
+  Mail
 } from "lucide-react";
+
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
@@ -166,6 +168,7 @@ export default function App() {
   const [plan] = useState("Free");
 
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [waitlistEmail, setWaitlistEmail] = useState("");
 
   const [cvText, setCvText] = useState("");
@@ -572,15 +575,32 @@ ${seniority || "Not specified"}
     setView("app");
   };
 
-  const login = () => {
-    if (!email.trim()) {
-      setError("Please enter your email.");
+  const login = async () => {
+    if (!email.trim() || !password.trim()) {
+      setError("Please enter both email and password.");
       return;
     }
-    setUser({ email });
-    setEmail("");
-    setError("");
-    setView("dashboard");
+
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (authError) {
+        setError(authError.message);
+        return;
+      }
+
+      setUser(data.user);
+      setEmail("");
+      setPassword("");
+      setError("");
+      setView("dashboard");
+    } catch (err) {
+      setError("Login failed. Please try again.");
+      console.error(err);
+    }
   };
 
   const logout = () => {
@@ -679,7 +699,7 @@ ${seniority || "Not specified"}
                 {user.email}
               </button>
             ) : (
-              <button style={styles.buttonPrimary} onClick={handleLogin}>
+              <button style={styles.buttonPrimary} onClick={() => setView("login")}>
                 <LogIn size={16} />
                 Login
               </button>
@@ -927,6 +947,13 @@ ${seniority || "Not specified"}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
+                style={styles.input}
+              />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
                 style={styles.input}
               />
               <button style={styles.buttonPrimary} onClick={login}>
@@ -1619,23 +1646,4 @@ ${seniority || "Not specified"}
       </div>
     </div>
   );
-}
-
-const [email, setEmail] = useState("")
-const [password, setPassword] = useState("")
-
-async function handleLogin() {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: email,
-    password: "password123"
-  })
-
-  if (error) {
-    alert(error.message)
-  } else {
-    alert("Login successful")
-    console.log(data)
-    setUser(data.user)
-    setView("dashboard")
-  }
 }
