@@ -1,5 +1,6 @@
 import { supabase } from "./supabaseClient";
 import React, { useEffect, useMemo, useState } from "react";
+
 import {
   Sparkles,
   FileText,
@@ -25,11 +26,11 @@ import {
 } from "lucide-react";
 
 import * as pdfjsLib from "pdfjs-dist";
-import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-const API_KEY = "YOUR_NEW_GEMINI_API_KEY";
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const MODEL = "gemini-2.5-flash";
 
 const styles = {
