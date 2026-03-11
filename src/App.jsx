@@ -1,5 +1,4 @@
 import { supabase } from "./supabaseClient"
-import { useState } from "react"
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Sparkles,
