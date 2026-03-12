@@ -335,7 +335,7 @@ export default function App() {
     }
 
     const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;  
     if (!text) throw new Error("No response returned from Gemini.");
     return text;
   };
@@ -410,6 +410,26 @@ ${cvText}
       const text = await callGemini(systemPrompt, query);
       setResult(text);
       extractDataFromReport(text);
+
+      // Save analysis to Supabase
+try {
+  const scoreMatch = text.match(/Final Alignment Score:\s*(\d+)/i);
+  const score = scoreMatch ? Number(scoreMatch[1]) : null;
+
+  await supabase.from("analyses").insert([
+    {
+      user_email: user?.email || null,
+      role: parseSingleLine(text, "Role Type") || "Untitled Analysis",
+      alignment_score: score,
+      cv_text: cvText,
+      job_description: jdText,
+      report: text,
+      created_at: new Date().toISOString()
+    }
+  ]);
+} catch (dbError) {
+  console.error("Supabase save failed:", dbError);
+}
 
       const newHistoryItem = {
         id: Date.now(),
