@@ -411,24 +411,44 @@ ${cvText}
       setResult(text);
       extractDataFromReport(text);
 
-      // Save analysis to Supabase
+// Save analysis to Supabase
 try {
   const scoreMatch = text.match(/Final Alignment Score:\s*(\d+)/i);
   const score = scoreMatch ? Number(scoreMatch[1]) : null;
 
-  await supabase.from("analyses").insert([
-    {
-      user_email: user?.email || null,
-      role: parseSingleLine(text, "Role Type") || "Untitled Analysis",
-      alignment_score: score,
-      cv_text: cvText,
-      job_description: jdText,
-      report: text,
-      created_at: new Date().toISOString()
-    }
-  ]);
+  const role = parseSingleLine(text, "Role Type") || "Untitled Analysis";
+
+  console.log("Saving analysis to Supabase...", {
+    user_email: user?.email || null,
+    role,
+    score
+  });
+
+  const { data, error } = await supabase
+    .from("analyses")
+    .insert([
+      {
+        user_email: user?.email || null,
+        role: role,
+        alignment_score: score,
+        cv_text: cvText,
+        job_description: jdText,
+        report: text,
+        created_at: new Date().toISOString()
+      }
+    ])
+    .select(); // response görmek için
+
+  console.log("Supabase insert result:", data, error);
+
+  if (error) {
+    console.error("Supabase save failed:", error.message);
+  } else {
+    console.log("Supabase save success");
+  }
+
 } catch (dbError) {
-  console.error("Supabase save failed:", dbError);
+  console.error("Supabase save exception:", dbError);
 }
 
       const newHistoryItem = {
