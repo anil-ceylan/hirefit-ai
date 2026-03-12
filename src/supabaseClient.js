@@ -1,18 +1,8 @@
-// Lightweight placeholder Supabase client for MVP / build stability.
-// Replace with a real Supabase client when you configure environment variables.
+import { createClient } from "@supabase/supabase-js";
 
-export const supabase = {
-  auth: {
-    async signInWithPassword({ email }) {
-      // Always return an auth error until Supabase is properly wired.
-      return {
-        data: null,
-        error: {
-          message:
-            `Supabase auth is not configured yet. Tried to login with: ${email}. ` +
-            "Please set up a real Supabase client in supabaseClient.js.",
-        },
-      };
-    },
-  },
-};
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+export default supabase;

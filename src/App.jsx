@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient";
+import supabase from "./supabaseClient";
 import React, { useEffect, useMemo, useState } from "react";
 
 import {
@@ -1688,3 +1688,5 @@ ${seniority || "Not specified"}
     </div>
   );
 }
+
+console.log("SUPABASE URL:", import.meta.env.VITE_SUPABASE_URL);
