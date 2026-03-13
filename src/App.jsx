@@ -236,6 +236,19 @@ export default function App() {
     }
   }, [user]);
 
+  useEffect(() => {
+  const savedUser = localStorage.getItem("hirefit-user");
+
+  if (savedUser) {
+    try {
+      setUser(JSON.parse(savedUser));
+    } catch {}
+  }
+
+  fetchAnalyses();
+
+}, []);
+
   const parseBullets = (text, sectionName) => {
     const regex = new RegExp(
       `${sectionName}:([\\s\\S]*?)(\\n[A-Z][A-Za-z ]+:|$)`,
@@ -438,6 +451,8 @@ try {
       }
     ])
     .select(); // response görmek için
+
+    await fetchAnalyses();
 
   console.log("Supabase insert result:", data, error);
 
@@ -681,6 +696,35 @@ ${seniority || "Not specified"}
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  const fetchAnalyses = async () => {
+  try {
+    const { data, error } = await supabase
+      .from("analyses")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (error) {
+      console.error("Fetch analyses error:", error);
+      return;
+    }
+
+    const formatted = data.map((item) => ({
+      id: item.id,
+      createdAt: new Date(item.created_at).toLocaleString(),
+      role: item.role,
+      score: item.alignment_score,
+      cvText: item.cv_text,
+      jdText: item.job_description,
+      report: item.report,
+    }));
+
+    setHistory(formatted);
+  } catch (err) {
+    console.error("Fetch failed:", err);
+  }
+};
 
   return (
     <div style={styles.page}>
