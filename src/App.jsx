@@ -1,7 +1,6 @@
 import supabase from "./supabaseClient";
 import React, { useEffect, useMemo, useState } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-<Route path="/report/:id" element={<ReportPage />} />
+import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
 
 import {
   Sparkles,
@@ -24,7 +23,7 @@ import {
   LogIn,
   LogOut,
   Download,
-  Mail
+  Mail,
 } from "lucide-react";
 
 import * as pdfjsLib from "pdfjs-dist";
@@ -165,7 +164,121 @@ function StatCard({ title, value, icon }) {
   );
 }
 
-export default function App() {
+function HistoryList({ history, onLoadItem, onClear, compact = false }) {
+  return (
+    <div style={styles.card}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "14px",
+        }}
+      >
+        <h3
+          style={{
+            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            fontSize: compact ? "18px" : "24px",
+          }}
+        >
+          <History size={18} />
+          {compact ? "Previous Analyses" : "Recent analyses"}
+        </h3>
+
+        <button
+          onClick={onClear}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            background: "#7f1d1d",
+            color: "#fee2e2",
+            border: "none",
+            borderRadius: compact ? "8px" : "10px",
+            padding: compact ? "8px 10px" : "10px 12px",
+            cursor: "pointer",
+            fontWeight: 700,
+            fontSize: compact ? "12px" : "14px",
+          }}
+        >
+          <Trash2 size={14} />
+          Clear
+        </button>
+      </div>
+
+      {history.length === 0 ? (
+        <div style={{ color: "#94a3b8", fontSize: "14px" }}>
+          No saved analyses yet.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {history.map((item) => (
+            <div key={item.id}>
+              <button
+                onClick={() => onLoadItem(item)}
+                style={{
+                  textAlign: "left",
+                  background: "#0f172a",
+                  border: "1px solid #334155",
+                  borderRadius: compact ? "12px" : "14px",
+                  padding: compact ? "12px" : "14px",
+                  cursor: "pointer",
+                  color: "white",
+                  width: "100%",
+                }}
+              >
+                <div
+                  style={{
+                    fontWeight: 800,
+                    marginBottom: "4px",
+                    fontSize: "18px",
+                  }}
+                >
+                  {item.role}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "13px",
+                    color: "#cbd5e1",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Score: {item.score}/100
+                </div>
+
+                <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+                  {item.createdAt}
+                </div>
+              </button>
+
+              <a
+                href={`/report/${item.id}`}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  fontSize: "12px",
+                  color: "#60a5fa",
+                  textDecoration: "none",
+                  display: "block",
+                  marginTop: "6px",
+                  marginLeft: "4px",
+                }}
+              >
+                View Report →
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MainApp() {
   const [view, setView] = useState("landing");
   const [user, setUser] = useState(null);
   const [plan] = useState("Free");
@@ -197,59 +310,6 @@ export default function App() {
 
   const [history, setHistory] = useState([]);
   const [waitlist, setWaitlist] = useState([]);
-
-  useEffect(() => {
-    const savedUser = localStorage.getItem("hirefit-user");
-    const savedHistory = localStorage.getItem("hirefit-history");
-    const savedWaitlist = localStorage.getItem("hirefit-waitlist");
-
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch {}
-    }
-
-    if (savedHistory) {
-      try {
-        setHistory(JSON.parse(savedHistory));
-      } catch {}
-    }
-
-    if (savedWaitlist) {
-      try {
-        setWaitlist(JSON.parse(savedWaitlist));
-      } catch {}
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("hirefit-history", JSON.stringify(history));
-  }, [history]);
-
-  useEffect(() => {
-    localStorage.setItem("hirefit-waitlist", JSON.stringify(waitlist));
-  }, [waitlist]);
-
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem("hirefit-user", JSON.stringify(user));
-    } else {
-      localStorage.removeItem("hirefit-user");
-    }
-  }, [user]);
-
-  useEffect(() => {
-  const savedUser = localStorage.getItem("hirefit-user");
-
-  if (savedUser) {
-    try {
-      setUser(JSON.parse(savedUser));
-    } catch {}
-  }
-
-  fetchAnalyses();
-
-}, []);
 
   const parseBullets = (text, sectionName) => {
     const regex = new RegExp(
@@ -283,6 +343,70 @@ export default function App() {
     setMissingSkills(parseBullets(text, "Missing Skills"));
     setTopKeywords(parseBullets(text, "Top Keywords"));
   };
+
+  const fetchAnalyses = async () => {
+    try {
+      const { data, error: fetchError } = await supabase
+        .from("analyses")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (fetchError) {
+        console.error("Fetch analyses error:", fetchError);
+        return;
+      }
+
+      const formatted = (data || []).map((item) => ({
+        id: item.id,
+        createdAt: new Date(item.created_at).toLocaleString(),
+        role: item.role,
+        score: item.alignment_score,
+        cvText: item.cv_text,
+        jdText: item.job_description,
+        report: item.report,
+      }));
+
+      setHistory(formatted);
+    } catch (err) {
+      console.error("Fetch failed:", err);
+    }
+  };
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem("hirefit-user");
+    const savedWaitlist = localStorage.getItem("hirefit-waitlist");
+
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch {}
+    }
+
+    if (savedWaitlist) {
+      try {
+        setWaitlist(JSON.parse(savedWaitlist));
+      } catch {}
+    }
+
+    fetchAnalyses();
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("hirefit-history", JSON.stringify(history));
+  }, [history]);
+
+  useEffect(() => {
+    localStorage.setItem("hirefit-waitlist", JSON.stringify(waitlist));
+  }, [waitlist]);
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem("hirefit-user", JSON.stringify(user));
+    } else {
+      localStorage.removeItem("hirefit-user");
+    }
+  }, [user]);
 
   const atsBreakdown = useMemo(() => {
     const keywordCoverage =
@@ -350,7 +474,7 @@ export default function App() {
     }
 
     const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;  
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) throw new Error("No response returned from Gemini.");
     return text;
   };
@@ -426,47 +550,37 @@ ${cvText}
       setResult(text);
       extractDataFromReport(text);
 
-// Save analysis to Supabase
-try {
-  const scoreMatch = text.match(/Final Alignment Score:\s*(\d+)/i);
-  const score = scoreMatch ? Number(scoreMatch[1]) : null;
+      try {
+        const scoreMatch = text.match(/Final Alignment Score:\s*(\d+)/i);
+        const score = scoreMatch ? Number(scoreMatch[1]) : null;
+        const role = parseSingleLine(text, "Role Type") || "Untitled Analysis";
 
-  const role = parseSingleLine(text, "Role Type") || "Untitled Analysis";
+        const { data, error: saveError } = await supabase
+          .from("analyses")
+          .insert([
+            {
+              user_email: user?.email || null,
+              role,
+              alignment_score: score,
+              cv_text: cvText,
+              job_description: jdText,
+              report: text,
+              created_at: new Date().toISOString(),
+            },
+          ])
+          .select();
 
-  console.log("Saving analysis to Supabase...", {
-    user_email: user?.email || null,
-    role,
-    score
-  });
+        console.log("Supabase insert result:", data, saveError);
 
-  const { data, error } = await supabase
-    .from("analyses")
-    .insert([
-      {
-        user_email: user?.email || null,
-        role: role,
-        alignment_score: score,
-        cv_text: cvText,
-        job_description: jdText,
-        report: text,
-        created_at: new Date().toISOString()
+        if (saveError) {
+          console.error("Supabase save failed:", saveError.message);
+        } else {
+          console.log("Supabase save success");
+          await fetchAnalyses();
+        }
+      } catch (dbError) {
+        console.error("Supabase save exception:", dbError);
       }
-    ])
-    .select(); // response görmek için
-
-    await fetchAnalyses();
-
-  console.log("Supabase insert result:", data, error);
-
-  if (error) {
-    console.error("Supabase save failed:", error.message);
-  } else {
-    console.log("Supabase save success");
-  }
-
-} catch (dbError) {
-  console.error("Supabase save exception:", dbError);
-}
 
       const newHistoryItem = {
         id: Date.now(),
@@ -623,10 +737,10 @@ ${seniority || "Not specified"}
   };
 
   const loadHistoryItem = (item) => {
-    setCvText(item.cvText);
-    setJdText(item.jdText);
-    setResult(item.report);
-    extractDataFromReport(item.report);
+    setCvText(item.cvText || "");
+    setJdText(item.jdText || "");
+    setResult(item.report || "");
+    extractDataFromReport(item.report || "");
     setOptimizedCv("");
     setLearningPlan("");
     setError("");
@@ -640,10 +754,12 @@ ${seniority || "Not specified"}
     }
 
     try {
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { data, error: authError } = await supabase.auth.signInWithPassword(
+        {
+          email,
+          password,
+        }
+      );
 
       if (authError) {
         setError(authError.message);
@@ -690,7 +806,9 @@ ${seniority || "Not specified"}
 
   const downloadOptimizedCv = () => {
     if (!optimizedCv) return;
-    const blob = new Blob([optimizedCv], { type: "text/plain;charset=utf-8" });
+    const blob = new Blob([optimizedCv], {
+      type: "text/plain;charset=utf-8",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -698,35 +816,6 @@ ${seniority || "Not specified"}
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  const fetchAnalyses = async () => {
-  try {
-    const { data, error } = await supabase
-      .from("analyses")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    if (error) {
-      console.error("Fetch analyses error:", error);
-      return;
-    }
-
-    const formatted = data.map((item) => ({
-      id: item.id,
-      createdAt: new Date(item.created_at).toLocaleString(),
-      role: item.role,
-      score: item.alignment_score,
-      cvText: item.cv_text,
-      jdText: item.job_description,
-      report: item.report,
-    }));
-
-    setHistory(formatted);
-  } catch (err) {
-    console.error("Fetch failed:", err);
-  }
-};
 
   return (
     <div style={styles.page}>
@@ -770,13 +859,22 @@ ${seniority || "Not specified"}
           </div>
 
           <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            <button style={styles.buttonSecondary} onClick={() => setView("landing")}>
+            <button
+              style={styles.buttonSecondary}
+              onClick={() => setView("landing")}
+            >
               Home
             </button>
-            <button style={styles.buttonSecondary} onClick={() => setView("app")}>
+            <button
+              style={styles.buttonSecondary}
+              onClick={() => setView("app")}
+            >
               Product
             </button>
-            <button style={styles.buttonSecondary} onClick={() => setView("dashboard")}>
+            <button
+              style={styles.buttonSecondary}
+              onClick={() => setView("dashboard")}
+            >
               Dashboard
             </button>
 
@@ -786,7 +884,10 @@ ${seniority || "Not specified"}
                 {user.email}
               </button>
             ) : (
-              <button style={styles.buttonPrimary} onClick={() => setView("login")}>
+              <button
+                style={styles.buttonPrimary}
+                onClick={() => setView("login")}
+              >
                 <LogIn size={16} />
                 Login
               </button>
@@ -871,12 +972,18 @@ ${seniority || "Not specified"}
                     marginBottom: "22px",
                   }}
                 >
-                  <button style={styles.buttonPrimary} onClick={() => setView("app")}>
+                  <button
+                    style={styles.buttonPrimary}
+                    onClick={() => setView("app")}
+                  >
                     Try HireFit
                     <ArrowRight size={16} />
                   </button>
 
-                  <button style={styles.buttonSecondary} onClick={() => setView("dashboard")}>
+                  <button
+                    style={styles.buttonSecondary}
+                    onClick={() => setView("dashboard")}
+                  >
                     View Dashboard
                   </button>
                 </div>
@@ -907,26 +1014,44 @@ ${seniority || "Not specified"}
               }}
             >
               <div style={styles.card}>
-                <BarChart3 size={22} style={{ marginBottom: "12px", color: "#60a5fa" }} />
-                <h3 style={{ marginTop: 0, fontSize: "22px" }}>ATS Score Engine</h3>
+                <BarChart3
+                  size={22}
+                  style={{ marginBottom: "12px", color: "#60a5fa" }}
+                />
+                <h3 style={{ marginTop: 0, fontSize: "22px" }}>
+                  ATS Score Engine
+                </h3>
                 <p style={{ color: "#cbd5e1", lineHeight: 1.6 }}>
-                  Quantifies CV alignment with skills, keywords, experience, and formatting.
+                  Quantifies CV alignment with skills, keywords, experience, and
+                  formatting.
                 </p>
               </div>
 
               <div style={styles.card}>
-                <Search size={22} style={{ marginBottom: "12px", color: "#2dd4bf" }} />
-                <h3 style={{ marginTop: 0, fontSize: "22px" }}>Keyword Intelligence</h3>
+                <Search
+                  size={22}
+                  style={{ marginBottom: "12px", color: "#2dd4bf" }}
+                />
+                <h3 style={{ marginTop: 0, fontSize: "22px" }}>
+                  Keyword Intelligence
+                </h3>
                 <p style={{ color: "#cbd5e1", lineHeight: 1.6 }}>
-                  Extracts top JD keywords and highlights what is missing from the CV.
+                  Extracts top JD keywords and highlights what is missing from the
+                  CV.
                 </p>
               </div>
 
               <div style={styles.card}>
-                <ShieldCheck size={22} style={{ marginBottom: "12px", color: "#4ade80" }} />
-                <h3 style={{ marginTop: 0, fontSize: "22px" }}>AI Optimization</h3>
+                <ShieldCheck
+                  size={22}
+                  style={{ marginBottom: "12px", color: "#4ade80" }}
+                />
+                <h3 style={{ marginTop: 0, fontSize: "22px" }}>
+                  AI Optimization
+                </h3>
                 <p style={{ color: "#cbd5e1", lineHeight: 1.6 }}>
-                  Generates a stronger, more ATS-friendly CV version tailored to the role.
+                  Generates a stronger, more ATS-friendly CV version tailored to
+                  the role.
                 </p>
               </div>
             </section>
@@ -942,7 +1067,9 @@ ${seniority || "Not specified"}
               <div style={styles.card}>
                 <h2 style={{ marginTop: 0, fontSize: "28px" }}>Pricing</h2>
 
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <div
+                  style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}
+                >
                   <div
                     style={{
                       border: "1px solid #334155",
@@ -951,16 +1078,22 @@ ${seniority || "Not specified"}
                       background: "#111827",
                     }}
                   >
-                    <div style={{ fontSize: "18px", fontWeight: 800, marginBottom: "8px" }}>
+                    <div
+                      style={{ fontSize: "18px", fontWeight: 800, marginBottom: "8px" }}
+                    >
                       Free
                     </div>
-                    <div style={{ fontSize: "34px", fontWeight: 900, marginBottom: "10px" }}>
+                    <div
+                      style={{ fontSize: "34px", fontWeight: 900, marginBottom: "10px" }}
+                    >
                       $0
                     </div>
                     <div style={{ color: "#cbd5e1", marginBottom: "14px" }}>
                       For students and first-time users.
                     </div>
-                    <ul style={{ paddingLeft: "18px", color: "#e2e8f0", lineHeight: 1.8 }}>
+                    <ul
+                      style={{ paddingLeft: "18px", color: "#e2e8f0", lineHeight: 1.8 }}
+                    >
                       <li>CV vs JD analysis</li>
                       <li>ATS score</li>
                       <li>Skill gap detection</li>
@@ -976,10 +1109,14 @@ ${seniority || "Not specified"}
                       background: "#172554",
                     }}
                   >
-                    <div style={{ fontSize: "18px", fontWeight: 800, marginBottom: "8px" }}>
+                    <div
+                      style={{ fontSize: "18px", fontWeight: 800, marginBottom: "8px" }}
+                    >
                       Pro
                     </div>
-                    <div style={{ fontSize: "34px", fontWeight: 900, marginBottom: "10px" }}>
+                    <div
+                      style={{ fontSize: "34px", fontWeight: 900, marginBottom: "10px" }}
+                    >
                       $12/mo
                     </div>
                     <div style={{ color: "#dbeafe", marginBottom: "14px" }}>
@@ -1015,7 +1152,8 @@ ${seniority || "Not specified"}
                 </div>
 
                 <div style={{ marginTop: "18px", color: "#94a3b8", fontSize: "14px" }}>
-                  Waitlist size: <strong style={{ color: "white" }}>{waitlist.length}</strong>
+                  Waitlist size:{" "}
+                  <strong style={{ color: "white" }}>{waitlist.length}</strong>
                 </div>
               </div>
             </section>
@@ -1026,10 +1164,13 @@ ${seniority || "Not specified"}
           <section style={{ ...styles.card, maxWidth: "560px", margin: "40px auto" }}>
             <h2 style={{ marginTop: 0, fontSize: "32px" }}>Login to HireFit</h2>
             <p style={{ color: "#cbd5e1", lineHeight: 1.6 }}>
-              This is a lightweight local login state for MVP purposes. Real auth comes next with Supabase or Clerk.
+              This is a lightweight local login state for MVP purposes. Real auth
+              comes next with Supabase or Clerk.
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "18px" }}>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "14px", marginTop: "18px" }}
+            >
               <input
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -1099,64 +1240,12 @@ ${seniority || "Not specified"}
                 gap: "18px",
               }}
             >
-              <div style={styles.card}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "14px",
-                  }}
-                >
-                  <h3 style={{ margin: 0, fontSize: "24px" }}>Recent analyses</h3>
-                  <button
-                    onClick={clearHistory}
-                    style={{
-                      background: "#7f1d1d",
-                      color: "#fee2e2",
-                      border: "none",
-                      borderRadius: "10px",
-                      padding: "10px 12px",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Clear
-                  </button>
-                </div>
-
-                {history.length === 0 ? (
-                  <div style={{ color: "#94a3b8" }}>No analyses yet.</div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                    {history.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => loadHistoryItem(item)}
-                        style={{
-                          textAlign: "left",
-                          background: "#0f172a",
-                          border: "1px solid #334155",
-                          borderRadius: "14px",
-                          padding: "14px",
-                          cursor: "pointer",
-                          color: "white",
-                        }}
-                      >
-                        <div style={{ fontWeight: 800, marginBottom: "6px", fontSize: "18px" }}>
-                          {item.role}
-                        </div>
-                        <div style={{ color: "#cbd5e1", marginBottom: "4px" }}>
-                          Score: {item.score}/100
-                        </div>
-                        <div style={{ color: "#94a3b8", fontSize: "13px" }}>
-                          {item.createdAt}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <HistoryList
+                history={history}
+                onLoadItem={loadHistoryItem}
+                onClear={clearHistory}
+                compact={false}
+              />
 
               <div style={styles.card}>
                 <h3 style={{ marginTop: 0, fontSize: "24px" }}>SaaS roadmap</h3>
@@ -1454,14 +1543,20 @@ ${seniority || "Not specified"}
                       <h3 style={{ marginTop: 0, marginBottom: "16px" }}>Job Intelligence</h3>
 
                       <div style={{ marginBottom: "12px" }}>
-                        <div style={{ color: "#94a3b8", fontSize: "13px", marginBottom: "4px" }}>
+                        <div
+                          style={{ color: "#94a3b8", fontSize: "13px", marginBottom: "4px" }}
+                        >
                           ROLE TYPE
                         </div>
-                        <div style={{ fontWeight: 800, fontSize: "18px" }}>{roleType || "—"}</div>
+                        <div style={{ fontWeight: 800, fontSize: "18px" }}>
+                          {roleType || "—"}
+                        </div>
                       </div>
 
                       <div>
-                        <div style={{ color: "#94a3b8", fontSize: "13px", marginBottom: "4px" }}>
+                        <div
+                          style={{ color: "#94a3b8", fontSize: "13px", marginBottom: "4px" }}
+                        >
                           SENIORITY
                         </div>
                         <div style={{ fontWeight: 800, fontSize: "18px" }}>
@@ -1651,95 +1746,12 @@ ${seniority || "Not specified"}
                   top: "20px",
                 }}
               >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "14px",
-                  }}
-                >
-                  <h3
-                    style={{
-                      margin: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                      fontSize: "18px",
-                    }}
-                  >
-                    <History size={18} />
-                    Previous Analyses
-                  </h3>
-
-                  <button
-                    onClick={clearHistory}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      background: "#7f1d1d",
-                      color: "#fee2e2",
-                      border: "none",
-                      borderRadius: "8px",
-                      padding: "8px 10px",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                      fontSize: "12px",
-                    }}
-                  >
-                    <Trash2 size={14} />
-                    Clear
-                  </button>
-                </div>
-
-                {history.length === 0 ? (
-                  <div style={{ color: "#94a3b8", fontSize: "14px" }}>
-                    No saved analyses yet.
-                  </div>
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                    {history.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => loadHistoryItem(item)}
-                        style={{
-                          textAlign: "left",
-                          background: "#0f172a",
-                          border: "1px solid hsl(215, 25%, 27%)",
-                          borderRadius: "12px",
-                          padding: "12px",
-                          cursor: "pointer",
-                          color: "white",
-                        }}
-                      >
-                        <div style={{ fontWeight: 800, marginBottom: "4px", fontSize: "18px" }}>
-                          {item.role}
-                        </div>
-                        <div style={{ fontSize: "13px", color: "#cbd5e1", marginBottom: "4px" }}>
-                          Score: {item.score}/100
-                        </div>
-                        <div style={{ fontSize: "12px", color: "#94a3b8" }}>
-                          {item.createdAt}
-                        </div>
-
-                        <div style={{ marginTop: "6px" }}>
-  <a
-    href={`/report/${item.id}`}
-    target="_blank"
-    style={{
-      fontSize: "12px",
-      color: "#60a5fa",
-      textDecoration: "none"
-    }}
-  >
-    View Report →
-  </a>
-</div>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <HistoryList
+                  history={history}
+                  onLoadItem={loadHistoryItem}
+                  onClear={clearHistory}
+                  compact={true}
+                />
               </div>
             </aside>
           </div>
@@ -1749,4 +1761,81 @@ ${seniority || "Not specified"}
   );
 }
 
-console.log("SUPABASE URL:", import.meta.env.VITE_SUPABASE_URL);
+function ReportPage() {
+  const { id } = useParams();
+
+  const [report, setReport] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchReport = async () => {
+      const { data, error } = await supabase
+        .from("analyses")
+        .select("*")
+        .eq("id", id)
+        .single();
+
+      if (error) {
+        console.error("Report fetch error:", error);
+      } else {
+        setReport(data.report);
+      }
+
+      setLoading(false);
+    };
+
+    fetchReport();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "linear-gradient(180deg, #081227 0%, #0f172a 100%)",
+          color: "white",
+          padding: "40px",
+          fontFamily: "Inter, sans-serif",
+        }}
+      >
+        Loading report...
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "linear-gradient(180deg, #081227 0%, #0f172a 100%)",
+        color: "white",
+        padding: "40px",
+        fontFamily: "Inter, sans-serif",
+      }}
+    >
+      <h1>HireFit Report</h1>
+
+      <pre
+        style={{
+          whiteSpace: "pre-wrap",
+          fontFamily: "monospace",
+          marginTop: 20,
+          lineHeight: 1.6,
+        }}
+      >
+        {report}
+      </pre>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<MainApp />} />
+        <Route path="/report/:id" element={<ReportPage />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
