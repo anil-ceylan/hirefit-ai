@@ -1,5 +1,7 @@
 import supabase from "./supabaseClient";
 import React, { useEffect, useMemo, useState } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+<Route path="/report/:id" element={<ReportPage />} />
 
 import {
   Sparkles,
@@ -1704,7 +1706,7 @@ ${seniority || "Not specified"}
                         style={{
                           textAlign: "left",
                           background: "#0f172a",
-                          border: "1px solid #334155",
+                          border: "1px solid hsl(215, 25%, 27%)",
                           borderRadius: "12px",
                           padding: "12px",
                           cursor: "pointer",
@@ -1720,6 +1722,20 @@ ${seniority || "Not specified"}
                         <div style={{ fontSize: "12px", color: "#94a3b8" }}>
                           {item.createdAt}
                         </div>
+
+                        <div style={{ marginTop: "6px" }}>
+  <a
+    href={`/report/${item.id}`}
+    target="_blank"
+    style={{
+      fontSize: "12px",
+      color: "#60a5fa",
+      textDecoration: "none"
+    }}
+  >
+    View Report →
+  </a>
+</div>
                       </button>
                     ))}
                   </div>
