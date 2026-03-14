@@ -1,5 +1,5 @@
-import supabase from "./supabaseClient";
-import React, { useEffect, useMemo, useState } from "react";
+import { supabase } from "./supabaseClient";
+import { useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Routes, Route, useParams } from "react-router-dom";
 
 import {
@@ -278,7 +278,7 @@ function HistoryList({ history, onLoadItem, onClear, compact = false }) {
   );
 }
 
-function MainApp() {
+function MainApp() {  
   const [view, setView] = useState("landing");
   const [user, setUser] = useState(null);
   const [plan] = useState("Free");
@@ -289,6 +289,9 @@ function MainApp() {
 
   const [cvText, setCvText] = useState("");
   const [jdText, setJdText] = useState("");
+
+  const [jobUrl, setJobUrl] = useState("");
+  const [extractingJob, setExtractingJob] = useState(false);
 
   const [result, setResult] = useState("");
   const [optimizedCv, setOptimizedCv] = useState("");
@@ -309,7 +312,52 @@ function MainApp() {
   const [topKeywords, setTopKeywords] = useState([]);
 
   const [history, setHistory] = useState([]);
-  const [waitlist, setWaitlist] = useState([]);
+const [waitlist, setWaitlist] = useState([]);
+
+const extractJobFromUrl = async () => {
+
+  if (!jobUrl.trim()) {
+    setError("Please paste a job URL first.");
+    return;
+  }
+
+  setExtractingJob(true);
+  setError("");
+
+  try {
+
+    const res = await fetch("/api/extract-job", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ url: jobUrl })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.error || "Extraction failed");
+    }
+
+    setJdText(data.text);
+
+  } catch (err) {
+
+    console.error(err);
+
+    setError(
+      "Could not extract job description automatically. Paste JD manually."
+    );
+
+  } finally {
+
+    setExtractingJob(false);
+
+  }
+};
+
+const parseBullets = (text, sectionName) => {
 
   const parseBullets = (text, sectionName) => {
     const regex = new RegExp(
@@ -1388,6 +1436,25 @@ ${seniority || "Not specified"}
                     value={jdText}
                     onChange={(e) => setJdText(e.target.value)}
                   />
+
+                  <div style={{ marginBottom: "12px" }}>
+  <input
+    value={jobUrl}
+    onChange={(e) => setJobUrl(e.target.value)}
+    placeholder="Paste job URL (LinkedIn, company careers page)"
+    style={styles.input}
+  />
+</div>
+
+<div style={{ marginBottom: "12px" }}>
+  <button
+    onClick={extractJobFromUrl}
+    disabled={extractingJob}
+    style={styles.buttonSecondary}
+  >
+    {extractingJob ? "Extracting Job..." : "Extract Job From URL"}
+  </button>
+</div>
                 </div>
               </div>
 
@@ -1788,29 +1855,16 @@ function ReportPage() {
   }, [id]);
 
   if (loading) {
-    return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "linear-gradient(180deg, #081227 0%, #0f172a 100%)",
-          color: "white",
-          padding: "40px",
-          fontFamily: "Inter, sans-serif",
-        }}
-      >
-        Loading report...
-      </div>
-    );
+    return <div style={{ padding: 40, color: "white" }}>Loading report...</div>;
   }
 
   return (
     <div
       style={{
-        minHeight: "100vh",
         background: "linear-gradient(180deg, #081227 0%, #0f172a 100%)",
         color: "white",
         padding: "40px",
-        fontFamily: "Inter, sans-serif",
+        fontFamily: "Inter, sans-serif"
       }}
     >
       <h1>HireFit Report</h1>
@@ -1820,7 +1874,7 @@ function ReportPage() {
           whiteSpace: "pre-wrap",
           fontFamily: "monospace",
           marginTop: 20,
-          lineHeight: 1.6,
+          lineHeight: 1.6
         }}
       >
         {report}
