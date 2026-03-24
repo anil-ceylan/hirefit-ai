@@ -813,14 +813,26 @@ function MainApp() {
     } catch (err) { console.error(err); }
   };
 
-  const callGemini = async (systemPrompt, userQuery) => {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${API_KEY}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ contents: [{ parts: [{ text: userQuery }] }], systemInstruction: { parts: [{ text: systemPrompt }] } }) });
-    if (!res.ok) { const e = await res.text(); throw new Error(`API ${res.status}: ${e}`); }
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error("No response from Gemini.");
-    return text;
-  };
+  const analyzeWithBackend = async (cvText, jobDescription) => {
+  const res = await fetch("http://localhost:3000/analyze", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      cvText,
+      jobDescription,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Backend error");
+  }
+
+  return await res.json();
+};
+   
+  
 
   useEffect(() => {
     const savedUser = localStorage.getItem("hirefit-user");
@@ -867,21 +879,31 @@ function MainApp() {
     setLoading(true); setError(""); setResult(""); setOptimizedCv(""); setLearningPlan("");
     setAlignmentScore(null); setMatchedSkills([]); setMissingSkills([]); setTopKeywords([]); setRoleType(""); setSeniority("");
     const systemPrompt = `You are an expert recruiter and ATS analyst. Analyze the CV against the job description and return EXACTLY this structure:\n\nFit Summary:\n[paragraph]\n\nRole Type:\n[role only]\n\nSeniority:\n[level only]\n\nFinal Alignment Score:\n[number 0-100]\n\nMatched Skills:\n- [skill]\n\nMissing Skills:\n- [skill]\n\nTop Keywords:\n- [keyword]\n\nStrengths:\n- [bullet]\n\nImprovement Suggestions:\n- [bullet]`;
-    try {
-      const text = await callGemini(systemPrompt, `JOB DESCRIPTION:\n${jdText}\n\nCANDIDATE CV:\n${cvText}`);
-      setResult(text);
-      extractDataFromReport(text);
-      const scoreMatch = text.match(/Final Alignment Score:\s*(\d+)/i);
-      const score = scoreMatch ? Number(scoreMatch[1]) : null;
-      const role = parseSingleLine(text, "Role Type") || "Untitled Analysis";
+
       try {
-        const { error: saveError } = await supabase.from("analyses").insert([{ user_email: user?.email || null, role, alignment_score: score, cv_text: cvText, job_description: jdText, report: text, created_at: new Date().toISOString() }]).select();
-        if (!saveError) await fetchAnalyses();
-      } catch {}
-      setHistory((prev) => [{ id: Date.now(), createdAt: new Date().toLocaleString(), role, score: score || "N/A", cvText, jdText, report: text }, ...prev].slice(0, 10));
-      setView("app");
-    } catch { setError("Analysis failed. Check your API key or network."); }
-    finally { setLoading(false); }
+  const res = await fetch("http://localhost:3000/analyze", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      cvText,
+      jobDescription: jdText,
+    }),
+  });
+
+  const data = await res.json();
+  console.log("BACKEND:", data);
+
+  setResult(JSON.stringify(data, null, 2));
+  setView("app");
+
+} catch {
+  setError("Analysis failed. Check your API key or network.");
+} finally {
+  setLoading(false);
+}
+            
   };
 
   const optimizeCv = async () => {

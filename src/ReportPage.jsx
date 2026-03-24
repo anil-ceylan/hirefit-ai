@@ -61,29 +61,18 @@ export default function ReportPage() {
     <div style={{ minHeight:"100vh", background:"#0f172a", color:"white",
       fontFamily:"Inter, sans-serif", padding:"40px 20px" }}>
       <div style={{ maxWidth:860, margin:"0 auto" }}>
+        <div style={{ background: "red", padding: 20 }}>
+  TEST COMPONENT
+</div>
 
         {/* Header */}
+
         <div style={{ marginBottom:32 }}>
           <h1 style={{ fontSize:32, fontWeight:800, margin:"0 0 8px 0" }}>
             {report.role || "CV Analysis"}
           </h1>
           <p style={{ color:"#64748b", margin:0 }}>AI-powered resume analysis by HireFit</p>
         </div>
-
-        {/* 🔥 NEW: Hire Score */}
-<HireScore 
-  probability={report?.hireProbability || 62}
-  confidence={report?.confidence || "Medium"}
-/>
-
-{/* 🔥 NEW: Rejection Reasons */}
-<RejectionPanel 
-  reasons={report?.rejectionReasons || {
-    high: ["No measurable impact"],
-    medium: ["Weak experience depth"],
-    low: ["Formatting issues"]
-  }}
-/>
 
         {/* Share Buttons */}
         <div style={{ display:"flex", gap:12, marginBottom:28, flexWrap:"wrap" }}>
@@ -105,6 +94,20 @@ export default function ReportPage() {
             Share on LinkedIn
           </a>
         </div>
+        
+<HireScore 
+  probability={report?.hireProbability || 62}
+  confidence={report?.confidence || "Medium"}
+/>
+
+<RejectionPanel 
+  reasons={report?.rejectionReasons || {
+    high: ["No measurable impact"],
+    medium: ["Weak experience depth"],
+    low: ["Formatting issues"]
+  }}
+/>
+
 
         {/* Score Card */}
         <div style={{ ...card, display:"flex", alignItems:"center", gap:32, flexWrap:"wrap" }}>
