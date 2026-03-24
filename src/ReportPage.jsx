@@ -1,6 +1,8 @@
 import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import supabase from "../supabaseClient";
+import supabase from "./supabaseClient";
+import RejectionPanel from "./components/RejectionPanel";
+import HireScore from "./components/HireScore";
 
 export default function ReportPage() {
   const { id } = useParams();
@@ -67,6 +69,21 @@ export default function ReportPage() {
           </h1>
           <p style={{ color:"#64748b", margin:0 }}>AI-powered resume analysis by HireFit</p>
         </div>
+
+        {/* 🔥 NEW: Hire Score */}
+<HireScore 
+  probability={report?.hireProbability || 62}
+  confidence={report?.confidence || "Medium"}
+/>
+
+{/* 🔥 NEW: Rejection Reasons */}
+<RejectionPanel 
+  reasons={report?.rejectionReasons || {
+    high: ["No measurable impact"],
+    medium: ["Weak experience depth"],
+    low: ["Formatting issues"]
+  }}
+/>
 
         {/* Share Buttons */}
         <div style={{ display:"flex", gap:12, marginBottom:28, flexWrap:"wrap" }}>
