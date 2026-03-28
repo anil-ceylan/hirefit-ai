@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   const missing = (data?.missing_skills || []).slice(0, 3).join(", ") || "None";
 
   const title = `${role} — ${score}/100 ${verdict} | HireFit`;
-  const description = `ATS Score: ${score}/100 · ${verdict} · Missing skills: ${missing}. Analyzed with HireFit AI.`;
+  const description = `ATS Score: ${score}/100 - ${verdict} - Missing: ${missing}. Analyzed with HireFit AI.`;
   const image = `https://hirefit-ai.vercel.app/og-default.png`;
 
   res.setHeader("Content-Type", "text/html");
