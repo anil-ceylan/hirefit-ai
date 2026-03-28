@@ -1,19 +1,17 @@
 import supabase from "./supabaseClient";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
 import {
   Sparkles, FileText, Briefcase, AlertCircle, Loader2,
   Upload, Copy, Wand2, Target, Search, History, Trash2,
-  CheckCircle2, BarChart3, ShieldCheck, Crown, ArrowRight,
-  LogIn, LogOut, Download, Mail, Zap, Star, TrendingUp,
+  CheckCircle2, ArrowRight, LogIn, LogOut, Download, Mail,
+  Zap, Star, TrendingUp, Crown,
 } from "lucide-react";
+
 import * as pdfjsLib from "pdfjs-dist";
+import workerSrc from "pdfjs-dist/build/pdf.worker?url";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-
-const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-const MODEL = "gemini-2.5-flash";
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 const T = {
   bg: "#060910",
@@ -40,24 +38,19 @@ const globalStyles = `
   .hf-card { background: ${T.bgCard}; border: 1px solid ${T.border}; border-radius: 16px; transition: all 0.25s ease; }
   .hf-card:hover { background: ${T.bgCardHover}; border-color: rgba(255,255,255,0.12); }
   .hf-feature-card { background: ${T.bgCard}; border: 1px solid ${T.border}; border-radius: 20px; padding: 32px; transition: all 0.3s ease; position: relative; overflow: hidden; }
-  .hf-feature-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(59,130,246,0.5), transparent); opacity: 0; transition: opacity 0.3s ease; }
   .hf-feature-card:hover { background: ${T.bgCardHover}; border-color: rgba(59,130,246,0.2); transform: translateY(-4px); box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px ${T.blueGlow}; }
-  .hf-feature-card:hover::before { opacity: 1; }
   .hf-input { width: 100%; padding: 13px 16px; border-radius: 10px; border: 1px solid ${T.border}; background: rgba(255,255,255,0.03); color: white; outline: none; font-family: 'DM Sans', sans-serif; font-size: 14px; transition: border-color 0.2s; }
   .hf-input:focus { border-color: rgba(59,130,246,0.5); }
   .hf-input::placeholder { color: ${T.textMuted}; }
-  .hf-textarea { width: 100%; height: 300px; padding: 16px; border-radius: 12px; border: 1px solid ${T.border}; background: rgba(255,255,255,0.02); color: white; resize: none; outline: none; font-family: 'DM Sans', sans-serif; font-size: 14px; line-height: 1.6; transition: border-color 0.2s; }
+  .hf-textarea { width: 100%; padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.2); color: white; resize: none; outline: none; font-family: 'DM Sans', sans-serif; font-size: 13px; line-height: 1.6; transition: border-color 0.2s; flex: 1; min-height: 0; }
   .hf-textarea:focus { border-color: rgba(59,130,246,0.5); }
-  .hf-textarea::placeholder { color<div style={{ ...styles.container, position: "relative", zIndex: 2, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", margin: "0 auto", padding "0 24px" }}>: ${T.textMuted}; }
+  .hf-textarea::placeholder { color: ${T.textMuted}; }
   .pricing-card { border-radius: 20px; padding: 32px; transition: all 0.3s ease; }
-  .pricing-card.free { background: rgba(255,255,255,0.02); border: 1px solid ${T.border}; }
-  .pricing-card.pro { background: linear-gradient(145deg, rgba(59,130,246,0.12), rgba(139,92,246,0.08)); border: 1px solid rgba(99,102,241,0.35); position: relative; overflow: hidden; }
-  .pricing-card.pro::after { content: 'POPULAR'; position: absolute; top: 16px; right: -28px; background: ${T.blue}; color: white; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; padding: 4px 36px; transform: rotate(45deg); }
   .pricing-card:hover { transform: translateY(-4px); }
   .nav-link { padding: 8px 14px; border-radius: 8px; color: ${T.textSub}; font-size: 14px; font-weight: 500; cursor: pointer; border: none; background: transparent; font-family: 'DM Sans', sans-serif; transition: all 0.15s ease; }
   .nav-link:hover { color: white; background: rgba(255,255,255,0.06); }
   .nav-link.active { color: white; }
-  .grid-bg { background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 48px 48px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 `;
 
 const styles = {
@@ -77,14 +70,6 @@ function ProgressBar({ value, color = T.blue }) {
     <div style={{ flex: 1, height: "6px", background: "rgba(255,255,255,0.08)", borderRadius: 999, overflow: "hidden" }}>
       <div style={{ width: `${Math.max(0, Math.min(100, value))}%`, height: "100%", background: color, borderRadius: 999, transition: "width 0.6s ease" }} />
     </div>
-  );
-}
-
-function Badge({ children, bg, color }) {
-  return (
-    <span style={{ padding: "6px 12px", borderRadius: 999, background: bg, color, fontWeight: 600, fontSize: "13px", display: "inline-flex", alignItems: "center", gap: 6 }}>
-      {children}
-    </span>
   );
 }
 
@@ -141,34 +126,417 @@ function parseBullets(text, sectionName) {
   return match[1].split("\n").map((l) => l.replace(/^[-•\s*]+/, "").trim()).filter(Boolean);
 }
 
+function ProgressStepper({ cvText, jdText, loading, analysisData }) {
+  const steps = [
+    { label: "Paste CV", done: cvText.trim().length > 50 },
+    { label: "Paste JD", done: jdText.trim().length > 50 },
+    { label: "Analyze", done: !!analysisData, loading: loading },
+  ];
+  const activeIndex = steps.findIndex(s => !s.done);
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 0, marginBottom: 16, padding: "12px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12 }}>
+      {steps.map((step, i) => (
+        <div key={i} style={{ display: "flex", alignItems: "center", flex: i < steps.length - 1 ? 1 : "none" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{
+              width: 24, height: 24, borderRadius: "50%", display: "grid", placeItems: "center", flexShrink: 0,
+              background: step.done ? "#10b981" : step.loading ? "#3b82f6" : i === activeIndex ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${step.done ? "#10b981" : step.loading ? "#3b82f6" : i === activeIndex ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.08)"}`,
+              transition: "all 0.3s ease",
+            }}>
+              {step.loading
+                ? <div style={{ width: 10, height: 10, borderRadius: "50%", border: "2px solid #3b82f6", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
+                : step.done
+                ? <span style={{ fontSize: 11, color: "white", fontWeight: 700 }}>✓</span>
+                : <span style={{ fontSize: 11, color: i === activeIndex ? "#a78bfa" : "#334155", fontWeight: 700 }}>{i + 1}</span>}
+            </div>
+            <span style={{ fontSize: 12, fontWeight: 600, color: step.done ? "#10b981" : step.loading ? "#60a5fa" : i === activeIndex ? "#e2e8f0" : "#334155", whiteSpace: "nowrap" }}>
+              {step.label}
+            </span>
+          </div>
+          {i < steps.length - 1 && (
+            <div style={{ flex: 1, height: 1, margin: "0 12px", background: step.done ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.06)", transition: "background 0.3s ease" }} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function parseSingleLine(text, sectionName) {
   const match = text.match(new RegExp(`${sectionName}:\\s*(.+)`, "i"));
   return match ? match[1].trim() : "";
 }
 
-function NavBar({ view, setView, user, logout }) {
+function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywords, result, optimizedCv, learningPlan, downloadText }) {
+  useEffect(() => {
+    if (!document.getElementById("db-fonts")) {
+      const el = document.createElement("style");
+      el.id = "db-fonts";
+      el.textContent = `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');`;
+      document.head.appendChild(el);
+    }
+  }, []);
+
+  const [displayScore, setDisplayScore] = useState(0);
+
+  useEffect(() => {
+    setDisplayScore(0);
+    const steps = 60;
+    const increment = score / steps;
+    let current = 0;
+    const timer = setInterval(() => {
+      current += increment;
+      if (current >= score) {
+        setDisplayScore(score);
+        clearInterval(timer);
+      } else {
+        setDisplayScore(Math.floor(current));
+      }
+    }, 1200 / steps);
+    return () => clearInterval(timer);
+  }, [score]);
+
+  const verdict = score >= 80 ? "Strong Match" : score >= 60 ? "Moderate Match" : "Needs Work";
+
+  const DB = {
+    root: { background: "#080808", borderRadius: 20, padding: 28, marginBottom: 16, fontFamily: "'Space Grotesk', sans-serif" },
+    hero: { border: "1px solid #1c1c1c", borderRadius: 20, padding: "28px 32px", marginBottom: 20, display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 32, alignItems: "center", background: "#0c0c0c", position: "relative", overflow: "hidden" },
+    grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 },
+    grid3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 0 },
+    grid4: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 24 },
+    card: { border: "1px solid #1c1c1c", borderRadius: 16, padding: 22, background: "#0c0c0c", position: "relative", overflow: "hidden" },
+    statCard: { border: "1px solid #1c1c1c", borderRadius: 12, padding: "16px 18px", background: "#0c0c0c", position: "relative", overflow: "hidden" },
+    sectionHeader: { display: "flex", alignItems: "center", gap: 12, marginBottom: 14, marginTop: 4 },
+    cardTag: { fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10, color: "#d4af37" },
+    moreLink: { fontSize: 12, color: "#d4af37", fontWeight: 700, marginTop: 12, letterSpacing: "0.04em", opacity: 0.7 },
+  };
+
   return (
-    <nav style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(6,9,16,0.85)", backdropFilter: "blur(20px)", borderBottom: `1px solid ${T.border}` }}>
-      <div style={{ ...styles.container, display: "flex", alignItems: "center", justifyContent: "space-between", height: "64px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => setView("landing")}>
-          <div style={{ width: 34, height: 34, borderRadius: 10, background: "linear-gradient(135deg, #3b82f6, #6366f1)", display: "grid", placeItems: "center", boxShadow: `0 0 20px ${T.blueGlow}` }}>
-            <Sparkles size={16} color="white" />
+    <>
+      <div style={DB.root}>
+
+        {/* HERO */}
+        <div style={DB.hero}>
+          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "linear-gradient(180deg, #d4af37, #b8860b, #8b6914)", borderRadius: "3px 0 0 3px" }} />
+          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(212,175,55,0.4), transparent)" }} />
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+            <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 76, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", background: "linear-gradient(135deg, #f0d060, #d4af37, #b8860b)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{displayScore}</div>
+            <div style={{ fontSize: 11, color: "#7a7a7a", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>out of 100</div>
+            <div style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 4, background: "rgba(212,175,55,0.08)", color: "#d4af37", border: "1px solid rgba(212,175,55,0.2)", marginTop: 6, letterSpacing: "0.06em", textTransform: "uppercase" }}>{verdict}</div>
           </div>
-          <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "18px", letterSpacing: "-0.01em" }}>HireFit</span>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#d4af37", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>{data.role_type || "Role"}</div>
+            <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 26, color: "#e8e8e8", lineHeight: 1.3, marginBottom: 12, fontStyle: "italic" }}>
+              {score >= 80
+                ? "You're a strong match — polish the details and apply with confidence."
+                : score >= 60
+                ? <span>You're close — but <span style={{ fontStyle: "normal", color: "#f87171" }}>{(data.missing_skills || []).length} gaps</span> are keeping you out of the yes pile.</span>
+                : <span>Significant gaps detected — <span style={{ fontStyle: "normal", color: "#f87171" }}>but all fixable.</span></span>}
+            </div>
+            <div style={{ fontSize: 13, color: "#7a7a7a", lineHeight: 1.65 }}>{data.fit_summary || ""}</div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+            <div style={{ fontSize: 10, color: "#7a7a7a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700 }}>AI Confidence</div>
+            <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 38, color: "#d4af37", lineHeight: 1 }}>{data.confidence_score || (data.confidence_level === "High" ? 78 : data.confidence_level === "Medium" ? 62 : 45)}%</div>
+            <div style={{ width: 110, height: 3, background: "#1c1c1c", borderRadius: 999, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${data.confidence_score || 70}%`, borderRadius: 999, background: "linear-gradient(90deg, #d4af37, #f0d060)" }} />
+            </div>
+            <div style={{ fontSize: 11, color: "#7a7a7a", textAlign: "right", lineHeight: 1.5 }}>{data.confidence_basis || (data.confidence_level + " confidence")}</div>
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <button className={`nav-link ${view === "landing" ? "active" : ""}`} onClick={() => setView("landing")}>Home</button>
-          <button className={`nav-link ${view === "app" ? "active" : ""}`} onClick={() => setView("app")}>Product</button>
-          <button className={`nav-link ${view === "dashboard" ? "active" : ""}`} onClick={() => setView("dashboard")}>Dashboard</button>
+
+        {/* STAT CARDS */}
+        <div style={DB.grid4}>
+          {[
+            { label: "Skills Match", val: data.score_breakdown?.skills_match ?? score, color: "#60a5fa", ctx: data.score_breakdown?.skills_explanation || `${(data.matched_skills || []).length} of ${(data.matched_skills || []).length + (data.missing_skills || []).length} matched` },
+            { label: "Keywords", val: data.score_breakdown?.keyword_match ?? 100, color: "#10b981", ctx: `${(data.top_keywords || []).length} keywords detected` },
+            { label: "Experience", val: data.score_breakdown?.experience_depth ?? Math.max(35, score - 10), color: "#f59e0b", ctx: data.score_breakdown?.experience_explanation || "Depth evaluated" },
+            { label: "Formatting", val: data.score_breakdown?.formatting ?? 75, color: "#60a5fa", ctx: data.language_analysis?.tone || "Formatting reviewed" },
+          ].map(({ label, val, color, ctx }) => (
+            <div key={label} style={DB.statCard}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(212,175,55,0.2), transparent)" }} />
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#d4af37", marginBottom: 6 }}>{label}</div>
+              <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 30, lineHeight: 1, color, marginBottom: 3 }}>{val}</div>
+              <div style={{ fontSize: 11, color: "#7a7a7a", fontWeight: 500 }}>{ctx}</div>
+            </div>
+          ))}
         </div>
-        <div>
+
+        {/* SECTION 01 */}
+        <div style={DB.sectionHeader}>
+          <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#d4af37", fontStyle: "italic" }}>01</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.14em" }}>Recruiter View</div>
+          <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(212,175,55,0.2), transparent)" }} />
+        </div>
+        <div style={DB.grid2}>
+          <div style={DB.card}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #f0d060)" }} />
+            <div style={DB.cardTag}>What the recruiter actually thinks</div>
+            <div style={{ borderLeft: "2px solid #d4af37", padding: "14px 16px", background: "rgba(212,175,55,0.03)", borderRadius: "0 10px 10px 0", marginBottom: 14 }}>
+              <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 15, color: "#8a8a8a", lineHeight: 1.7, fontStyle: "italic" }}>"{data.recruiter_simulation?.internal_monologue || data.fit_summary || "Analysis complete."}"</div>
+              <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700, marginTop: 8, letterSpacing: "0.04em" }}>— {data.recruiter_simulation?.sector || "Industry"} Recruiter · {data.seniority || "Junior"} level hiring</div>
+            </div>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 14px", borderRadius: 6, background: data.recruiter_simulation?.would_interview ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)", border: `1px solid ${data.recruiter_simulation?.would_interview ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)"}`, color: data.recruiter_simulation?.would_interview ? "#10b981" : "#f87171", fontSize: 12, fontWeight: 700 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: data.recruiter_simulation?.would_interview ? "#10b981" : "#f87171", display: "inline-block", flexShrink: 0 }} />
+              {data.recruiter_simulation?.decision || (data.recruiter_simulation?.would_interview ? "Would shortlist" : "Would not proceed")}
+            </div>
+            {(data.recruiter_simulation?.red_flags || []).length > 0 && (
+              <div style={DB.moreLink}>+ {data.recruiter_simulation.red_flags.length} red flag{data.recruiter_simulation.red_flags.length > 1 ? "s" : ""} detected →</div>
+            )}
+          </div>
+
+          <div style={DB.card}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #ef4444, #f97316)" }} />
+            <div style={DB.cardTag}>What you think is fine — but isn't</div>
+            {(data.blind_spots || (data.rejection_reasons?.high || []).map((r) => ({ issue: r, fix: "" }))).slice(0, 3).map((item, i) => (
+              <div key={i} style={{ display: "flex", gap: 12, marginBottom: 14, paddingBottom: 14, borderBottom: i < 2 ? "1px solid #1c1c1c" : "none" }}>
+                <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 22, color: "rgba(212,175,55,0.4)", flexShrink: 0, marginTop: -2 }}>{i + 1}</div>
+                <div>
+                  <div style={{ fontSize: 13, color: "#8a8a8a", lineHeight: 1.55, marginBottom: 6 }}>{item.issue || item}</div>
+                  {item.fix && <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.15)", borderRadius: 4, padding: "4px 10px", display: "inline-block" }}>→ {item.fix}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* SECTION 02 */}
+        <div style={DB.sectionHeader}>
+          <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#d4af37", fontStyle: "italic" }}>02</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.14em" }}>Deep Analysis</div>
+          <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(212,175,55,0.2), transparent)" }} />
+        </div>
+        <div style={DB.grid2}>
+          <div style={DB.card}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #10b981)" }} />
+            <div style={DB.cardTag}>You vs the candidate they're picturing</div>
+            <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, fontWeight: 800, color: "#e8e8e8", marginBottom: 16, lineHeight: 1.25 }}>
+              Gap is {data.benchmark?.gap_percentage || 35}%. <em style={{ color: "#8a8a8a", fontSize: 16 }}>Most of it is closeable.</em>
+            </div>
+            {(data.benchmark?.dimensions || [
+              { name: "Skills match", candidate_level: matchedSkills.length > 2 ? "Good" : "Basic", ideal_level: "Advanced" },
+              { name: "Impact proof", candidate_level: "Missing", ideal_level: "Quantified" },
+            ]).slice(0, 4).map((dim, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, paddingBottom: 10, borderBottom: i < 3 ? "1px solid #1c1c1c" : "none" }}>
+                <span style={{ fontSize: 12, color: "#7a7a7a", width: 100, flexShrink: 0, fontWeight: 500 }}>{dim.name}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 4, background: ["Strong ✓","Good"].includes(dim.candidate_level) ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)", color: ["Strong ✓","Good"].includes(dim.candidate_level) ? "#10b981" : "#f87171", border: `1px solid ${["Strong ✓","Good"].includes(dim.candidate_level) ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)"}` }}>{dim.candidate_level}</span>
+                <span style={{ fontSize: 10, color: "#5a5a5a", fontWeight: 700 }}>vs</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 4, background: "rgba(16,185,129,0.08)", color: "#10b981", border: "1px solid rgba(16,185,129,0.15)" }}>{dim.ideal_level}</span>
+              </div>
+            ))}
+            <div style={DB.moreLink}>Fix top 2 → estimated score: {score} → {data.benchmark?.before_after_estimate || Math.min(91, score + 9)} →</div>
+          </div>
+
+          <div style={DB.card}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #a78bfa)" }} />
+            <div style={DB.cardTag}>Roles where your CV also shines</div>
+            <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#e8e8e8", marginBottom: 16, lineHeight: 1.25 }}>
+              Your CV may open more doors here. <em style={{ color: "#8a8a8a", fontSize: 16 }}>Worth knowing before you apply.</em>
+            </div>
+            {(data.role_matches || []).slice(0, 4).map((r, i) => {
+              const colors = ["#10b981", "#60a5fa", "#f59e0b", "#555555"];
+              return (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                  <span style={{ fontFamily: "'Instrument Serif', serif", fontSize: 22, color: colors[i], width: 36, flexShrink: 0 }}>{r.match_score}</span>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: i < 3 ? "#c8c8c8" : "#6a6a6a", flex: 1 }}>{r.role}</span>
+                  <div style={{ width: `${r.match_score * 0.6}px`, height: 2, borderRadius: 999, background: i < 3 ? `linear-gradient(90deg, #d4af37, ${colors[i]})` : "#1c1c1c" }} />
+                </div>
+              );
+            })}
+            {(data.role_matches || []).length > 0 && (
+              <div style={{ marginTop: 12, fontSize: 12, color: "#7a7a7a", lineHeight: 1.5 }}>{data.role_matches[0]?.reason || ""}</div>
+            )}
+          </div>
+        </div>
+
+        {/* SECTION 03 */}
+        <div style={DB.sectionHeader}>
+          <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#d4af37", fontStyle: "italic" }}>03</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.14em" }}>Action Plan</div>
+          <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(212,175,55,0.2), transparent)" }} />
+        </div>
+        <div style={DB.grid2}>
+          <div style={DB.card}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #7c3aed)" }} />
+            <div style={DB.cardTag}>Interview Prep</div>
+            {(data.interview_prep || []).slice(0, 2).map((q, i) => (
+              <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i === 0 ? "1px solid #1c1c1c" : "none" }}>
+                <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 15, color: "#e8e8e8", lineHeight: 1.5, marginBottom: 5, fontStyle: "italic" }}>"{q.question}"</div>
+                <div style={{ fontSize: 11, color: "#7a7a7a", marginBottom: 4, fontWeight: 500 }}>{q.why_asked}</div>
+                <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>{q.personal_angle}</div>
+              </div>
+            ))}
+            {(data.interview_prep || []).length > 2 && (
+              <div style={DB.moreLink}>+ {data.interview_prep.length - 2} more questions →</div>
+            )}
+          </div>
+
+          <div style={DB.card}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #22d3ee)" }} />
+            <div style={DB.cardTag}>Market Intelligence</div>
+            {data.salary_insight && (
+              <>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#d4af37", marginBottom: 8 }}>Salary Insight</div>
+                <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 28, color: "#e8e8e8", lineHeight: 1, marginBottom: 3 }}>
+                  {data.salary_insight.currency === "TRY" ? "₺" : data.salary_insight.currency === "USD" ? "$" : "€"}{(data.salary_insight.range_min || 0).toLocaleString()} – {(data.salary_insight.range_max || 0).toLocaleString()}
+                </div>
+                <div style={{ fontSize: 12, color: "#7a7a7a", marginBottom: 14 }}>{data.role_type} · {data.seniority} · Mid: {data.salary_insight.currency === "TRY" ? "₺" : "$"}{(data.salary_insight.mid_point || 0).toLocaleString()}</div>
+                <div style={{ height: 1, background: "#1c1c1c", marginBottom: 14 }} />
+              </>
+            )}
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#d4af37", marginBottom: 10 }}>ATS Compatibility</div>
+            {(data.ats_compatibility || [
+              { system: "Workday", status: "Passes", note: "Keywords detected" },
+              { system: "Greenhouse", status: "Passes", note: "Format compatible" },
+              { system: "Lever", status: "Review", note: "Check PDF parsing" },
+            ]).slice(0, 3).map((ats, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < 2 ? "1px solid #1c1c1c" : "none" }}>
+                <span style={{ fontSize: 13, color: "#8a8a8a", fontWeight: 600 }}>{ats.system}</span>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: ats.status === "Passes" ? "#10b981" : ats.status === "Review" ? "#f59e0b" : "#f87171" }}>{ats.status === "Passes" ? "✓ Passes" : ats.status === "Review" ? "⚡ Review" : "✗ At Risk"}</div>
+                  <div style={{ fontSize: 11, color: "#7a7a7a", marginTop: 1 }}>{ats.note}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* SECTION 04 */}
+        <div style={DB.sectionHeader}>
+          <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#d4af37", fontStyle: "italic" }}>04</div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.14em" }}>Skills & Keywords</div>
+          <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(212,175,55,0.2), transparent)" }} />
+        </div>
+        <div style={DB.grid3}>
+          {[
+            { title: "Matched Skills", skills: matchedSkills, bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.15)", color: "#6ee7b7", titleColor: "#10b981" },
+            { title: "Missing Skills", skills: missingSkills, bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.15)", color: "#fca5a5", titleColor: "#f87171" },
+            { title: "Top Keywords", skills: topKeywords, bg: "rgba(212,175,55,0.08)", border: "rgba(212,175,55,0.15)", color: "#d4af37", titleColor: "#d4af37" },
+          ].map(({ title, skills, bg, border, color, titleColor }) => (
+            <div key={title} style={{ border: "1px solid #1c1c1c", borderRadius: 16, padding: 18, background: "#0c0c0c" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: titleColor, marginBottom: 12 }}>{title}</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {skills.length ? skills.map((s) => <span key={s} style={{ padding: "4px 10px", borderRadius: 999, background: bg, border: `1px solid ${border}`, color, fontSize: 11, fontWeight: 600 }}>{s}</span>) : <span style={{ color: "#5a5a5a", fontSize: 12 }}>None detected</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
+          <button className="hf-btn-ghost" onClick={() => navigator.clipboard.writeText(result)} style={{ fontSize: "12px", padding: "9px 16px", borderRadius: 8 }}><Copy size={12} />Copy Report</button>
+          <button className="hf-btn-ghost" onClick={() => downloadText(result, "hirefit-report.txt")} style={{ fontSize: "12px", padding: "9px 16px", borderRadius: 8 }}><Download size={12} />Download</button>
+        </div>
+      </div>
+
+      {optimizedCv && (
+  <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(34,211,238,0.12)", borderRadius: 20, padding: 24, marginBottom: 14 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+      <div style={{ fontSize: "13px", fontWeight: 700, color: T.cyan }}>✦ CV Comparison</div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="hf-btn-ghost" onClick={() => navigator.clipboard.writeText(optimizedCv)} style={{ fontSize: "12px", padding: "7px 14px", borderRadius: 8 }}><Copy size={12} />Copy Optimized</button>
+        <button className="hf-btn-ghost" onClick={() => downloadText(optimizedCv, "hirefit-optimized-cv.txt")} style={{ fontSize: "12px", padding: "7px 14px", borderRadius: 8 }}><Download size={12} />Download</button>
+      </div>
+    </div>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#f87171", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
+          Original CV
+        </div>
+        <div style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.1)", borderRadius: 12, padding: 16, maxHeight: 400, overflowY: "auto" }}>
+          <pre style={{ whiteSpace: "pre-wrap", fontFamily: "'DM Sans', sans-serif", fontSize: "12px", lineHeight: 1.8, color: "#64748b", margin: 0 }}>{result}</pre>
+        </div>
+      </div>
+      <div>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#10b981", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", display: "inline-block" }} />
+          Optimized CV
+        </div>
+        <div style={{ background: "rgba(16,185,129,0.04)", border: "1px solid rgba(16,185,129,0.1)", borderRadius: 12, padding: 16, maxHeight: 400, overflowY: "auto" }}>
+          <pre style={{ whiteSpace: "pre-wrap", fontFamily: "'DM Sans', sans-serif", fontSize: "12px", lineHeight: 1.8, color: "#94a3b8", margin: 0 }}>{optimizedCv}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
+
+
+
+      {learningPlan && (
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(16,185,129,0.12)", borderRadius: 20, padding: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: T.green }}>✦ Learning Roadmap</div>
+            <button className="hf-btn-ghost" onClick={() => navigator.clipboard.writeText(learningPlan)} style={{ fontSize: "12px", padding: "7px 14px", borderRadius: 8 }}><Copy size={12} />Copy</button>
+          </div>
+          <pre style={{ whiteSpace: "pre-wrap", fontFamily: "'DM Sans', sans-serif", fontSize: "13px", lineHeight: 1.8, color: "#94a3b8" }}>{learningPlan}</pre>
+        </div>
+      )}
+    </>
+  );
+}
+
+function NavBar({ view, user, logout, navigate }) {
+  const [scrolled, setScrolled] = useState(false);
+  const [hovered, setHovered] = useState(null);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll);
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (document.getElementById("navbar-styles-v2")) return;
+    const el = document.createElement("style");
+    el.id = "navbar-styles-v2";
+    el.textContent = `
+      @keyframes logoPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.4); } 50% { box-shadow: 0 0 0 8px rgba(99,102,241,0); } }
+      @keyframes navSlideIn { from { opacity:0; transform:translateY(-16px); } to { opacity:1; transform:translateY(0); } }
+      @keyframes gradientShift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+      .hf-nav-root { animation: navSlideIn 0.5s ease both; }
+      .hf-logo-wrap { animation: logoPulse 3s ease-in-out infinite; }
+      .hf-logo-wrap:hover { animation: none; }
+      .hf-nav-pill { padding: 9px 20px; border-radius: 10px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; transition: all 0.25s ease; position: relative; overflow: hidden; background: transparent; color: #475569; letter-spacing: 0.01em; }
+      .hf-nav-pill::before { content: ''; position: absolute; inset: 0; opacity: 0; background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(139,92,246,0.12)); transition: opacity 0.25s ease; }
+      .hf-nav-pill:hover { color: #cbd5e1; }
+      .hf-nav-pill:hover::before { opacity: 1; }
+      .hf-nav-pill.active { color: #0f172a !important; background: rgba(255,255,255,0.92) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+      .hf-nav-pill.active::after { content: ''; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 16px; height: 2px; background: linear-gradient(90deg, #3b82f6, #8b5cf6); border-radius: 999px; }
+      .hf-monogram { background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6, #ec4899); background-size: 300% 300%; animation: gradientShift 4s ease infinite; }
+    `;
+    document.head.appendChild(el);
+  }, []);
+
+  return (
+    <nav className="hf-nav-root" style={{ position: "sticky", top: 0, zIndex: 100, background: scrolled ? "rgba(6,9,16,0.94)" : "rgba(6,9,16,0.65)", backdropFilter: "blur(28px)", WebkitBackdropFilter: "blur(28px)", borderBottom: scrolled ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent", transition: "all 0.4s ease" }}>
+      <div style={{ ...styles.container, display: "flex", alignItems: "center", justifyContent: "space-between", height: "80px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }} onClick={() => navigate("/")}>
+          <div className="hf-logo-wrap hf-monogram" style={{ width: 48, height: 48, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden", flexShrink: 0, transform: hovered === "logo" ? "scale(1.1) rotate(-5deg)" : "scale(1)", transition: "transform 0.3s cubic-bezier(0.34,1.56,0.64,1)" }} onMouseEnter={() => setHovered("logo")} onMouseLeave={() => setHovered(null)}>
+            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,255,255,0.25) 0%, transparent 60%)", zIndex: 1 }} />
+            <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "18px", color: "white", letterSpacing: "-0.04em", position: "relative", zIndex: 2 }}>HF</span>
+          </div>
+          <div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "22px", letterSpacing: "-0.03em", lineHeight: 1.05, color: hovered === "logo" ? "#a78bfa" : "#f1f5f9", transition: "all 0.3s ease" }}>HireFit</div>
+            <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", lineHeight: 1, background: "linear-gradient(90deg, #3b82f6, #8b5cf6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>AI Resume</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 16, padding: "6px", boxShadow: "0 4px 32px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.05)" }}>
+          {[{ label: "Home", path: "/", viewKey: "landing" }, { label: "Product", path: "/app", viewKey: "app" }, { label: "Dashboard", path: "/dashboard", viewKey: "dashboard" }].map(({ label, path, viewKey }) => (
+            <button key={label} onClick={() => navigate(path)} className={`hf-nav-pill ${view === viewKey ? "active" : ""}`}>{label}</button>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {user ? (
-            <button className="hf-btn-ghost" onClick={logout}>
-              <LogOut size={14} />
-              <span style={{ maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.email}</span>
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0, background: "linear-gradient(135deg, #3b82f6, #8b5cf6)", display: "grid", placeItems: "center", fontSize: "14px", fontWeight: 800, color: "white", boxShadow: "0 0 16px rgba(99,102,241,0.5)", fontFamily: "'Syne', sans-serif" }}>
+                {user.email?.[0]?.toUpperCase()}
+              </div>
+              <button className="hf-btn-ghost" onClick={logout} style={{ padding: "9px 18px", fontSize: "13px" }}><LogOut size={13} /> Sign out</button>
+            </div>
           ) : (
-            <button className="hf-btn-primary" onClick={() => setView("login")} style={{ padding: "9px 20px", fontSize: "14px" }}>
+            <button className="hf-btn-primary" onClick={() => navigate("/login")} style={{ padding: "11px 24px", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 24px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.15)", borderRadius: 12 }}>
               <LogIn size={14} /> Login
             </button>
           )}
@@ -178,480 +546,134 @@ function NavBar({ view, setView, user, logout }) {
   );
 }
 
-function HeroSection({ setView }) {
-  const [step, setStep] = useState("idle");
-  const [fakeLoading, setFakeLoading] = useState(true);
+function HeroSection({ navigate }) {
   const [score, setScore] = useState(0);
-  const [targetScore, setTargetScore] = useState(0);
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [uploaded, setUploaded] = useState(false);
+  const [animating, setAnimating] = useState(false);
 
   useEffect(() => {
-    setTimeout(() => setFakeLoading(false), 2000);
-  }, []); 
-  
- useEffect(() => {
-  if (targetScore > 0) {
-    let i = 0;
+    if (!document.getElementById("hero-styles")) {
+      const el = document.createElement("style");
+      el.id = "hero-styles";
+      el.textContent = `
+        @keyframes heroFadeUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes floatY { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
+        @keyframes shimmer { 0%{background-position:-200% 0;} 100%{background-position:200% 0;} }
+        @keyframes orb1 { 0%,100%{transform:translate(0,0);} 33%{transform:translate(40px,-30px);} 66%{transform:translate(-20px,20px);} }
+        @keyframes orb2 { 0%,100%{transform:translate(0,0);} 33%{transform:translate(-30px,40px);} 66%{transform:translate(30px,-20px);} }
+        .hero-badge { animation: heroFadeUp 0.6s 0.1s ease both; }
+        .hero-h1 { animation: heroFadeUp 0.6s 0.2s ease both; }
+        .hero-desc { animation: heroFadeUp 0.6s 0.3s ease both; }
+        .hero-btns { animation: heroFadeUp 0.6s 0.4s ease both; }
+        .hero-card { animation: heroFadeUp 0.6s 0.5s ease both, floatY 5s 1s ease-in-out infinite; }
+        .hero-stat { transition: all 0.3s ease; }
+        .hero-stat:hover { transform: translateY(-2px); }
+        .score-ring-fill { transition: stroke-dashoffset 1.5s cubic-bezier(0.34,1.2,0.64,1); }
+        .shimmer-text { background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 25%, #f472b6 50%, #a78bfa 75%, #60a5fa 100%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 4s linear infinite; }
+      `;
+      document.head.appendChild(el);
+    }
+  }, []);
 
+  const handleDemoClick = () => {
+    setAnimating(true);
+    let i = 0;
+    const target = 78;
     const interval = setInterval(() => {
       i += 2;
-      setScore(i);
-
-      if (i >= targetScore) {
-        setScore(targetScore);
-        clearInterval(interval);
-      }
+      setScore(Math.min(i, target));
+      if (i >= target) { clearInterval(interval); setAnimating(false); }
     }, 20);
+  };
 
-    return () => clearInterval(interval);
-  }
-}, [targetScore]);
- 
-
-     const startFakeUpload = () => {
-      setUploading(true);
-      setUploadProgress(0);
-      setStep ("analyzing");
-
-      const fakeAIResult = {
-        score: 82
-      };
-
-      setTargetScore(fakeAIResult.score);
-
-      let progress = 0;
-
-      const interval = setInterval (() => {
-
-        progress += 10;
-        setUploadProgress(progress);
-
-        if (progress >= 30) setStep ("keywords");
-        if (progress >= 60) setStep ("matching");
-        if (progress >= 90) setStep ("finalizing");
-
-
-
-        if (progress >= 100) {
-          progress = 100;
-          clearInterval (interval);
-
-          setTimeout (() => {
-            setUploading (false);
-            setUploaded (true);
-            }, 500);
-           } 
-
-           setUploadProgress (progress);
-           
-          }, 300);
-
-          };
+  const r = 54;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (score / 100) * circ;
+  const scoreColor = score >= 80 ? "#10b981" : score >= 60 ? "#f59e0b" : "#3b82f6";
 
   return (
-    <section
-      className="grid-bg"
-      style={{
-        position: "relative",
-        padding: "1O8O 0 80px",
-        overflow: "hidden",
-      }}
-    >
-      {/* Background Glow */}
-      <div
-        style={{
-          position: "absolute",
-          top: "-100px",
-          left: "20%",
-          width: 500,
-          height: 500,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(59,130,246,0.12), transparent 70%)",
-          pointerEvents: "none",
-        }}
-
-      ></div>
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          right: "10%",
-          width: 400,
-          height: 400,
-          borderRadius: "50%",
-          background:
-            "radial-gradient(circle, rgba(34,211,238,0.08), transparent 70%)",
-          pointerEvents: "none",
-       }}
-       />
-       
-
-      {/* CONTENT */}
-      <div
-        style={{
-          ...styles.container,
-          position: "relative",
-          zIndex: 2,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          textAlign: "center",
-        }}
-      >
-        {/* Badge */}
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 16px",
-            borderRadius: 999,
-            background: "rgba(59,130,246,0.1)",
-            border: "1px solid rgba(59,130,246,0.25)",
-            fontSize: "13px",
-            fontWeight: 600,
-            color: "#93c5fd",
-            margin: "0 auto 28px",
-          }}
-        >
-          <span
-            style={{
-              width: 6,
-              height: 6,
-              borderRadius: "50%",
-              background: T.blue,
-              display: "inline-block",
-            }}
-          />
-          AI Resume Intelligence — Free to Use
+    <section style={{ position: "relative", padding: "100px 0 80px", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: "-150px", left: "-100px", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.12), transparent 65%)", animation: "orb1 12s ease-in-out infinite", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: "-100px", right: "-100px", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(236,72,153,0.08), transparent 65%)", animation: "orb2 15s ease-in-out infinite", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)", backgroundSize: "48px 48px", pointerEvents: "none" }} />
+      <div style={{ ...styles.container, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center", position: "relative", zIndex: 2 }}>
+        <div>
+          <div className="hero-badge" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 16px", borderRadius: 999, background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.25)", fontSize: "12px", fontWeight: 700, color: "#a78bfa", marginBottom: 28, letterSpacing: "0.04em" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#8b5cf6", display: "inline-block", boxShadow: "0 0 8px #8b5cf6" }} />
+            AI-Powered Resume Intelligence
+          </div>
+          <h1 className="hero-h1" style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(42px, 4.5vw, 68px)", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.03em", marginBottom: 20 }}>
+            Why does your<br />CV keep getting<br /><span className="shimmer-text">rejected?</span>
+          </h1>
+          <p className="hero-desc" style={{ fontSize: "17px", lineHeight: 1.7, color: "#94a3b8", maxWidth: "480px", marginBottom: 36 }}>
+            HireFit analyzes your CV against any job description and tells you exactly what recruiters see — in seconds.
+          </p>
+          <div className="hero-btns" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 48 }}>
+            <button className="hf-btn-primary" onClick={() => navigate("/app")} style={{ padding: "14px 32px", fontSize: "15px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 32px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.15)", borderRadius: 12 }}>
+              Analyze My CV Free <ArrowRight size={16} />
+            </button>
+            <button className="hf-btn-ghost" onClick={() => navigate("/dashboard")} style={{ padding: "14px 24px", fontSize: "15px", borderRadius: 12 }}>View Dashboard</button>
+          </div>
+          <div className="hero-desc" style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <div style={{ display: "flex" }}>
+              {["#3b82f6", "#8b5cf6", "#ec4899", "#10b981"].map((c, i) => (
+                <div key={i} style={{ width: 28, height: 28, borderRadius: "50%", background: c, border: "2px solid #060910", marginLeft: i === 0 ? 0 : -8, display: "grid", placeItems: "center", fontSize: "10px", fontWeight: 700, color: "white" }}>{["A","B","C","D"][i]}</div>
+              ))}
+            </div>
+            <div style={{ fontSize: "13px", color: "#64748b" }}><span style={{ color: "#f1f5f9", fontWeight: 600 }}>2,400+</span> CVs analyzed this week</div>
+          </div>
         </div>
-
-        {/* HEADLINE */}
-        <h1
-          style={{
-            fontFamily: "'Syne', sans-serif",
-            fontSize: "clamp(48px, 6vw, 82px)",
-            fontWeight: 800,
-            lineHeight: 1.1,
-            letterSpacing: "-0.03em",
-            maxWidth: "900px",
-            marginBottom: 24,
-          }}
-        >
-          Land interviews
-          <br />
-          <span
-            style={{
-              background: "linear-gradient(135deg, #60a5fa, #22d3ee)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            with AI-powered
-          </span>
-          <br />
-          CV alignment.
-        </h1>
-
-        <div style={{
-  marginTop: 40,
-  maxWidth: 420,
-  padding: 20,
-  borderRadius: 16,
-  background: "rgba(255,255,255,0.03)",
-  border: "1px solid rgba(255,255,255,0.08)",
-  backdropFilter: "blur(10px)"
-}}>
-  
-  <div style={{
-    display: "flex",
-    justifyContent: "space-between",
-    marginBottom: 10,
-    fontSize: 14,
-    color: "#94a3b8"
-  }}>
-    <span>ATS Score</span>
-    <span style={{
-      fontWeight: 700,
-      color: score >= 80 ? "#10b981" : "#22d3ee"
-    }}>
-      {fakeLoading ? "Scanning..." : `${score}/100`}
-    </span>
-  </div>
-
-  <div style={{
-    width: "100%",
-    height: 8,
-    borderRadius: 999,
-    background: "rgba(255,255,255,0.08)",
-    overflow: "hidden"
-  }}>
-    <div style={{
-      width: fakeLoading ? "30%" : `${score}%`,
-      height: "100%",
-      background: "linear-gradient(90deg, #3b82f6, #22d3ee)",
-      transition: "all 1s ease"
-    }} />
-  </div>
-
-</div>
-
-        {/* DESCRIPTION */}
-        <p
-          style={{
-            fontSize: "18px",
-            lineHeight: 1.7,
-            color: T.textSub,
-            maxWidth: "600px",
-            margin: "20px auto 40px",
-            textAlign: "center"
-          }}
-        >
-          Get your ATS score in seconds. Discover exactly what recruiters look for, fix your gaps, and turn your CV into an interview magnet.
-        </p>
-
-        {/* BUTTONS */}
-        <div
-          style={{
-            display: "flex",
-            gap: 12,
-            flexWrap: "wrap",
-            justifyContent: "center",
-            marginBottom: 48,
-          }}
-        >
-          <button
-            className="hf-btn-primary"
-            onClick={() => setView("app")}
-            style={{ padding: "14px 28px", fontSize: "15px" }}
-          >
-            Get Your ATS Score Now <ArrowRight size={16} />
-          </button>
-
-          <button
-            className="hf-btn-ghost"
-            onClick={() => setView("dashboard")}
-            style={{ padding: "14px 24px", fontSize: "15px" }}
-          >
-            View Dashboard
-          </button>
-        </div>
-
-        {/* UPLOAD BOX */}
-<div
-  style={{
-    marginTop: "40px",
-    border: "1px dashed rgba(255,255,255,0.2)",
-    borderRadius: "16px",
-    padding: "40px",
-    textAlign: "center",
-    maxWidth: "500px",
-    marginInline: "auto",
-    background: "rgba(255,255,255,0.02)",
-  }}
->
-  {!uploading && !uploaded && (
-    <>
-      <p style={{ marginBottom: "16px", color: "#aaa" }}>
-        Upload your CV (PDF)
-      </p>
-
-      <button
-        onClick={startFakeUpload}
-        style={{
-          padding: "12px 24px",
-          borderRadius: "10px",
-          background: "#3b82f6",
-          border: "none",
-          color: "white",
-          cursor: "pointer",
-          fontWeight: 600,
-        }}
-      >
-        TEST
-      </button>
-    </>
-  )}
-
-
-
-{uploading && (
-  <div style={{ marginTop: 16, textAlign: "center" }}>
-    
-    <div
-      style={{
-        width: "200px",
-        height: "8px",
-        background: "#1f2937",
-        borderRadius: "999px",
-        overflow: "hidden",
-        margin: "0 auto",
-      }}
-    >
-      <div
-        style={{
-          width: `${uploadProgress}%`,
-          height: "100%",
-          background: "#3b82f6",
-          transition: "width 0.3s ease",
-        }}
-      />
-    </div>
-
-    <p style={{ marginTop: 8, color: "#aaa" }}>
-      Analyzing... {uploadProgress}%
-    </p>
-
-    <p style={{ marginTop: 6, color: "#888", fontSize: "14px" }}> 
-      {step === "analyzing" && "Analyzing your CV..."}
-      {step === "keywords" && "Extracting keywords..."}
-      {step === "matching" && "Matching skills..."}
-      {step === "finalizing" && "Generating final score..."}
-        
-     </p> 
-
-  </div>
-)}
-
-{uploaded && (
-  <div style={{ marginTop: 20, textAlign: "center" }}>
-    <h3 style={{ color: "#22c55e", fontSize: "24px" }}>
-      ATS Score: 87/100
-    </h3>
-  </div>
-)}
-
-  {uploading && (
-    <>
-      <p style={{ marginBottom: "12px", color: "#aaa" }}>
-        Analyzing your CV...
-      </p>
-
-      <div
-        style={{
-          height: "8px",
-          background: "#222",
-          borderRadius: "10px",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            width: `${uploadProgress}%`,
-            height: "100%",
-            background: "linear-gradient(90deg, #60a5fa, #22d3ee)",
-            transition: "width 0.3s",
-          }}
-        />
-      </div>
-
-      <p style={{ marginTop: "10px", fontSize: "12px", color: "#888" }}>
-        {Math.floor(uploadProgress)}%
-      </p>
-    </>
-  )}
-
-  {uploaded && (
-  <div
-    style={{
-      marginTop: 24,
-      textAlign: "center",
-      padding: "20px",
-      borderRadius: "16px",
-      background: "rgba(34,197,94,0.08)",
-      border: "1px solid rgba(34,197,94,0.2)"
-    }}
-  >
-    <h2 style={{ color: "#22c55e", fontSize: "28px", marginBottom: "8px" }}>
-      ATS Score: 87/100
-    </h2>
-
-    <p style={{ color: "#4ade80", marginBottom: "16px" }}>
-      ✔ Analysis Complete
-    </p>
-
-    <div style={{ marginTop: "10px" }}>
-      <div style={{ fontSize: "14px", color: "#aaa", marginBottom: "6px" }}>
-        Overall Match
-      </div>
-
-      <div
-        style={{
-          width: "100%",
-          height: "10px",
-          background: "#1f2937",
-          borderRadius: "999px",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            width: "87%",
-            height: "100%",
-            background: "#22c55e",
-          }}
-        />
-      </div>
-    </div>
-
-  </div>
-)}
-
-</div>
-        {/* FEATURES */}
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            flexWrap: "wrap",
-            justifyContent: "center",
-          }}
-        >
-          {[
-            {
-              icon: <CheckCircle2 size={13} />,
-              label: "ATS Scoring",
-              color: T.green,
-              bg: "rgba(16,185,129,0.1)",
-              border: "rgba(16,185,129,0.2)",
-            },
-            {
-              icon: <Target size={13} />,
-              label: "Skill Gap Detection",
-              color: "#60a5fa",
-              bg: "rgba(59,130,246,0.1)",
-              border: "rgba(59,130,246,0.2)",
-            },
-            {
-              icon: <Wand2 size={13} />,
-              label: "CV Optimizer",
-              color: T.cyan,
-              bg: "rgba(34,211,238,0.1)",
-              border: "rgba(34,211,238,0.2)",
-            },
-          ].map(({ icon, label, color, bg, border }) => (
-            <span
-              key={label}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "6px 12px",
-                borderRadius: 999,
-                background: bg,
-                border: `1px solid ${border}`,
-                color,
-                fontSize: "12px",
-                fontWeight: 600,
-              }}
-            >
-              {icon} {label}
-            </span>
-          ))}
+        <div className="hero-card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 24, padding: "32px", position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.5), transparent)" }} />
+            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#475569", marginBottom: 20 }}>Live Analysis Preview</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 24, marginBottom: 24 }}>
+              <div style={{ position: "relative", width: 120, height: 120, flexShrink: 0 }}>
+                <svg width="120" height="120" viewBox="0 0 120 120" style={{ transform: "rotate(-90deg)" }}>
+                  <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7" />
+                  <circle className="score-ring-fill" cx="60" cy="60" r={r} fill="none" stroke={scoreColor} strokeWidth="7" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} />
+                </svg>
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                  <span style={{ fontFamily: "'Syne', sans-serif", fontSize: "28px", fontWeight: 800, color: scoreColor, lineHeight: 1 }}>{score}</span>
+                  <span style={{ fontSize: "11px", color: "#475569" }}>/100</span>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 700, marginBottom: 6, color: score > 0 ? scoreColor : "#f1f5f9" }}>
+                  {score === 0 ? "Click to Demo" : score >= 80 ? "Strong Match" : score >= 60 ? "Moderate Match" : "Needs Work"}
+                </div>
+                <div style={{ fontSize: "13px", color: "#64748b", lineHeight: 1.5, marginBottom: 12 }}>
+                  {score === 0 ? "See how HireFit analyzes your CV in real time" : "Based on skills, keywords, experience & formatting"}
+                </div>
+                <button onClick={handleDemoClick} disabled={animating} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.1)", color: "#a78bfa", fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                  {animating ? "Analyzing..." : "▶ Run Demo"}
+                </button>
+              </div>
+            </div>
+            {score > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 20px" }}>
+                {[["Skills Match", score], ["Keywords", Math.min(100, score + 8)], ["Experience", Math.max(30, score - 12)], ["Formatting", 75]].map(([label, val]) => (
+                  <div key={label}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#475569", marginBottom: 4 }}><span>{label}</span><span>{val}</span></div>
+                    <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
+                      <div style={{ width: `${val}%`, height: "100%", background: "linear-gradient(90deg, #3b82f6, #8b5cf6)", borderRadius: 999, transition: "width 1.2s ease" }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+            {[
+              { label: "Avg. score boost", value: "+23pts", color: "#10b981", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.15)" },
+              { label: "Analysis time", value: "~8sec", color: "#3b82f6", bg: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.15)" },
+              { label: "Free to use", value: "100%", color: "#8b5cf6", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.15)" },
+            ].map(({ label, value, color, bg, border }) => (
+              <div key={label} className="hero-stat" style={{ background: bg, border: `1px solid ${border}`, borderRadius: 14, padding: "14px 12px", textAlign: "center" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 800, color, marginBottom: 4 }}>{value}</div>
+                <div style={{ fontSize: "11px", color: "#475569", lineHeight: 1.3 }}>{label}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -660,24 +682,33 @@ function HeroSection({ setView }) {
 
 function FeatureCards() {
   const features = [
-    { icon: <BarChart3 size={24} />, iconColor: "#60a5fa", iconBg: "rgba(59,130,246,0.12)", title: "ATS Score Engine", desc: "Quantifies your CV alignment with skills, keywords, experience, and formatting using a multi-factor scoring model.", tag: "Core" },
-    { icon: <Search size={24} />, iconColor: T.cyan, iconBg: "rgba(34,211,238,0.12)", title: "Keyword Intelligence", desc: "Extracts the top keywords from any job description and pinpoints exactly what's missing from your CV.", tag: "AI-Powered" },
-    { icon: <Wand2 size={24} />, iconColor: "#a78bfa", iconBg: "rgba(167,139,250,0.12)", title: "CV Optimizer", desc: "Rewrites your resume to be stronger, more relevant, and fully ATS-optimized for the specific role.", tag: "Premium" },
+    { icon: "📊", tag: "Core", tagColor: "#60a5fa", tagBg: "rgba(59,130,246,0.1)", title: "ATS Score Engine", desc: "Multi-factor scoring across skills, keywords, experience, and formatting — the same way real ATS software evaluates you.", accent: "#3b82f6", glow: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.15)", stat: "87% accuracy" },
+    { icon: "🚫", tag: "Differentiator", tagColor: "#f87171", tagBg: "rgba(239,68,68,0.1)", title: "Rejection Engine", desc: "We don't just score you — we tell you the exact reasons a recruiter would pass on your CV and how to fix each one.", accent: "#ef4444", glow: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.15)", stat: "Top differentiator" },
+    { icon: "🔍", tag: "AI-Powered", tagColor: "#22d3ee", tagBg: "rgba(34,211,238,0.1)", title: "Keyword Intelligence", desc: "Extracts the exact keywords recruiters are scanning for, then shows you which ones are missing from your CV.", accent: "#22d3ee", glow: "rgba(34,211,238,0.08)", border: "rgba(34,211,238,0.15)", stat: "50+ keywords extracted" },
+    { icon: "✨", tag: "Premium", tagColor: "#a78bfa", tagBg: "rgba(139,92,246,0.1)", title: "CV Rewriter", desc: "AI rewrites your entire CV to be stronger, more relevant, and fully optimized for the specific role you're targeting.", accent: "#8b5cf6", glow: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.15)", stat: "+23pts avg. boost" },
   ];
   return (
     <section style={{ padding: "80px 0" }}>
       <div style={styles.container}>
         <div style={{ textAlign: "center", marginBottom: 56 }}>
-          <div style={{ fontSize: "12px", fontWeight: 700, letterSpacing: "0.12em", color: T.blue, textTransform: "uppercase", marginBottom: 12 }}>What HireFit Does</div>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "40px", fontWeight: 800, letterSpacing: "-0.02em" }}>Every tool you need to get hired</h2>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)", fontSize: "11px", fontWeight: 700, color: "#60a5fa", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>What HireFit Does</div>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(32px, 4vw, 52px)", fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 14, lineHeight: 1.1 }}>Every tool you need<br />to get hired</h2>
+          <p style={{ color: "#64748b", fontSize: "16px", maxWidth: 480, margin: "0 auto" }}>Not just another ATS checker — HireFit tells you why you're getting rejected and exactly how to fix it.</p>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
-          {features.map(({ icon, iconColor, iconBg, title, desc, tag }) => (
-            <div key={title} className="hf-feature-card">
-              <div style={{ position: "absolute", top: 20, right: 20, fontSize: "11px", fontWeight: 700, color: iconColor, background: iconBg, padding: "3px 10px", borderRadius: 999, letterSpacing: "0.04em" }}>{tag}</div>
-              <div style={{ width: 52, height: 52, borderRadius: 14, background: iconBg, display: "flex", alignItems: "center", justifyContent: "center", color: iconColor, marginBottom: 20 }}>{icon}</div>
-              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 700, marginBottom: 10, letterSpacing: "-0.01em" }}>{title}</h3>
-              <p style={{ color: T.textSub, fontSize: "14px", lineHeight: 1.7 }}>{desc}</p>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          {features.map(({ icon, tag, tagColor, tagBg, title, desc, accent, glow, border, stat }) => (
+            <div key={title} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 24, padding: 32, transition: "all 0.3s ease", position: "relative", overflow: "hidden" }}>
+              <div style={{ position: "absolute", top: 0, right: 0, width: 200, height: 200, borderRadius: "50%", background: `radial-gradient(circle, ${glow}, transparent 70%)`, pointerEvents: "none" }} />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                <div style={{ width: 52, height: 52, borderRadius: 16, background: "rgba(255,255,255,0.04)", border: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px" }}>{icon}</div>
+                <span style={{ padding: "4px 12px", borderRadius: 999, background: tagBg, color: tagColor, fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em" }}>{tag}</span>
+              </div>
+              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 700, marginBottom: 10 }}>{title}</h3>
+              <p style={{ color: "#64748b", fontSize: "14px", lineHeight: 1.7, marginBottom: 20 }}>{desc}</p>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                <div style={{ width: 6, height: 6, borderRadius: "50%", background: accent, boxShadow: `0 0 8px ${accent}` }} />
+                <span style={{ fontSize: "12px", fontWeight: 600, color: accent }}>{stat}</span>
+              </div>
             </div>
           ))}
         </div>
@@ -686,48 +717,53 @@ function FeatureCards() {
   );
 }
 
-function PricingSection() {
+function PricingSection({ navigate }) {
   return (
     <section style={{ padding: "80px 0" }}>
       <div style={styles.container}>
         <div style={{ textAlign: "center", marginBottom: 48 }}>
-          <div style={{ fontSize: "12px", fontWeight: 700, letterSpacing: "0.12em", color: T.blue, textTransform: "uppercase", marginBottom: 12 }}>Pricing</div>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "40px", fontWeight: 800, letterSpacing: "-0.02em" }}>Simple, transparent pricing</h2>
-          <p style={{ color: T.textSub, marginTop: 12, fontSize: "16px" }}>Start free. Upgrade when you're ready.</p>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)", fontSize: "11px", fontWeight: 700, color: "#60a5fa", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>Pricing</div>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(32px,4vw,52px)", fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 12, lineHeight: 1.1 }}>Simple, transparent pricing</h2>
+          <p style={{ color: "#64748b", fontSize: "16px" }}>Start free. Upgrade when you're ready.</p>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, maxWidth: 760, margin: "0 auto" }}>
-          <div className="pricing-card free">
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: "14px", fontWeight: 600, color: T.textSub, marginBottom: 8 }}>Free</div>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "48px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1 }}>$0</div>
-              <div style={{ color: T.textMuted, fontSize: "13px", marginTop: 6 }}>Forever free for students</div>
-            </div>
-            <div style={{ height: "1px", background: T.border, marginBottom: 24 }} />
-            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12 }}>
-              {["CV vs JD analysis", "ATS score", "Skill gap detection", "Learning roadmap", "Local history"].map((f) => (
-                <li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: T.textSub }}>
-                  <CheckCircle2 size={15} color={T.green} style={{ flexShrink: 0 }} />{f}
-                </li>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, maxWidth: 960, margin: "0 auto" }}>
+          <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 24, padding: 32 }}>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: "#64748b", marginBottom: 8 }}>Free</div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "48px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, marginBottom: 4 }}>$0</div>
+            <div style={{ color: "#475569", fontSize: "13px", marginBottom: 24 }}>Forever free</div>
+            <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginBottom: 24 }} />
+            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+              {["2 analyses/month", "ATS score", "Skill gap detection", "Shareable report"].map(f => (
+                <li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#94a3b8" }}><CheckCircle2 size={14} color="#10b981" style={{ flexShrink: 0 }} />{f}</li>
               ))}
             </ul>
+            <button onClick={() => navigate("/app")} className="hf-btn-ghost" style={{ width: "100%", justifyContent: "center", fontSize: "14px" }}>Get Started</button>
           </div>
-          <div className="pricing-card pro">
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ fontSize: "14px", fontWeight: 600, color: "#93c5fd", marginBottom: 8 }}>Pro</div>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "48px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1 }}>$12</div>
-              <div style={{ color: "#93c5fd", fontSize: "13px", marginTop: 6 }}>per month</div>
-            </div>
-            <div style={{ height: "1px", background: "rgba(99,102,241,0.25)", marginBottom: 24 }} />
-            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12 }}>
-              {["Everything in Free", "Unlimited analyses", "Saved CV versions", "Shareable reports", "Team / recruiter mode"].map((f) => (
-                <li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#cbd5e1" }}>
-                  <Star size={14} color="#818cf8" style={{ flexShrink: 0 }} />{f}
-                </li>
+          <div style={{ background: "linear-gradient(145deg, rgba(59,130,246,0.1), rgba(99,102,241,0.07))", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 24, padding: 32, position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.6), transparent)" }} />
+            <div style={{ position: "absolute", top: 16, right: -30, background: "linear-gradient(135deg, #3b82f6, #6366f1)", color: "white", fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", padding: "4px 40px", transform: "rotate(45deg)" }}>POPULAR</div>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: "#93c5fd", marginBottom: 8 }}>Pro</div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "48px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, marginBottom: 4 }}>$12</div>
+            <div style={{ color: "#93c5fd", fontSize: "13px", marginBottom: 24 }}>per month</div>
+            <div style={{ height: 1, background: "rgba(99,102,241,0.2)", marginBottom: 24 }} />
+            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+              {["Unlimited analyses", "Rejection Engine", "CV Rewriter", "Advanced insights", "Shareable reports", "Priority support"].map(f => (
+                <li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#cbd5e1" }}><Star size={13} color="#818cf8" style={{ flexShrink: 0 }} />{f}</li>
               ))}
             </ul>
-            <button className="hf-btn-primary" style={{ width: "100%", justifyContent: "center", marginTop: 28, fontSize: "14px" }}>
-              Join Waitlist <ArrowRight size={14} />
-            </button>
+            <button className="hf-btn-primary" style={{ width: "100%", justifyContent: "center", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 24px rgba(99,102,241,0.3)" }}>Join Waitlist <ArrowRight size={14} /></button>
+          </div>
+          <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 24, padding: 32 }}>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: "#64748b", marginBottom: 8 }}>Coach</div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "48px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, marginBottom: 4 }}>$39</div>
+            <div style={{ color: "#475569", fontSize: "13px", marginBottom: 24 }}>per month</div>
+            <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginBottom: 24 }} />
+            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
+              {["Everything in Pro", "White-label reports", "10 client invites", "Coach dashboard", "Client management"].map(f => (
+                <li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#94a3b8" }}><CheckCircle2 size={14} color="#8b5cf6" style={{ flexShrink: 0 }} />{f}</li>
+              ))}
+            </ul>
+            <button className="hf-btn-ghost" style={{ width: "100%", justifyContent: "center", fontSize: "14px", borderColor: "rgba(139,92,246,0.3)", color: "#a78bfa" }}>Join Waitlist <ArrowRight size={14} /></button>
           </div>
         </div>
       </div>
@@ -736,31 +772,51 @@ function PricingSection() {
 }
 
 function WaitlistSection() {
+  const [email, setEmail] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!email.trim()) return;
+    setSubmitting(true);
+    try {
+      await supabase.from("waitlist").insert({ email });
+      setSubmitted(true);
+    } catch { setSubmitted(true); }
+    finally { setSubmitting(false); }
+  };
+
   return (
     <section style={{ padding: "80px 0 100px" }}>
       <div style={styles.container}>
-        <div style={{ borderRadius: 24, background: "linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.05))", border: "1px solid rgba(59,130,246,0.18)", padding: "56px 48px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center", position: "relative", overflow: "hidden" }}>
+        <div style={{ borderRadius: 24, background: "linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.05))", border: "1px solid rgba(59,130,246,0.18)", padding: "64px 48px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center", position: "relative", overflow: "hidden" }}>
           <div style={{ position: "absolute", top: "-80px", right: "-80px", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%)", pointerEvents: "none" }} />
           <div style={{ position: "relative", zIndex: 2 }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 999, background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)", fontSize: "12px", fontWeight: 700, color: "#93c5fd", letterSpacing: "0.06em", marginBottom: 20, textTransform: "uppercase" }}>
               <Zap size={12} /> Pro Plan Coming Soon
             </div>
-            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "36px", fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 14, lineHeight: 1.15 }}>
-              Be first to know<br />when Pro launches
-            </h2>
-            <p style={{ color: T.textSub, fontSize: "15px", lineHeight: 1.7 }}>
-              Get early access, founding member pricing, and exclusive features before public launch.
-            </p>
+            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "36px", fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 14, lineHeight: 1.15 }}>Be first to know<br />when Pro launches</h2>
+            <p style={{ color: T.textSub, fontSize: "15px", lineHeight: 1.7 }}>Get early access, founding member pricing, and exclusive features before public launch.</p>
           </div>
           <div style={{ position: "relative", zIndex: 2 }}>
-            <div style={{ background: "rgba(6,9,16,0.6)", borderRadius: 16, padding: 4, border: `1px solid ${T.border}` }}>
-              <iframe
-                width="100%" height="220"
-                src="https://e2447a81.sibforms.com/serve/MUIFAJ45UwJ9NCi1s-BbG6gVUzLJ8Yvgp_B-f-eIKIPViV08D7HPKspDmKZIOj-3hgukEmXeUTXS1cAm5UFcwJuDFTizz4hpqDJ_ZpbjA5Bh3_uvwOdRKgXAoTPvBwLvlGfzXyM8fxSAoEHQhFaCTL1pSHILWQJIHH-qaO7HI4_4-pGQpSC6qjGNB6xWovBBaJtX9Q5n4JqQ64uRCA=="
-                frameBorder="0" scrolling="auto" allowFullScreen
-                style={{ display: "block", width: "100%", borderRadius: 12 }}
-              />
-            </div>
+            {submitted ? (
+              <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 16, padding: "36px 32px", textAlign: "center" }}>
+                <div style={{ fontSize: 32, marginBottom: 12 }}>🎉</div>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>You're on the list!</div>
+                <div style={{ color: T.textSub, fontSize: 14 }}>We'll notify you when Pro launches.</div>
+              </div>
+            ) : (
+              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "36px 32px" }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Join the waitlist</div>
+                <div style={{ color: T.textSub, fontSize: 14, marginBottom: 24 }}>Be notified the moment Pro goes live.</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <input className="hf-input" type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSubmit()} />
+                  <button className="hf-btn-primary" onClick={handleSubmit} disabled={submitting} style={{ justifyContent: "center", opacity: submitting ? 0.7 : 1 }}>
+                    {submitting ? <><Loader2 size={14} />Joining...</> : <>Notify Me <ArrowRight size={14} /></>}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -768,8 +824,72 @@ function WaitlistSection() {
   );
 }
 
+function Footer({ navigate }) {
+  return (
+    <footer style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "48px 0 32px" }}>
+      <div style={styles.container}>
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 48, marginBottom: 48 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, cursor: "pointer" }} onClick={() => navigate("/")}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "14px", color: "white" }}>HF</span>
+              </div>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "18px", letterSpacing: "-0.02em" }}>HireFit</span>
+            </div>
+            <p style={{ color: "#475569", fontSize: "14px", lineHeight: 1.7, maxWidth: 280 }}>AI-powered CV analysis that tells you exactly why you're getting rejected — and how to fix it.</p>
+            <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+              {["LinkedIn", "Twitter"].map(s => (<div key={s} style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", fontSize: "12px", fontWeight: 600, color: "#64748b", cursor: "pointer" }}>{s}</div>))}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#334155", marginBottom: 16 }}>Product</div>
+            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
+              {[["Analyze CV", "/app"], ["Dashboard", "/dashboard"], ["Pricing", "/"]].map(([label, path]) => (
+                <li key={label}><button onClick={() => navigate(path)} style={{ background: "none", border: "none", color: "#64748b", fontSize: "14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0 }} onMouseEnter={e => e.currentTarget.style.color = "#f1f5f9"} onMouseLeave={e => e.currentTarget.style.color = "#64748b"}>{label}</button></li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#334155", marginBottom: 16 }}>Legal</div>
+            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
+              {["Privacy Policy", "Terms of Service", "Cookie Policy"].map(label => (<li key={label}><span style={{ color: "#64748b", fontSize: "14px", cursor: "pointer" }}>{label}</span></li>))}
+            </ul>
+          </div>
+        </div>
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div style={{ color: "#334155", fontSize: "13px" }}>© 2026 HireFit. All rights reserved.</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "12px", color: "#334155" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", display: "inline-block", boxShadow: "0 0 8px #10b981" }} />
+            All systems operational
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
 function MainApp() {
-  const [view, setView] = useState("landing");
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const getInitialView = () => {
+    const path = window.location.pathname;
+    if (path === "/app") return "app";
+    if (path === "/dashboard") return "dashboard";
+    if (path === "/login") return "login";
+    return "landing";
+  };
+
+  const [view, setView] = useState(getInitialView);
+
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === "/app") setView("app");
+    else if (path === "/dashboard") setView("dashboard");
+    else if (path === "/login") setView("login");
+    else setView("landing");
+  }, [location.pathname]);
+
   const [user, setUser] = useState(null);
   const [plan] = useState("Free");
   const [email, setEmail] = useState("");
@@ -794,6 +914,7 @@ function MainApp() {
   const [missingSkills, setMissingSkills] = useState([]);
   const [topKeywords, setTopKeywords] = useState([]);
   const [history, setHistory] = useState([]);
+  const [analysisData, setAnalysisData] = useState(null);
 
   const extractDataFromReport = (text) => {
     const scoreMatch = text.match(/Final Alignment Score:\s*(\d+)/i);
@@ -812,27 +933,6 @@ function MainApp() {
       setHistory((data || []).map((item) => ({ id: item.id, createdAt: new Date(item.created_at).toLocaleString(), role: item.role, score: item.alignment_score, cvText: item.cv_text, jdText: item.job_description, report: item.report })));
     } catch (err) { console.error(err); }
   };
-
-  const analyzeWithBackend = async (cvText, jobDescription) => {
-  const res = await fetch("http://localhost:3000/analyze", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      cvText,
-      jobDescription,
-    }),
-  });
-
-  if (!res.ok) {
-    throw new Error("Backend error");
-  }
-
-  return await res.json();
-};
-   
-  
 
   useEffect(() => {
     const savedUser = localStorage.getItem("hirefit-user");
@@ -876,42 +976,32 @@ function MainApp() {
 
   const analyze = async () => {
     if (!cvText.trim() || !jdText.trim()) { setError("Please paste both the CV and the Job Description."); return; }
-    setLoading(true); setError(""); setResult(""); setOptimizedCv(""); setLearningPlan("");
-    setAlignmentScore(null); setMatchedSkills([]); setMissingSkills([]); setTopKeywords([]); setRoleType(""); setSeniority("");
-    const systemPrompt = `You are an expert recruiter and ATS analyst. Analyze the CV against the job description and return EXACTLY this structure:\n\nFit Summary:\n[paragraph]\n\nRole Type:\n[role only]\n\nSeniority:\n[level only]\n\nFinal Alignment Score:\n[number 0-100]\n\nMatched Skills:\n- [skill]\n\nMissing Skills:\n- [skill]\n\nTop Keywords:\n- [keyword]\n\nStrengths:\n- [bullet]\n\nImprovement Suggestions:\n- [bullet]`;
-
-      try {
-  const res = await fetch("http://localhost:3000/analyze", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      cvText,
-      jobDescription: jdText,
-    }),
-  });
-
-  const data = await res.json();
-  console.log("BACKEND:", data);
-
-  setResult(JSON.stringify(data, null, 2));
-  setView("app");
-
-} catch {
-  setError("Analysis failed. Check your API key or network.");
-} finally {
-  setLoading(false);
-}
-            
+    setLoading(true); setError("");
+    try {
+      const res = await fetch("http://localhost:3000/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cvText, jobDescription: jdText }) });
+      const data = await res.json();
+      setAlignmentScore(data.alignment_score ?? null);
+      setRoleType(data.role_type ?? "");
+      setSeniority(data.seniority ?? "");
+      setMatchedSkills(data.matched_skills ?? []);
+      setMissingSkills(data.missing_skills ?? []);
+      setTopKeywords(data.top_keywords ?? []);
+      const reportText = `Fit Summary:\n${data.fit_summary ?? ""}\n\nStrengths:\n${(data.strengths ?? []).map(s => `- ${s}`).join("\n")}\n\nImprovement Suggestions:\n${(data.improvements ?? []).map(s => `- ${s}`).join("\n")}\n\nWhy You Might Get Rejected:\nHIGH: ${(data.rejection_reasons?.high ?? []).join(", ") || "None"}\nMEDIUM: ${(data.rejection_reasons?.medium ?? []).join(", ") || "None"}`.trim();
+      setResult(reportText);
+      setAnalysisData(data);
+      await supabase.from("analyses").insert({ role: data.role_type ?? "Unknown", alignment_score: data.alignment_score ?? 0, cv_text: cvText, job_description: jdText, report: reportText, matched_skills: data.matched_skills ?? [], missing_skills: data.missing_skills ?? [], top_keywords: data.top_keywords ?? [], rejection_reasons: data.rejection_reasons ?? {}, seniority: data.seniority ?? "" });
+      await fetchAnalyses();
+    } catch (err) { console.error(err); setError("Analysis failed. Check your API key or network."); }
+    finally { setLoading(false); }
   };
 
   const optimizeCv = async () => {
     if (!cvText.trim() || !jdText.trim()) { setError("Please paste both the CV and JD first."); return; }
     setOptimizing(true); setError(""); setOptimizedCv("");
     try {
-      const text = await callGemini("You are an expert resume writer. Rewrite the CV to better match the job description. Keep it concise, stronger, and ATS-friendly.", `JOB DESCRIPTION:\n${jdText}\n\nCURRENT CV:\n${cvText}`);
-      setOptimizedCv(text);
+      const res = await fetch("http://localhost:3000/optimize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cvText, jobDescription: jdText }) });
+      const data = await res.json();
+      setOptimizedCv(data.optimizedCv || "");
     } catch { setError("CV optimization failed."); }
     finally { setOptimizing(false); }
   };
@@ -920,8 +1010,9 @@ function MainApp() {
     if (!missingSkills.length) { setError("No missing skills detected yet."); return; }
     setRoadmapLoading(true); setError(""); setLearningPlan("");
     try {
-      const text = await callGemini("You are an expert career coach. Create a practical learning roadmap for the missing skills.", `Missing skills:\n${missingSkills.join(", ")}\n\nTarget role:\n${roleType || "Not specified"}\n\nSeniority:\n${seniority || "Not specified"}`);
-      setLearningPlan(text);
+      const res = await fetch("http://localhost:3000/roadmap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ missingSkills, roleType, seniority }) });
+      const data = await res.json();
+      setLearningPlan(data.roadmap || "");
     } catch { setError("Failed to generate learning roadmap."); }
     finally { setRoadmapLoading(false); }
   };
@@ -938,7 +1029,12 @@ function MainApp() {
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
-        fullText += `\n${content.items.map((item) => item.str).join(" ")}`;
+        const pageText = content.items.map((item, i) => {
+          const nextItem = content.items[i + 1];
+          const hasLineBreak = nextItem && Math.abs(nextItem.transform[5] - item.transform[5]) > 5;
+          return item.str + (hasLineBreak ? "\n" : " ");
+        }).join("");
+        fullText += "\n" + pageText;
       }
       setCvText(fullText.trim());
     } catch { setError("Failed to read PDF."); }
@@ -946,16 +1042,16 @@ function MainApp() {
   };
 
   const clearHistory = () => { setHistory([]); localStorage.removeItem("hirefit-history"); };
-  const loadHistoryItem = (item) => { setCvText(item.cvText || ""); setJdText(item.jdText || ""); setResult(item.report || ""); extractDataFromReport(item.report || ""); setOptimizedCv(""); setLearningPlan(""); setError(""); setView("app"); };
+  const loadHistoryItem = (item) => { setCvText(item.cvText || ""); setJdText(item.jdText || ""); setResult(item.report || ""); extractDataFromReport(item.report || ""); setOptimizedCv(""); setLearningPlan(""); setError(""); navigate("/app"); };
   const login = async () => {
     if (!email.trim() || !password.trim()) { setError("Please enter both email and password."); return; }
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) { setError(authError.message); return; }
-      setUser(data.user); setEmail(""); setPassword(""); setError(""); setView("dashboard");
+      setUser(data.user); setEmail(""); setPassword(""); setError(""); navigate("/dashboard");
     } catch { setError("Login failed."); }
   };
-  const logout = () => { setUser(null); setView("landing"); };
+  const logout = () => { setUser(null); navigate("/"); };
   const downloadText = (content, filename) => {
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -966,14 +1062,15 @@ function MainApp() {
 
   return (
     <div style={styles.page}>
-      <NavBar view={view} setView={setView} user={user} logout={logout} />
+      <NavBar view={view} setView={setView} user={user} logout={logout} navigate={navigate} />
 
       {view === "landing" && (
         <>
-          <HeroSection setView={setView} />
+          <HeroSection navigate={navigate} />
           <FeatureCards />
-          <PricingSection />
+          <PricingSection navigate={navigate} />
           <WaitlistSection />
+          <Footer navigate={navigate} />
         </>
       )}
 
@@ -1017,142 +1114,133 @@ function MainApp() {
                   </li>
                 ))}
               </ul>
-              <button className="hf-btn-primary" onClick={() => setView("app")} style={{ marginTop: 24, fontSize: "14px" }}>Open Product <ArrowRight size={14} /></button>
+              <button className="hf-btn-primary" onClick={() => navigate("/app")} style={{ marginTop: 24, fontSize: "14px" }}>Open Product <ArrowRight size={14} /></button>
             </div>
           </div>
         </div>
       )}
 
       {view === "app" && (
-        <div style={{ ...styles.container, padding: "40px 24px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 24, alignItems: "start" }}>
+        <div style={{ ...styles.container, padding: "40px 24px", minHeight: "calc(100vh - 80px)" }}>
+          <div style={{ marginBottom: 32, display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
             <div>
-              <div style={{ marginBottom: 28 }}>
-                <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(32px,5vw,56px)", fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.1, marginBottom: 8 }}>AI CV Alignment Analyzer</h1>
-                <p style={{ color: T.textSub, fontSize: "15px" }}>Check how well your CV matches any job description</p>
+              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 999, background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)", fontSize: "11px", fontWeight: 700, color: "#a78bfa", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
+                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#8b5cf6", boxShadow: "0 0 6px #8b5cf6", display: "inline-block" }} />
+                AI Analysis
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
-                <div>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, fontWeight: 600, fontSize: "14px" }}><FileText size={15} color={T.blue} /> Candidate CV</label>
-                  <label style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 16px", borderRadius: 10, background: "rgba(255,255,255,0.04)", border: `1px solid ${T.border}`, cursor: "pointer", fontWeight: 600, fontSize: "13px", color: T.textSub, marginBottom: 10 }}>
-                    <Upload size={14} />{uploadingPdf ? "Reading PDF..." : "Upload CV PDF"}
-                    <input type="file" accept="application/pdf" onChange={handlePdfUpload} style={{ display: "none" }} />
-                  </label>
-                  <textarea className="hf-textarea" placeholder="Or paste your CV here..." value={cvText} onChange={(e) => setCvText(e.target.value)} />
+              <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(28px,3vw,42px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 6 }}>CV Alignment Analyzer</h1>
+              <p style={{ color: "#64748b", fontSize: "14px" }}>Paste your CV and job description — get rejection reasons + fix suggestions in seconds.</p>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 12, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.15)" }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px #10b981", display: "inline-block" }} />
+              <span style={{ fontSize: "12px", fontWeight: 600, color: "#10b981" }}>Free to use</span>
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 320px", gap: 20, alignItems: "start" }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", gap: 16, marginBottom: 16, width: "100%" }}>
+                <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: 20, display: "flex", flexDirection: "column", gap: 12, height: "480px", flex: "0 0 calc(50% - 8px)", width: "calc(50% - 8px)" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "13px", color: "#f1f5f9" }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.2)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                        <FileText size={13} color="#60a5fa" />
+                      </div>
+                      Candidate CV
+                    </label>
+                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer", fontWeight: 600, fontSize: "11px", color: "#94a3b8", flexShrink: 0 }}>
+                      <Upload size={11} />
+                      {uploadingPdf ? "Reading..." : "Upload PDF"}
+                      <input type="file" accept="application/pdf" onChange={handlePdfUpload} style={{ display: "none" }} />
+                    </label>
+                  </div>
+                  <textarea className="hf-textarea" placeholder="Paste your CV text here..." value={cvText} onChange={(e) => setCvText(e.target.value)} />
+                  {cvText && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "11px", color: "#10b981", flexShrink: 0 }}>
+                      <CheckCircle2 size={11} />
+                      {cvText.split(" ").length} words loaded
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, fontWeight: 600, fontSize: "14px" }}><Briefcase size={15} color={T.cyan} /> Job Description</label>
-                  <textarea className="hf-textarea" style={{ height: "calc(300px + 52px)" }} placeholder="Paste the job description here..." value={jdText} onChange={(e) => setJdText(e.target.value)} />
-                  <div style={{ marginTop: 10, display: "flex", gap: 8 }}>
-                    <input className="hf-input" value={jobUrl} onChange={(e) => setJobUrl(e.target.value)} placeholder="Or paste a job URL..." style={{ flex: 1 }} />
-                    <button className="hf-btn-ghost" onClick={extractJobFromUrl} disabled={extractingJob} style={{ whiteSpace: "nowrap", fontSize: "13px" }}>
-                      {extractingJob ? <><Loader2 size={13} />Extracting...</> : "Extract"}
+                <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: 20, display: "flex", flexDirection: "column", gap: 12, height: "480px", flex: "0 0 calc(50% - 8px)", width: "calc(50% - 8px)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(34,211,238,0.15)", border: "1px solid rgba(34,211,238,0.2)", display: "grid", placeItems: "center", flexShrink: 0 }}>
+                      <Briefcase size={13} color="#22d3ee" />
+                    </div>
+                    <label style={{ fontWeight: 700, fontSize: "13px", color: "#f1f5f9" }}>Job Description</label>
+                  </div>
+                  <textarea className="hf-textarea" placeholder="Paste the job description here..." value={jdText} onChange={(e) => setJdText(e.target.value)} />
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <input className="hf-input" value={jobUrl} onChange={(e) => setJobUrl(e.target.value)} placeholder="Or paste a job URL..." style={{ flex: 1, fontSize: "12px", padding: "9px 12px", borderRadius: 8, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.06)" }} />
+                    <button className="hf-btn-ghost" onClick={extractJobFromUrl} disabled={extractingJob} style={{ whiteSpace: "nowrap", fontSize: "12px", padding: "9px 14px", borderRadius: 8 }}>
+                      {extractingJob ? <Loader2 size={12} /> : <Search size={12} />}
+                      {extractingJob ? "Extracting..." : "Extract"}
                     </button>
                   </div>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
-                <button className="hf-btn-primary" onClick={analyze} disabled={loading} style={{ opacity: loading ? 0.7 : 1 }}>
-                  {loading ? <><Loader2 size={15} />Analyzing...</> : <>Check My Fit <Sparkles size={15} /></>}
+
+              <ProgressStepper cvText={cvText} jdText={jdText} loading={loading} analysisData={analysisData} />
+
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20, padding: "16px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16 }}>
+                <button className="hf-btn-primary" onClick={analyze} disabled={loading} style={{ opacity: loading ? 0.7 : 1, padding: "12px 24px", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: loading ? "none" : "0 0 24px rgba(99,102,241,0.3)", borderRadius: 10 }}>
+                  {loading ? <><Loader2 size={14} />Analyzing...</> : <>Check My Fit <Sparkles size={14} /></>}
                 </button>
-                <button className="hf-btn-ghost" onClick={optimizeCv} disabled={optimizing} style={{ color: optimizing ? T.textMuted : T.cyan, borderColor: optimizing ? T.border : "rgba(34,211,238,0.25)" }}>
-                  {optimizing ? <><Loader2 size={15} />Optimizing...</> : <><Wand2 size={15} />Generate Optimized CV</>}
+                <button className="hf-btn-ghost" onClick={optimizeCv} disabled={optimizing} style={{ color: optimizing ? T.textMuted : T.cyan, borderColor: optimizing ? T.border : "rgba(34,211,238,0.2)", padding: "12px 20px", fontSize: "14px", borderRadius: 10 }}>
+                  {optimizing ? <><Loader2 size={14} />Optimizing...</> : <><Wand2 size={14} />Optimize CV</>}
                 </button>
-                <button className="hf-btn-ghost" onClick={generateLearningPlan} disabled={roadmapLoading} style={{ color: roadmapLoading ? T.textMuted : T.green, borderColor: roadmapLoading ? T.border : "rgba(16,185,129,0.25)" }}>
-                  {roadmapLoading ? <><Loader2 size={15} />Building...</> : <><Target size={15} />Learning Roadmap</>}
+                <button className="hf-btn-ghost" onClick={generateLearningPlan} disabled={roadmapLoading} style={{ color: roadmapLoading ? T.textMuted : T.green, borderColor: roadmapLoading ? T.border : "rgba(16,185,129,0.2)", padding: "12px 20px", fontSize: "14px", borderRadius: 10 }}>
+                  {roadmapLoading ? <><Loader2 size={14} />Building...</> : <><Target size={14} />Learning Roadmap</>}
                 </button>
               </div>
 
-              {error && <div style={{ display: "flex", gap: 10, padding: "14px 16px", borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", color: "#fca5a5", fontSize: "14px", marginBottom: 20 }}><AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />{error}</div>}
-
-              {alignmentScore !== null && (
-                <>
-                  <div className="hf-card" style={{ padding: 24, marginBottom: 16 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                      <span style={{ fontSize: "14px", fontWeight: 600, color: T.textSub }}>Alignment Score</span>
-                      <span style={{ fontFamily: "'Syne', sans-serif", fontSize: "24px", fontWeight: 800, color: alignmentScore >= 80 ? T.green : alignmentScore >= 60 ? "#fbbf24" : "#f87171" }}>{alignmentScore}/100</span>
-                    </div>
-                    <ProgressBar value={alignmentScore} color={alignmentScore >= 80 ? T.green : alignmentScore >= 60 ? "#fbbf24" : "#f87171"} />
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
-                    <div className="hf-card" style={{ padding: 24 }}>
-                      <h3 style={{ fontSize: "15px", fontWeight: 700, marginBottom: 16 }}>ATS Score</h3>
-                      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                        <ProgressBar value={atsBreakdown.finalAts} color={T.cyan} />
-                        <span style={{ fontWeight: 700, fontSize: "16px", color: T.cyan, whiteSpace: "nowrap" }}>{atsBreakdown.finalAts}/100</span>
-                      </div>
-                      {[["Skills Match", atsBreakdown.skillsScore], ["Keyword Match", atsBreakdown.keywordsScore], ["Experience Match", atsBreakdown.experienceScore], ["Formatting", atsBreakdown.formattingScore]].map(([label, value]) => (
-                        <div key={label} style={{ marginBottom: 10 }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: T.textSub, marginBottom: 5 }}><span>{label}</span><span>{value}</span></div>
-                          <ProgressBar value={value} color="rgba(34,211,238,0.6)" />
-                        </div>
-                      ))}
-                    </div>
-                    <div className="hf-card" style={{ padding: 24 }}>
-                      <h3 style={{ fontSize: "15px", fontWeight: 700, marginBottom: 20 }}>Job Intelligence</h3>
-                      <div style={{ marginBottom: 16 }}>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: T.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Role Type</div>
-                        <div style={{ fontSize: "18px", fontWeight: 700 }}>{roleType || "—"}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: T.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Seniority</div>
-                        <div style={{ fontSize: "18px", fontWeight: 700 }}>{seniority || "—"}</div>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
-                    {[
-                      { title: "Matched Skills", skills: matchedSkills, bg: "rgba(16,185,129,0.1)", border: "rgba(16,185,129,0.2)", color: "#6ee7b7", titleColor: "#10b981" },
-                      { title: "Missing Skills", skills: missingSkills, bg: "rgba(239,68,68,0.1)", border: "rgba(239,68,68,0.2)", color: "#fca5a5", titleColor: "#f87171" },
-                      { title: "Top Keywords", skills: topKeywords, bg: "rgba(59,130,246,0.1)", border: "rgba(59,130,246,0.2)", color: "#93c5fd", titleColor: "#60a5fa" },
-                    ].map(({ title, skills, bg, border, color, titleColor }) => (
-                      <div key={title} className="hf-card" style={{ padding: 20 }}>
-                        <h3 style={{ fontSize: "13px", fontWeight: 700, marginBottom: 14, color: titleColor, textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</h3>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                          {skills.length ? skills.map((s) => <span key={s} style={{ padding: "4px 10px", borderRadius: 999, background: bg, border: `1px solid ${border}`, color, fontSize: "12px", fontWeight: 600 }}>{s}</span>) : <span style={{ color: T.textMuted, fontSize: "12px" }}>None detected</span>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {result && (
-                <div style={{ marginBottom: 16 }}>
-                  <div className="hf-card" style={{ padding: 24 }}>
-                    <h2 style={{ fontSize: "16px", fontWeight: 700, marginBottom: 16 }}>Alignment Report</h2>
-                    <pre style={{ whiteSpace: "pre-wrap", fontFamily: "monospace", fontSize: "13px", lineHeight: 1.7, color: "#cbd5e1" }}>{result}</pre>
-                  </div>
-                  <div style={{ display: "flex", gap: 10, marginTop: 12 }}>
-                    <button className="hf-btn-primary" onClick={() => navigator.clipboard.writeText(result)} style={{ fontSize: "13px", padding: "10px 18px", background: T.green }}><Copy size={13} />Copy Report</button>
-                    <button className="hf-btn-ghost" onClick={() => downloadText(result, "hirefit-report.txt")} style={{ fontSize: "13px", padding: "10px 18px" }}><Download size={13} />Download</button>
-                  </div>
+              {error && (
+                <div style={{ display: "flex", gap: 10, padding: "14px 16px", borderRadius: 12, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", color: "#fca5a5", fontSize: "14px", marginBottom: 16 }}>
+                  <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />{error}
                 </div>
               )}
 
-              {optimizedCv && (
-                <div className="hf-card" style={{ padding: 24, marginBottom: 16 }}>
-                  <h2 style={{ fontSize: "16px", fontWeight: 700, marginBottom: 16 }}>Optimized CV Version</h2>
-                  <pre style={{ whiteSpace: "pre-wrap", fontFamily: "monospace", fontSize: "13px", lineHeight: 1.7, color: "#cbd5e1" }}>{optimizedCv}</pre>
-                  <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
-                    <button className="hf-btn-primary" onClick={() => navigator.clipboard.writeText(optimizedCv)} style={{ fontSize: "13px", padding: "10px 18px" }}><Copy size={13} />Copy</button>
-                    <button className="hf-btn-ghost" onClick={() => downloadText(optimizedCv, "hirefit-optimized-cv.txt")} style={{ fontSize: "13px", padding: "10px 18px" }}><Download size={13} />Download</button>
-                  </div>
-                </div>
-              )}
-
-              {learningPlan && (
-                <div className="hf-card" style={{ padding: 24 }}>
-                  <h2 style={{ fontSize: "16px", fontWeight: 700, marginBottom: 16 }}>Learning Roadmap</h2>
-                  <pre style={{ whiteSpace: "pre-wrap", fontFamily: "monospace", fontSize: "13px", lineHeight: 1.7, color: "#cbd5e1" }}>{learningPlan}</pre>
-                  <button className="hf-btn-primary" onClick={() => navigator.clipboard.writeText(learningPlan)} style={{ marginTop: 16, fontSize: "13px", padding: "10px 18px", background: T.green }}><Copy size={13} />Copy Roadmap</button>
-                </div>
+              {alignmentScore !== null && analysisData && (
+                <DashboardResults
+                  data={analysisData}
+                  score={alignmentScore}
+                  matchedSkills={matchedSkills}
+                  missingSkills={missingSkills}
+                  topKeywords={topKeywords}
+                  result={result}
+                  optimizedCv={optimizedCv}
+                  learningPlan={learningPlan}
+                  downloadText={downloadText}
+                />
               )}
             </div>
 
             <aside>
-              <div style={{ position: "sticky", top: 80 }}>
-                <HistoryList history={history} onLoadItem={loadHistoryItem} onClear={clearHistory} compact />
+              <div style={{ position: "sticky", top: 88 }}>
+                <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: 20 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "13px", fontWeight: 700 }}>
+                      <History size={14} color={T.blue} />Previous Analyses
+                    </div>
+                    <button onClick={clearHistory} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontWeight: 600, fontSize: "11px", fontFamily: "'DM Sans', sans-serif" }}>
+                      <Trash2 size={10} /> Clear
+                    </button>
+                  </div>
+                  {history.length === 0 ? (
+                    <div style={{ color: "#334155", fontSize: "12px", textAlign: "center", padding: "24px 0" }}>No analyses yet.</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {history.map((item) => (
+                        <div key={item.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 12, padding: 12, cursor: "pointer", transition: "all 0.2s" }} onClick={() => loadHistoryItem(item)}>
+                          <div style={{ fontWeight: 700, marginBottom: 3, fontSize: "13px", color: "#f1f5f9" }}>{item.role}</div>
+                          <div style={{ fontSize: "11px", color: item.score >= 80 ? T.green : item.score >= 60 ? "#f59e0b" : "#f87171", marginBottom: 2, fontWeight: 600 }}>{item.score}/100</div>
+                          <div style={{ fontSize: "10px", color: "#334155" }}>{item.createdAt}</div>
+                          <a href={`/report/${item.id}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: "11px", color: T.cyan, textDecoration: "none", display: "block", marginTop: 6, fontWeight: 600 }}>View Report →</a>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </aside>
           </div>

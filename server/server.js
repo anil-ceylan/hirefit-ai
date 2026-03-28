@@ -5,11 +5,28 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-console.log("OPENROUTER:", process.env.OPENROUTER_API_KEY);
-
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+if (!process.env.OPENROUTER_API_KEY) {
+  console.error("❌ OPENROUTER_API_KEY missing!");
+}
+
+function extractJSON(text) {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    const match = text.match(/\{[\s\S]*\}/);
+    if (!match) return null;
+    try {
+      return JSON.parse(match[0]);
+    } catch {
+      return null;
+    }
+  }
+}
 
 app.post("/analyze", async (req, res) => {
   const { cvText, jobDescription } = req.body;
@@ -27,74 +44,240 @@ app.post("/analyze", async (req, res) => {
       },
       body: JSON.stringify({
         model: "openai/gpt-4o-mini",
+        temperature: 0.1,
+        response_format: { type: "json_object" },
         messages: [
           {
             role: "user",
-            content: `
-Analyze CV vs Job Description.
+            content: `You are an expert career analyst and senior recruiter with 15+ years of experience across tech, consulting, finance, and FMCG sectors. Analyze the CV against the Job Description with extreme precision and return a comprehensive JSON analysis.
 
-CV: ${cvText}
+Be specific, honest, and actionable. Reference actual content from the CV — never give generic advice. If you see "McKinsey Forward Program", mention it. If you see specific tools or projects, reference them directly.
 
-Job: ${jobDescription}
+CV:
+${cvText}
 
-Return ONLY valid JSON. No explanation.
+Job Description:
+${jobDescription}
 
-Format:
+Return ONLY valid JSON. No markdown, no explanation, no extra text.
+
 {
-  "hireProbability": number,
-  "confidence": "Low" | "Medium" | "High",
-  "rejectionReasons": {
-    "high": string[],
-    "medium": string[],
-    "low": string[]
+  "alignment_score": <number 40-91, be realistic>,
+  "role_type": "<exact job title from JD>",
+  "seniority": "<Intern|Junior|Mid|Senior>",
+  "confidence_score": <number 60-95>,
+  "confidence_level": "<Low|Medium|High>",
+  "confidence_basis": "<1 sentence: what made you confident or uncertain>",
+
+  "matched_skills": ["<specific skill from CV that matches JD>"],
+  "missing_skills": ["<specific skill in JD not found in CV>"],
+  "top_keywords": ["<most important keyword from JD>"],
+
+  "score_breakdown": {
+    "skills_match": <number 0-100>,
+    "keyword_match": <number 0-100>,
+    "experience_depth": <number 0-100>,
+    "formatting": <number 0-100>,
+    "skills_explanation": "<1 sentence why this score>",
+    "experience_explanation": "<1 sentence why this score>"
+  },
+
+  "fit_summary": "<2-3 sentences, reference specific CV content>",
+
+  "strengths": ["<specific strength with CV reference>"],
+  "improvements": ["<specific actionable improvement>"],
+
+  "rejection_reasons": {
+    "high": ["<critical reason — specific, not generic>"],
+    "medium": ["<moderate concern>"],
+    "low": ["<minor issue>"]
+  },
+
+  "recruiter_simulation": {
+    "sector": "<sector of the role>",
+    "first_impression": "<what recruiter notices in first 7 seconds — specific>",
+    "internal_monologue": "<2-3 sentences: what recruiter actually thinks, conversational, honest — reference CV specifics>",
+    "would_interview": <true|false>,
+    "decision": "<one line: shortlist / reject / follow-up / strong yes>",
+    "red_flags": ["<specific red flag from CV>"],
+    "standout_moments": ["<specific thing that impressed>"]
+  },
+
+  "blind_spots": [
+    {
+      "issue": "<what candidate thinks is fine but isn't — be specific>",
+      "why_it_hurts": "<why recruiters see this negatively>",
+      "fix": "<exact rewrite or action — concrete>"
+    }
+  ],
+
+  "benchmark": {
+    "gap_percentage": <number 0-60>,
+    "before_after_estimate": <number, predicted score after fixes>,
+    "dimensions": [
+      {
+        "name": "<dimension name>",
+        "candidate_level": "<Basic|Some|Good|Strong|Missing>",
+        "ideal_level": "<what ideal candidate has>",
+        "closeable": <true|false>
+      }
+    ]
+  },
+
+  "interview_prep": [
+    {
+      "question": "<likely interview question>",
+      "why_asked": "<why they ask this for this specific role>",
+      "personal_angle": "<specific tip using candidate's actual CV content>"
+    }
+  ],
+
+  "role_matches": [
+    {
+      "role": "<role title>",
+      "match_score": <number 60-95>,
+      "reason": "<1 sentence why CV fits this role>"
+    }
+  ],
+
+  "salary_insight": {
+    "range_min": <number>,
+    "range_max": <number>,
+    "currency": "<TRY|USD|EUR|GBP>",
+    "mid_point": <number>,
+    "confidence": "<Low|Medium|High>",
+    "context": "<brief market context>"
+  },
+
+  "ats_compatibility": [
+    {
+      "system": "<Workday|Greenhouse|Lever|SAP|Taleo>",
+      "status": "<Passes|Review|At Risk>",
+      "note": "<specific reason>"
+    }
+  ],
+
+  "culture_fit": {
+    "overall_score": <number 40-95>,
+    "dimensions": [
+      {
+        "name": "<dimension like Innovation|Fast pace|Ambiguity|Collaboration>",
+        "score": <number 40-95>,
+        "signal": "<what in CV signals this>"
+      }
+    ]
+  },
+
+  "language_analysis": {
+    "passive_voice_count": <number>,
+    "weak_phrases": ["<exact phrase from CV that is weak>"],
+    "missing_impact_metrics": <true|false>,
+    "tone": "<Professional|Too casual|Too formal|Appropriate>"
   }
-}
-`
+}`
           }
         ]
       })
     });
 
     const data = await response.json();
+    const rawText = data?.choices?.[0]?.message?.content;
+    console.log("🧠 RAW AI:", rawText);
 
-    const text = data.choices?.[0]?.message?.content;
+    const parsed = extractJSON(rawText);
 
-    console.log("RAW AI:", text);
-
-    // 🔥 JSON PARSE (CRITICAL)
-    let parsed;
-
-    try {
-      parsed = JSON.parse(text);
-    } catch (e) {
-      console.log("PARSE ERROR:", e);
-
+    if (!parsed) {
+      console.log("⚠️ PARSE FAILED");
       return res.json({
-        hireProbability: 50,
-        confidence: "Medium",
-        rejectionReasons: {
-          high: ["AI response parsing failed"],
-          medium: [],
-          low: []
-        }
+        alignment_score: 50,
+        confidence_level: "Medium",
+        rejection_reasons: { high: ["Parsing failed"], medium: [], low: [] }
       });
     }
 
-    // ✅ SUCCESS RESPONSE
     return res.json(parsed);
 
   } catch (err) {
-    console.error("SERVER ERROR:", err);
-
+    console.error("💥 SERVER ERROR:", err);
     return res.status(500).json({
-      hireProbability: 0,
-      confidence: "Low",
-      rejectionReasons: {
-        high: ["Server error"],
-        medium: [],
-        low: []
-      }
+      alignment_score: 0,
+      confidence_level: "Low",
+      rejection_reasons: { high: ["Server error"], medium: [], low: [] }
     });
+  }
+});
+
+app.post("/optimize", async (req, res) => {
+  const { cvText, jobDescription } = req.body;
+  if (!cvText || !jobDescription) return res.status(400).json({ error: "Missing CV or JD" });
+
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-4o-mini",
+        temperature: 0.3,
+        messages: [
+          {
+            role: "user",
+            content: `You are an expert CV writer. Rewrite the following CV to be fully optimized for the job description below. Keep all real experience and facts — only improve wording, structure, and keyword alignment. Return ONLY the rewritten CV text, no explanations.
+
+CV:
+${cvText}
+
+Job Description:
+${jobDescription}`
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    const optimizedCv = data?.choices?.[0]?.message?.content || "";
+    return res.json({ optimizedCv });
+
+  } catch (err) {
+    console.error("💥 OPTIMIZE ERROR:", err);
+    return res.status(500).json({ error: "Optimization failed" });
+  }
+});
+
+app.post("/roadmap", async (req, res) => {
+  const { missingSkills, roleType, seniority } = req.body;
+  if (!missingSkills?.length) return res.status(400).json({ error: "No missing skills provided" });
+
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-4o-mini",
+        temperature: 0.4,
+        messages: [
+          {
+            role: "user",
+            content: `Create a concise 30-day learning roadmap for someone targeting a ${seniority || "Junior"} ${roleType || "role"} who is missing these skills: ${missingSkills.join(", ")}.
+
+For each skill provide: week number, specific resource (course/book/project), and estimated hours. Be practical and specific. Return as plain text, no JSON.`
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    const roadmap = data?.choices?.[0]?.message?.content || "";
+    return res.json({ roadmap });
+
+  } catch (err) {
+    console.error("💥 ROADMAP ERROR:", err);
+    return res.status(500).json({ error: "Roadmap generation failed" });
   }
 });
 
