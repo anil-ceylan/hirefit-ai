@@ -29,7 +29,8 @@ function extractJSON(text) {
 }
 
 app.post("/analyze", async (req, res) => {
-  const { cvText, jobDescription } = req.body;
+  const { cvText, jobDescription, sector } = req.body;
+  console.log("SECTOR RECEIVED:", sector);
 
   if (!cvText || !jobDescription) {
     return res.status(400).json({ error: "Missing CV or Job Description" });
@@ -49,9 +50,9 @@ app.post("/analyze", async (req, res) => {
         messages: [
           {
             role: "user",
-            content: `You are an expert career analyst and senior recruiter with 15+ years of experience across tech, consulting, finance, and FMCG sectors. Analyze the CV against the Job Description with extreme precision and return a comprehensive JSON analysis.
+            content: `You are an expert career analyst and senior recruiter with 15+ years of experience. ${sector && sector !== "Auto-detect" ? `You are specifically evaluating this CV as a ${sector} sector recruiter. Apply the exact standards, expectations, and red flags that ${sector} recruiters care about most.` : "You have deep expertise across tech, consulting, finance, and FMCG sectors."} Analyze the CV against the Job Description with extreme precision and return a comprehensive JSON analysis.
 
-Be specific, honest, and actionable. Reference actual content from the CV — never give generic advice. If you see "McKinsey Forward Program", mention it. If you see specific tools or projects, reference them directly.
+
 
 CV:
 ${cvText}

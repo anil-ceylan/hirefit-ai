@@ -915,6 +915,7 @@ function MainApp() {
   const [topKeywords, setTopKeywords] = useState([]);
   const [history, setHistory] = useState([]);
   const [analysisData, setAnalysisData] = useState(null);
+  const [sector, setSector] = useState("Auto-detect");
 
   const extractDataFromReport = (text) => {
     const scoreMatch = text.match(/Final Alignment Score:\s*(\d+)/i);
@@ -975,10 +976,11 @@ function MainApp() {
   };
 
   const analyze = async () => {
+    console.log("SECTOR:", sector);
     if (!cvText.trim() || !jdText.trim()) { setError("Please paste both the CV and the Job Description."); return; }
     setLoading(true); setError("");
     try {
-      const res = await fetch("http://localhost:3000/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cvText, jobDescription: jdText }) });
+      const res = await fetch("https://hirefit-ai-production.up.railway.app/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cvText, jobDescription: jdText }) });
       const data = await res.json();
       setAlignmentScore(data.alignment_score ?? null);
       setRoleType(data.role_type ?? "");
@@ -999,7 +1001,7 @@ function MainApp() {
     if (!cvText.trim() || !jdText.trim()) { setError("Please paste both the CV and JD first."); return; }
     setOptimizing(true); setError(""); setOptimizedCv("");
     try {
-      const res = await fetch("http://localhost:3000/optimize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cvText, jobDescription: jdText }) });
+      const res = await fetch("https://hirefit-ai-production.up.railway.app/optimize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cvText, jobDescription: jdText, sector }) });
       const data = await res.json();
       setOptimizedCv(data.optimizedCv || "");
     } catch { setError("CV optimization failed."); }
@@ -1010,7 +1012,7 @@ function MainApp() {
     if (!missingSkills.length) { setError("No missing skills detected yet."); return; }
     setRoadmapLoading(true); setError(""); setLearningPlan("");
     try {
-      const res = await fetch("http://localhost:3000/roadmap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ missingSkills, roleType, seniority }) });
+      const res = await fetch("https://hirefit-ai-production.up.railway.app/roadmap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ missingSkills, roleType, seniority }) });
       const data = await res.json();
       setLearningPlan(data.roadmap || "");
     } catch { setError("Failed to generate learning roadmap."); }
@@ -1179,6 +1181,23 @@ function MainApp() {
                   </div>
                 </div>
               </div>
+
+              <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
+  {["Auto-detect", "Tech / Startup", "Consulting", "Finance", "FMCG / Retail", "Healthcare", "Government"].map((s) => (
+    <button
+      key={s}
+      onClick={() => setSector(s)}
+      style={{
+        padding: "6px 14px", borderRadius: 999, fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s",
+        background: sector === s ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)",
+        border: `1px solid ${sector === s ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.07)"}`,
+        color: sector === s ? "#a78bfa" : "#475569",
+      }}
+    >
+      {s}
+    </button>
+  ))}
+</div>
 
               <ProgressStepper cvText={cvText} jdText={jdText} loading={loading} analysisData={analysisData} />
 
