@@ -1082,7 +1082,8 @@ function MainApp() {
   };
 
   const logout = async () => { 
-  await supabase.auth.signOut(); 
+  await supabase.auth.signOut();
+  localStorage.removeItem("hirefit-user");
   setUser(null); 
   navigate("/"); 
 };
