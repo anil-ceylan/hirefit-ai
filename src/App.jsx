@@ -939,7 +939,7 @@ function MainApp() {
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     if (session?.user) {
       setUser(session.user);
-      if (event === "SIGNED_IN") navigate("/dashboard");
+      if (event === "SIGNED_IN" && window.location.pathname === "/login") navigate("/dashboard");
     } else {
       setUser(null);
     }
