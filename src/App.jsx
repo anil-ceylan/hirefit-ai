@@ -936,6 +936,23 @@ function MainApp() {
   };
 
   useEffect(() => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    if (session?.user) {
+      setUser(session.user);
+      if (event === "SIGNED_IN") navigate("/dashboard");
+    } else {
+      setUser(null);
+    }
+  });
+
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session?.user) setUser(session.user);
+  });
+
+  return () => subscription.unsubscribe();
+}, []);
+
+  useEffect(() => {
     const savedUser = localStorage.getItem("hirefit-user");
     const savedWaitlist = localStorage.getItem("hirefit-waitlist");
     if (savedUser) { try { setUser(JSON.parse(savedUser)); } catch {} }
@@ -980,7 +997,7 @@ function MainApp() {
     if (!cvText.trim() || !jdText.trim()) { setError("Please paste both the CV and the Job Description."); return; }
     setLoading(true); setError("");
     try {
-      const res = await fetch("https://hirefit-ai-production.up.railway.app/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cvText, jobDescription: jdText }) });
+      const res = await fetch("https://hirefit-ai-production.up.railway.app/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cvText, jobDescription: jdText, sector }) });
       const data = await res.json();
       setAlignmentScore(data.alignment_score ?? null);
       setRoleType(data.role_type ?? "");
@@ -1046,15 +1063,6 @@ function MainApp() {
   const clearHistory = () => { setHistory([]); localStorage.removeItem("hirefit-history"); };
   const loadHistoryItem = (item) => { setCvText(item.cvText || ""); setJdText(item.jdText || ""); setResult(item.report || ""); extractDataFromReport(item.report || ""); setOptimizedCv(""); setLearningPlan(""); setError(""); navigate("/app"); };
   const login = async () => {
-  const loginWithGoogle = async () => {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: "https://hirefit-ai.vercel.app/dashboard"
-    }
-  });
-  if (error) console.error(error);
-};
     if (!email.trim() || !password.trim()) { setError("Please enter both email and password."); return; }
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
@@ -1062,6 +1070,17 @@ function MainApp() {
       setUser(data.user); setEmail(""); setPassword(""); setError(""); navigate("/dashboard");
     } catch { setError("Login failed."); }
   };
+
+  const loginWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: "https://hirefit-ai.vercel.app/dashboard"
+      }
+    });
+    if (error) console.error(error);
+  };
+
   const logout = () => { setUser(null); navigate("/"); };
   const downloadText = (content, filename) => {
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
