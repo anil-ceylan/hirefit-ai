@@ -126,6 +126,35 @@ function parseBullets(text, sectionName) {
   return match[1].split("\n").map((l) => l.replace(/^[-•\s*]+/, "").trim()).filter(Boolean);
 }
 
+function PaywallModal({ onClose, onUpgrade }) {
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ background: "#0c0c0c", border: "1px solid rgba(212,175,55,0.3)", borderRadius: 24, padding: 40, maxWidth: 480, width: "100%", position: "relative", textAlign: "center" }}>
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "24px 24px 0 0", background: "linear-gradient(90deg, #d4af37, #f0d060)" }} />
+        <div style={{ fontSize: 40, marginBottom: 16 }}>🚀</div>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, color: "#f1f5f9", marginBottom: 8 }}>You've hit your free limit</div>
+        <div style={{ fontSize: 14, color: "#7a7a7a", lineHeight: 1.7, marginBottom: 28 }}>
+          You've used your 2 free analyses. Upgrade to Pro for unlimited analyses, CV Rewriter, Recruiter Simulation, and full insights.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
+          {["Unlimited analyses", "CV Rewriter", "Recruiter Simulation", "Salary Insights", "ATS Compatibility", "Interview Prep"].map(f => (
+            <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#94a3b8" }}>
+              <span style={{ color: "#d4af37" }}>✓</span> {f}
+            </div>
+          ))}
+        </div>
+        <button onClick={onUpgrade} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "linear-gradient(135deg, #d4af37, #f0d060)", color: "#000", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>
+          Upgrade to Pro — $12/mo 🚀
+        </button>
+        <button onClick={onClose} style={{ width: "100%", padding: "12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: "#475569", fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+          Maybe later
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
 function ProgressStepper({ cvText, jdText, loading, analysisData }) {
   const steps = [
     { label: "Paste CV", done: cvText.trim().length > 50 },
@@ -916,6 +945,8 @@ function MainApp() {
   const [history, setHistory] = useState([]);
   const [analysisData, setAnalysisData] = useState(null);
   const [sector, setSector] = useState("Auto-detect");
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [analysisCount, setAnalysisCount] = useState(0);
 
   const extractDataFromReport = (text) => {
     const scoreMatch = text.match(/Final Alignment Score:\s*(\d+)/i);
@@ -1001,23 +1032,28 @@ function MainApp() {
   const analyze = async () => {
     console.log("SECTOR:", sector);
     if (!cvText.trim() || !jdText.trim()) { setError("Please paste both the CV and the Job Description."); return; }
+
     if (!user) {
   const anonCount = Number(localStorage.getItem("hirefit-anon-count") || 0);
   if (anonCount >= 2) {
-    setError("You've used your 2 free analyses. Sign in to continue.");
-    window.open("https://hirefit.lemonsqueezy.com/checkout/buy/19ee5972-0f76-4d2f-b2a0-9e08dc9a9a7d", "_blank");
+    setShowPaywall(true);
     return;
   }
   localStorage.setItem("hirefit-anon-count", String(anonCount + 1));
+  setAnalysisCount(anonCount + 1);
 } else {
   const userCount = Number(localStorage.getItem(`hirefit-count-${user.id}`) || 0);
   if (userCount >= 2) {
-    setError("You've used your 2 free analyses. Upgrade to Pro for unlimited access.");
-    window.open("https://hirefit.lemonsqueezy.com/checkout/buy/19ee5972-0f76-4d2f-b2a0-9e08dc9a9a7d", "_blank");
+    setShowPaywall(true);
     return;
   }
   localStorage.setItem(`hirefit-count-${user.id}`, String(userCount + 1));
+  setAnalysisCount(userCount + 1);
 }
+
+
+
+
     setLoading(true); setError("");
     try {
       const res = await fetch("https://hirefit-ai-production.up.railway.app/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cvText, jobDescription: jdText, sector }) });
@@ -1125,6 +1161,16 @@ function MainApp() {
   return (
     <div style={styles.page}>
       <NavBar view={view} setView={setView} user={user} logout={logout} navigate={navigate} />
+
+      {showPaywall && (
+  <PaywallModal
+    onClose={() => setShowPaywall(false)}
+    onUpgrade={() => {
+      setShowPaywall(false);
+      window.open("https://hirefit.lemonsqueezy.com/checkout/buy/19ee5972-0f76-4d2f-b2a0-9e08dc9a9a7d", "_blank");
+    }}
+  />
+)}
 
       {view === "landing" && (
         <>
@@ -1245,6 +1291,18 @@ function MainApp() {
                   </div>
                 </div>
               </div>
+
+              {(() => {
+  const count = user 
+    ? Number(localStorage.getItem(`hirefit-count-${user.id}`) || 0)
+    : Number(localStorage.getItem("hirefit-anon-count") || 0);
+  const remaining = Math.max(0, 2 - count);
+  return remaining < 2 ? (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 8, background: remaining === 0 ? "rgba(239,68,68,0.08)" : "rgba(245,158,11,0.08)", border: `1px solid ${remaining === 0 ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)"}`, marginBottom: 8, fontSize: 13, color: remaining === 0 ? "#f87171" : "#fbbf24", fontWeight: 600 }}>
+      {remaining === 0 ? "⚠️ No free analyses left — Upgrade to Pro" : `⚡ ${remaining} free analysis remaining`}
+    </div>
+  ) : null;
+})()}
 
               <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
   {["Auto-detect", "Tech / Startup", "Consulting", "Finance", "FMCG / Retail", "Healthcare", "Government"].map((s) => (
