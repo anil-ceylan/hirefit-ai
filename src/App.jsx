@@ -1081,7 +1081,11 @@ function MainApp() {
     if (error) console.error(error);
   };
 
-  const logout = () => { setUser(null); navigate("/"); };
+  const logout = async () => { 
+  await supabase.auth.signOut(); 
+  setUser(null); 
+  navigate("/"); 
+};
   const downloadText = (content, filename) => {
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = URL.createObjectURL(blob);
