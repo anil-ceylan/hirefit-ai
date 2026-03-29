@@ -995,6 +995,23 @@ function MainApp() {
   const analyze = async () => {
     console.log("SECTOR:", sector);
     if (!cvText.trim() || !jdText.trim()) { setError("Please paste both the CV and the Job Description."); return; }
+    if (!user) {
+  const anonCount = Number(localStorage.getItem("hirefit-anon-count") || 0);
+  if (anonCount >= 2) {
+    setError("You've used your 2 free analyses. Sign in to continue.");
+    window.open("https://hirefit.lemonsqueezy.com/checkout/buy/19ee5972-0f76-4d2f-b2a0-9e08dc9a9a7d", "_blank");
+    return;
+  }
+  localStorage.setItem("hirefit-anon-count", String(anonCount + 1));
+} else {
+  const userCount = Number(localStorage.getItem(`hirefit-count-${user.id}`) || 0);
+  if (userCount >= 2) {
+    setError("You've used your 2 free analyses. Upgrade to Pro for unlimited access.");
+    window.open("https://hirefit.lemonsqueezy.com/checkout/buy/19ee5972-0f76-4d2f-b2a0-9e08dc9a9a7d", "_blank");
+    return;
+  }
+  localStorage.setItem(`hirefit-count-${user.id}`, String(userCount + 1));
+}
     setLoading(true); setError("");
     try {
       const res = await fetch("https://hirefit-ai-production.up.railway.app/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cvText, jobDescription: jdText, sector }) });
