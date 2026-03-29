@@ -928,12 +928,18 @@ function MainApp() {
   };
 
   const fetchAnalyses = async () => {
-    try {
-      const { data, error: fetchError } = await supabase.from("analyses").select("*").order("created_at", { ascending: false }).limit(10);
-      if (fetchError) return;
-      setHistory((data || []).map((item) => ({ id: item.id, createdAt: new Date(item.created_at).toLocaleString(), role: item.role, score: item.alignment_score, cvText: item.cv_text, jdText: item.job_description, report: item.report })));
-    } catch (err) { console.error(err); }
-  };
+  try {
+    const clearedAt = localStorage.getItem("hirefit-cleared-at");
+    const { data, error: fetchError } = await supabase.from("analyses").select("*").order("created_at", { ascending: false }).limit(10);
+    if (fetchError) return;
+    const filtered = (data || []).filter(item => 
+      !clearedAt || new Date(item.created_at) > new Date(clearedAt)
+    );
+    setHistory(filtered.map((item) => ({ id: item.id, createdAt: new Date(item.created_at).toLocaleString(), role: item.role, score: item.alignment_score, cvText: item.cv_text, jdText: item.job_description, report: item.report })));
+  } catch (err) { console.error(err); }
+};
+    
+      
 
   useEffect(() => {
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -1077,7 +1083,11 @@ function MainApp() {
     finally { setUploadingPdf(false); }
   };
 
-  const clearHistory = () => { setHistory([]); localStorage.removeItem("hirefit-history"); };
+  const clearHistory = async () => {
+  setHistory([]);
+  localStorage.removeItem("hirefit-history");
+  localStorage.setItem("hirefit-cleared-at", new Date().toISOString());
+};
   const loadHistoryItem = (item) => { setCvText(item.cvText || ""); setJdText(item.jdText || ""); setResult(item.report || ""); extractDataFromReport(item.report || ""); setOptimizedCv(""); setLearningPlan(""); setError(""); navigate("/app"); };
   const login = async () => {
     if (!email.trim() || !password.trim()) { setError("Please enter both email and password."); return; }
