@@ -506,7 +506,7 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
   );
 }
 
-function NavBar({ view, user, logout, navigate }) {
+function NavBar({ view, user, logout, navigate, lang, setLang }) {
   const [scrolled, setScrolled] = useState(false);
   const [hovered, setHovered] = useState(null);
 
@@ -557,6 +557,38 @@ function NavBar({ view, user, logout, navigate }) {
           ))}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+  onClick={() => setLang(lang === "EN" ? "TR" : "EN")}
+  style={{
+    display: "flex", alignItems: "center", gap: 8,
+    padding: "7px 14px", borderRadius: 10,
+    border: `1px solid ${lang === "TR" ? "rgba(220,38,38,0.3)" : "rgba(59,130,246,0.3)"}`,
+    background: lang === "TR" ? "rgba(220,38,38,0.08)" : "rgba(59,130,246,0.08)",
+    cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+    transition: "all 0.3s ease",
+  }}
+>
+  {lang === "EN" ? (
+    <svg width="20" height="14" viewBox="0 0 20 14" fill="none">
+      <rect width="20" height="14" fill="#E30A17"/>
+      <circle cx="7.5" cy="7" r="3" fill="white"/>
+      <circle cx="8.5" cy="7" r="2.3" fill="#E30A17"/>
+      <polygon points="11,7 12.5,5.5 12.5,8.5" fill="white"/>
+    </svg>
+  ) : (
+    <svg width="20" height="14" viewBox="0 0 20 14" fill="none">
+      <rect width="20" height="14" fill="#012169"/>
+      <path d="M0,0 L20,14 M20,0 L0,14" stroke="white" strokeWidth="2.5"/>
+      <path d="M0,0 L20,14 M20,0 L0,14" stroke="#C8102E" strokeWidth="1.5"/>
+      <path d="M10,0 V14 M0,7 H20" stroke="white" strokeWidth="4"/>
+      <path d="M10,0 V14 M0,7 H20" stroke="#C8102E" strokeWidth="2.5"/>
+    </svg>
+  )}
+  <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: lang === "EN" ? "#f87171" : "#93c5fd" }}>
+    {lang === "EN" ? "Türkçe" : "English"}
+  </span>
+</button>
+  
           {user ? (
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0, background: "linear-gradient(135deg, #3b82f6, #8b5cf6)", display: "grid", placeItems: "center", fontSize: "14px", fontWeight: 800, color: "white", boxShadow: "0 0 16px rgba(99,102,241,0.5)", fontFamily: "'Syne', sans-serif" }}>
@@ -945,6 +977,7 @@ function MainApp() {
   const [history, setHistory] = useState([]);
   const [analysisData, setAnalysisData] = useState(null);
   const [sector, setSector] = useState("Auto-detect");
+  const [lang, setLang] = useState("EN");
   const [showPaywall, setShowPaywall] = useState(false);
   const [analysisCount, setAnalysisCount] = useState(0);
 
@@ -1160,7 +1193,7 @@ function MainApp() {
 
   return (
     <div style={styles.page}>
-      <NavBar view={view} setView={setView} user={user} logout={logout} navigate={navigate} />
+      <NavBar view={view} setView={setView} user={user} logout={logout} navigate={navigate} lang={lang} setLang={setLang} />
 
       {showPaywall && (
   <PaywallModal
