@@ -282,6 +282,43 @@ For each skill provide: week number, specific resource (course/book/project), an
   }
 });
 
+app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  const secret = process.env.LEMON_WEBHOOK_SECRET;
+  const signature = req.headers["x-signature"];
+  
+  const crypto = await import("crypto");
+  const hmac = crypto.default.createHmac("sha256", secret);
+  const digest = hmac.update(req.body).digest("hex");
+  
+  if (digest !== signature) {
+    return res.status(401).json({ error: "Invalid signature" });
+  }
+
+  const payload = JSON.parse(req.body.toString());
+  const eventName = payload.meta?.event_name;
+  const userEmail = payload.data?.attributes?.user_email;
+
+  if (eventName === "order_created" || eventName === "subscription_created") {
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabase = createClient(
+      process.env.VITE_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
+    const { data: users } = await supabase.auth.admin.listUsers();
+    const user = users?.users?.find(u => u.email === userEmail);
+
+    if (user) {
+      await supabase.from("user_plans").upsert({
+        user_id: user.id,
+        plan: "pro"
+      }, { onConflict: "user_id" });
+    }
+  }
+
+  res.json({ received: true });
+});
+
 app.listen(3000, () => {
   console.log("🚀 Backend running on http://localhost:3000");
 });
