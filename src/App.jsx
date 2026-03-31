@@ -13,6 +13,55 @@ import workerSrc from "pdfjs-dist/build/pdf.worker?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
+const translations = {
+  EN: {
+    heroTitle: "Why does your CV keep getting rejected?",
+    heroDesc: "HireFit analyzes your CV against any job description and tells you exactly what recruiters see — in seconds.",
+    analyzeBtn: "Analyze My CV Free",
+    checkFit: "Check My Fit",
+    optimizeCV: "Optimize CV",
+    pasteCv: "Paste your CV text here...",
+    pasteJd: "Paste the job description here...",
+    candidateCV: "Candidate CV",
+    jobDesc: "Job Description",
+    uploadPdf: "Upload PDF",
+    freeToUse: "Free to use",
+    analyzing: "Analyzing...",
+    optimizing: "Optimizing...",
+    noAnalyses: "No analyses yet.",
+    previousAnalyses: "Previous Analyses",
+    freeLimitWarning: "free analysis remaining",
+    noFreeLeft: "No free analyses left — Upgrade to Pro",
+    upgradeBtn: "Upgrade to Pro — $9.99/mo 🚀",
+    maybeLater: "Maybe later",
+    paywallTitle: "You've hit your free limit",
+    paywallDesc: "You've used your 2 free analyses. Upgrade to Pro for unlimited analyses, CV Rewriter, Recruiter Simulation, and full insights.",
+  },
+  TR: {
+    heroTitle: "CV'niz neden sürekli reddediliyor?",
+    heroDesc: "HireFit, CV'nizi iş ilanıyla karşılaştırır ve işe alım uzmanlarının tam olarak ne gördüğünü saniyeler içinde söyler.",
+    analyzeBtn: "CV'mi Ücretsiz Analiz Et",
+    checkFit: "Uyumu Kontrol Et",
+    optimizeCV: "CV'yi Optimize Et",
+    pasteCv: "CV metninizi buraya yapıştırın...",
+    pasteJd: "İş ilanını buraya yapıştırın...",
+    candidateCV: "Aday CV'si",
+    jobDesc: "İş Tanımı",
+    uploadPdf: "PDF Yükle",
+    freeToUse: "Ücretsiz kullanım",
+    analyzing: "Analiz ediliyor...",
+    optimizing: "Optimize ediliyor...",
+    noAnalyses: "Henüz analiz yok.",
+    previousAnalyses: "Önceki Analizler",
+    freeLimitWarning: "ücretsiz analiz hakkın kaldı",
+    noFreeLeft: "Ücretsiz hakkın bitti — Pro'ya Geç",
+    upgradeBtn: "Pro'ya Geç — $9.99/ay 🚀",
+    maybeLater: "Belki sonra",
+    paywallTitle: "Ücretsiz limitine ulaştın",
+    paywallDesc: "2 ücretsiz analizini kullandın. Sınırsız analiz, CV Yazıcı, İşe Alım Simülasyonu ve tam içgörüler için Pro'ya geç.",
+  }
+};
+
 const T = {
   bg: "#060910",
   bgCard: "rgba(255,255,255,0.03)",
@@ -126,16 +175,16 @@ function parseBullets(text, sectionName) {
   return match[1].split("\n").map((l) => l.replace(/^[-•\s*]+/, "").trim()).filter(Boolean);
 }
 
-function PaywallModal({ onClose, onUpgrade }) {
+function PaywallModal({ onClose, onUpgrade, lang }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ background: "#0c0c0c", border: "1px solid rgba(212,175,55,0.3)", borderRadius: 24, padding: 40, maxWidth: 480, width: "100%", position: "relative", textAlign: "center" }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "24px 24px 0 0", background: "linear-gradient(90deg, #d4af37, #f0d060)" }} />
         <div style={{ fontSize: 40, marginBottom: 16 }}>🚀</div>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, color: "#f1f5f9", marginBottom: 8 }}>You've hit your free limit</div>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, color: "#f1f5f9", marginBottom: 8 }}>{lang === "TR" ? "Ücretsiz limitine ulaştın" : "You've hit your free limit"}</div>
         <div style={{ fontSize: 14, color: "#7a7a7a", lineHeight: 1.7, marginBottom: 28 }}>
-          You've used your 2 free analyses. Upgrade to Pro for unlimited analyses, CV Rewriter, Recruiter Simulation, and full insights.
-        </div>
+  {lang === "TR" ? "2 ücretsiz analizini kullandın. Sınırsız analiz için Pro'ya geç." : "You've used your 2 free analyses. Upgrade to Pro for unlimited analyses, CV Rewriter, and full insights."}
+</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
           {["Unlimited analyses", "CV Rewriter", "Recruiter Simulation", "Salary Insights", "ATS Compatibility", "Interview Prep"].map(f => (
             <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#94a3b8" }}>
@@ -607,7 +656,7 @@ function NavBar({ view, user, logout, navigate, lang, setLang }) {
   );
 }
 
-function HeroSection({ navigate }) {
+function HeroSection({ navigate, lang }) {
   const [score, setScore] = useState(0);
   const [animating, setAnimating] = useState(false);
 
@@ -663,14 +712,21 @@ function HeroSection({ navigate }) {
             AI-Powered Resume Intelligence
           </div>
           <h1 className="hero-h1" style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(42px, 4.5vw, 68px)", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.03em", marginBottom: 20 }}>
-            Why does your<br />CV keep getting<br /><span className="shimmer-text">rejected?</span>
-          </h1>
+  {lang === "TR" ? (
+    <>CV'niz neden sürekli<br />reddediliyor?</>
+  ) : (
+    <>Why does your<br />CV keep getting<br /><span className="shimmer-text">rejected?</span></>
+  )}
+</h1>
           <p className="hero-desc" style={{ fontSize: "17px", lineHeight: 1.7, color: "#94a3b8", maxWidth: "480px", marginBottom: 36 }}>
-            HireFit analyzes your CV against any job description and tells you exactly what recruiters see — in seconds.
+            {lang === "TR" 
+  ? "HireFit, CV'nizi iş ilanıyla karşılaştırır ve işe alım uzmanlarının tam olarak ne gördüğünü saniyeler içinde söyler."
+  : "HireFit analyzes your CV against any job description and tells you exactly what recruiters see — in seconds."
+}
           </p>
           <div className="hero-btns" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 48 }}>
             <button className="hf-btn-primary" onClick={() => navigate("/app")} style={{ padding: "14px 32px", fontSize: "15px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 32px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.15)", borderRadius: 12 }}>
-              Analyze My CV Free <ArrowRight size={16} />
+              {lang === "TR" ? "CV'mi Ücretsiz Analiz Et" : "Analyze My CV Free"} <ArrowRight size={16} />
             </button>
             <button className="hf-btn-ghost" onClick={() => navigate("/dashboard")} style={{ padding: "14px 24px", fontSize: "15px", borderRadius: 12 }}>View Dashboard</button>
           </div>
@@ -1207,7 +1263,7 @@ function MainApp() {
 
       {view === "landing" && (
         <>
-          <HeroSection navigate={navigate} />
+          <HeroSection navigate={navigate} lang={lang} />
           <FeatureCards />
           <PricingSection navigate={navigate} />
           <WaitlistSection />
@@ -1274,11 +1330,11 @@ function MainApp() {
                 AI Analysis
               </div>
               <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(28px,3vw,42px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 6 }}>CV Alignment Analyzer</h1>
-              <p style={{ color: "#64748b", fontSize: "14px" }}>Paste your CV and job description — get rejection reasons + fix suggestions in seconds.</p>
+              <p style={{ color: "#64748b", fontSize: "14px" }}>{lang === "TR" ? "CV'nizi ve iş ilanını yapıştırın — saniyeler içinde red nedenleri ve düzeltme önerileri alın." : "Paste your CV and job description — get rejection reasons + fix suggestions in seconds."}</p>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 12, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.15)" }}>
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px #10b981", display: "inline-block" }} />
-              <span style={{ fontSize: "12px", fontWeight: 600, color: "#10b981" }}>Free to use</span>
+              <span style={{ fontSize: "12px", fontWeight: 600, color: "#10b981" }}>{lang === "TR" ? "Ücretsiz kullanım" : "Free to use"}</span>
             </div>
           </div>
 
@@ -1291,15 +1347,15 @@ function MainApp() {
                       <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.2)", display: "grid", placeItems: "center", flexShrink: 0 }}>
                         <FileText size={13} color="#60a5fa" />
                       </div>
-                      Candidate CV
+                      {lang === "TR" ? "Aday CV'si" : "Candidate CV"}
                     </label>
                     <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer", fontWeight: 600, fontSize: "11px", color: "#94a3b8", flexShrink: 0 }}>
                       <Upload size={11} />
-                      {uploadingPdf ? "Reading..." : "Upload PDF"}
+                      {uploadingPdf ? (lang === "TR" ? "Okunuyor..." : "Reading...") : (lang === "TR" ? "PDF Yükle" : "Upload PDF")}
                       <input type="file" accept="application/pdf" onChange={handlePdfUpload} style={{ display: "none" }} />
                     </label>
                   </div>
-                  <textarea className="hf-textarea" placeholder="Paste your CV text here..." value={cvText} onChange={(e) => setCvText(e.target.value)} />
+                  <textarea className="hf-textarea" placeholder={lang === "TR" ? "CV metninizi buraya yapıştırın..." : "Paste your CV text here..."} value={cvText} onChange={(e) => setCvText(e.target.value)} />
                   {cvText && (
                     <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "11px", color: "#10b981", flexShrink: 0 }}>
                       <CheckCircle2 size={11} />
@@ -1312,9 +1368,9 @@ function MainApp() {
                     <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(34,211,238,0.15)", border: "1px solid rgba(34,211,238,0.2)", display: "grid", placeItems: "center", flexShrink: 0 }}>
                       <Briefcase size={13} color="#22d3ee" />
                     </div>
-                    <label style={{ fontWeight: 700, fontSize: "13px", color: "#f1f5f9" }}>Job Description</label>
+                    <label style={{ fontWeight: 700, fontSize: "13px", color: "#f1f5f9" }}>{lang === "TR" ? "İş Tanımı" : "Job Description"}</label>
                   </div>
-                  <textarea className="hf-textarea" placeholder="Paste the job description here..." value={jdText} onChange={(e) => setJdText(e.target.value)} />
+                  <textarea className="hf-textarea" placeholder={lang === "TR" ? "İş ilanını buraya yapıştırın..." : "Paste the job description here..."} value={jdText} onChange={(e) => setJdText(e.target.value)} />
                   <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                     <input className="hf-input" value={jobUrl} onChange={(e) => setJobUrl(e.target.value)} placeholder="Or paste a job URL..." style={{ flex: 1, fontSize: "12px", padding: "9px 12px", borderRadius: 8, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.06)" }} />
                     <button className="hf-btn-ghost" onClick={extractJobFromUrl} disabled={extractingJob} style={{ whiteSpace: "nowrap", fontSize: "12px", padding: "9px 14px", borderRadius: 8 }}>
@@ -1358,10 +1414,10 @@ function MainApp() {
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20, padding: "16px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16 }}>
                 <button className="hf-btn-primary" onClick={analyze} disabled={loading} style={{ opacity: loading ? 0.7 : 1, padding: "12px 24px", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: loading ? "none" : "0 0 24px rgba(99,102,241,0.3)", borderRadius: 10 }}>
-                  {loading ? <><Loader2 size={14} />Analyzing...</> : <>Check My Fit <Sparkles size={14} /></>}
+                  {loading ? <><Loader2 size={14} />{lang === "TR" ? "Analiz ediliyor..." : "Analyzing..."}</> : <>{lang === "TR" ? "Uyumu Kontrol Et" : "Check My Fit"} <Sparkles size={14} /></>}
                 </button>
                 <button className="hf-btn-ghost" onClick={optimizeCv} disabled={optimizing} style={{ color: optimizing ? T.textMuted : T.cyan, borderColor: optimizing ? T.border : "rgba(34,211,238,0.2)", padding: "12px 20px", fontSize: "14px", borderRadius: 10 }}>
-                  {optimizing ? <><Loader2 size={14} />Optimizing...</> : <><Wand2 size={14} />Optimize CV</>}
+                  {optimizing ? <><Loader2 size={14} />{lang === "TR" ? "Optimize ediliyor..." : "Optimizing..."}</> : <><Wand2 size={14} />{lang === "TR" ? "CV'yi Optimize Et" : "Optimize CV"}</>}
                 </button>
                 <button className="hf-btn-ghost" onClick={generateLearningPlan} disabled={roadmapLoading} style={{ color: roadmapLoading ? T.textMuted : T.green, borderColor: roadmapLoading ? T.border : "rgba(16,185,129,0.2)", padding: "12px 20px", fontSize: "14px", borderRadius: 10 }}>
                   {roadmapLoading ? <><Loader2 size={14} />Building...</> : <><Target size={14} />Learning Roadmap</>}
