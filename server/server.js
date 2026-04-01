@@ -29,7 +29,7 @@ function extractJSON(text) {
 }
 
 app.post("/analyze", async (req, res) => {
-  const { cvText, jobDescription, sector } = req.body;
+  const { cvText, jobDescription, sector, lang } = req.body;
   console.log("SECTOR RECEIVED:", sector);
 
   if (!cvText || !jobDescription) {
@@ -50,7 +50,17 @@ app.post("/analyze", async (req, res) => {
         messages: [
           {
             role: "user",
-            content: `You are an expert career analyst and senior recruiter with 15+ years of experience. ${sector && sector !== "Auto-detect" ? `You are specifically evaluating this CV as a ${sector} sector recruiter. Apply the exact standards, expectations, and red flags that ${sector} recruiters care about most.` : "You have deep expertise across tech, consulting, finance, and FMCG sectors."} Analyze the CV against the Job Description with extreme precision and return a comprehensive JSON analysis.
+            content: `You are an expert career analyst and senior recruiter with 15+ years of experience.
+            ${sector && sector !== "Auto-detect" ? `You are specifically evaluating this CV as a ${sector} sector recruiter. ${
+  sector === "Tech / Startup" ? "Focus on: technical skills, GitHub/portfolio, startup experience, problem-solving ability, specific tech stack match, side projects. Red flags: no technical projects, vague descriptions, no measurable impact." :
+  sector === "Consulting" ? "Focus on: structured thinking, quantified impact, prestigious education, leadership, case experience, communication skills. Red flags: no numbers/metrics, weak academic background, poor formatting." :
+  sector === "Finance" ? "Focus on: Excel/financial modeling, CFA/internships, quantitative skills, attention to detail, regulatory knowledge. Red flags: no finance certifications, gaps in employment, lack of quantitative evidence." :
+  sector === "FMCG / Retail" ? "Focus on: commercial acumen, sales numbers, brand management, market analysis, cross-functional work. Red flags: no commercial results, lack of consumer insight experience." :
+  sector === "Healthcare" ? "Focus on: certifications/licenses, clinical experience, compliance knowledge, patient outcomes. Red flags: missing certifications, gaps in clinical experience." :
+  sector === "Government" ? "Focus on: public sector experience, policy knowledge, compliance, formal writing, citizenship requirements. Red flags: only private sector background, lack of formal qualifications." :
+  `Apply the exact standards, expectations, and red flags that ${sector} recruiters care about most.`
+}` : "You have deep expertise across tech, consulting, finance, and FMCG sectors. Auto-detect the most relevant sector from the job description and apply appropriate standards."}
+            
 
 
 
@@ -59,7 +69,7 @@ ${cvText}
 
 Job Description:
 ${jobDescription}
-
+${lang === "TR" ? "IMPORTANT: Return ALL text fields in Turkish language. fit_summary, strengths, improvements, rejection_reasons, recruiter_simulation, blind_spots, interview_prep dahil tüm metin alanlarını Türkçe yaz." : "Return all text fields in English."}
 Return ONLY valid JSON. No markdown, no explanation, no extra text.
 
 {
