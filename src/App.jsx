@@ -280,6 +280,95 @@ function PaywallModal({ onClose, onUpgrade, lang }) {
   );
 }
 
+function DecisionCard({ data, loading, lang }) {
+  if (loading) return (
+    <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 20, marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid #3b82f6", borderTopColor: "transparent", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
+      <span style={{ fontSize: 13, color: "#475569" }}>{lang === "TR" ? "Karar analizi yapılıyor..." : "Analyzing your decision..."}</span>
+    </div>
+  );
+  if (!data) return null;
+
+  const decisionColor = data.decision?.includes("High") || data.decision?.includes("Yüksek") ? "#10b981"
+    : data.decision?.includes("Medium") || data.decision?.includes("Orta") ? "#f59e0b" : "#f87171";
+  const decisionBg = data.decision?.includes("High") || data.decision?.includes("Yüksek") ? "rgba(16,185,129,0.08)"
+    : data.decision?.includes("Medium") || data.decision?.includes("Orta") ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)";
+  const decisionBorder = data.decision?.includes("High") || data.decision?.includes("Yüksek") ? "rgba(16,185,129,0.2)"
+    : data.decision?.includes("Medium") || data.decision?.includes("Orta") ? "rgba(245,158,11,0.2)" : "rgba(239,68,68,0.2)";
+
+  return (
+    <div style={{ background: "#0c0c0c", border: `1px solid ${decisionBorder}`, borderRadius: 20, padding: 24, marginBottom: 16, position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${decisionColor}, transparent)` }} />
+      
+      {/* Decision */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
+        <div style={{ padding: "10px 20px", borderRadius: 12, background: decisionBg, border: `1px solid ${decisionBorder}` }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: decisionColor, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>
+            {lang === "TR" ? "Karar" : "Decision"}
+          </div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: decisionColor }}>{data.decision}</div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, color: "#8a8a8a", lineHeight: 1.6, marginBottom: 8 }}>{data.decision_reasoning}</div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: "#d4af37", background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.15)", borderRadius: 8, padding: "6px 12px", display: "inline-block" }}>
+            💡 {data.one_liner}
+          </div>
+        </div>
+        <div style={{ textAlign: "center", flexShrink: 0 }}>
+          <div style={{ fontSize: 10, color: "#475569", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
+            {lang === "TR" ? "Şu an → Sonra" : "Now → After"}
+          </div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#f87171" }}>{data.fit_score}</div>
+          <div style={{ fontSize: 16, color: "#475569", margin: "2px 0" }}>→</div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#10b981" }}>{data.improved_score}</div>
+        </div>
+      </div>
+
+      {/* Top 3 Fixes */}
+      {(data.top_fixes || []).length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#d4af37", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
+            {lang === "TR" ? "Top 3 Kritik Düzeltme" : "Top 3 Critical Fixes"}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {data.top_fixes.slice(0, 3).map((fix, i) => (
+              <div key={i} style={{ display: "flex", gap: 12, padding: "10px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 10 }}>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, color: "rgba(212,175,55,0.5)", flexShrink: 0 }}>{i + 1}</div>
+                <div>
+                  <div style={{ fontSize: 12, color: "#f87171", fontWeight: 600, marginBottom: 3 }}>⚠ {fix.problem}</div>
+                  <div style={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>→ {fix.fix}</div>
+                </div>
+                <div style={{ marginLeft: "auto", flexShrink: 0 }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: fix.impact === "High" ? "rgba(239,68,68,0.1)" : "rgba(245,158,11,0.1)", color: fix.impact === "High" ? "#f87171" : "#fbbf24", border: `1px solid ${fix.impact === "High" ? "rgba(239,68,68,0.2)" : "rgba(245,158,11,0.2)"}` }}>
+                    {fix.impact}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Deadline Plan */}
+      {data.deadline_plan?.steps?.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#d4af37", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
+            {lang === "TR" ? "⏰ Aksiyon Planı" : "⏰ Action Plan"}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {data.deadline_plan.steps.map((step, i) => (
+              <div key={i} style={{ flex: "1 1 160px", padding: "10px 14px", background: "rgba(99,102,241,0.05)", border: "1px solid rgba(99,102,241,0.15)", borderRadius: 10 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", marginBottom: 4, letterSpacing: "0.08em" }}>{step.day}</div>
+                <div style={{ fontSize: 12, color: "#8a8a8a", lineHeight: 1.5 }}>{step.action}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProgressStepper({ cvText, jdText, loading, analysisData, lang }) {
   const t = translations[lang];
   const steps = [
@@ -1179,6 +1268,10 @@ function MainApp() {
   const [lang, setLang] = useState("EN");
   const [showPaywall, setShowPaywall] = useState(false);
   const [analysisCount, setAnalysisCount] = useState(0);
+  const [deadline, setDeadline] = useState("1_week");
+  const [targetRole, setTargetRole] = useState("");
+  const [decisionData, setDecisionData] = useState(null);
+  const [decisionLoading, setDecisionLoading] = useState(false);
 
   const t = translations[lang];
 
@@ -1291,10 +1384,29 @@ function MainApp() {
       setAnalysisData(data);
       await supabase.from("analyses").insert({ role: data.role_type ?? "Unknown", alignment_score: data.alignment_score ?? 0, cv_text: cvText, job_description: jdText, report: reportText, matched_skills: data.matched_skills ?? [], missing_skills: data.missing_skills ?? [], top_keywords: data.top_keywords ?? [], rejection_reasons: data.rejection_reasons ?? {}, seniority: data.seniority ?? "", user_id: user?.id ?? null });
       await fetchAnalyses();
-    } catch (err) { console.error(err); setError(lang === "TR" ? "Analiz başarısız. API anahtarınızı veya ağınızı kontrol edin." : "Analysis failed. Check your API key or network."); }
-    finally { setLoading(false); }
+      } catch (err) { 
+      console.error(err); 
+      setError(lang === "TR" ? "Analiz başarısız." : "Analysis failed. Check your API key or network."); 
+    } finally { 
+      setLoading(false);
+      // Auto-trigger decision engine
+      setDecisionLoading(true);
+      try {
+        const decisionRes = await fetch("https://hirefit-ai-production.up.railway.app/decision", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang, deadline, targetRole })
+        });
+        const decisionResult = await decisionRes.json();
+        setDecisionData(decisionResult);
+      } catch (err) {
+        console.error("Decision engine failed:", err);
+      } finally {
+        setDecisionLoading(false);
+      }
+    }
   };
-
+    
   const optimizeCv = async () => {
     if (!cvText.trim() || !jdText.trim()) { setError(lang === "TR" ? "Lütfen önce hem CV'yi hem de iş ilanını yapıştırın." : "Please paste both the CV and JD first."); return; }
     setOptimizing(true); setError(""); setOptimizedCv("");
@@ -1544,6 +1656,25 @@ function MainApp() {
                 ) : null;
               })()}
 
+              <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+  <span style={{ fontSize: 12, fontWeight: 600, color: "#475569", whiteSpace: "nowrap" }}>
+    {lang === "TR" ? "⏰ Başvuru zamanın:" : "⏰ Application deadline:"}
+  </span>
+  {[
+    { value: "urgent", label: lang === "TR" ? "🔴 Acil (bugün)" : "🔴 Urgent (today)" },
+    { value: "1_week", label: lang === "TR" ? "🟡 1 Hafta" : "🟡 1 Week" },
+    { value: "1_month", label: lang === "TR" ? "🟢 1 Ay+" : "🟢 1 Month+" },
+  ].map(({ value, label }) => (
+    <button key={value} onClick={() => setDeadline(value)} style={{
+      padding: "6px 14px", borderRadius: 999, fontSize: "12px", fontWeight: 600,
+      cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s",
+      background: deadline === value ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)",
+      border: `1px solid ${deadline === value ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.07)"}`,
+      color: deadline === value ? "#a78bfa" : "#475569",
+    }}>{label}</button>
+  ))}
+</div>
+
               <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
                 {sectorValues.map((s, idx) => (
                   <button
@@ -1580,6 +1711,10 @@ function MainApp() {
                   <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />{error}
                 </div>
               )}
+
+              {(decisionData || decisionLoading) && (
+  <DecisionCard data={decisionData} loading={decisionLoading} lang={lang} />
+)}
 
               {alignmentScore !== null && analysisData && (
                 <DashboardResults
