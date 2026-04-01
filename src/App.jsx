@@ -1368,6 +1368,14 @@ function MainApp() {
     await supabase.auth.signOut();
     localStorage.removeItem("hirefit-user");
     setUser(null);
+    setCvText("");
+    setJdText("");
+    setResult("");
+    setAnalysisData(null);
+    setAlignmentScore(null);
+    setHistory([]);
+    setOptimizedCv("");
+    setLearningPlan("");
     navigate("/");
   };
 
