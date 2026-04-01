@@ -329,6 +329,80 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
   res.json({ received: true });
 });
 
+app.post("/decision", async (req, res) => {
+  const { cvText, jobDescription, sector, lang, deadline, targetRole } = req.body;
+
+  if (!cvText || !jobDescription) {
+    return res.status(400).json({ error: "Missing CV or Job Description" });
+  }
+
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-4o-mini",
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "user",
+            content: `You are a senior career coach and recruiter with 15+ years of experience${sector && sector !== "Auto-detect" ? ` specializing in ${sector}` : ""}.
+
+Analyze this CV against the job description and return a DECISION-FOCUSED analysis.
+
+CV:
+${cvText}
+
+JOB DESCRIPTION:
+${jobDescription}
+
+${targetRole ? `TARGET ROLE: ${targetRole}` : ""}
+${deadline ? `DEADLINE: ${deadline}` : ""}
+${lang === "TR" ? "Return ALL text fields in Turkish." : "Return all text fields in English."}
+
+Return ONLY this JSON structure (no markdown, no extra text):
+{
+  "decision": "High chance" | "Medium chance" | "Low chance",
+  "decision_reasoning": "One sentence explaining why",
+  "fit_score": 0-100,
+  "improved_score": 0-100,
+  "improvement_reasoning": "What needs to change to reach improved score",
+  "top_fixes": [
+    { "problem": "...", "fix": "...", "impact": "High" | "Medium" },
+    { "problem": "...", "fix": "...", "impact": "High" | "Medium" },
+    { "problem": "...", "fix": "...", "impact": "High" | "Medium" }
+  ],
+  "missing_skills": ["skill1", "skill2", "skill3"],
+  "deadline_plan": {
+    "type": "${deadline || "1_week"}",
+    "steps": [
+      { "day": "Day 1", "action": "..." },
+      { "day": "Day 2-3", "action": "..." },
+      { "day": "Day 4-7", "action": "..." }
+    ]
+  },
+  "one_liner": "Single most important thing this person must do right now"
+}`
+          }
+        ]
+      })
+    });
+
+    const aiData = await response.json();
+    const content = aiData.choices?.[0]?.message?.content;
+    const parsed = JSON.parse(content);
+    res.json(parsed);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Decision analysis failed" });
+  }
+});
+
+
 app.listen(3000, () => {
   console.log("🚀 Backend running on http://localhost:3000");
 });
