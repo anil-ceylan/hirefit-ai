@@ -1392,6 +1392,7 @@ function MainApp() {
       // Auto-trigger decision engine
       setDecisionLoading(true);
       try {
+        console.log("DECISION REQUEST:", { lang, deadline, targetRole });
         const decisionRes = await fetch("https://hirefit-ai-production.up.railway.app/decision", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
