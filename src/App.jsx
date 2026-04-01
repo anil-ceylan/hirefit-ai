@@ -1196,9 +1196,8 @@ function MainApp() {
     try {
       const clearedAt = localStorage.getItem("hirefit-cleared-at");
       const { data: { user: currentUser } } = await supabase.auth.getUser();
-const query = supabase.from("analyses").select("*").order("created_at", { ascending: false }).limit(10);
-if (currentUser) query.eq("user_id", currentUser.id);
-const { data, error: fetchError } = await query;
+      if (!currentUser) { setHistory([]); return; }
+      const { data, error: fetchError } = await supabase.from("analyses").select("*").eq("user_id", currentUser.id).order("created_at", { ascending: false }).limit(10);
       if (fetchError) return;
       const filtered = (data || []).filter(item =>
         !clearedAt || new Date(item.created_at) > new Date(clearedAt)
