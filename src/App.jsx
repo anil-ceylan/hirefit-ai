@@ -1195,7 +1195,10 @@ function MainApp() {
   const fetchAnalyses = async () => {
     try {
       const clearedAt = localStorage.getItem("hirefit-cleared-at");
-      const { data, error: fetchError } = await supabase.from("analyses").select("*").order("created_at", { ascending: false }).limit(10);
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+const query = supabase.from("analyses").select("*").order("created_at", { ascending: false }).limit(10);
+if (currentUser) query.eq("user_id", currentUser.id);
+const { data, error: fetchError } = await query;
       if (fetchError) return;
       const filtered = (data || []).filter(item =>
         !clearedAt || new Date(item.created_at) > new Date(clearedAt)
@@ -1287,7 +1290,7 @@ function MainApp() {
       const reportText = `Fit Summary:\n${data.fit_summary ?? ""}\n\nStrengths:\n${(data.strengths ?? []).map(s => `- ${s}`).join("\n")}\n\nImprovement Suggestions:\n${(data.improvements ?? []).map(s => `- ${s}`).join("\n")}\n\nWhy You Might Get Rejected:\nHIGH: ${(data.rejection_reasons?.high ?? []).join(", ") || "None"}\nMEDIUM: ${(data.rejection_reasons?.medium ?? []).join(", ") || "None"}`.trim();
       setResult(reportText);
       setAnalysisData(data);
-      await supabase.from("analyses").insert({ role: data.role_type ?? "Unknown", alignment_score: data.alignment_score ?? 0, cv_text: cvText, job_description: jdText, report: reportText, matched_skills: data.matched_skills ?? [], missing_skills: data.missing_skills ?? [], top_keywords: data.top_keywords ?? [], rejection_reasons: data.rejection_reasons ?? {}, seniority: data.seniority ?? "" });
+      await supabase.from("analyses").insert({ role: data.role_type ?? "Unknown", alignment_score: data.alignment_score ?? 0, cv_text: cvText, job_description: jdText, report: reportText, matched_skills: data.matched_skills ?? [], missing_skills: data.missing_skills ?? [], top_keywords: data.top_keywords ?? [], rejection_reasons: data.rejection_reasons ?? {}, seniority: data.seniority ?? "", user_id: user?.id ?? null });
       await fetchAnalyses();
     } catch (err) { console.error(err); setError(lang === "TR" ? "Analiz başarısız. API anahtarınızı veya ağınızı kontrol edin." : "Analysis failed. Check your API key or network."); }
     finally { setLoading(false); }
