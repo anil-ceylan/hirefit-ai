@@ -366,7 +366,7 @@ ${lang === "TR" ? "Return ALL text fields in Turkish." : "Return all text fields
 
 Return ONLY this JSON structure (no markdown, no extra text):
 {
-  "decision": "High chance" | "Medium chance" | "Low chance",
+  "decision": ${lang === "TR" ? '"Yüksek ihtimal" | "Orta ihtimal" | "Düşük ihtimal"' : '"High chance" | "Medium chance" | "Low chance"'},
   "decision_reasoning": "One sentence explaining why",
   "fit_score": 0-100,
   "improved_score": 0-100,
