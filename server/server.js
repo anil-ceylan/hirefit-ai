@@ -425,7 +425,95 @@ Return ONLY this JSON (no markdown):
     // Clean AI tone from output
     const cleaned = cleanAITone(gptParsed);
 
-    // STEP 2: Tone rewriter — make output sound human
+    // =========================
+// STEP 2: AI DETECTION + GUT FEELING
+// =========================
+
+try {
+  const [aiRes, gutRes] = await Promise.all([
+    fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-4o-mini",
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "user",
+            content: `You are a recruiter detecting AI-written CVs.
+
+Return STRICT JSON:
+{
+  "aiScore": number (0-100),
+  "aiLevel": "Low" | "Medium" | "High",
+  "reasons": string[],
+  "fix": string[]
+}
+
+Rules:
+- High score if generic phrases exist
+- High score if no metrics
+- High score if too polished
+- Be harsh
+
+CV:
+${cvText}`
+          }
+        ]
+      })
+    }),
+
+    fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-4o-mini",
+        temperature: 0.3,
+        messages: [
+          {
+            role: "user",
+            content: `You are a recruiter.
+
+Say your gut feeling about this CV in ONE short sentence.
+
+Rules:
+- Max 10 words
+- Direct
+- Slightly harsh
+
+CV:
+${cvText}`
+          }
+        ]
+      })
+    })
+  ]);
+
+  const aiData = await aiRes.json();
+  const gutData = await gutRes.json();
+
+  const aiParsed = extractJSON(aiData?.choices?.[0]?.message?.content);
+
+  cleaned.aiScore = aiParsed?.aiScore || 0;
+  cleaned.aiLevel = aiParsed?.aiLevel || "Low";
+  cleaned.aiReasons = aiParsed?.reasons || [];
+  cleaned.aiFix = aiParsed?.fix || [];
+
+  cleaned.gutFeeling =
+    gutData?.choices?.[0]?.message?.content || "Feels average.";
+
+} catch (err) {
+  console.error("AI detection/gut failed:", err.message);
+}
+
+    // STEP 3: Tone rewriter — make output sound human
 try {
   const toneResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -470,7 +558,12 @@ ${JSON.stringify({
   oneAction: cleaned.oneAction,
   recruiterInsight: cleaned.recruiterInsight,
   aiSuspicion: cleaned.aiSuspicion,
-  deadlinePlan: cleaned.deadlinePlan
+  deadlinePlan: cleaned.deadlinePlan,
+  aiScore: cleaned.aiScore,
+  aiLevel: cleaned.aiLevel,
+  aiReasons: cleaned.aiReasons,
+  aiFix: cleaned.aiFix,
+  gutFeeling: cleaned.gutFeeling
 })}
 
 Return ONLY a JSON object with the same keys and rewritten values. No markdown.`
@@ -488,6 +581,11 @@ Return ONLY a JSON object with the same keys and rewritten values. No markdown.`
     const final = {
       ...cleaned,
       summary: toneParsed.summary || cleaned.summary,
+      aiScore: toneParsed.aiScore || cleaned.aiScore,
+      aiLevel: toneParsed.aiLevel || cleaned.aiLevel,
+      aiReasons: toneParsed.aiReasons || cleaned.aiReasons,
+      aiFix: toneParsed.aiFix || cleaned.aiFix,
+      gutFeeling: toneParsed.gutFeeling || cleaned.gutFeeling,
       biggestMistake: toneParsed.biggestMistake || cleaned.biggestMistake,
       topFixes: toneParsed.topFixes || cleaned.topFixes,
       oneAction: toneParsed.oneAction || cleaned.oneAction,
