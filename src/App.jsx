@@ -73,6 +73,15 @@ const translations = {
     product: "Product",
     recentAnalyses: "Recent Analyses",
     allSystemsOp: "All systems operational",
+    applyFix: "Apply Fix",
+    applying: "Applying...",
+    fixApplied: "Fix Applied ✓",
+    copyFix: "Copy",
+    proOnly: "Pro Only",
+    upgradeToSee: "Upgrade to Pro to see all fixes",
+    scoreProgress: "Score Progress",
+    improvement: "improvement",
+    latestScore: "Latest",
   },
   TR: {
     heroTitle: "CV'niz neden sürekli reddediliyor?",
@@ -133,6 +142,15 @@ const translations = {
     product: "Ürün",
     recentAnalyses: "Son Analizler",
     allSystemsOp: "Tüm sistemler çalışıyor",
+    applyFix: "Düzeltmeyi Uygula",
+    applying: "Uygulanıyor...",
+    fixApplied: "Uygulandı ✓",
+    copyFix: "Kopyala",
+    proOnly: "Sadece Pro",
+    upgradeToSee: "Tüm düzeltmeleri görmek için Pro'ya geç",
+    scoreProgress: "Skor Geçmişi",
+    improvement: "iyileşme",
+    latestScore: "Son",
   }
 };
 
@@ -174,6 +192,7 @@ const globalStyles = `
   .nav-link:hover { color: white; background: rgba(255,255,255,0.06); }
   .nav-link.active { color: white; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 `;
 
 const styles = {
@@ -280,7 +299,9 @@ function PaywallModal({ onClose, onUpgrade, lang }) {
   );
 }
 
-function DecisionCard({ data, loading, lang }) {
+function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fixResults, onUpgrade }) {
+  const t = translations[lang];
+
   if (loading) return (
     <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 20, marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
       <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid #3b82f6", borderTopColor: "transparent", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
@@ -299,10 +320,10 @@ function DecisionCard({ data, loading, lang }) {
   return (
     <div style={{ background: "#0c0c0c", border: `1px solid ${decisionBorder}`, borderRadius: 20, padding: 24, marginBottom: 16, position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${decisionColor}, transparent)` }} />
-      
-      {/* Decision */}
+
+      {/* Decision Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
-        <div style={{ padding: "10px 20px", borderRadius: 12, background: decisionBg, border: `1px solid ${decisionBorder}` }}>
+        <div style={{ padding: "10px 20px", borderRadius: 12, background: decisionBg, border: `1px solid ${decisionBorder}`, flexShrink: 0 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: decisionColor, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>
             {lang === "TR" ? "Karar" : "Decision"}
           </div>
@@ -324,27 +345,116 @@ function DecisionCard({ data, loading, lang }) {
         </div>
       </div>
 
-      {/* Top 3 Fixes */}
+      {/* Top Fixes with Action Buttons */}
       {(data.top_fixes || []).length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "#d4af37", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
             {lang === "TR" ? "Top 3 Kritik Düzeltme" : "Top 3 Critical Fixes"}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {data.top_fixes.slice(0, 3).map((fix, i) => (
-              <div key={i} style={{ display: "flex", gap: 12, padding: "10px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 10 }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, color: "rgba(212,175,55,0.5)", flexShrink: 0 }}>{i + 1}</div>
-                <div>
-                  <div style={{ fontSize: 12, color: "#f87171", fontWeight: 600, marginBottom: 3 }}>⚠ {fix.problem}</div>
-                  <div style={{ fontSize: 12, color: "#10b981", fontWeight: 600 }}>→ {fix.fix}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {data.top_fixes.slice(0, 3).map((fix, i) => {
+              const isLocked = !isPro && i > 0;
+              const isApplying = applyingFix === i;
+              const fixResult = fixResults?.[i];
+
+              return (
+                <div key={i} style={{ position: "relative", borderRadius: 12, overflow: "hidden" }}>
+                  <div style={{
+                    padding: "12px 14px",
+                    background: "rgba(255,255,255,0.02)",
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    borderRadius: 12,
+                    filter: isLocked ? "blur(3px)" : "none",
+                    transition: "filter 0.2s",
+                    userSelect: isLocked ? "none" : "auto",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, color: "rgba(212,175,55,0.5)", flexShrink: 0 }}>{i + 1}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 12, color: "#f87171", fontWeight: 600, marginBottom: 3 }}>⚠ {fix.problem}</div>
+                        <div style={{ fontSize: 12, color: "#10b981", fontWeight: 600, marginBottom: fixResult ? 10 : 0 }}>→ {fix.fix}</div>
+
+                        {/* Fix Result */}
+                        {fixResult && !isLocked && (
+                          <div style={{ marginTop: 10, animation: "fadeIn 0.3s ease" }}>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
+                              {lang === "TR" ? "✨ Yeniden Yazıldı" : "✨ Rewritten"}
+                            </div>
+                            <div style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)", borderRadius: 8, padding: "10px 12px" }}>
+                              {fixResult.original_section && (
+                                <div style={{ marginBottom: 8 }}>
+                                  <div style={{ fontSize: 10, color: "#f87171", fontWeight: 700, marginBottom: 3 }}>
+                                    {lang === "TR" ? "Önce:" : "Before:"}
+                                  </div>
+                                  <div style={{ fontSize: 12, color: "#64748b", fontStyle: "italic", lineHeight: 1.5 }}>{fixResult.original_section}</div>
+                                </div>
+                              )}
+                              {fixResult.rewritten_section && (
+                                <div style={{ marginBottom: 8 }}>
+                                  <div style={{ fontSize: 10, color: "#10b981", fontWeight: 700, marginBottom: 3 }}>
+                                    {lang === "TR" ? "Sonra:" : "After:"}
+                                  </div>
+                                  <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5 }}>{fixResult.rewritten_section}</div>
+                                </div>
+                              )}
+                              {fixResult.explanation && (
+                                <div style={{ fontSize: 11, color: "#a78bfa", fontStyle: "italic" }}>💡 {fixResult.explanation}</div>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => navigator.clipboard.writeText(fixResult.rewritten_section || "")}
+                              style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#94a3b8", fontSize: "11px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+                            >
+                              <Copy size={10} /> {t.copyFix}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: fix.impact === "High" ? "rgba(239,68,68,0.1)" : "rgba(245,158,11,0.1)", color: fix.impact === "High" ? "#f87171" : "#fbbf24", border: `1px solid ${fix.impact === "High" ? "rgba(239,68,68,0.2)" : "rgba(245,158,11,0.2)"}` }}>
+                          {fix.impact}
+                        </span>
+                        {!isLocked && (
+                          <button
+                            onClick={() => onApplyFix(fix, i)}
+                            disabled={isApplying || !!fixResult}
+                            style={{
+                              display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8,
+                              background: fixResult ? "rgba(16,185,129,0.1)" : "rgba(99,102,241,0.15)",
+                              border: `1px solid ${fixResult ? "rgba(16,185,129,0.25)" : "rgba(99,102,241,0.3)"}`,
+                              color: fixResult ? "#10b981" : "#a78bfa",
+                              fontSize: "11px", fontWeight: 700, cursor: fixResult ? "default" : "pointer",
+                              fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap",
+                              opacity: isApplying ? 0.7 : 1,
+                            }}
+                          >
+                            {isApplying ? (
+                              <><div style={{ width: 10, height: 10, borderRadius: "50%", border: "2px solid #a78bfa", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />{t.applying}</>
+                            ) : fixResult ? (
+                              t.fixApplied
+                            ) : (
+                              <><Wand2 size={10} />{t.applyFix}</>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Blur overlay for locked fixes */}
+                  {isLocked && (
+                    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(6,9,16,0.6)", borderRadius: 12 }}>
+                      <button
+                        onClick={onUpgrade}
+                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 8, background: "linear-gradient(135deg, #d4af37, #f0d060)", border: "none", color: "#000", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+                      >
+                        <Crown size={12} /> {t.upgradeToSee}
+                      </button>
+                    </div>
+                  )}
                 </div>
-                <div style={{ marginLeft: "auto", flexShrink: 0 }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: fix.impact === "High" ? "rgba(239,68,68,0.1)" : "rgba(245,158,11,0.1)", color: fix.impact === "High" ? "#f87171" : "#fbbf24", border: `1px solid ${fix.impact === "High" ? "rgba(239,68,68,0.2)" : "rgba(245,158,11,0.2)"}` }}>
-                    {fix.impact}
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -369,8 +479,55 @@ function DecisionCard({ data, loading, lang }) {
   );
 }
 
-function ProgressStepper({ cvText, jdText, loading, analysisData, lang }) {
+function ScoreProgressCard({ scoreHistory, lang }) {
   const t = translations[lang];
+  if (scoreHistory.length < 2) return null;
+
+  const latest = scoreHistory[0];
+  const previous = scoreHistory[1];
+  const diff = latest.score - previous.score;
+  const isUp = diff > 0;
+
+  return (
+    <div className="hf-card" style={{ padding: 24 }}>
+      <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: "18px", fontWeight: 700, marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
+        <TrendingUp size={16} color={T.cyan} />
+        {t.scoreProgress}
+      </h3>
+      <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+        <div style={{ flex: 1, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)", borderRadius: 12, padding: "14px 16px" }}>
+          <div style={{ fontSize: 10, color: "#475569", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{t.latestScore}</div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, color: latest.score >= 80 ? "#10b981" : latest.score >= 60 ? "#f59e0b" : "#f87171" }}>{latest.score}</div>
+          <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{latest.role}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: isUp ? "#10b981" : "#f87171" }}>
+              {isUp ? "+" : ""}{diff}
+            </div>
+            <div style={{ fontSize: 10, color: "#475569" }}>{t.improvement}</div>
+          </div>
+        </div>
+        <div style={{ flex: 1, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: "14px 16px" }}>
+          <div style={{ fontSize: 10, color: "#475569", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>Previous</div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, color: "#475569" }}>{previous.score}</div>
+          <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{previous.role}</div>
+        </div>
+      </div>
+      {scoreHistory.length > 2 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {scoreHistory.slice(0, 6).map((entry, i) => (
+            <div key={i} style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 11, color: "#475569" }}>
+              {entry.score} <span style={{ color: "#334155" }}>· {entry.date}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProgressStepper({ cvText, jdText, loading, analysisData, lang }) {
   const steps = [
     { label: lang === "TR" ? "CV Yapıştır" : "Paste CV", done: cvText.trim().length > 50 },
     { label: lang === "TR" ? "İlan Yapıştır" : "Paste JD", done: jdText.trim().length > 50 },
@@ -469,7 +626,6 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
   return (
     <>
       <div style={DB.root}>
-        {/* HERO */}
         <div style={DB.hero}>
           <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "linear-gradient(180deg, #d4af37, #b8860b, #8b6914)", borderRadius: "3px 0 0 3px" }} />
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(212,175,55,0.4), transparent)" }} />
@@ -499,7 +655,6 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
           </div>
         </div>
 
-        {/* STAT CARDS */}
         <div style={DB.grid4}>
           {[
             { label: statLabels[0], val: data.score_breakdown?.skills_match ?? score, color: "#60a5fa", ctx: data.score_breakdown?.skills_explanation || `${(data.matched_skills || []).length} of ${(data.matched_skills || []).length + (data.missing_skills || []).length} matched` },
@@ -516,7 +671,6 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
           ))}
         </div>
 
-        {/* SECTION 01 */}
         <div style={DB.sectionHeader}>
           <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#d4af37", fontStyle: "italic" }}>01</div>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.14em" }}>{lang === "TR" ? "İşe Alım Uzmanı Görüşü" : "Recruiter View"}</div>
@@ -534,11 +688,7 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: data.recruiter_simulation?.would_interview ? "#10b981" : "#f87171", display: "inline-block", flexShrink: 0 }} />
               {data.recruiter_simulation?.decision || (data.recruiter_simulation?.would_interview ? (lang === "TR" ? "Listeye alır" : "Would shortlist") : (lang === "TR" ? "İlerlemez" : "Would not proceed"))}
             </div>
-            {(data.recruiter_simulation?.red_flags || []).length > 0 && (
-              <div style={DB.moreLink}>+ {data.recruiter_simulation.red_flags.length} {lang === "TR" ? "kırmızı bayrak tespit edildi" : `red flag${data.recruiter_simulation.red_flags.length > 1 ? "s" : ""} detected`} →</div>
-            )}
           </div>
-
           <div style={DB.card}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #ef4444, #f97316)" }} />
             <div style={DB.cardTag}>{lang === "TR" ? "İyi sanıp aslında sorunlu olan şeyler" : "What you think is fine — but isn't"}</div>
@@ -554,7 +704,6 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
           </div>
         </div>
 
-        {/* SECTION 02 */}
         <div style={DB.sectionHeader}>
           <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#d4af37", fontStyle: "italic" }}>02</div>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.14em" }}>{lang === "TR" ? "Derin Analiz" : "Deep Analysis"}</div>
@@ -580,7 +729,6 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
             ))}
             <div style={DB.moreLink}>{lang === "TR" ? `İlk 2'yi düzelt → tahmini skor: ${score} → ${data.benchmark?.before_after_estimate || Math.min(91, score + 9)} →` : `Fix top 2 → estimated score: ${score} → ${data.benchmark?.before_after_estimate || Math.min(91, score + 9)} →`}</div>
           </div>
-
           <div style={DB.card}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #a78bfa)" }} />
             <div style={DB.cardTag}>{lang === "TR" ? "CV'nizin parladığı diğer roller" : "Roles where your CV also shines"}</div>
@@ -597,13 +745,9 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
                 </div>
               );
             })}
-            {(data.role_matches || []).length > 0 && (
-              <div style={{ marginTop: 12, fontSize: 12, color: "#7a7a7a", lineHeight: 1.5 }}>{data.role_matches[0]?.reason || ""}</div>
-            )}
           </div>
         </div>
 
-        {/* SECTION 03 */}
         <div style={DB.sectionHeader}>
           <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#d4af37", fontStyle: "italic" }}>03</div>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.14em" }}>{lang === "TR" ? "Aksiyon Planı" : "Action Plan"}</div>
@@ -620,11 +764,7 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
                 <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>{q.personal_angle}</div>
               </div>
             ))}
-            {(data.interview_prep || []).length > 2 && (
-              <div style={DB.moreLink}>+ {data.interview_prep.length - 2} {lang === "TR" ? "daha fazla soru →" : "more questions →"}</div>
-            )}
           </div>
-
           <div style={DB.card}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #22d3ee)" }} />
             <div style={DB.cardTag}>{lang === "TR" ? "Pazar İstihbaratı" : "Market Intelligence"}</div>
@@ -655,7 +795,6 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
           </div>
         </div>
 
-        {/* SECTION 04 */}
         <div style={DB.sectionHeader}>
           <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#d4af37", fontStyle: "italic" }}>04</div>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.14em" }}>{lang === "TR" ? "Beceriler & Anahtar Kelimeler" : "Skills & Keywords"}</div>
@@ -919,18 +1058,10 @@ function HeroSection({ navigate, lang }) {
               </div>
               <div>
                 <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 700, marginBottom: 6, color: score > 0 ? scoreColor : "#f1f5f9" }}>
-                  {score === 0
-                    ? (lang === "TR" ? "Demo için Tıklayın" : "Click to Demo")
-                    : score >= 80
-                    ? (lang === "TR" ? "Güçlü Eşleşme" : "Strong Match")
-                    : score >= 60
-                    ? (lang === "TR" ? "Orta Eşleşme" : "Moderate Match")
-                    : (lang === "TR" ? "Geliştirilmeli" : "Needs Work")}
+                  {score === 0 ? (lang === "TR" ? "Demo için Tıklayın" : "Click to Demo") : score >= 80 ? (lang === "TR" ? "Güçlü Eşleşme" : "Strong Match") : score >= 60 ? (lang === "TR" ? "Orta Eşleşme" : "Moderate Match") : (lang === "TR" ? "Geliştirilmeli" : "Needs Work")}
                 </div>
                 <div style={{ fontSize: "13px", color: "#64748b", lineHeight: 1.5, marginBottom: 12 }}>
-                  {score === 0
-                    ? (lang === "TR" ? "HireFit'in CV'nizi gerçek zamanlı analiz ettiğini görün" : "See how HireFit analyzes your CV in real time")
-                    : (lang === "TR" ? "Beceriler, anahtar kelimeler, deneyim ve biçimlendirmeye göre" : "Based on skills, keywords, experience & formatting")}
+                  {score === 0 ? (lang === "TR" ? "HireFit'in CV'nizi gerçek zamanlı analiz ettiğini görün" : "See how HireFit analyzes your CV in real time") : (lang === "TR" ? "Beceriler, anahtar kelimeler, deneyim ve biçimlendirmeye göre" : "Based on skills, keywords, experience & formatting")}
                 </div>
                 <button onClick={handleDemoClick} disabled={animating} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.1)", color: "#a78bfa", fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
                   {animating ? (lang === "TR" ? "Analiz ediliyor..." : "Analyzing...") : "▶ Run Demo"}
@@ -1018,15 +1149,9 @@ function FeatureCards({ lang }) {
 }
 
 function PricingSection({ navigate, lang }) {
-  const freeFeatures = lang === "TR"
-    ? ["Ayda 2 analiz", "ATS skoru", "Beceri açığı tespiti", "Paylaşılabilir rapor"]
-    : ["2 analyses/month", "ATS score", "Skill gap detection", "Shareable report"];
-  const proFeatures = lang === "TR"
-    ? ["Sınırsız analiz", "Red Motoru", "CV Yeniden Yazıcı", "Gelişmiş içgörüler", "Paylaşılabilir raporlar", "Öncelikli destek"]
-    : ["Unlimited analyses", "Rejection Engine", "CV Rewriter", "Advanced insights", "Shareable reports", "Priority support"];
-  const coachFeatures = lang === "TR"
-    ? ["Pro'daki her şey", "Beyaz etiketli raporlar", "10 müşteri daveti", "Koç paneli", "Müşteri yönetimi"]
-    : ["Everything in Pro", "White-label reports", "10 client invites", "Coach dashboard", "Client management"];
+  const freeFeatures = lang === "TR" ? ["Ayda 2 analiz", "ATS skoru", "Beceri açığı tespiti", "Paylaşılabilir rapor"] : ["2 analyses/month", "ATS score", "Skill gap detection", "Shareable report"];
+  const proFeatures = lang === "TR" ? ["Sınırsız analiz", "Red Motoru", "CV Yeniden Yazıcı", "Gelişmiş içgörüler", "Paylaşılabilir raporlar", "Öncelikli destek"] : ["Unlimited analyses", "Rejection Engine", "CV Rewriter", "Advanced insights", "Shareable reports", "Priority support"];
+  const coachFeatures = lang === "TR" ? ["Pro'daki her şey", "Beyaz etiketli raporlar", "10 müşteri daveti", "Koç paneli", "Müşteri yönetimi"] : ["Everything in Pro", "White-label reports", "10 client invites", "Coach dashboard", "Client management"];
 
   return (
     <section style={{ padding: "80px 0" }}>
@@ -1047,13 +1172,9 @@ function PricingSection({ navigate, lang }) {
             <div style={{ color: "#475569", fontSize: "13px", marginBottom: 24 }}>{lang === "TR" ? "Sonsuza kadar ücretsiz" : "Forever free"}</div>
             <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginBottom: 24 }} />
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
-              {freeFeatures.map(f => (
-                <li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#94a3b8" }}><CheckCircle2 size={14} color="#10b981" style={{ flexShrink: 0 }} />{f}</li>
-              ))}
+              {freeFeatures.map(f => (<li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#94a3b8" }}><CheckCircle2 size={14} color="#10b981" style={{ flexShrink: 0 }} />{f}</li>))}
             </ul>
-            <button onClick={() => navigate("/app")} className="hf-btn-ghost" style={{ width: "100%", justifyContent: "center", fontSize: "14px" }}>
-              {lang === "TR" ? "Başla" : "Get Started"}
-            </button>
+            <button onClick={() => navigate("/app")} className="hf-btn-ghost" style={{ width: "100%", justifyContent: "center", fontSize: "14px" }}>{lang === "TR" ? "Başla" : "Get Started"}</button>
           </div>
           <div style={{ background: "linear-gradient(145deg, rgba(59,130,246,0.1), rgba(99,102,241,0.07))", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 24, padding: 32, position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.6), transparent)" }} />
@@ -1063,9 +1184,7 @@ function PricingSection({ navigate, lang }) {
             <div style={{ color: "#93c5fd", fontSize: "13px", marginBottom: 24 }}>{lang === "TR" ? "aylık" : "per month"}</div>
             <div style={{ height: 1, background: "rgba(99,102,241,0.2)", marginBottom: 24 }} />
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
-              {proFeatures.map(f => (
-                <li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#cbd5e1" }}><Star size={13} color="#818cf8" style={{ flexShrink: 0 }} />{f}</li>
-              ))}
+              {proFeatures.map(f => (<li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#cbd5e1" }}><Star size={13} color="#818cf8" style={{ flexShrink: 0 }} />{f}</li>))}
             </ul>
             <button className="hf-btn-primary" onClick={() => window.open("https://hirefit.lemonsqueezy.com/checkout/buy/19ee5972-0f76-4d2f-b2a0-9e08dc9a9a7d", "_blank")} style={{ width: "100%", justifyContent: "center", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 24px rgba(99,102,241,0.3)" }}>
               {lang === "TR" ? "Pro'ya Geç" : "Upgrade to Pro"} <ArrowRight size={14} />
@@ -1077,9 +1196,7 @@ function PricingSection({ navigate, lang }) {
             <div style={{ color: "#475569", fontSize: "13px", marginBottom: 24 }}>{lang === "TR" ? "aylık" : "per month"}</div>
             <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginBottom: 24 }} />
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
-              {coachFeatures.map(f => (
-                <li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#94a3b8" }}><CheckCircle2 size={14} color="#8b5cf6" style={{ flexShrink: 0 }} />{f}</li>
-              ))}
+              {coachFeatures.map(f => (<li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#94a3b8" }}><CheckCircle2 size={14} color="#8b5cf6" style={{ flexShrink: 0 }} />{f}</li>))}
             </ul>
             <button className="hf-btn-ghost" style={{ width: "100%", justifyContent: "center", fontSize: "14px", borderColor: "rgba(139,92,246,0.3)", color: "#a78bfa" }}>
               {lang === "TR" ? "Bekleme Listesine Katıl" : "Join Waitlist"} <ArrowRight size={14} />
@@ -1099,10 +1216,8 @@ function WaitlistSection({ lang }) {
   const handleSubmit = async () => {
     if (!email.trim()) return;
     setSubmitting(true);
-    try {
-      await supabase.from("waitlist").insert({ email });
-      setSubmitted(true);
-    } catch { setSubmitted(true); }
+    try { await supabase.from("waitlist").insert({ email }); setSubmitted(true); }
+    catch { setSubmitted(true); }
     finally { setSubmitting(false); }
   };
 
@@ -1126,27 +1241,17 @@ function WaitlistSection({ lang }) {
             {submitted ? (
               <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 16, padding: "36px 32px", textAlign: "center" }}>
                 <div style={{ fontSize: 32, marginBottom: 12 }}>🎉</div>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
-                  {lang === "TR" ? "Listedesiniz!" : "You're on the list!"}
-                </div>
-                <div style={{ color: T.textSub, fontSize: 14 }}>
-                  {lang === "TR" ? "Pro yayına girdiğinde sizi bilgilendireceğiz." : "We'll notify you when Pro launches."}
-                </div>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>{lang === "TR" ? "Listedesiniz!" : "You're on the list!"}</div>
+                <div style={{ color: T.textSub, fontSize: 14 }}>{lang === "TR" ? "Pro yayına girdiğinde sizi bilgilendireceğiz." : "We'll notify you when Pro launches."}</div>
               </div>
             ) : (
               <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "36px 32px" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
-                  {lang === "TR" ? "Bekleme listesine katılın" : "Join the waitlist"}
-                </div>
-                <div style={{ color: T.textSub, fontSize: 14, marginBottom: 24 }}>
-                  {lang === "TR" ? "Pro yayına girdiği anda haberdar olun." : "Be notified the moment Pro goes live."}
-                </div>
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 6 }}>{lang === "TR" ? "Bekleme listesine katılın" : "Join the waitlist"}</div>
+                <div style={{ color: T.textSub, fontSize: 14, marginBottom: 24 }}>{lang === "TR" ? "Pro yayına girdiği anda haberdar olun." : "Be notified the moment Pro goes live."}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   <input className="hf-input" type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSubmit()} />
                   <button className="hf-btn-primary" onClick={handleSubmit} disabled={submitting} style={{ justifyContent: "center", opacity: submitting ? 0.7 : 1 }}>
-                    {submitting
-                      ? <><Loader2 size={14} />{lang === "TR" ? "Katılınıyor..." : "Joining..."}</>
-                      : <>{lang === "TR" ? "Beni Haberdar Et" : "Notify Me"} <ArrowRight size={14} /></>}
+                    {submitting ? <><Loader2 size={14} />{lang === "TR" ? "Katılınıyor..." : "Joining..."}</> : <>{lang === "TR" ? "Beni Haberdar Et" : "Notify Me"} <ArrowRight size={14} /></>}
                   </button>
                 </div>
               </div>
@@ -1159,12 +1264,8 @@ function WaitlistSection({ lang }) {
 }
 
 function Footer({ navigate, lang }) {
-  const productLinks = lang === "TR"
-    ? [["CV Analiz Et", "/app"], ["Panel", "/dashboard"], ["Fiyatlandırma", "/"]]
-    : [["Analyze CV", "/app"], ["Dashboard", "/dashboard"], ["Pricing", "/"]];
-  const legalLinks = lang === "TR"
-    ? ["Gizlilik Politikası", "Kullanım Şartları", "Çerez Politikası"]
-    : ["Privacy Policy", "Terms of Service", "Cookie Policy"];
+  const productLinks = lang === "TR" ? [["CV Analiz Et", "/app"], ["Panel", "/dashboard"], ["Fiyatlandırma", "/"]] : [["Analyze CV", "/app"], ["Dashboard", "/dashboard"], ["Pricing", "/"]];
+  const legalLinks = lang === "TR" ? ["Gizlilik Politikası", "Kullanım Şartları", "Çerez Politikası"] : ["Privacy Policy", "Terms of Service", "Cookie Policy"];
 
   return (
     <footer style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "48px 0 32px" }}>
@@ -1178,28 +1279,20 @@ function Footer({ navigate, lang }) {
               <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "18px", letterSpacing: "-0.02em" }}>HireFit</span>
             </div>
             <p style={{ color: "#475569", fontSize: "14px", lineHeight: 1.7, maxWidth: 280 }}>
-              {lang === "TR"
-                ? "AI destekli CV analizi — neden reddedildiğinizi ve nasıl düzelteceğinizi tam olarak söyler."
-                : "AI-powered CV analysis that tells you exactly why you're getting rejected — and how to fix it."}
+              {lang === "TR" ? "AI destekli CV analizi — neden reddedildiğinizi ve nasıl düzelteceğinizi tam olarak söyler." : "AI-powered CV analysis that tells you exactly why you're getting rejected — and how to fix it."}
             </p>
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               {["LinkedIn", "Twitter"].map(s => (<div key={s} style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", fontSize: "12px", fontWeight: 600, color: "#64748b", cursor: "pointer" }}>{s}</div>))}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#334155", marginBottom: 16 }}>
-              {lang === "TR" ? "Ürün" : "Product"}
-            </div>
+            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#334155", marginBottom: 16 }}>{lang === "TR" ? "Ürün" : "Product"}</div>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
-              {productLinks.map(([label, path]) => (
-                <li key={label}><button onClick={() => navigate(path)} style={{ background: "none", border: "none", color: "#64748b", fontSize: "14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0 }} onMouseEnter={e => e.currentTarget.style.color = "#f1f5f9"} onMouseLeave={e => e.currentTarget.style.color = "#64748b"}>{label}</button></li>
-              ))}
+              {productLinks.map(([label, path]) => (<li key={label}><button onClick={() => navigate(path)} style={{ background: "none", border: "none", color: "#64748b", fontSize: "14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0 }} onMouseEnter={e => e.currentTarget.style.color = "#f1f5f9"} onMouseLeave={e => e.currentTarget.style.color = "#64748b"}>{label}</button></li>))}
             </ul>
           </div>
           <div>
-            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#334155", marginBottom: 16 }}>
-              {lang === "TR" ? "Hukuki" : "Legal"}
-            </div>
+            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#334155", marginBottom: 16 }}>{lang === "TR" ? "Hukuki" : "Legal"}</div>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
               {legalLinks.map(label => (<li key={label}><span style={{ color: "#64748b", fontSize: "14px", cursor: "pointer" }}>{label}</span></li>))}
             </ul>
@@ -1240,6 +1333,7 @@ function MainApp() {
   }, [location.pathname]);
 
   const [user, setUser] = useState(null);
+  const [isPro, setIsPro] = useState(false);
   const [plan] = useState("Free");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -1272,8 +1366,21 @@ function MainApp() {
   const [targetRole, setTargetRole] = useState("");
   const [decisionData, setDecisionData] = useState(null);
   const [decisionLoading, setDecisionLoading] = useState(false);
+  const [applyingFix, setApplyingFix] = useState(null);
+  const [fixResults, setFixResults] = useState({});
+  const [scoreHistory, setScoreHistory] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("hirefit-score-history") || "[]"); } catch { return []; }
+  });
 
   const t = translations[lang];
+
+  const checkUserPlan = async (userId) => {
+    if (!userId) return;
+    try {
+      const { data } = await supabase.from("user_plans").select("plan").eq("user_id", userId).single();
+      setIsPro(data?.plan === "pro");
+    } catch {}
+  };
 
   const extractDataFromReport = (text) => {
     const scoreMatch = text.match(/Final Alignment Score:\s*(\d+)/i);
@@ -1292,9 +1399,7 @@ function MainApp() {
       if (!currentUser) { setHistory([]); return; }
       const { data, error: fetchError } = await supabase.from("analyses").select("*").eq("user_id", currentUser.id).order("created_at", { ascending: false }).limit(10);
       if (fetchError) return;
-      const filtered = (data || []).filter(item =>
-        !clearedAt || new Date(item.created_at) > new Date(clearedAt)
-      );
+      const filtered = (data || []).filter(item => !clearedAt || new Date(item.created_at) > new Date(clearedAt));
       setHistory(filtered.map((item) => ({ id: item.id, createdAt: new Date(item.created_at).toLocaleString(), role: item.role, score: item.alignment_score, cvText: item.cv_text, jdText: item.job_description, report: item.report })));
     } catch (err) { console.error(err); }
   };
@@ -1303,13 +1408,15 @@ function MainApp() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser(session.user);
+        checkUserPlan(session.user.id);
         if (event === "SIGNED_IN" && window.location.pathname === "/login") navigate("/dashboard");
       } else {
         setUser(null);
+        setIsPro(false);
       }
     });
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) setUser(session.user);
+      if (session?.user) { setUser(session.user); checkUserPlan(session.user.id); }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -1324,6 +1431,7 @@ function MainApp() {
 
   useEffect(() => { localStorage.setItem("hirefit-history", JSON.stringify(history)); }, [history]);
   useEffect(() => { localStorage.setItem("hirefit-waitlist", JSON.stringify(waitlist)); }, [waitlist]);
+  useEffect(() => { localStorage.setItem("hirefit-score-history", JSON.stringify(scoreHistory)); }, [scoreHistory]);
   useEffect(() => { if (user) localStorage.setItem("hirefit-user", JSON.stringify(user)); else localStorage.removeItem("hirefit-user"); }, [user]);
 
   const atsBreakdown = useMemo(() => {
@@ -1364,12 +1472,17 @@ function MainApp() {
       setAnalysisCount(anonCount + 1);
     } else {
       const userCount = Number(localStorage.getItem(`hirefit-count-${user.id}`) || 0);
-      if (userCount >= 2) { setShowPaywall(true); return; }
-      localStorage.setItem(`hirefit-count-${user.id}`, String(userCount + 1));
-      setAnalysisCount(userCount + 1);
+      if (userCount >= 2 && !isPro) { setShowPaywall(true); return; }
+      if (!isPro) {
+        localStorage.setItem(`hirefit-count-${user.id}`, String(userCount + 1));
+        setAnalysisCount(userCount + 1);
+      }
     }
 
     setLoading(true); setError("");
+    setFixResults({});
+    setDecisionData(null);
+
     try {
       const res = await fetch("https://hirefit-ai-production.up.railway.app/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang }) });
       const data = await res.json();
@@ -1382,17 +1495,20 @@ function MainApp() {
       const reportText = `Fit Summary:\n${data.fit_summary ?? ""}\n\nStrengths:\n${(data.strengths ?? []).map(s => `- ${s}`).join("\n")}\n\nImprovement Suggestions:\n${(data.improvements ?? []).map(s => `- ${s}`).join("\n")}\n\nWhy You Might Get Rejected:\nHIGH: ${(data.rejection_reasons?.high ?? []).join(", ") || "None"}\nMEDIUM: ${(data.rejection_reasons?.medium ?? []).join(", ") || "None"}`.trim();
       setResult(reportText);
       setAnalysisData(data);
+
+      // Save to score history
+      const newEntry = { score: data.alignment_score ?? 0, role: data.role_type ?? "Unknown", date: new Date().toLocaleDateString() };
+      setScoreHistory(prev => [newEntry, ...prev].slice(0, 10));
+
       await supabase.from("analyses").insert({ role: data.role_type ?? "Unknown", alignment_score: data.alignment_score ?? 0, cv_text: cvText, job_description: jdText, report: reportText, matched_skills: data.matched_skills ?? [], missing_skills: data.missing_skills ?? [], top_keywords: data.top_keywords ?? [], rejection_reasons: data.rejection_reasons ?? {}, seniority: data.seniority ?? "", user_id: user?.id ?? null });
       await fetchAnalyses();
-      } catch (err) { 
-      console.error(err); 
-      setError(lang === "TR" ? "Analiz başarısız." : "Analysis failed. Check your API key or network."); 
-    } finally { 
+    } catch (err) {
+      console.error(err);
+      setError(lang === "TR" ? "Analiz başarısız." : "Analysis failed. Check your API key or network.");
+    } finally {
       setLoading(false);
-      // Auto-trigger decision engine
       setDecisionLoading(true);
       try {
-        console.log("DECISION REQUEST:", { lang, deadline, targetRole });
         const decisionRes = await fetch("https://hirefit-ai-production.up.railway.app/decision", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1407,7 +1523,24 @@ function MainApp() {
       }
     }
   };
-    
+
+  const applyFix = async (fix, index) => {
+    setApplyingFix(index);
+    try {
+      const res = await fetch("https://hirefit-ai-production.up.railway.app/apply-fix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cvText, problem: fix.problem, fix: fix.fix, lang })
+      });
+      const data = await res.json();
+      setFixResults(prev => ({ ...prev, [index]: data }));
+    } catch (err) {
+      console.error("Apply fix failed:", err);
+    } finally {
+      setApplyingFix(null);
+    }
+  };
+
   const optimizeCv = async () => {
     if (!cvText.trim() || !jdText.trim()) { setError(lang === "TR" ? "Lütfen önce hem CV'yi hem de iş ilanını yapıştırın." : "Please paste both the CV and JD first."); return; }
     setOptimizing(true); setError(""); setOptimizedCv("");
@@ -1459,7 +1592,9 @@ function MainApp() {
     localStorage.removeItem("hirefit-history");
     localStorage.setItem("hirefit-cleared-at", new Date().toISOString());
   };
-  const loadHistoryItem = (item) => { setCvText(item.cvText || ""); setJdText(item.jdText || ""); setResult(item.report || ""); extractDataFromReport(item.report || ""); setOptimizedCv(""); setLearningPlan(""); setError(""); navigate("/app"); };
+
+  const loadHistoryItem = (item) => { setCvText(item.cvText || ""); setJdText(item.jdText || ""); setResult(item.report || ""); extractDataFromReport(item.report || ""); setOptimizedCv(""); setLearningPlan(""); setError(""); setDecisionData(null); setFixResults({}); navigate("/app"); };
+
   const login = async () => {
     if (!email.trim() || !password.trim()) { setError(lang === "TR" ? "Lütfen hem email hem de şifreyi girin." : "Please enter both email and password."); return; }
     try {
@@ -1481,14 +1616,10 @@ function MainApp() {
     await supabase.auth.signOut();
     localStorage.removeItem("hirefit-user");
     setUser(null);
-    setCvText("");
-    setJdText("");
-    setResult("");
-    setAnalysisData(null);
-    setAlignmentScore(null);
-    setHistory([]);
-    setOptimizedCv("");
-    setLearningPlan("");
+    setIsPro(false);
+    setCvText(""); setJdText(""); setResult(""); setAnalysisData(null);
+    setAlignmentScore(null); setHistory([]); setOptimizedCv(""); setLearningPlan("");
+    setDecisionData(null); setFixResults({});
     navigate("/");
   };
 
@@ -1499,6 +1630,8 @@ function MainApp() {
     a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
   };
+
+  const openUpgrade = () => window.open("https://hirefit.lemonsqueezy.com/checkout/buy/19ee5972-0f76-4d2f-b2a0-9e08dc9a9a7d", "_blank");
 
   const sectorLabels = lang === "TR"
     ? ["Otomatik", "Teknoloji / Startup", "Danışmanlık", "Finans", "FMCG / Perakende", "Sağlık", "Kamu"]
@@ -1513,10 +1646,7 @@ function MainApp() {
         <PaywallModal
           lang={lang}
           onClose={() => setShowPaywall(false)}
-          onUpgrade={() => {
-            setShowPaywall(false);
-            window.open("https://hirefit.lemonsqueezy.com/checkout/buy/19ee5972-0f76-4d2f-b2a0-9e08dc9a9a7d", "_blank");
-          }}
+          onUpgrade={() => { setShowPaywall(false); openUpgrade(); }}
         />
       )}
 
@@ -1560,24 +1690,27 @@ function MainApp() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
             <StatCard title={t.totalAnalyses} value={history.length} icon={<History size={16} color={T.blue} />} />
             <StatCard title={t.averageScore} value={`${averageScore}/100`} icon={<TrendingUp size={16} color={T.cyan} />} />
-            <StatCard title={t.currentPlan} value={plan} icon={<Crown size={16} color="#fbbf24" />} />
+            <StatCard title={t.currentPlan} value={isPro ? "Pro ✨" : plan} icon={<Crown size={16} color="#fbbf24" />} />
             <StatCard title={t.waitlistLeads} value={waitlist.length} icon={<Mail size={16} color={T.green} />} />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
             <HistoryList history={history} onLoadItem={loadHistoryItem} onClear={clearHistory} lang={lang} />
-            <div className="hf-card" style={{ padding: 28 }}>
-              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 700, marginBottom: 20 }}>{t.productRoadmap}</h3>
-              <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12 }}>
-                {(lang === "TR"
-                  ? ["Gerçek kimlik doğrulama (Supabase)", "Veritabanı destekli raporlar", "Paylaşılabilir rapor URL'leri", "Stripe ödeme sistemi", "İşe alım uzmanı paneli modu"]
-                  : ["Real authentication (Supabase / Clerk)", "Database-backed saved reports", "Shareable public report URLs", "Stripe checkout for Pro plan", "Recruiter dashboard mode"]
-                ).map((item) => (
-                  <li key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: T.textSub }}>
-                    <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.blue, flexShrink: 0 }} />{item}
-                  </li>
-                ))}
-              </ul>
-              <button className="hf-btn-primary" onClick={() => navigate("/app")} style={{ marginTop: 24, fontSize: "14px" }}>{t.openProduct} <ArrowRight size={14} /></button>
+            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <ScoreProgressCard scoreHistory={scoreHistory} lang={lang} />
+              <div className="hf-card" style={{ padding: 28 }}>
+                <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 700, marginBottom: 20 }}>{t.productRoadmap}</h3>
+                <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12 }}>
+                  {(lang === "TR"
+                    ? ["Gerçek kimlik doğrulama (Supabase)", "Veritabanı destekli raporlar", "Paylaşılabilir rapor URL'leri", "Stripe ödeme sistemi", "İşe alım uzmanı paneli modu"]
+                    : ["Real authentication (Supabase / Clerk)", "Database-backed saved reports", "Shareable public report URLs", "Stripe checkout for Pro plan", "Recruiter dashboard mode"]
+                  ).map((item) => (
+                    <li key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: T.textSub }}>
+                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.blue, flexShrink: 0 }} />{item}
+                    </li>
+                  ))}
+                </ul>
+                <button className="hf-btn-primary" onClick={() => navigate("/app")} style={{ marginTop: 24, fontSize: "14px" }}>{t.openProduct} <ArrowRight size={14} /></button>
+              </div>
             </div>
           </div>
         </div>
@@ -1594,9 +1727,9 @@ function MainApp() {
               <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(28px,3vw,42px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 6 }}>{t.cvAnalyzer}</h1>
               <p style={{ color: "#64748b", fontSize: "14px" }}>{t.cvAnalyzerDesc}</p>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 12, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.15)" }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px #10b981", display: "inline-block" }} />
-              <span style={{ fontSize: "12px", fontWeight: 600, color: "#10b981" }}>{t.freeToUse}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 12, background: isPro ? "rgba(212,175,55,0.08)" : "rgba(16,185,129,0.08)", border: `1px solid ${isPro ? "rgba(212,175,55,0.2)" : "rgba(16,185,129,0.15)"}` }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: isPro ? "#d4af37" : "#10b981", boxShadow: `0 0 8px ${isPro ? "#d4af37" : "#10b981"}`, display: "inline-block" }} />
+              <span style={{ fontSize: "12px", fontWeight: 600, color: isPro ? "#d4af37" : "#10b981" }}>{isPro ? "Pro ✨" : t.freeToUse}</span>
             </div>
           </div>
 
@@ -1644,50 +1777,38 @@ function MainApp() {
               </div>
 
               {(() => {
-                const count = user
-                  ? Number(localStorage.getItem(`hirefit-count-${user.id}`) || 0)
-                  : Number(localStorage.getItem("hirefit-anon-count") || 0);
+                const count = user ? Number(localStorage.getItem(`hirefit-count-${user.id}`) || 0) : Number(localStorage.getItem("hirefit-anon-count") || 0);
                 const remaining = Math.max(0, 2 - count);
+                if (isPro) return null;
                 return remaining < 2 ? (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 8, background: remaining === 0 ? "rgba(239,68,68,0.08)" : "rgba(245,158,11,0.08)", border: `1px solid ${remaining === 0 ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)"}`, marginBottom: 8, fontSize: 13, color: remaining === 0 ? "#f87171" : "#fbbf24", fontWeight: 600 }}>
-                    {remaining === 0
-                      ? t.noFreeLeft
-                      : `⚡ ${remaining} ${t.freeLimitWarning}`}
+                    {remaining === 0 ? t.noFreeLeft : `⚡ ${remaining} ${t.freeLimitWarning}`}
                   </div>
                 ) : null;
               })()}
 
               <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
-  <span style={{ fontSize: 12, fontWeight: 600, color: "#475569", whiteSpace: "nowrap" }}>
-    {lang === "TR" ? "⏰ Başvuru zamanın:" : "⏰ Application deadline:"}
-  </span>
-  {[
-    { value: "urgent", label: lang === "TR" ? "🔴 Acil (bugün)" : "🔴 Urgent (today)" },
-    { value: "1_week", label: lang === "TR" ? "🟡 1 Hafta" : "🟡 1 Week" },
-    { value: "1_month", label: lang === "TR" ? "🟢 1 Ay+" : "🟢 1 Month+" },
-  ].map(({ value, label }) => (
-    <button key={value} onClick={() => setDeadline(value)} style={{
-      padding: "6px 14px", borderRadius: 999, fontSize: "12px", fontWeight: 600,
-      cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s",
-      background: deadline === value ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)",
-      border: `1px solid ${deadline === value ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.07)"}`,
-      color: deadline === value ? "#a78bfa" : "#475569",
-    }}>{label}</button>
-  ))}
-</div>
+                <span style={{ fontSize: 12, fontWeight: 600, color: "#475569", whiteSpace: "nowrap" }}>
+                  {lang === "TR" ? "⏰ Başvuru zamanın:" : "⏰ Application deadline:"}
+                </span>
+                {[
+                  { value: "urgent", label: lang === "TR" ? "🔴 Acil (bugün)" : "🔴 Urgent (today)" },
+                  { value: "1_week", label: lang === "TR" ? "🟡 1 Hafta" : "🟡 1 Week" },
+                  { value: "1_month", label: lang === "TR" ? "🟢 1 Ay+" : "🟢 1 Month+" },
+                ].map(({ value, label }) => (
+                  <button key={value} onClick={() => setDeadline(value)} style={{
+                    padding: "6px 14px", borderRadius: 999, fontSize: "12px", fontWeight: 600,
+                    cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s",
+                    background: deadline === value ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${deadline === value ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.07)"}`,
+                    color: deadline === value ? "#a78bfa" : "#475569",
+                  }}>{label}</button>
+                ))}
+              </div>
 
               <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
                 {sectorValues.map((s, idx) => (
-                  <button
-                    key={s}
-                    onClick={() => setSector(s)}
-                    style={{
-                      padding: "6px 14px", borderRadius: 999, fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s",
-                      background: sector === s ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)",
-                      border: `1px solid ${sector === s ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.07)"}`,
-                      color: sector === s ? "#a78bfa" : "#475569",
-                    }}
-                  >
+                  <button key={s} onClick={() => setSector(s)} style={{ padding: "6px 14px", borderRadius: 999, fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s", background: sector === s ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)", border: `1px solid ${sector === s ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.07)"}`, color: sector === s ? "#a78bfa" : "#475569" }}>
                     {sectorLabels[idx]}
                   </button>
                 ))}
@@ -1714,8 +1835,17 @@ function MainApp() {
               )}
 
               {(decisionData || decisionLoading) && (
-  <DecisionCard data={decisionData} loading={decisionLoading} lang={lang} />
-)}
+                <DecisionCard
+                  data={decisionData}
+                  loading={decisionLoading}
+                  lang={lang}
+                  isPro={isPro}
+                  onApplyFix={applyFix}
+                  applyingFix={applyingFix}
+                  fixResults={fixResults}
+                  onUpgrade={openUpgrade}
+                />
+              )}
 
               {alignmentScore !== null && analysisData && (
                 <DashboardResults

@@ -60,9 +60,6 @@ app.post("/analyze", async (req, res) => {
   sector === "Government" ? "Focus on: public sector experience, policy knowledge, compliance, formal writing, citizenship requirements. Red flags: only private sector background, lack of formal qualifications." :
   `Apply the exact standards, expectations, and red flags that ${sector} recruiters care about most.`
 }` : "You have deep expertise across tech, consulting, finance, and FMCG sectors. Auto-detect the most relevant sector from the job description and apply appropriate standards."}
-            
-
-
 
 CV:
 ${cvText}
@@ -292,6 +289,56 @@ For each skill provide: week number, specific resource (course/book/project), an
   }
 });
 
+app.post("/apply-fix", async (req, res) => {
+  const { cvText, problem, fix, lang } = req.body;
+  if (!cvText || !problem) return res.status(400).json({ error: "Missing data" });
+
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-4o-mini",
+        temperature: 0.3,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "user",
+            content: `You are an expert CV writer.
+
+The CV has this problem: "${problem}"
+The suggested fix is: "${fix}"
+
+Full CV:
+${cvText}
+
+Find the specific section or bullet point in the CV that has this problem. Rewrite ONLY that part with the fix applied — keep everything else exactly the same.
+${lang === "TR" ? "Return the response in Turkish." : "Return the response in English."}
+
+Return ONLY this JSON (no markdown):
+{
+  "original_section": "the exact original text that needs changing (copy verbatim from CV)",
+  "rewritten_section": "the improved version of that specific section",
+  "explanation": "1 sentence: what changed and why it's better"
+}`
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content;
+    const parsed = extractJSON(content);
+    res.json(parsed || { error: "Could not parse response" });
+  } catch (err) {
+    console.error("💥 APPLY-FIX ERROR:", err);
+    res.status(500).json({ error: "Apply fix failed" });
+  }
+});
+
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   const secret = process.env.LEMON_WEBHOOK_SECRET;
   const signature = req.headers["x-signature"];
@@ -359,7 +406,6 @@ ${cvText}
 
 JOB DESCRIPTION:
 ${jobDescription}
-
 ${targetRole ? `TARGET ROLE: ${targetRole}` : ""}
 ${deadline ? `DEADLINE: ${deadline}` : ""}
 ${lang === "TR" ? "Return ALL text fields in Turkish." : "Return all text fields in English."}
@@ -401,7 +447,6 @@ Return ONLY this JSON structure (no markdown, no extra text):
     res.status(500).json({ error: "Decision analysis failed" });
   }
 });
-
 
 app.listen(3000, () => {
   console.log("🚀 Backend running on http://localhost:3000");
