@@ -425,12 +425,93 @@ Return ONLY this JSON (no markdown):
     // Clean AI tone from output
     const cleaned = cleanAITone(gptParsed);
 
-    // STEP 2: Multi-model slot — Claude enrichment (future)
+    // STEP 2: Tone rewriter — make output sound human
+try {
+  const toneResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "openai/gpt-4o-mini",
+      temperature: 0.2,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "user",
+          content: `You are a recruiter reviewing a CV. You have 10 seconds. Say what matters.
+
+RULES:
+- Short sentences. Max 8-10 words each.
+- No filler words. No AI tone. No corporate language.
+- FORBIDDEN: optimize, enhance, leverage, improve, consider, suggest, could, would
+- Be direct. Slightly harsh but fair.
+
+EXAMPLES:
+❌ "Good experience, but lacks project management skills."
+✅ "Experience exists. Wrong skills for this role."
+
+❌ "Highlight specific data analysis tools used."
+✅ "List exact tools. SQL, Python, Excel."
+
+❌ "This CV contains generic phrases."
+✅ "Feels generic. Anyone could write this."
+
+Rewrite ONLY these text fields. Keep all numbers, arrays structure, and non-text fields EXACTLY the same.
+DO NOT change logic. DO NOT add insights. ONLY rewrite tone.
+${lang === "TR" ? "Keep all text in Turkish." : "Keep all text in English."}
+
+Input JSON:
+${JSON.stringify({
+  summary: cleaned.summary,
+  biggestMistake: cleaned.biggestMistake,
+  topFixes: cleaned.topFixes,
+  oneAction: cleaned.oneAction,
+  recruiterInsight: cleaned.recruiterInsight,
+  aiSuspicion: cleaned.aiSuspicion,
+  deadlinePlan: cleaned.deadlinePlan
+})}
+
+Return ONLY a JSON object with the same keys and rewritten values. No markdown.`
+        }
+      ]
+    })
+  });
+
+  const toneData = await toneResponse.json();
+  const toneContent = toneData?.choices?.[0]?.message?.content;
+  console.log("Tone raw:", toneContent);
+  const toneParsed = extractJSON(toneContent);
+
+  if (toneParsed) {
+    const final = {
+      ...cleaned,
+      summary: toneParsed.summary || cleaned.summary,
+      biggestMistake: toneParsed.biggestMistake || cleaned.biggestMistake,
+      topFixes: toneParsed.topFixes || cleaned.topFixes,
+      oneAction: toneParsed.oneAction || cleaned.oneAction,
+      recruiterInsight: toneParsed.recruiterInsight || cleaned.recruiterInsight,
+      aiSuspicion: toneParsed.aiSuspicion || cleaned.aiSuspicion,
+      deadlinePlan: toneParsed.deadlinePlan || cleaned.deadlinePlan,
+    }
+    return res.json(final);
+  }
+} catch (toneErr) {
+  console.error("Tone rewriter failed, using original:", toneErr.message);
+}
+
+return res.json(cleaned);
+
+
+
+
+
     // When Claude API is connected:
     // const claudeEnriched = await enrichWithClaude(cleaned, cvText, lang);
     // return res.json(mergeOutputs(cleaned, claudeEnriched));
 
-    res.json(cleaned);
+    
 
   } catch (err) {
     console.error("💥 DECISION ERROR:", err);
