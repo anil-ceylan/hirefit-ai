@@ -310,90 +310,131 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
   );
   if (!data) return null;
 
-  const decisionColor = data.decision?.includes("High") || data.decision?.includes("Yüksek") ? "#10b981"
-    : data.decision?.includes("Medium") || data.decision?.includes("Orta") ? "#f59e0b" : "#f87171";
-  const decisionBg = data.decision?.includes("High") || data.decision?.includes("Yüksek") ? "rgba(16,185,129,0.08)"
-    : data.decision?.includes("Medium") || data.decision?.includes("Orta") ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)";
-  const decisionBorder = data.decision?.includes("High") || data.decision?.includes("Yüksek") ? "rgba(16,185,129,0.2)"
-    : data.decision?.includes("Medium") || data.decision?.includes("Orta") ? "rgba(245,158,11,0.2)" : "rgba(239,68,68,0.2)";
+  const isHigh = data.decision?.includes("High") || data.decision?.includes("Yüksek");
+  const isMed = data.decision?.includes("Medium") || data.decision?.includes("Orta");
+  const decisionColor = isHigh ? "#10b981" : isMed ? "#f59e0b" : "#f87171";
+  const decisionBg = isHigh ? "rgba(16,185,129,0.08)" : isMed ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)";
+  const decisionBorder = isHigh ? "rgba(16,185,129,0.2)" : isMed ? "rgba(245,158,11,0.2)" : "rgba(239,68,68,0.2)";
+
+  const aiLevel = data.aiSuspicion?.level;
+  const aiColor = aiLevel === "High" ? "#f87171" : aiLevel === "Medium" ? "#fbbf24" : "#10b981";
+  const aiBg = aiLevel === "High" ? "rgba(239,68,68,0.06)" : aiLevel === "Medium" ? "rgba(245,158,11,0.06)" : "rgba(16,185,129,0.06)";
+  const aiBorder = aiLevel === "High" ? "rgba(239,68,68,0.15)" : aiLevel === "Medium" ? "rgba(245,158,11,0.15)" : "rgba(16,185,129,0.15)";
 
   return (
-    <div style={{ background: "#0c0c0c", border: `1px solid ${decisionBorder}`, borderRadius: 20, padding: 24, marginBottom: 16, position: "relative", overflow: "hidden" }}>
+    <div style={{ background: "#0a0a0a", border: `1px solid ${decisionBorder}`, borderRadius: 20, padding: 24, marginBottom: 16, position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${decisionColor}, transparent)` }} />
 
-      {/* Decision Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20 }}>
-        <div style={{ padding: "10px 20px", borderRadius: 12, background: decisionBg, border: `1px solid ${decisionBorder}`, flexShrink: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: decisionColor, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>
+      {/* 1. DECISION */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
+        <div style={{ padding: "12px 20px", borderRadius: 12, background: decisionBg, border: `1px solid ${decisionBorder}`, flexShrink: 0 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: decisionColor, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 3 }}>
             {lang === "TR" ? "Karar" : "Decision"}
           </div>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: decisionColor }}>{data.decision}</div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: decisionColor }}>{data.decision}</div>
         </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, color: "#8a8a8a", lineHeight: 1.6, marginBottom: 8 }}>{data.decision_reasoning}</div>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 13, fontWeight: 700, color: "#d4af37", background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.15)", borderRadius: 8, padding: "6px 12px", display: "inline-block" }}>
-            💡 {data.one_liner}
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
+          {data.confidence !== undefined && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
+                <div style={{ width: `${data.confidence}%`, height: "100%", background: `linear-gradient(90deg, ${decisionColor}, transparent)`, borderRadius: 999, transition: "width 0.8s ease" }} />
+              </div>
+              <span style={{ fontSize: 11, color: "#475569", fontWeight: 700, flexShrink: 0 }}>{data.confidence}%</span>
+            </div>
+          )}
+          <div style={{ fontSize: 11, color: "#475569", fontWeight: 600, letterSpacing: "0.04em" }}>
+            {lang === "TR" ? "Güven Skoru" : "Confidence"}
           </div>
         </div>
-        <div style={{ textAlign: "center", flexShrink: 0 }}>
-          <div style={{ fontSize: 10, color: "#475569", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
-            {lang === "TR" ? "Şu an → Sonra" : "Now → After"}
+        {data.fitScore !== undefined && (
+          <div style={{ textAlign: "center", flexShrink: 0 }}>
+            <div style={{ fontSize: 10, color: "#475569", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
+              {lang === "TR" ? "Şu an → Sonra" : "Now → After"}
+            </div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#f87171" }}>{data.fitScore}</div>
+            <div style={{ fontSize: 14, color: "#334155", margin: "1px 0" }}>→</div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: isPro ? "#10b981" : "#334155" }}>
+              {isPro ? data.improvedScore : <span style={{ fontSize: 14 }}>🔒 Pro</span>}
+            </div>
           </div>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#f87171" }}>{data.fit_score}</div>
-          <div style={{ fontSize: 16, color: "#475569", margin: "2px 0" }}>→</div>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#10b981" }}>{data.improved_score}</div>
-        </div>
+        )}
       </div>
 
-      {/* Top Fixes with Action Buttons */}
-      {(data.top_fixes || []).length > 0 && (
+      {/* 2. SUMMARY */}
+      {data.summary && (
+        <div style={{ marginBottom: 16, padding: "12px 16px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>
+            {lang === "TR" ? "Özet" : "Summary"}
+          </div>
+          <div style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.6, fontWeight: 500 }}>{data.summary}</div>
+        </div>
+      )}
+
+      {/* 3. BIGGEST MISTAKE */}
+      {data.biggestMistake && (
+        <div style={{ marginBottom: 16, padding: "12px 16px", background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#f87171", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>
+            ⚡ {lang === "TR" ? "En Büyük Sorun" : "Biggest Mistake"}
+          </div>
+          <div style={{ fontSize: 14, color: "#fca5a5", fontWeight: 600 }}>{data.biggestMistake}</div>
+        </div>
+      )}
+
+      {/* 4. AI SUSPICION */}
+      {data.aiSuspicion && data.aiSuspicion.level !== "Low" && (
+        <div style={{ marginBottom: 16, padding: "12px 16px", background: aiBg, border: `1px solid ${aiBorder}`, borderRadius: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: aiColor, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+              🤖 {lang === "TR" ? "Yapay Ton Tespiti" : "Generic CV Detected"}
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: aiBg, border: `1px solid ${aiBorder}`, color: aiColor }}>
+              {data.aiSuspicion.level}
+            </span>
+          </div>
+          {(data.aiSuspicion.reasons || []).map((r, i) => (
+            <div key={i} style={{ fontSize: 12, color: "#94a3b8", marginBottom: 3 }}>• {r}</div>
+          ))}
+          {data.aiSuspicion.fix && (
+            <div style={{ marginTop: 8, fontSize: 12, color: aiColor, fontWeight: 600 }}>→ {data.aiSuspicion.fix}</div>
+          )}
+        </div>
+      )}
+
+      {/* 5. TOP FIXES */}
+      {(data.topFixes || data.top_fixes || []).length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "#d4af37", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
             {lang === "TR" ? "Top 3 Kritik Düzeltme" : "Top 3 Critical Fixes"}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {data.top_fixes.slice(0, 3).map((fix, i) => {
+            {(data.topFixes || data.top_fixes || []).slice(0, 3).map((fix, i) => {
               const isLocked = !isPro && i > 0;
               const isApplying = applyingFix === i;
               const fixResult = fixResults?.[i];
+              const problem = fix.problem;
+              const fixText = fix.fix;
+              const impact = fix.impact;
 
               return (
                 <div key={i} style={{ position: "relative", borderRadius: 12, overflow: "hidden" }}>
-                  <div style={{
-                    padding: "12px 14px",
-                    background: "rgba(255,255,255,0.02)",
-                    border: "1px solid rgba(255,255,255,0.05)",
-                    borderRadius: 12,
-                    filter: isLocked ? "blur(3px)" : "none",
-                    transition: "filter 0.2s",
-                    userSelect: isLocked ? "none" : "auto",
-                  }}>
+                  <div style={{ padding: "12px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 12, filter: isLocked ? "blur(3px)" : "none", userSelect: isLocked ? "none" : "auto" }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                       <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, color: "rgba(212,175,55,0.5)", flexShrink: 0 }}>{i + 1}</div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, color: "#f87171", fontWeight: 600, marginBottom: 3 }}>⚠ {fix.problem}</div>
-                        <div style={{ fontSize: 12, color: "#10b981", fontWeight: 600, marginBottom: fixResult ? 10 : 0 }}>→ {fix.fix}</div>
-
-                        {/* Fix Result */}
+                        <div style={{ fontSize: 12, color: "#f87171", fontWeight: 600, marginBottom: 3 }}>⚠ {problem}</div>
+                        <div style={{ fontSize: 12, color: "#10b981", fontWeight: 600, marginBottom: fixResult ? 10 : 0 }}>→ {fixText}</div>
                         {fixResult && !isLocked && (
                           <div style={{ marginTop: 10, animation: "fadeIn 0.3s ease" }}>
-                            <div style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
-                              {lang === "TR" ? "✨ Yeniden Yazıldı" : "✨ Rewritten"}
-                            </div>
                             <div style={{ background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)", borderRadius: 8, padding: "10px 12px" }}>
                               {fixResult.original_section && (
                                 <div style={{ marginBottom: 8 }}>
-                                  <div style={{ fontSize: 10, color: "#f87171", fontWeight: 700, marginBottom: 3 }}>
-                                    {lang === "TR" ? "Önce:" : "Before:"}
-                                  </div>
+                                  <div style={{ fontSize: 10, color: "#f87171", fontWeight: 700, marginBottom: 3 }}>{lang === "TR" ? "Önce:" : "Before:"}</div>
                                   <div style={{ fontSize: 12, color: "#64748b", fontStyle: "italic", lineHeight: 1.5 }}>{fixResult.original_section}</div>
                                 </div>
                               )}
                               {fixResult.rewritten_section && (
                                 <div style={{ marginBottom: 8 }}>
-                                  <div style={{ fontSize: 10, color: "#10b981", fontWeight: 700, marginBottom: 3 }}>
-                                    {lang === "TR" ? "Sonra:" : "After:"}
-                                  </div>
+                                  <div style={{ fontSize: 10, color: "#10b981", fontWeight: 700, marginBottom: 3 }}>{lang === "TR" ? "Sonra:" : "After:"}</div>
                                   <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5 }}>{fixResult.rewritten_section}</div>
                                 </div>
                               )}
@@ -401,53 +442,27 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
                                 <div style={{ fontSize: 11, color: "#a78bfa", fontStyle: "italic" }}>💡 {fixResult.explanation}</div>
                               )}
                             </div>
-                            <button
-                              onClick={() => navigator.clipboard.writeText(fixResult.rewritten_section || "")}
-                              style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#94a3b8", fontSize: "11px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
-                            >
+                            <button onClick={() => navigator.clipboard.writeText(fixResult.rewritten_section || "")} style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "#94a3b8", fontSize: "11px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
                               <Copy size={10} /> {t.copyFix}
                             </button>
                           </div>
                         )}
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
-                        <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: fix.impact === "High" ? "rgba(239,68,68,0.1)" : "rgba(245,158,11,0.1)", color: fix.impact === "High" ? "#f87171" : "#fbbf24", border: `1px solid ${fix.impact === "High" ? "rgba(239,68,68,0.2)" : "rgba(245,158,11,0.2)"}` }}>
-                          {fix.impact}
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: impact === "High" ? "rgba(239,68,68,0.1)" : "rgba(245,158,11,0.1)", color: impact === "High" ? "#f87171" : "#fbbf24", border: `1px solid ${impact === "High" ? "rgba(239,68,68,0.2)" : "rgba(245,158,11,0.2)"}` }}>
+                          {impact}
                         </span>
                         {!isLocked && (
-                          <button
-                            onClick={() => onApplyFix(fix, i)}
-                            disabled={isApplying || !!fixResult}
-                            style={{
-                              display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8,
-                              background: fixResult ? "rgba(16,185,129,0.1)" : "rgba(99,102,241,0.15)",
-                              border: `1px solid ${fixResult ? "rgba(16,185,129,0.25)" : "rgba(99,102,241,0.3)"}`,
-                              color: fixResult ? "#10b981" : "#a78bfa",
-                              fontSize: "11px", fontWeight: 700, cursor: fixResult ? "default" : "pointer",
-                              fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap",
-                              opacity: isApplying ? 0.7 : 1,
-                            }}
-                          >
-                            {isApplying ? (
-                              <><div style={{ width: 10, height: 10, borderRadius: "50%", border: "2px solid #a78bfa", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />{t.applying}</>
-                            ) : fixResult ? (
-                              t.fixApplied
-                            ) : (
-                              <><Wand2 size={10} />{t.applyFix}</>
-                            )}
+                          <button onClick={() => onApplyFix(fix, i)} disabled={isApplying || !!fixResult} style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 8, background: fixResult ? "rgba(16,185,129,0.1)" : "rgba(99,102,241,0.15)", border: `1px solid ${fixResult ? "rgba(16,185,129,0.25)" : "rgba(99,102,241,0.3)"}`, color: fixResult ? "#10b981" : "#a78bfa", fontSize: "11px", fontWeight: 700, cursor: fixResult ? "default" : "pointer", fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap", opacity: isApplying ? 0.7 : 1 }}>
+                            {isApplying ? <><div style={{ width: 10, height: 10, borderRadius: "50%", border: "2px solid #a78bfa", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />{t.applying}</> : fixResult ? t.fixApplied : <><Wand2 size={10} />{t.applyFix}</>}
                           </button>
                         )}
                       </div>
                     </div>
                   </div>
-
-                  {/* Blur overlay for locked fixes */}
                   {isLocked && (
                     <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(6,9,16,0.6)", borderRadius: 12 }}>
-                      <button
-                        onClick={onUpgrade}
-                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 8, background: "linear-gradient(135deg, #d4af37, #f0d060)", border: "none", color: "#000", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
-                      >
+                      <button onClick={onUpgrade} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 8, background: "linear-gradient(135deg, #d4af37, #f0d060)", border: "none", color: "#000", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
                         <Crown size={12} /> {t.upgradeToSee}
                       </button>
                     </div>
@@ -459,25 +474,66 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
         </div>
       )}
 
-      {/* Deadline Plan */}
-      {data.deadline_plan?.steps?.length > 0 && (
-        <div>
+      {/* 6. RECRUITER INSIGHT — Pro only */}
+      {data.recruiterInsight && data.recruiterInsight.length > 0 && (
+        <div style={{ marginBottom: 16, position: "relative" }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: "#d4af37", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
-            {lang === "TR" ? "⏰ Aksiyon Planı" : "⏰ Action Plan"}
+            {lang === "TR" ? "İşe Alım Uzmanı Görüşü" : "Recruiter Insight"}
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {data.deadline_plan.steps.map((step, i) => (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, filter: isPro ? "none" : "blur(4px)", userSelect: isPro ? "auto" : "none" }}>
+            {data.recruiterInsight.map((insight, i) => (
+              <div key={i} style={{ padding: "8px 12px", background: "rgba(212,175,55,0.04)", border: "1px solid rgba(212,175,55,0.1)", borderRadius: 8, fontSize: 13, color: "#94a3b8", lineHeight: 1.5 }}>
+                💬 {insight}
+              </div>
+            ))}
+          </div>
+          {!isPro && (
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <button onClick={onUpgrade} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 8, background: "linear-gradient(135deg, #d4af37, #f0d060)", border: "none", color: "#000", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                <Crown size={12} /> {lang === "TR" ? "Pro ile Gör" : "Unlock with Pro"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 7. ONE ACTION */}
+      {data.oneAction && (
+        <div style={{ marginBottom: 16, padding: "14px 16px", background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>
+            🎯 {lang === "TR" ? "Şimdi Yapman Gereken Tek Şey" : "One Action Right Now"}
+          </div>
+          <div style={{ fontSize: 15, color: "#e2e8f0", fontWeight: 700 }}>{data.oneAction}</div>
+        </div>
+      )}
+
+      {/* 8. DEADLINE PLAN — Pro only */}
+      {data.deadlinePlan?.steps?.length > 0 && (
+        <div style={{ position: "relative" }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#d4af37", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
+            ⏰ {lang === "TR" ? "Aksiyon Planı" : "Action Plan"}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", filter: isPro ? "none" : "blur(4px)", userSelect: isPro ? "auto" : "none" }}>
+            {data.deadlinePlan.steps.map((step, i) => (
               <div key={i} style={{ flex: "1 1 160px", padding: "10px 14px", background: "rgba(99,102,241,0.05)", border: "1px solid rgba(99,102,241,0.15)", borderRadius: 10 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: "#a78bfa", marginBottom: 4, letterSpacing: "0.08em" }}>{step.day}</div>
                 <div style={{ fontSize: 12, color: "#8a8a8a", lineHeight: 1.5 }}>{step.action}</div>
               </div>
             ))}
           </div>
+          {!isPro && (
+            <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <button onClick={onUpgrade} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 8, background: "linear-gradient(135deg, #d4af37, #f0d060)", border: "none", color: "#000", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                <Crown size={12} /> {lang === "TR" ? "Pro ile Aç" : "Unlock with Pro"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
+
 
 function ScoreProgressCard({ scoreHistory, lang }) {
   const t = translations[lang];

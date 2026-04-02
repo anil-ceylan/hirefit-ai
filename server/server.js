@@ -28,6 +28,51 @@ function extractJSON(text) {
   }
 }
 
+// Post-processing cleaner — removes AI-like language from string fields
+function cleanAITone(obj) {
+  if (!obj || typeof obj !== "object") return obj;
+  const forbidden = [
+    /\boptimize\b/gi, /\benhance\b/gi, /\bleverage\b/gi,
+    /\bconsider\b/gi, /\bsuggests?\b/gi, /\bcould be\b/gi,
+    /\bit is (important|recommended|worth)\b/gi,
+    /\bplease note\b/gi, /\bfeel free\b/gi,
+    /\bin order to\b/gi, /\bsubstantially\b/gi,
+  ];
+  const replacements = {
+    "optimize": "fix", "enhance": "strengthen", "leverage": "use",
+    "consider": "do this:", "could be improved": "is weak",
+    "it is important": "critical:", "it is recommended": "",
+    "in order to": "to",
+  };
+
+  function cleanString(str) {
+    if (typeof str !== "string") return str;
+    let result = str;
+    forbidden.forEach(rx => {
+      result = result.replace(rx, match => {
+        const lower = match.toLowerCase();
+        return replacements[lower] || match;
+      });
+    });
+    return result;
+  }
+
+  function walk(node) {
+    if (typeof node === "string") return cleanString(node);
+    if (Array.isArray(node)) return node.map(walk);
+    if (node && typeof node === "object") {
+      const cleaned = {};
+      for (const key of Object.keys(node)) {
+        cleaned[key] = walk(node[key]);
+      }
+      return cleaned;
+    }
+    return node;
+  }
+
+  return walk(obj);
+}
+
 app.post("/analyze", async (req, res) => {
   const { cvText, jobDescription, sector, lang } = req.body;
   console.log("SECTOR RECEIVED:", sector);
@@ -61,12 +106,18 @@ app.post("/analyze", async (req, res) => {
   `Apply the exact standards, expectations, and red flags that ${sector} recruiters care about most.`
 }` : "You have deep expertise across tech, consulting, finance, and FMCG sectors. Auto-detect the most relevant sector from the job description and apply appropriate standards."}
 
+TONE RULES — CRITICAL:
+- Write like a recruiter reviewing in 10 seconds. Short sentences. Direct. No filler.
+- FORBIDDEN WORDS: optimize, enhance, leverage, consider, suggest, could, important to note, in order to, please note
+- BAD: "This CV could be improved by adding metrics" 
+- GOOD: "No metrics. Add numbers to every bullet."
+
 CV:
 ${cvText}
 
 Job Description:
 ${jobDescription}
-${lang === "TR" ? "IMPORTANT: Return ALL text fields in Turkish language. fit_summary, strengths, improvements, rejection_reasons, recruiter_simulation, blind_spots, interview_prep dahil tüm metin alanlarını Türkçe yaz." : "Return all text fields in English."}
+${lang === "TR" ? "IMPORTANT: Return ALL text fields in Turkish language. Tüm metin alanlarını Türkçe yaz." : "Return all text fields in English."}
 Return ONLY valid JSON. No markdown, no explanation, no extra text.
 
 {
@@ -75,110 +126,65 @@ Return ONLY valid JSON. No markdown, no explanation, no extra text.
   "seniority": "<Intern|Junior|Mid|Senior>",
   "confidence_score": <number 60-95>,
   "confidence_level": "<Low|Medium|High>",
-  "confidence_basis": "<1 sentence: what made you confident or uncertain>",
-
-  "matched_skills": ["<specific skill from CV that matches JD>"],
-  "missing_skills": ["<specific skill in JD not found in CV>"],
-  "top_keywords": ["<most important keyword from JD>"],
-
+  "confidence_basis": "<1 sentence, direct>",
+  "matched_skills": ["<skill>"],
+  "missing_skills": ["<skill>"],
+  "top_keywords": ["<keyword>"],
   "score_breakdown": {
-    "skills_match": <number 0-100>,
-    "keyword_match": <number 0-100>,
-    "experience_depth": <number 0-100>,
-    "formatting": <number 0-100>,
-    "skills_explanation": "<1 sentence why this score>",
-    "experience_explanation": "<1 sentence why this score>"
+    "skills_match": <0-100>,
+    "keyword_match": <0-100>,
+    "experience_depth": <0-100>,
+    "formatting": <0-100>,
+    "skills_explanation": "<direct 1 sentence>",
+    "experience_explanation": "<direct 1 sentence>"
   },
-
-  "fit_summary": "<2-3 sentences, reference specific CV content>",
-
-  "strengths": ["<specific strength with CV reference>"],
-  "improvements": ["<specific actionable improvement>"],
-
+  "fit_summary": "<2-3 direct sentences, no filler>",
+  "strengths": ["<specific strength>"],
+  "improvements": ["<specific action, not suggestion>"],
   "rejection_reasons": {
-    "high": ["<critical reason — specific, not generic>"],
+    "high": ["<critical reason, specific>"],
     "medium": ["<moderate concern>"],
     "low": ["<minor issue>"]
   },
-
   "recruiter_simulation": {
-    "sector": "<sector of the role>",
-    "first_impression": "<what recruiter notices in first 7 seconds — specific>",
-    "internal_monologue": "<2-3 sentences: what recruiter actually thinks, conversational, honest — reference CV specifics>",
+    "sector": "<sector>",
+    "first_impression": "<what recruiter sees in 7 seconds>",
+    "internal_monologue": "<2-3 sentences, honest, direct, no corporate tone>",
     "would_interview": <true|false>,
-    "decision": "<one line: shortlist / reject / follow-up / strong yes>",
-    "red_flags": ["<specific red flag from CV>"],
-    "standout_moments": ["<specific thing that impressed>"]
+    "decision": "<shortlist | reject | follow-up | strong yes>",
+    "red_flags": ["<specific red flag>"],
+    "standout_moments": ["<specific strength>"]
   },
-
   "blind_spots": [
-    {
-      "issue": "<what candidate thinks is fine but isn't — be specific>",
-      "why_it_hurts": "<why recruiters see this negatively>",
-      "fix": "<exact rewrite or action — concrete>"
-    }
+    { "issue": "<specific issue>", "why_it_hurts": "<direct reason>", "fix": "<exact action>" }
   ],
-
   "benchmark": {
-    "gap_percentage": <number 0-60>,
-    "before_after_estimate": <number, predicted score after fixes>,
+    "gap_percentage": <0-60>,
+    "before_after_estimate": <number>,
     "dimensions": [
-      {
-        "name": "<dimension name>",
-        "candidate_level": "<Basic|Some|Good|Strong|Missing>",
-        "ideal_level": "<what ideal candidate has>",
-        "closeable": <true|false>
-      }
+      { "name": "<dimension>", "candidate_level": "<Basic|Some|Good|Strong|Missing>", "ideal_level": "<target>", "closeable": <true|false> }
     ]
   },
-
   "interview_prep": [
-    {
-      "question": "<likely interview question>",
-      "why_asked": "<why they ask this for this specific role>",
-      "personal_angle": "<specific tip using candidate's actual CV content>"
-    }
+    { "question": "<question>", "why_asked": "<reason>", "personal_angle": "<tip using CV content>" }
   ],
-
   "role_matches": [
-    {
-      "role": "<role title>",
-      "match_score": <number 60-95>,
-      "reason": "<1 sentence why CV fits this role>"
-    }
+    { "role": "<role>", "match_score": <60-95>, "reason": "<1 sentence>" }
   ],
-
   "salary_insight": {
-    "range_min": <number>,
-    "range_max": <number>,
-    "currency": "<TRY|USD|EUR|GBP>",
-    "mid_point": <number>,
-    "confidence": "<Low|Medium|High>",
-    "context": "<brief market context>"
+    "range_min": <number>, "range_max": <number>, "currency": "<TRY|USD|EUR|GBP>",
+    "mid_point": <number>, "confidence": "<Low|Medium|High>", "context": "<brief>"
   },
-
   "ats_compatibility": [
-    {
-      "system": "<Workday|Greenhouse|Lever|SAP|Taleo>",
-      "status": "<Passes|Review|At Risk>",
-      "note": "<specific reason>"
-    }
+    { "system": "<Workday|Greenhouse|Lever|SAP|Taleo>", "status": "<Passes|Review|At Risk>", "note": "<reason>" }
   ],
-
   "culture_fit": {
-    "overall_score": <number 40-95>,
-    "dimensions": [
-      {
-        "name": "<dimension like Innovation|Fast pace|Ambiguity|Collaboration>",
-        "score": <number 40-95>,
-        "signal": "<what in CV signals this>"
-      }
-    ]
+    "overall_score": <40-95>,
+    "dimensions": [{ "name": "<dimension>", "score": <40-95>, "signal": "<CV signal>" }]
   },
-
   "language_analysis": {
     "passive_voice_count": <number>,
-    "weak_phrases": ["<exact phrase from CV that is weak>"],
+    "weak_phrases": ["<exact phrase from CV>"],
     "missing_impact_metrics": <true|false>,
     "tone": "<Professional|Too casual|Too formal|Appropriate>"
   }
@@ -190,28 +196,17 @@ Return ONLY valid JSON. No markdown, no explanation, no extra text.
 
     const data = await response.json();
     const rawText = data?.choices?.[0]?.message?.content;
-    console.log("🧠 RAW AI:", rawText);
-
     const parsed = extractJSON(rawText);
 
     if (!parsed) {
-      console.log("⚠️ PARSE FAILED");
-      return res.json({
-        alignment_score: 50,
-        confidence_level: "Medium",
-        rejection_reasons: { high: ["Parsing failed"], medium: [], low: [] }
-      });
+      return res.json({ alignment_score: 50, confidence_level: "Medium", rejection_reasons: { high: ["Parsing failed"], medium: [], low: [] } });
     }
 
-    return res.json(parsed);
+    return res.json(cleanAITone(parsed));
 
   } catch (err) {
     console.error("💥 SERVER ERROR:", err);
-    return res.status(500).json({
-      alignment_score: 0,
-      confidence_level: "Low",
-      rejection_reasons: { high: ["Server error"], medium: [], low: [] }
-    });
+    return res.status(500).json({ alignment_score: 0, confidence_level: "Low", rejection_reasons: { high: ["Server error"], medium: [], low: [] } });
   }
 });
 
@@ -309,20 +304,20 @@ app.post("/apply-fix", async (req, res) => {
             role: "user",
             content: `You are an expert CV writer.
 
-The CV has this problem: "${problem}"
-The suggested fix is: "${fix}"
+Problem in this CV: "${problem}"
+Fix to apply: "${fix}"
 
 Full CV:
 ${cvText}
 
-Find the specific section or bullet point in the CV that has this problem. Rewrite ONLY that part with the fix applied — keep everything else exactly the same.
-${lang === "TR" ? "Return the response in Turkish." : "Return the response in English."}
+Find the specific section with this problem. Rewrite ONLY that part. Keep everything else the same.
+${lang === "TR" ? "Return in Turkish." : "Return in English."}
 
-Return ONLY this JSON (no markdown):
+Return ONLY this JSON:
 {
-  "original_section": "the exact original text that needs changing (copy verbatim from CV)",
-  "rewritten_section": "the improved version of that specific section",
-  "explanation": "1 sentence: what changed and why it's better"
+  "original_section": "exact original text from CV",
+  "rewritten_section": "improved version",
+  "explanation": "1 sentence: what changed"
 }`
           }
         ]
@@ -339,43 +334,6 @@ Return ONLY this JSON (no markdown):
   }
 });
 
-app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-  const secret = process.env.LEMON_WEBHOOK_SECRET;
-  const signature = req.headers["x-signature"];
-  
-  const crypto = await import("crypto");
-  const hmac = crypto.default.createHmac("sha256", secret);
-  const digest = hmac.update(req.body).digest("hex");
-  
-  if (digest !== signature) {
-    return res.status(401).json({ error: "Invalid signature" });
-  }
-
-  const payload = JSON.parse(req.body.toString());
-  const eventName = payload.meta?.event_name;
-  const userEmail = payload.data?.attributes?.user_email;
-
-  if (eventName === "order_created" || eventName === "subscription_created") {
-    const { createClient } = await import("@supabase/supabase-js");
-    const supabase = createClient(
-      process.env.VITE_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-
-    const { data: users } = await supabase.auth.admin.listUsers();
-    const user = users?.users?.find(u => u.email === userEmail);
-
-    if (user) {
-      await supabase.from("user_plans").upsert({
-        user_id: user.id,
-        plan: "pro"
-      }, { onConflict: "user_id" });
-    }
-  }
-
-  res.json({ received: true });
-});
-
 app.post("/decision", async (req, res) => {
   const { cvText, jobDescription, sector, lang, deadline, targetRole } = req.body;
 
@@ -383,8 +341,11 @@ app.post("/decision", async (req, res) => {
     return res.status(400).json({ error: "Missing CV or Job Description" });
   }
 
+  const deadlineType = deadline || "1_week";
+
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    // STEP 1: GPT — Core decision (source of truth)
+    const gptResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
@@ -397,55 +358,113 @@ app.post("/decision", async (req, res) => {
         messages: [
           {
             role: "user",
-            content: `You are a senior career coach and recruiter with 15+ years of experience${sector && sector !== "Auto-detect" ? ` specializing in ${sector}` : ""}.
+            content: `You are a senior recruiter. Review this CV against the job description. Be direct. No corporate language. Write like you're talking to a colleague.
 
-Analyze this CV against the job description and return a DECISION-FOCUSED analysis.
+FORBIDDEN WORDS: optimize, enhance, leverage, consider, suggest, could, important to note, in order to
+
+STYLE: Short sentences. Max 12 words each. Direct. Real.
 
 CV:
 ${cvText}
 
 JOB DESCRIPTION:
 ${jobDescription}
-${targetRole ? `TARGET ROLE: ${targetRole}` : ""}
-${deadline ? `DEADLINE: ${deadline}` : ""}
-${lang === "TR" ? "Return ALL text fields in Turkish." : "Return all text fields in English."}
 
-Return ONLY this JSON structure (no markdown, no extra text):
+${targetRole ? `TARGET ROLE: ${targetRole}` : ""}
+DEADLINE: ${deadlineType}
+SECTOR: ${sector || "Auto-detect"}
+${lang === "TR" ? "Return ALL text in Turkish. No English words except JSON keys." : "Return in English."}
+
+Return ONLY this JSON (no markdown):
 {
   "decision": ${lang === "TR" ? '"Yüksek ihtimal" | "Orta ihtimal" | "Düşük ihtimal"' : '"High chance" | "Medium chance" | "Low chance"'},
-  "decision_reasoning": "One sentence explaining why",
-  "fit_score": 0-100,
-  "improved_score": 0-100,
-  "improvement_reasoning": "What needs to change to reach improved score",
-  "top_fixes": [
-    { "problem": "...", "fix": "...", "impact": "High" | "Medium" },
-    { "problem": "...", "fix": "...", "impact": "High" | "Medium" },
-    { "problem": "...", "fix": "...", "impact": "High" | "Medium" }
+  "confidence": <number 0-100>,
+  "fitScore": <number 0-100>,
+  "improvedScore": <number 0-100>,
+  "summary": "<1 strong sentence, max 15 words, no filler>",
+  "biggestMistake": "<single biggest issue, max 12 words, direct>",
+  "topFixes": [
+    { "problem": "<specific problem, max 10 words>", "fix": "<exact action, max 12 words>", "impact": "High" | "Medium" },
+    { "problem": "<specific problem>", "fix": "<exact action>", "impact": "High" | "Medium" },
+    { "problem": "<specific problem>", "fix": "<exact action>", "impact": "High" | "Medium" }
   ],
-  "missing_skills": ["skill1", "skill2", "skill3"],
-  "deadline_plan": {
-    "type": "${deadline || "1_week"}",
-    "steps": [
-      { "day": "Day 1", "action": "..." },
-      { "day": "Day 2-3", "action": "..." },
-      { "day": "Day 4-7", "action": "..." }
-    ]
+  "missingSkills": ["<skill>", "<skill>", "<skill>"],
+  "recruiterInsight": [
+    "<direct recruiter thought, 1 sentence, honest>",
+    "<direct recruiter thought>",
+    "<direct recruiter thought>"
+  ],
+  "oneAction": "<single most important action, max 12 words>",
+  "aiSuspicion": {
+    "level": "Low" | "Medium" | "High",
+    "reasons": ["<specific generic phrase found in CV>"],
+    "fix": "<how to make it sound more human, max 15 words>"
   },
-  "one_liner": "Single most important thing this person must do right now"
+  "deadlinePlan": {
+    "type": "${deadlineType}",
+    "steps": [
+      { "day": "<timeframe>", "action": "<specific action, max 12 words>" },
+      { "day": "<timeframe>", "action": "<specific action>" },
+      { "day": "<timeframe>", "action": "<specific action>" }
+    ]
+  }
 }`
           }
         ]
       })
     });
 
-    const aiData = await response.json();
-    const content = aiData.choices?.[0]?.message?.content;
-    const parsed = JSON.parse(content);
-    res.json(parsed);
+    const gptData = await gptResponse.json();
+    const gptContent = gptData?.choices?.[0]?.message?.content;
+    const gptParsed = extractJSON(gptContent);
+
+    if (!gptParsed) {
+      return res.status(500).json({ error: "GPT parsing failed" });
+    }
+
+    // Clean AI tone from output
+    const cleaned = cleanAITone(gptParsed);
+
+    // STEP 2: Multi-model slot — Claude enrichment (future)
+    // When Claude API is connected:
+    // const claudeEnriched = await enrichWithClaude(cleaned, cvText, lang);
+    // return res.json(mergeOutputs(cleaned, claudeEnriched));
+
+    res.json(cleaned);
+
   } catch (err) {
-    console.error(err);
+    console.error("💥 DECISION ERROR:", err);
     res.status(500).json({ error: "Decision analysis failed" });
   }
+});
+
+app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  const secret = process.env.LEMON_WEBHOOK_SECRET;
+  const signature = req.headers["x-signature"];
+
+  const crypto = await import("crypto");
+  const hmac = crypto.default.createHmac("sha256", secret);
+  const digest = hmac.update(req.body).digest("hex");
+
+  if (digest !== signature) {
+    return res.status(401).json({ error: "Invalid signature" });
+  }
+
+  const payload = JSON.parse(req.body.toString());
+  const eventName = payload.meta?.event_name;
+  const userEmail = payload.data?.attributes?.user_email;
+
+  if (eventName === "order_created" || eventName === "subscription_created") {
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const { data: users } = await supabase.auth.admin.listUsers();
+    const user = users?.users?.find(u => u.email === userEmail);
+    if (user) {
+      await supabase.from("user_plans").upsert({ user_id: user.id, plan: "pro" }, { onConflict: "user_id" });
+    }
+  }
+
+  res.json({ received: true });
 });
 
 app.listen(3000, () => {
