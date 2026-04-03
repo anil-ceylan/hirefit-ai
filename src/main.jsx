@@ -14,6 +14,8 @@ createRoot(document.getElementById('root')).render(
         <Route path="/dashboard" element={<MainApp />} />
         <Route path="/login" element={<MainApp />} />
         <Route path="/report/:id" element={<ReportPage />} />
+        <Route path="/terms" element={<MainApp />} />
+        <Route path="/privacy" element={<MainApp />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,
