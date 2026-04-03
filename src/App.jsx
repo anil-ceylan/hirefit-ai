@@ -1467,7 +1467,16 @@ function Footer({ navigate, lang }) {
           <div>
             <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#334155", marginBottom: 16 }}>{lang === "TR" ? "Hukuki" : "Legal"}</div>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
-              {legalLinks.map(label => (<li key={label}><span style={{ color: "#64748b", fontSize: "14px", cursor: "pointer" }}>{label}</span></li>))}
+              {(lang === "TR"
+  ? [["Gizlilik Politikası", "/privacy"], ["Kullanım Şartları", "/terms"], ["Çerez Politikası", "/privacy"]]
+  : [["Privacy Policy", "/privacy"], ["Terms of Service", "/terms"], ["Cookie Policy", "/privacy"]]
+).map(([label, path]) => (
+  <li key={label}>
+    <span onClick={() => navigate(path)} style={{ color: "#64748b", fontSize: "14px", cursor: "pointer" }} onMouseEnter={e => e.currentTarget.style.color = "#f1f5f9"} onMouseLeave={e => e.currentTarget.style.color = "#64748b"}>
+      {label}
+    </span>
+  </li>
+))}
             </ul>
           </div>
         </div>
