@@ -324,6 +324,85 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
   return (
     <div style={{ background: "#0a0a0a", border: `1px solid ${decisionBorder}`, borderRadius: 20, padding: 24, marginBottom: 16, position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${decisionColor}, transparent)` }} />
+      {/* 🧠 GUT FEELING */}
+{data.gutFeeling && (
+  <div style={{
+    marginBottom: 16,
+    padding: "14px 16px",
+    background: "rgba(239,68,68,0.08)",
+    border: "1px solid rgba(239,68,68,0.2)",
+    borderRadius: 12,
+    textAlign: "center"
+  }}>
+    <div style={{
+      fontSize: 10,
+      fontWeight: 700,
+      color: "#f87171",
+      letterSpacing: "0.12em",
+      textTransform: "uppercase",
+      marginBottom: 6
+    }}>
+      🧠 Recruiter First Reaction
+    </div>
+
+    <div style={{
+      fontSize: 16,
+      fontWeight: 700,
+      color: "#fca5a5"
+    }}>
+      "{data.gutFeeling}"
+    </div>
+  </div>
+)}
+
+{/* 🤖 AI DETECTOR */}
+{data.aiScore !== undefined && (
+  <div style={{
+    marginBottom: 16,
+    padding: "14px 16px",
+    background: "rgba(245,158,11,0.06)",
+    border: "1px solid rgba(245,158,11,0.2)",
+    borderRadius: 12
+  }}>
+    <div style={{
+      fontSize: 10,
+      fontWeight: 700,
+      color: "#fbbf24",
+      letterSpacing: "0.12em",
+      textTransform: "uppercase",
+      marginBottom: 6
+    }}>
+      🤖 AI Likelihood
+    </div>
+
+    <div style={{
+      fontFamily: "'Syne', sans-serif",
+      fontSize: 20,
+      fontWeight: 800,
+      color: "#fbbf24",
+      marginBottom: 6
+    }}>
+      {data.aiScore}% ({data.aiLevel})
+    </div>
+
+    {data.aiReasons?.[0] && (
+      <div style={{ fontSize: 12, color: "#94a3b8" }}>
+        • {data.aiReasons[0]}
+      </div>
+    )}
+
+    {data.aiFix?.[0] && (
+      <div style={{
+        marginTop: 6,
+        fontSize: 12,
+        color: "#fbbf24",
+        fontWeight: 600
+      }}>
+        → {data.aiFix[0]}
+      </div>
+    )}
+  </div>
+)}
 
       {/* 1. DECISION */}
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
@@ -377,26 +456,6 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
             ⚡ {lang === "TR" ? "En Büyük Sorun" : "Biggest Mistake"}
           </div>
           <div style={{ fontSize: 14, color: "#fca5a5", fontWeight: 600 }}>{data.biggestMistake}</div>
-        </div>
-      )}
-
-      {/* 4. AI SUSPICION */}
-      {data.aiSuspicion && data.aiSuspicion.level !== "Low" && (
-        <div style={{ marginBottom: 16, padding: "12px 16px", background: aiBg, border: `1px solid ${aiBorder}`, borderRadius: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: aiColor, letterSpacing: "0.12em", textTransform: "uppercase" }}>
-              🤖 {lang === "TR" ? "Yapay Ton Tespiti" : "Generic CV Detected"}
-            </div>
-            <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: aiBg, border: `1px solid ${aiBorder}`, color: aiColor }}>
-              {data.aiSuspicion.level}
-            </span>
-          </div>
-          {(data.aiSuspicion.reasons || []).map((r, i) => (
-            <div key={i} style={{ fontSize: 12, color: "#94a3b8", marginBottom: 3 }}>• {r}</div>
-          ))}
-          {data.aiSuspicion.fix && (
-            <div style={{ marginTop: 8, fontSize: 12, color: aiColor, fontWeight: 600 }}>→ {data.aiSuspicion.fix}</div>
-          )}
         </div>
       )}
 
@@ -530,10 +589,68 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
           )}
         </div>
       )}
+
+
+
+      {/* 📤 SHARE CARD */}
+              
+      <div style={{
+        marginTop: 20,
+        padding: "16px",
+        borderRadius: 12,
+        background: "#050505",
+        border: "1px solid rgba(255,255,255,0.08)"
+      }}>
+        <div style={{
+          fontSize: 11,
+          color: "#7a7a7a",
+          marginBottom: 8,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase"
+        }}>
+          Share Your Result
+        </div>
+
+        <div style={{
+          background: "rgba(255,255,255,0.03)",
+          padding: "10px 12px",
+          borderRadius: 8
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>
+            HireFit Score: {data.fitScore}
+          </div>
+
+          <div style={{ fontSize: 12, color: "#94a3b8" }}>
+            AI Score: {data.aiScore}
+          </div>
+
+          <div style={{ fontSize: 12, color: "#94a3b8" }}>
+            Biggest Mistake: {data.biggestMistake}
+          </div>
+        </div>
+
+        <button
+          onClick={() => navigator.clipboard.writeText(
+            `HireFit Score: ${data.fitScore}\nAI Score: ${data.aiScore}\nBiggest Mistake: ${data.biggestMistake}`)}
+          style={{
+            marginTop: 10,
+            padding: "8px 12px",
+            borderRadius: 8,
+            background: "#3b82f6",
+            border: "none",
+            color: "white",
+            fontSize: 12,
+            cursor: "pointer"
+          }}
+        >
+          Copy & Share
+        </button>
+      </div>
+
     </div>
   );
-}
 
+}
 
 function ScoreProgressCard({ scoreHistory, lang }) {
   const t = translations[lang];
@@ -1375,6 +1492,9 @@ function MainApp() {
     if (path === "/app") return "app";
     if (path === "/dashboard") return "dashboard";
     if (path === "/login") return "login";
+    if (path === "/terms") return "terms";
+    if (path === "/privacy") return "privacy";
+
     return "landing";
   };
 
@@ -1385,6 +1505,8 @@ function MainApp() {
     if (path === "/app") setView("app");
     else if (path === "/dashboard") setView("dashboard");
     else if (path === "/login") setView("login");
+    else if (path === "/terms") setView("terms");
+    else if (path === "/privacy") setView("privacy");
     else setView("landing");
   }, [location.pathname]);
 
@@ -1704,6 +1826,58 @@ function MainApp() {
           onClose={() => setShowPaywall(false)}
           onUpgrade={() => { setShowPaywall(false); openUpgrade(); }}
         />
+      )}
+
+      {view === "terms" && (
+        <div style={{ ...styles.container, padding: "60px 24px", maxWidth: 800 }}>
+          <button onClick={() => navigate("/")} style={{ marginBottom: 32, background: "none", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>← Back</button>
+          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, marginBottom: 8 }}>Terms of Service</h1>
+          <p style={{ color: "#475569", marginBottom: 40, fontSize: 14 }}>Last updated: April 2026</p>
+          {[
+            ["1. Agreement to Terms", "By accessing or using HireFit, you agree to be bound by these Terms. HireFit is operated by Muhammed Anıl Ceylan, an individual developer based in Nicosia, Cyprus."],
+            ["2. Description of Service", "HireFit is an AI-powered CV analysis tool. Users can compare their CV against job descriptions, receive ATS scores, identify skill gaps, generate optimized CV suggestions, and access recruiter simulation insights."],
+            ["3. Accounts", "You must provide accurate information, be at least 18 years old, and maintain the security of your account. One account per person."],
+            ["4. Subscription and Payments", "Free Plan: 2 CV analyses/month at no cost. Pro Plan: $9.99/month with 7-day free trial. Coach Plan: $39/month. Payments processed via Lemon Squeezy. Subscriptions renew automatically unless cancelled. Refund requests must be submitted within 7 days of charge."],
+            ["5. Acceptable Use", "You agree not to upload illegal or harmful content, reverse-engineer the Service, use automated tools to bulk-access the Service, or share account credentials."],
+            ["6. Intellectual Property", "You retain ownership of your uploaded CV and job description content. By uploading, you grant us a limited license to process it for the purpose of providing the Service."],
+            ["7. AI-Generated Content", "HireFit uses third-party AI models (GPT-4o-mini via OpenRouter) to generate outputs. These are for informational purposes only and are not a substitute for professional career advice."],
+            ["8. Disclaimers", "The Service is provided \"as is\" without warranties of any kind. We do not guarantee uninterrupted or error-free service, or that analysis will result in job interviews or offers."],
+            ["9. Limitation of Liability", "To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, or consequential damages. Total liability shall not exceed amounts paid in the 3 months preceding the claim."],
+            ["10. Governing Law", "These Terms are governed by the laws of Cyprus."],
+            ["11. Contact", "support@hirefit.ai — hirefit-ai.vercel.app"],
+          ].map(([title, body]) => (
+            <div key={title} style={{ marginBottom: 28, paddingBottom: 28, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 8, color: "#e2e8f0" }}>{title}</h3>
+              <p style={{ color: "#94a3b8", fontSize: 14, lineHeight: 1.8 }}>{body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {view === "privacy" && (
+        <div style={{ ...styles.container, padding: "60px 24px", maxWidth: 800 }}>
+          <button onClick={() => navigate("/")} style={{ marginBottom: 32, background: "none", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>← Back</button>
+          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, marginBottom: 8 }}>Privacy Policy</h1>
+          <p style={{ color: "#475569", marginBottom: 40, fontSize: 14 }}>Last updated: April 2026</p>
+          {[
+            ["1. Who We Are", "HireFit is operated by Muhammed Anıl Ceylan, Nicosia, Cyprus. Contact: support@hirefit.ai"],
+            ["2. Data We Collect", "Account info (email, name via Google OAuth), CV content you upload, job descriptions, usage data, and device/session data. Payment details are handled entirely by Lemon Squeezy — we never store card information."],
+            ["3. How We Use Your Data", "To provide the Service, process AI analysis, manage your account and subscription, send transactional emails, and detect fraud. We do not sell your data or use your CV content to train AI models."],
+            ["4. Data Storage", "Database: Supabase (EU-hosted). Authentication: Supabase Auth with Google OAuth. Data is retained while your account is active. You may request deletion at any time."],
+            ["5. Third-Party Services", "Supabase (database/auth), OpenRouter/OpenAI (AI analysis), Lemon Squeezy (payments), Vercel (hosting), Railway (backend). Your CV is sent to OpenAI via API for processing — it is not used to train their models by default."],
+            ["6. Cookies", "We use minimal cookies for session management only. No advertising or tracking cookies."],
+            ["7. Your Rights", "You may access, correct, delete, or export your data at any time. Email support@hirefit.ai to make a request."],
+            ["8. GDPR", "For EU/EEA users, we process data under contract performance and legitimate interests. You have the right to lodge a complaint with your local data protection authority."],
+            ["9. Security", "We use HTTPS/TLS, hashed passwords, and row-level security. No transmission method is 100% secure."],
+            ["10. Children", "HireFit is not intended for users under 18. We do not knowingly collect data from minors."],
+            ["11. Contact", "support@hirefit.ai — hirefit-ai.vercel.app — Nicosia, Cyprus"],
+          ].map(([title, body]) => (
+            <div key={title} style={{ marginBottom: 28, paddingBottom: 28, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 8, color: "#e2e8f0" }}>{title}</h3>
+              <p style={{ color: "#94a3b8", fontSize: 14, lineHeight: 1.8 }}>{body}</p>
+            </div>
+          ))}
+        </div>
       )}
 
       {view === "landing" && (
