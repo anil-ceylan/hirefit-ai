@@ -1289,8 +1289,9 @@ function HeroSection({ navigate, lang }) {
               style={{ width: "100%", padding: "10px", borderRadius: 10, border: "none", background: animating ? "rgba(99,102,241,0.3)" : "linear-gradient(135deg, #3b82f6, #6366f1)", color: "white", fontSize: 13, fontWeight: 700, cursor: animating ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
             >
               {animating
-                ? <><div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid white", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />{lang === "TR" ? "Analiz ediliyor..." : "Analyzing..."}</>
-                : <>{lang === "TR" ? "▶ Demo Çalıştır" : "▶ Run Demo"}</>}
+              ? <><div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid white", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />{demoSteps[demoStep]}</>
+              : <>{lang === "TR" ? "👁 Bir CV'nin nasıl reddedildiğini gör →" : "👁 Watch this CV get rejected →"}</>}
+
             </button>
           </div>
 
@@ -1406,9 +1407,19 @@ function FeatureCards({ lang }) {
 }
 
 function PricingSection({ navigate, lang }) {
-  const freeFeatures = lang === "TR" ? ["Ayda 2 analiz", "ATS skoru", "Beceri açığı tespiti", "Paylaşılabilir rapor"] : ["2 analyses/month", "ATS score", "Skill gap detection", "Shareable report"];
-  const proFeatures = lang === "TR" ? ["Sınırsız analiz", "Red Motoru", "CV Yeniden Yazıcı", "Gelişmiş içgörüler", "Paylaşılabilir raporlar", "Öncelikli destek"] : ["Unlimited analyses", "Rejection Engine", "CV Rewriter", "Advanced insights", "Shareable reports", "Priority support"];
-  const coachFeatures = lang === "TR" ? ["Pro'daki her şey", "Beyaz etiketli raporlar", "10 müşteri daveti", "Koç paneli", "Müşteri yönetimi"] : ["Everything in Pro", "White-label reports", "10 client invites", "Coach dashboard", "Client management"];
+
+  const freeFeatures = lang === "TR"
+  ? ["Ayda 2 karar", "Temel ATS skoru", "En büyük hatanı gör", "Paylaşılabilir rapor"]
+  : ["2 decisions/month", "Basic ATS score", "See your biggest mistake", "Shareable report"];
+
+const proFeatures = lang === "TR"
+  ? ["Her başvuruda karar al", "Tam red analizi", "Zayıf CV'yi interview-ready yap", "Neden reddedildiğini tam anla", "Recruiter'ın ne düşündüğünü gör", "Öncelikli destek"]
+  : ["Know before every application", "Full rejection breakdown", "Turn weak CV into interview-ready", "Understand exactly why you get rejected", "See what the recruiter actually thinks", "Priority support"];
+
+const coachFeatures = lang === "TR"
+  ? ["Pro'daki her şey", "Müşterilerini doğru role yönlendir", "10 müşteri daveti", "Beyaz etiketli raporlar", "Koç paneli"]
+  : ["Everything in Pro", "Guide clients to the right roles", "10 client invites", "White-label reports", "Coach dashboard"];
+  
 
   return (
     <section style={{ padding: "80px 0" }}>
@@ -1418,10 +1429,12 @@ function PricingSection({ navigate, lang }) {
             {lang === "TR" ? "Fiyatlandırma" : "Pricing"}
           </div>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(32px,4vw,52px)", fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 12, lineHeight: 1.1 }}>
-            {lang === "TR" ? "Sade ve şeffaf fiyatlandırma" : "Simple, transparent pricing"}
-          </h2>
-          <p style={{ color: "#64748b", fontSize: "16px" }}>{lang === "TR" ? "Ücretsiz başla. Hazır olduğunda yükselt." : "Start free. Upgrade when you're ready."}</p>
-        </div>
+  {lang === "TR" ? "Ne kadar netlik istiyorsun?" : "How much clarity do you want?"}
+</h2>
+<p style={{ color: "#64748b", fontSize: "16px" }}>
+  {lang === "TR" ? "Ücretsiz başla. Gerçekten hazır olduğunda yükselt." : "Free gets you started. Pro gets you hired."}
+</p>
+</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, maxWidth: 960, margin: "0 auto" }}>
           <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 24, padding: 32 }}>
             <div style={{ fontSize: "13px", fontWeight: 600, color: "#64748b", marginBottom: 8 }}>Free</div>
@@ -1438,7 +1451,9 @@ function PricingSection({ navigate, lang }) {
             <div style={{ position: "absolute", top: 16, right: -30, background: "linear-gradient(135deg, #3b82f6, #6366f1)", color: "white", fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", padding: "4px 40px", transform: "rotate(45deg)" }}>POPULAR</div>
             <div style={{ fontSize: "13px", fontWeight: 600, color: "#93c5fd", marginBottom: 8 }}>Pro</div>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "48px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, marginBottom: 4 }}>$9.99</div>
-            <div style={{ color: "#93c5fd", fontSize: "13px", marginBottom: 24 }}>{lang === "TR" ? "aylık" : "per month"}</div>
+            <div style={{ color: "#93c5fd", fontSize: "13px", marginBottom: 24 }}> {lang === "TR" ? "Başvurmadan önce net ol" : "Clarity before every application"}
+
+            </div>
             <div style={{ height: 1, background: "rgba(99,102,241,0.2)", marginBottom: 24 }} />
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
               {proFeatures.map(f => (<li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#cbd5e1" }}><Star size={13} color="#818cf8" style={{ flexShrink: 0 }} />{f}</li>))}
