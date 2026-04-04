@@ -1553,6 +1553,7 @@ function MainApp() {
   const [targetRole, setTargetRole] = useState("");
   const [decisionData, setDecisionData] = useState(null);
   const [decisionLoading, setDecisionLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("");
   const [applyingFix, setApplyingFix] = useState(null);
   const [fixResults, setFixResults] = useState({});
   const [scoreHistory, setScoreHistory] = useState(() => {
@@ -1666,7 +1667,22 @@ function MainApp() {
       }
     }
 
-    setLoading(true); setError("");
+    setLoading(true); 
+    // Loading messages
+const loadingMessages = lang === "TR"
+  ? ["CV'n analiz ediliyor...", "Recruiter gibi düşünülüyor...", "İş ilanıyla karşılaştırılıyor...", "Sonuçlar hazırlanıyor..."]
+  : ["Analyzing your CV...", "Thinking like a recruiter...", "Checking job alignment...", "Preparing your results..."];
+let msgIndex = 0;
+setLoadingMessage(loadingMessages[0]);
+const msgInterval = setInterval(() => {
+  msgIndex++;
+  if (msgIndex < loadingMessages.length) {
+    setLoadingMessage(loadingMessages[msgIndex]);
+  } else {
+    clearInterval(msgInterval);
+  }
+}, 900);
+    setError("");
     setFixResults({});
     setDecisionData(null);
 
@@ -1693,6 +1709,8 @@ function MainApp() {
       console.error(err);
       setError(lang === "TR" ? "Analiz başarısız." : "Analysis failed. Check your API key or network.");
     } finally {
+      clearInterval(msgInterval);
+      setLoadingMessage("");
       setLoading(false);
       setDecisionLoading(true);
       try {
@@ -2057,7 +2075,7 @@ function MainApp() {
 
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20, padding: "16px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16 }}>
                 <button className="hf-btn-primary" onClick={analyze} disabled={loading} style={{ opacity: loading ? 0.7 : 1, padding: "12px 24px", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: loading ? "none" : "0 0 24px rgba(99,102,241,0.3)", borderRadius: 10 }}>
-                  {loading ? <><Loader2 size={14} />{t.analyzing}</> : <>{t.checkFit} <Sparkles size={14} /></>}
+                  {loading ? <><Loader2 size={14} />{loadingMessage || t.analyzing}</> : <>{t.checkFit} <Sparkles size={14} /></>}
                 </button>
                 <button className="hf-btn-ghost" onClick={optimizeCv} disabled={optimizing} style={{ color: optimizing ? T.textMuted : T.cyan, borderColor: optimizing ? T.border : "rgba(34,211,238,0.2)", padding: "12px 20px", fontSize: "14px", borderRadius: 10 }}>
                   {optimizing ? <><Loader2 size={14} />{t.optimizing}</> : <><Wand2 size={14} />{t.optimizeCV}</>}
