@@ -1554,6 +1554,7 @@ function MainApp() {
   const [decisionData, setDecisionData] = useState(null);
   const [decisionLoading, setDecisionLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
+  const [pressedBtn, setPressedBtn] = useState(null);
   const [applyingFix, setApplyingFix] = useState(null);
   const [fixResults, setFixResults] = useState({});
   const [scoreHistory, setScoreHistory] = useState(() => {
@@ -2078,35 +2079,32 @@ const msgInterval = setInterval(() => {
   { key: "analyze", label: loading ? <><Loader2 size={14} />{loadingMessage || t.analyzing}</> : <>{t.checkFit} <Sparkles size={14} /></>, onClick: analyze, disabled: loading, color: "#6366f1", glow: "rgba(99,102,241,0.3)" },
   { key: "optimize", label: optimizing ? <><Loader2 size={14} />{t.optimizing}</> : <><Wand2 size={14} />{t.optimizeCV}</>, onClick: optimizeCv, disabled: optimizing, color: "#22d3ee", glow: "rgba(34,211,238,0.2)" },
   { key: "roadmap", label: roadmapLoading ? <><Loader2 size={14} />{t.building}</> : <><Target size={14} />{t.learningRoadmap}</>, onClick: generateLearningPlan, disabled: roadmapLoading, color: "#10b981", glow: "rgba(16,185,129,0.2)" },
-].map(({ key, label, onClick, disabled, color, glow }) => {
-  const [pressed, setPressed] = React.useState(false);
-  return (
-    <button
-      key={key}
-      onClick={() => { setPressed(true); setTimeout(() => setPressed(false), 600); onClick(); }}
-      disabled={disabled}
-      style={{
-        position: "relative", overflow: "hidden",
-        display: "inline-flex", alignItems: "center", gap: 8,
-        padding: "12px 24px", fontSize: "14px", borderRadius: 10,
-        border: `1px solid ${color}55`, background: "rgba(255,255,255,0.03)",
-        color: color, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer",
-        fontFamily: "'DM Sans', sans-serif", opacity: disabled ? 0.7 : 1,
-        boxShadow: pressed ? `0 0 20px ${glow}` : "none",
-        transition: "box-shadow 0.3s ease",
-      }}
-    >
-      <span style={{
-        position: "absolute", inset: 0,
-        background: `linear-gradient(90deg, transparent, ${color}22, ${color}33)`,
-        transform: pressed ? "translateX(0%)" : "translateX(100%)",
-        transition: pressed ? "transform 0.5s ease" : "transform 0s",
-        pointerEvents: "none",
-      }} />
-      {label}
-    </button>
-  );
-})}
+].map(({ key, label, onClick, disabled, color, glow }) => (
+  <button
+    key={key}
+    onClick={() => { setPressedBtn(key); setTimeout(() => setPressedBtn(null), 600); onClick(); }}
+    disabled={disabled}
+    style={{
+      position: "relative", overflow: "hidden",
+      display: "inline-flex", alignItems: "center", gap: 8,
+      padding: "12px 24px", fontSize: "14px", borderRadius: 10,
+      border: `1px solid ${color}55`, background: "rgba(255,255,255,0.03)",
+      color: color, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer",
+      fontFamily: "'DM Sans', sans-serif", opacity: disabled ? 0.7 : 1,
+      boxShadow: pressedBtn === key ? `0 0 20px ${glow}` : "none",
+      transition: "box-shadow 0.3s ease",
+    }}
+  >
+    <span style={{
+      position: "absolute", inset: 0,
+      background: `linear-gradient(90deg, transparent, ${color}22, ${color}33)`,
+      transform: pressedBtn === key ? "translateX(0%)" : "translateX(100%)",
+      transition: pressedBtn === key ? "transform 0.5s ease" : "transform 0s",
+      pointerEvents: "none",
+    }} />
+    {label}
+  </button>
+))}
                 
               </div>
 
