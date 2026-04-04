@@ -1134,9 +1134,9 @@ function NavBar({ view, user, logout, navigate, lang, setLang }) {
 }
 
 function HeroSection({ navigate, lang }) {
-  const t = translations[lang];
   const [score, setScore] = useState(0);
   const [animating, setAnimating] = useState(false);
+  const [showResult, setShowResult] = useState(false);
 
   useEffect(() => {
     if (!document.getElementById("hero-styles")) {
@@ -1148,124 +1148,208 @@ function HeroSection({ navigate, lang }) {
         @keyframes shimmer { 0%{background-position:-200% 0;} 100%{background-position:200% 0;} }
         @keyframes orb1 { 0%,100%{transform:translate(0,0);} 33%{transform:translate(40px,-30px);} 66%{transform:translate(-20px,20px);} }
         @keyframes orb2 { 0%,100%{transform:translate(0,0);} 33%{transform:translate(-30px,40px);} 66%{transform:translate(30px,-20px);} }
-        .hero-badge { animation: heroFadeUp 0.6s 0.1s ease both; }
-        .hero-h1 { animation: heroFadeUp 0.6s 0.2s ease both; }
-        .hero-desc { animation: heroFadeUp 0.6s 0.3s ease both; }
-        .hero-btns { animation: heroFadeUp 0.6s 0.4s ease both; }
-        .hero-card { animation: heroFadeUp 0.6s 0.5s ease both, floatY 5s 1s ease-in-out infinite; }
-        .hero-stat { transition: all 0.3s ease; }
-        .hero-stat:hover { transform: translateY(-2px); }
-        .score-ring-fill { transition: stroke-dashoffset 1.5s cubic-bezier(0.34,1.2,0.64,1); }
-        .shimmer-text { background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 25%, #f472b6 50%, #a78bfa 75%, #60a5fa 100%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 4s linear infinite; }
+        @keyframes resultReveal { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
+        .hero-fade { animation: heroFadeUp 0.6s ease both; }
+        .shimmer-text { background: linear-gradient(90deg, #f87171 0%, #fb923c 25%, #f87171 50%, #fb923c 75%, #f87171 100%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 3s linear infinite; }
+        .shimmer-blue { background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 25%, #f472b6 50%, #a78bfa 75%, #60a5fa 100%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 4s linear infinite; }
       `;
       document.head.appendChild(el);
     }
   }, []);
 
-  const handleDemoClick = () => {
+  const handleDemo = () => {
     setAnimating(true);
+    setShowResult(false);
     let i = 0;
-    const target = 78;
+    const target = 34;
     const interval = setInterval(() => {
       i += 2;
       setScore(Math.min(i, target));
-      if (i >= target) { clearInterval(interval); setAnimating(false); }
-    }, 20);
+      if (i >= target) { clearInterval(interval); setAnimating(false); setShowResult(true); }
+    }, 30);
   };
 
-  const r = 54;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (score / 100) * circ;
-  const scoreColor = score >= 80 ? "#10b981" : score >= 60 ? "#f59e0b" : "#3b82f6";
+  const fakeResult = {
+    EN: {
+      decision: "Not Likely",
+      decisionColor: "#f87171",
+      decisionBg: "rgba(239,68,68,0.08)",
+      decisionBorder: "rgba(239,68,68,0.2)",
+      mistake: "No measurable impact. Every bullet says 'responsible for'.",
+      fix: "Replace with numbers. 'Grew email list by 40% in 3 months.'",
+      insight: "This CV looks like everyone else's. Nothing stands out in 7 seconds.",
+    },
+    TR: {
+      decision: "Düşük İhtimal",
+      decisionColor: "#f87171",
+      decisionBg: "rgba(239,68,68,0.08)",
+      decisionBorder: "rgba(239,68,68,0.2)",
+      mistake: "Ölçülebilir etki yok. Her madde 'sorumlu oldum' diyor.",
+      fix: "Rakam ekle. '3 ayda email listesini %40 büyüttüm.'",
+      insight: "Bu CV herkesinkiyle aynı. 7 saniyede hiçbir şey öne çıkmıyor.",
+    }
+  };
+
+  const r = fakeResult[lang];
 
   return (
-    <section style={{ position: "relative", padding: "100px 0 80px", overflow: "hidden" }}>
-      <div style={{ position: "absolute", top: "-150px", left: "-100px", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.12), transparent 65%)", animation: "orb1 12s ease-in-out infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: "-100px", right: "-100px", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(236,72,153,0.08), transparent 65%)", animation: "orb2 15s ease-in-out infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)", backgroundSize: "48px 48px", pointerEvents: "none" }} />
+    <section style={{ position: "relative", padding: "80px 0 60px", overflow: "hidden" }}>
+      <div style={{ position: "absolute", top: "-150px", left: "-100px", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(239,68,68,0.06), transparent 65%)", animation: "orb1 12s ease-in-out infinite", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: "-100px", right: "-100px", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.08), transparent 65%)", animation: "orb2 15s ease-in-out infinite", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)", backgroundSize: "48px 48px", pointerEvents: "none" }} />
+
       <div style={{ ...styles.container, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center", position: "relative", zIndex: 2 }}>
+
+        {/* LEFT */}
         <div>
-          <div className="hero-badge" style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 16px", borderRadius: 999, background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.25)", fontSize: "12px", fontWeight: 700, color: "#a78bfa", marginBottom: 28, letterSpacing: "0.04em" }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#8b5cf6", display: "inline-block", boxShadow: "0 0 8px #8b5cf6" }} />
-            {lang === "TR" ? "AI Destekli Özgeçmiş Analizi" : "AI-Powered Resume Intelligence"}
+          <div className="hero-fade" style={{ animationDelay: "0.1s", display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", borderRadius: 999, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", fontSize: "11px", fontWeight: 700, color: "#f87171", marginBottom: 24, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#f87171", display: "inline-block", animation: "pulse 2s infinite" }} />
+            {lang === "TR" ? "Kariyer Karar Motoru" : "Career Decision Engine"}
           </div>
-          <h1 className="hero-h1" style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(42px, 4.5vw, 68px)", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.03em", marginBottom: 20 }}>
+
+          <h1 className="hero-fade" style={{ animationDelay: "0.2s", fontFamily: "'Syne', sans-serif", fontSize: "clamp(36px, 4.5vw, 62px)", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.03em", marginBottom: 20 }}>
             {lang === "TR" ? (
-              <>CV'niz neden sürekli<br />reddediliyor?</>
+              <>CV'n neden reddediliyor?<br /><span className="shimmer-text">Artık bileceksin.</span></>
             ) : (
-              <>Why does your<br />CV keep getting<br /><span className="shimmer-text">rejected?</span></>
+              <>Stop guessing why<br />your CV gets<br /><span className="shimmer-text">rejected.</span></>
             )}
           </h1>
-          <p className="hero-desc" style={{ fontSize: "17px", lineHeight: 1.7, color: "#94a3b8", maxWidth: "480px", marginBottom: 36 }}>
-            {t.heroDesc}
+
+          <p className="hero-fade" style={{ animationDelay: "0.3s", fontSize: "17px", lineHeight: 1.75, color: "#64748b", maxWidth: "440px", marginBottom: 16 }}>
+            {lang === "TR"
+              ? "CV'ni bir recruiter gibi analiz ediyoruz ve gerçeği söylüyoruz — başvurmadan önce."
+              : "We analyze your CV like a recruiter and tell you the truth — before you waste your time applying."}
           </p>
-          <div className="hero-btns" style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 48 }}>
-            <button className="hf-btn-primary" onClick={() => navigate("/app")} style={{ padding: "14px 32px", fontSize: "15px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 32px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.15)", borderRadius: 12 }}>
-              {t.analyzeBtn} <ArrowRight size={16} />
-            </button>
-            <button className="hf-btn-ghost" onClick={() => navigate("/dashboard")} style={{ padding: "14px 24px", fontSize: "15px", borderRadius: 12 }}>{t.viewDashboard}</button>
+
+          <div className="hero-fade" style={{ animationDelay: "0.35s", marginBottom: 28, padding: "10px 16px", borderRadius: 10, background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.12)", display: "inline-block" }}>
+            <span style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.7 }}>
+              {lang === "TR"
+                ? "Çoğu CV, insanların göremediği nedenlerle başarısız oluyor. Biz tam olarak nerede kaybedeceğini gösteriyoruz."
+                : "Most CVs fail for reasons people don't see. We show you exactly where you're losing."}
+            </span>
           </div>
-          <div className="hero-desc" style={{ display: "flex", alignItems: "center", gap: 20 }}>
-            <div style={{ display: "flex" }}>
-              {["#3b82f6", "#8b5cf6", "#ec4899", "#10b981"].map((c, i) => (
-                <div key={i} style={{ width: 28, height: 28, borderRadius: "50%", background: c, border: "2px solid #060910", marginLeft: i === 0 ? 0 : -8, display: "grid", placeItems: "center", fontSize: "10px", fontWeight: 700, color: "white" }}>{["A","B","C","D"][i]}</div>
+
+          <div className="hero-fade" style={{ animationDelay: "0.4s", display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }}>
+            <button
+              onClick={() => navigate("/app")}
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "16px 36px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", border: "none", borderRadius: 14, cursor: "pointer", color: "white", fontWeight: 700, fontSize: 16, fontFamily: "'DM Sans', sans-serif", boxShadow: "0 0 40px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.15)", transition: "all 0.2s ease", width: "fit-content" }}
+            >
+              {lang === "TR" ? "Kararını öğren" : "Get your decision"} <ArrowRight size={16} />
+            </button>
+            <div style={{ display: "flex", gap: 16 }}>
+              {(lang === "TR"
+                ? ["⚡ 10 saniye sürer", "🎯 Gerçek recruiter mantığı", "🔓 Kayıt gerekmez"]
+                : ["⚡ Takes 10 seconds", "🎯 Real recruiter logic", "🔓 No signup needed"]
+              ).map(item => (
+                <span key={item} style={{ fontSize: 12, color: "#475569", fontWeight: 600 }}>{item}</span>
               ))}
             </div>
-            <div style={{ fontSize: "13px", color: "#64748b" }}><span style={{ color: "#f1f5f9", fontWeight: 600 }}>2,400+</span> {lang === "TR" ? "CV bu hafta analiz edildi" : "CVs analyzed this week"}</div>
+          </div>
+
+          <div className="hero-fade" style={{ animationDelay: "0.5s", display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ display: "flex" }}>
+              {["#3b82f6","#8b5cf6","#ec4899","#10b981"].map((c,i) => (
+                <div key={i} style={{ width: 28, height: 28, borderRadius: "50%", background: c, border: "2px solid #060910", marginLeft: i===0?0:-8, display: "grid", placeItems: "center", fontSize: "10px", fontWeight: 700, color: "white" }}>{["A","B","C","D"][i]}</div>
+              ))}
+            </div>
+            <div style={{ fontSize: 13, color: "#475569" }}>
+              <span style={{ color: "#f1f5f9", fontWeight: 600 }}>2,400+</span> {lang === "TR" ? "CV bu hafta analiz edildi" : "CVs analyzed this week"}
+            </div>
           </div>
         </div>
-        <div className="hero-card" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 24, padding: "32px", position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.5), transparent)" }} />
-            <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#475569", marginBottom: 20 }}>{lang === "TR" ? "Canlı Analiz Önizlemesi" : "Live Analysis Preview"}</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 24, marginBottom: 24 }}>
-              <div style={{ position: "relative", width: 120, height: 120, flexShrink: 0 }}>
-                <svg width="120" height="120" viewBox="0 0 120 120" style={{ transform: "rotate(-90deg)" }}>
-                  <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="7" />
-                  <circle className="score-ring-fill" cx="60" cy="60" r={r} fill="none" stroke={scoreColor} strokeWidth="7" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={offset} />
-                </svg>
-                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ fontFamily: "'Syne', sans-serif", fontSize: "28px", fontWeight: 800, color: scoreColor, lineHeight: 1 }}>{score}</span>
-                  <span style={{ fontSize: "11px", color: "#475569" }}>/100</span>
-                </div>
-              </div>
-              <div>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 700, marginBottom: 6, color: score > 0 ? scoreColor : "#f1f5f9" }}>
-                  {score === 0 ? (lang === "TR" ? "Demo için Tıklayın" : "Click to Demo") : score >= 80 ? (lang === "TR" ? "Güçlü Eşleşme" : "Strong Match") : score >= 60 ? (lang === "TR" ? "Orta Eşleşme" : "Moderate Match") : (lang === "TR" ? "Geliştirilmeli" : "Needs Work")}
-                </div>
-                <div style={{ fontSize: "13px", color: "#64748b", lineHeight: 1.5, marginBottom: 12 }}>
-                  {score === 0 ? (lang === "TR" ? "HireFit'in CV'nizi gerçek zamanlı analiz ettiğini görün" : "See how HireFit analyzes your CV in real time") : (lang === "TR" ? "Beceriler, anahtar kelimeler, deneyim ve biçimlendirmeye göre" : "Based on skills, keywords, experience & formatting")}
-                </div>
-                <button onClick={handleDemoClick} disabled={animating} style={{ padding: "8px 16px", borderRadius: 8, border: "1px solid rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.1)", color: "#a78bfa", fontSize: "12px", fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
-                  {animating ? (lang === "TR" ? "Analiz ediliyor..." : "Analyzing...") : "▶ Run Demo"}
-                </button>
-              </div>
+
+        {/* RIGHT — Result Preview */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+
+          {/* Mock Input */}
+          <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: 24, position: "relative", overflow: "hidden" }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.4), transparent)" }} />
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>
+              {lang === "TR" ? "Canlı Önizleme" : "Live Preview"}
             </div>
-            {score > 0 && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 20px" }}>
-                {[[lang === "TR" ? "Beceri Eşleşmesi" : "Skills Match", score], [lang === "TR" ? "Anahtar Kelimeler" : "Keywords", Math.min(100, score + 8)], [lang === "TR" ? "Deneyim" : "Experience", Math.max(30, score - 12)], [lang === "TR" ? "Biçimlendirme" : "Formatting", 75]].map(([label, val]) => (
-                  <div key={label}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#475569", marginBottom: 4 }}><span>{label}</span><span>{val}</span></div>
-                    <div style={{ height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
-                      <div style={{ width: `${val}%`, height: "100%", background: "linear-gradient(90deg, #3b82f6, #8b5cf6)", borderRadius: 999, transition: "width 1.2s ease" }} />
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+              {[
+                { label: lang === "TR" ? "CV" : "CV", lines: [70, 90, 55, 80] },
+                { label: lang === "TR" ? "İş İlanı" : "Job Description", lines: [85, 65, 75, 50] },
+              ].map(({ label, lines }) => (
+                <div key={label} style={{ background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 10, color: "#334155", fontWeight: 700, marginBottom: 8 }}>{label}</div>
+                  {lines.map((w, i) => (
+                    <div key={i} style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,0.06)", marginBottom: 6, width: `${w}%` }} />
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={handleDemo}
+              disabled={animating}
+              style={{ width: "100%", padding: "10px", borderRadius: 10, border: "none", background: animating ? "rgba(99,102,241,0.3)" : "linear-gradient(135deg, #3b82f6, #6366f1)", color: "white", fontSize: 13, fontWeight: 700, cursor: animating ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+            >
+              {animating
+                ? <><div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid white", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />{lang === "TR" ? "Analiz ediliyor..." : "Analyzing..."}</>
+                : <>{lang === "TR" ? "▶ Demo Çalıştır" : "▶ Run Demo"}</>}
+            </button>
+          </div>
+
+          {/* Result Card */}
+          {showResult && (
+            <div style={{ background: "#0a0a0a", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 20, padding: 20, position: "relative", overflow: "hidden", animation: "resultReveal 0.4s ease" }}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #f87171, transparent)" }} />
+
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                <div style={{ padding: "8px 16px", borderRadius: 10, background: r.decisionBg, border: `1px solid ${r.decisionBorder}` }}>
+                  <div style={{ fontSize: 9, fontWeight: 700, color: r.decisionColor, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>{lang === "TR" ? "Karar" : "Decision"}</div>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: r.decisionColor }}>{r.decision}</div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
+                      <div style={{ width: `${score}%`, height: "100%", background: "linear-gradient(90deg, #f87171, transparent)", borderRadius: 999, transition: "width 0.3s ease" }} />
                     </div>
+                    <span style={{ fontSize: 11, color: "#475569", fontWeight: 700 }}>{score}%</span>
                   </div>
-                ))}
+                  <div style={{ fontSize: 10, color: "#334155", fontWeight: 600 }}>{lang === "TR" ? "Uyum Skoru" : "Fit Score"}</div>
+                </div>
               </div>
-            )}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-            {[
-              { label: lang === "TR" ? "Ort. skor artışı" : "Avg. score boost", value: "+23pts", color: "#10b981", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.15)" },
-              { label: lang === "TR" ? "Analiz süresi" : "Analysis time", value: "~8sec", color: "#3b82f6", bg: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.15)" },
-              { label: lang === "TR" ? "Ücretsiz kullanım" : "Free to use", value: "100%", color: "#8b5cf6", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.15)" },
-            ].map(({ label, value, color, bg, border }) => (
-              <div key={label} className="hero-stat" style={{ background: bg, border: `1px solid ${border}`, borderRadius: 14, padding: "14px 12px", textAlign: "center" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 800, color, marginBottom: 4 }}>{value}</div>
-                <div style={{ fontSize: "11px", color: "#475569", lineHeight: 1.3 }}>{label}</div>
+
+              <div style={{ marginBottom: 10, padding: "10px 12px", background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.12)", borderRadius: 8 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#f87171", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>⚡ {lang === "TR" ? "En Büyük Sorun" : "Biggest Mistake"}</div>
+                <div style={{ fontSize: 12, color: "#fca5a5", fontWeight: 600 }}>{r.mistake}</div>
               </div>
-            ))}
-          </div>
+
+              <div style={{ marginBottom: 10, padding: "10px 12px", background: "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.12)", borderRadius: 8 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#10b981", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>→ {lang === "TR" ? "Düzeltme" : "Fix"}</div>
+                <div style={{ fontSize: 12, color: "#6ee7b7", fontWeight: 600 }}>{r.fix}</div>
+              </div>
+
+              <div style={{ padding: "10px 12px", background: "rgba(212,175,55,0.04)", border: "1px solid rgba(212,175,55,0.1)", borderRadius: 8 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: "#d4af37", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>💬 {lang === "TR" ? "Recruiter Görüşü" : "Recruiter Insight"}</div>
+                <div style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic" }}>"{r.insight}"</div>
+              </div>
+
+              <button onClick={() => navigate("/app")} style={{ marginTop: 14, width: "100%", padding: "10px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #3b82f6, #6366f1)", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+                {lang === "TR" ? "Kendi CV'ni analiz et →" : "Analyze your own CV →"}
+              </button>
+            </div>
+          )}
+
+          {!showResult && !animating && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+              {[
+                { label: lang === "TR" ? "Ort. skor artışı" : "Avg. score boost", value: "+23pts", color: "#10b981", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.15)" },
+                { label: lang === "TR" ? "Analiz süresi" : "Analysis time", value: "~8sec", color: "#3b82f6", bg: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.15)" },
+                { label: lang === "TR" ? "Ücretsiz" : "Free to use", value: "100%", color: "#8b5cf6", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.15)" },
+              ].map(({ label, value, color, bg, border }) => (
+                <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 14, padding: "14px 12px", textAlign: "center" }}>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color, marginBottom: 4 }}>{value}</div>
+                  <div style={{ fontSize: 11, color: "#475569", lineHeight: 1.3 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>
@@ -1279,10 +1363,10 @@ function FeatureCards({ lang }) {
     { icon: "🔍", tag: "AI Destekli", tagColor: "#22d3ee", tagBg: "rgba(34,211,238,0.1)", title: "Anahtar Kelime Zekası", desc: "İşe alım uzmanlarının taradığı tam anahtar kelimeleri çıkarır, ardından CV'nizde hangilerinin eksik olduğunu gösterir.", accent: "#22d3ee", glow: "rgba(34,211,238,0.08)", border: "rgba(34,211,238,0.15)", stat: "50+ anahtar kelime" },
     { icon: "✨", tag: "Premium", tagColor: "#a78bfa", tagBg: "rgba(139,92,246,0.1)", title: "CV Yeniden Yazıcı", desc: "AI, CV'nizi hedeflediğiniz role göre daha güçlü, daha alakalı ve tamamen optimize edilmiş şekilde yeniden yazar.", accent: "#8b5cf6", glow: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.15)", stat: "Ort. +23 puan artış" },
   ] : [
-    { icon: "📊", tag: "Core", tagColor: "#60a5fa", tagBg: "rgba(59,130,246,0.1)", title: "ATS Score Engine", desc: "Multi-factor scoring across skills, keywords, experience, and formatting — the same way real ATS software evaluates you.", accent: "#3b82f6", glow: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.15)", stat: "87% accuracy" },
-    { icon: "🚫", tag: "Differentiator", tagColor: "#f87171", tagBg: "rgba(239,68,68,0.1)", title: "Rejection Engine", desc: "We don't just score you — we tell you the exact reasons a recruiter would pass on your CV and how to fix each one.", accent: "#ef4444", glow: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.15)", stat: "Top differentiator" },
-    { icon: "🔍", tag: "AI-Powered", tagColor: "#22d3ee", tagBg: "rgba(34,211,238,0.1)", title: "Keyword Intelligence", desc: "Extracts the exact keywords recruiters are scanning for, then shows you which ones are missing from your CV.", accent: "#22d3ee", glow: "rgba(34,211,238,0.08)", border: "rgba(34,211,238,0.15)", stat: "50+ keywords extracted" },
-    { icon: "✨", tag: "Premium", tagColor: "#a78bfa", tagBg: "rgba(139,92,246,0.1)", title: "CV Rewriter", desc: "AI rewrites your entire CV to be stronger, more relevant, and fully optimized for the specific role you're targeting.", accent: "#8b5cf6", glow: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.15)", stat: "+23pts avg. boost" },
+    { icon: "🎯", tag: "Core", tagColor: "#f87171", tagBg: "rgba(239,68,68,0.1)", title: "Should I apply or not?", desc: "We don't just score you. We give you a clear decision: High chance, Medium chance, or Not likely — with the exact reason why.", accent: "#f87171", glow: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.15)", stat: "Top differentiator" },
+{ icon: "🔍", tag: "AI-Powered", tagColor: "#22d3ee", tagBg: "rgba(34,211,238,0.1)", title: "See what recruiters are scanning for", desc: "We extract the exact keywords recruiters look for, then show you which ones are missing. Not guesses — real job description intelligence.", accent: "#22d3ee", glow: "rgba(34,211,238,0.08)", border: "rgba(34,211,238,0.15)", stat: "50+ keywords extracted" },
+{ icon: "💥", tag: "Differentiator", tagColor: "#a78bfa", tagBg: "rgba(139,92,246,0.1)", title: "Generic CV detected", desc: "We flag CVs that sound AI-written or templated. Recruiters reject them in 7 seconds. We tell you exactly which phrases are hurting you.", accent: "#8b5cf6", glow: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.15)", stat: "Key differentiator" },
+{ icon: "✨", tag: "Premium", tagColor: "#d4af37", tagBg: "rgba(212,175,55,0.1)", title: "Turn weak bullets into real impact", desc: "CV Rewriter rewrites your bullets to be specific, metric-driven, and human. Not AI-sounding — recruiter-approved.", accent: "#d4af37", glow: "rgba(212,175,55,0.08)", border: "rgba(212,175,55,0.15)", stat: "+23pts avg. boost" },
   ];
 
   return (
