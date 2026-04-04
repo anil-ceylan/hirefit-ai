@@ -1555,6 +1555,7 @@ function MainApp() {
   const [decisionLoading, setDecisionLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [pressedBtn, setPressedBtn] = useState(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [applyingFix, setApplyingFix] = useState(null);
   const [fixResults, setFixResults] = useState({});
   const [scoreHistory, setScoreHistory] = useState(() => {
@@ -1975,206 +1976,221 @@ const msgInterval = setInterval(() => {
       )}
 
       {view === "app" && (
-        <div style={{ ...styles.container, padding: "40px 24px", minHeight: "calc(100vh - 80px)" }}>
-          <div style={{ marginBottom: 32, display: "flex", alignItems: "flex-end", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
-            <div>
-              <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 12px", borderRadius: 999, background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)", fontSize: "11px", fontWeight: 700, color: "#a78bfa", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
-                <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#8b5cf6", boxShadow: "0 0 6px #8b5cf6", display: "inline-block" }} />
-                {lang === "TR" ? "AI Analizi" : "AI Analysis"}
-              </div>
-              <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(28px,3vw,42px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 6 }}>{t.cvAnalyzer}</h1>
-              <p style={{ color: "#64748b", fontSize: "14px" }}>{t.cvAnalyzerDesc}</p>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 12, background: isPro ? "rgba(212,175,55,0.08)" : "rgba(16,185,129,0.08)", border: `1px solid ${isPro ? "rgba(212,175,55,0.2)" : "rgba(16,185,129,0.15)"}` }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: isPro ? "#d4af37" : "#10b981", boxShadow: `0 0 8px ${isPro ? "#d4af37" : "#10b981"}`, display: "inline-block" }} />
-              <span style={{ fontSize: "12px", fontWeight: 600, color: isPro ? "#d4af37" : "#10b981" }}>{isPro ? "Pro ✨" : t.freeToUse}</span>
-            </div>
+  <div style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
+
+    {/* HEADER */}
+    <div style={{ textAlign: "center", marginBottom: 40 }}>
+      <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 14px", borderRadius: 999, background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)", fontSize: "11px", fontWeight: 700, color: "#a78bfa", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>
+        <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#8b5cf6", boxShadow: "0 0 6px #8b5cf6", display: "inline-block" }} />
+        {lang === "TR" ? "AI Kariyer Analizi" : "AI Career Analysis"}
+      </div>
+      <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 12 }}>
+        {lang === "TR" ? "CV'ni yapıştır, kararını al." : "Paste your CV. Get your answer."}
+      </h1>
+      <p style={{ color: "#475569", fontSize: 15, maxWidth: 480, margin: "0 auto" }}>
+        {lang === "TR" ? "Saniyeler içinde recruiter'ın ne düşündüğünü öğren." : "Know exactly what a recruiter thinks — in seconds."}
+      </p>
+    </div>
+
+    {/* CV INPUT */}
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 13, color: "#f1f5f9" }}>
+          <div style={{ width: 26, height: 26, borderRadius: 8, background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.2)", display: "grid", placeItems: "center" }}>
+            <FileText size={12} color="#60a5fa" />
           </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 320px", gap: 20, alignItems: "start" }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: "flex", gap: 16, marginBottom: 16, width: "100%" }}>
-                <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: 20, display: "flex", flexDirection: "column", gap: 12, height: "480px", flex: "0 0 calc(50% - 8px)", width: "calc(50% - 8px)" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
-                    <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "13px", color: "#f1f5f9" }}>
-                      <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.2)", display: "grid", placeItems: "center", flexShrink: 0 }}>
-                        <FileText size={13} color="#60a5fa" />
-                      </div>
-                      {t.candidateCV}
-                    </label>
-                    <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer", fontWeight: 600, fontSize: "11px", color: "#94a3b8", flexShrink: 0 }}>
-                      <Upload size={11} />
-                      {uploadingPdf ? t.reading : t.uploadPdf}
-                      <input type="file" accept="application/pdf" onChange={handlePdfUpload} style={{ display: "none" }} />
-                    </label>
-                  </div>
-                  <textarea className="hf-textarea" placeholder={t.pasteCv} value={cvText} onChange={(e) => setCvText(e.target.value)} />
-                  {cvText && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "11px", color: "#10b981", flexShrink: 0 }}>
-                      <CheckCircle2 size={11} />
-                      {cvText.split(" ").length} {t.wordsLoaded}
-                    </div>
-                  )}
-                </div>
-                <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: 20, display: "flex", flexDirection: "column", gap: 12, height: "480px", flex: "0 0 calc(50% - 8px)", width: "calc(50% - 8px)" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 8, background: "rgba(34,211,238,0.15)", border: "1px solid rgba(34,211,238,0.2)", display: "grid", placeItems: "center", flexShrink: 0 }}>
-                      <Briefcase size={13} color="#22d3ee" />
-                    </div>
-                    <label style={{ fontWeight: 700, fontSize: "13px", color: "#f1f5f9" }}>{t.jobDesc}</label>
-                  </div>
-                  <textarea className="hf-textarea" placeholder={t.pasteJd} value={jdText} onChange={(e) => setJdText(e.target.value)} />
-                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-                    <input className="hf-input" value={jobUrl} onChange={(e) => setJobUrl(e.target.value)} placeholder={lang === "TR" ? "Veya bir iş URL'si yapıştırın..." : "Or paste a job URL..."} style={{ flex: 1, fontSize: "12px", padding: "9px 12px", borderRadius: 8, background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.06)" }} />
-                    <button className="hf-btn-ghost" onClick={extractJobFromUrl} disabled={extractingJob} style={{ whiteSpace: "nowrap", fontSize: "12px", padding: "9px 14px", borderRadius: 8 }}>
-                      {extractingJob ? <Loader2 size={12} /> : <Search size={12} />}
-                      {extractingJob ? t.extracting : t.extract}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {(() => {
-                const count = user ? Number(localStorage.getItem(`hirefit-count-${user.id}`) || 0) : Number(localStorage.getItem("hirefit-anon-count") || 0);
-                const remaining = Math.max(0, 2 - count);
-                if (isPro) return null;
-                return remaining < 2 ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 8, background: remaining === 0 ? "rgba(239,68,68,0.08)" : "rgba(245,158,11,0.08)", border: `1px solid ${remaining === 0 ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)"}`, marginBottom: 8, fontSize: 13, color: remaining === 0 ? "#f87171" : "#fbbf24", fontWeight: 600 }}>
-                    {remaining === 0 ? t.noFreeLeft : `⚡ ${remaining} ${t.freeLimitWarning}`}
-                  </div>
-                ) : null;
-              })()}
-
-              <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: "#475569", whiteSpace: "nowrap" }}>
-                  {lang === "TR" ? "⏰ Başvuru zamanın:" : "⏰ Application deadline:"}
-                </span>
-                {[
-                  { value: "urgent", label: lang === "TR" ? "🔴 Acil (bugün)" : "🔴 Urgent (today)" },
-                  { value: "1_week", label: lang === "TR" ? "🟡 1 Hafta" : "🟡 1 Week" },
-                  { value: "1_month", label: lang === "TR" ? "🟢 1 Ay+" : "🟢 1 Month+" },
-                ].map(({ value, label }) => (
-                  <button key={value} onClick={() => setDeadline(value)} style={{
-                    padding: "6px 14px", borderRadius: 999, fontSize: "12px", fontWeight: 600,
-                    cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s",
-                    background: deadline === value ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)",
-                    border: `1px solid ${deadline === value ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.07)"}`,
-                    color: deadline === value ? "#a78bfa" : "#475569",
-                  }}>{label}</button>
-                ))}
-              </div>
-
-              <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
-                {sectorValues.map((s, idx) => (
-                  <button key={s} onClick={() => setSector(s)} style={{ padding: "6px 14px", borderRadius: 999, fontSize: "12px", fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.2s", background: sector === s ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)", border: `1px solid ${sector === s ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.07)"}`, color: sector === s ? "#a78bfa" : "#475569" }}>
-                    {sectorLabels[idx]}
-                  </button>
-                ))}
-              </div>
-
-              <ProgressStepper cvText={cvText} jdText={jdText} loading={loading} analysisData={analysisData} lang={lang} />
-
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20, padding: "16px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16 }}>
-                {[
-  { key: "analyze", label: loading ? <><Loader2 size={14} />{loadingMessage || t.analyzing}</> : <>{t.checkFit} <Sparkles size={14} /></>, onClick: analyze, disabled: loading, color: "#6366f1", glow: "rgba(99,102,241,0.3)" },
-  { key: "optimize", label: optimizing ? <><Loader2 size={14} />{t.optimizing}</> : <><Wand2 size={14} />{t.optimizeCV}</>, onClick: optimizeCv, disabled: optimizing, color: "#22d3ee", glow: "rgba(34,211,238,0.2)" },
-  { key: "roadmap", label: roadmapLoading ? <><Loader2 size={14} />{t.building}</> : <><Target size={14} />{t.learningRoadmap}</>, onClick: generateLearningPlan, disabled: roadmapLoading, color: "#10b981", glow: "rgba(16,185,129,0.2)" },
-].map(({ key, label, onClick, disabled, color, glow }) => (
-  <button
-    key={key}
-    onClick={() => { setPressedBtn(key); setTimeout(() => setPressedBtn(null), 600); onClick(); }}
-    disabled={disabled}
-    style={{
-      position: "relative", overflow: "hidden",
-      display: "inline-flex", alignItems: "center", gap: 8,
-      padding: "12px 24px", fontSize: "14px", borderRadius: 10,
-      border: `1px solid ${color}55`, background: "rgba(255,255,255,0.03)",
-      color: color, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer",
-      fontFamily: "'DM Sans', sans-serif", opacity: disabled ? 0.7 : 1,
-      boxShadow: pressedBtn === key ? `0 0 20px ${glow}` : "none",
-      transition: "box-shadow 0.3s ease",
-    }}
-  >
-    <span style={{
-      position: "absolute", inset: 0,
-      background: `linear-gradient(90deg, transparent, ${color}22, ${color}33)`,
-      transform: pressedBtn === key ? "translateX(0%)" : "translateX(100%)",
-      transition: pressedBtn === key ? "transform 0.5s ease" : "transform 0s",
-      pointerEvents: "none",
-    }} />
-    {label}
-  </button>
-))}
-                
-              </div>
-
-              {error && (
-                <div style={{ display: "flex", gap: 10, padding: "14px 16px", borderRadius: 12, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", color: "#fca5a5", fontSize: "14px", marginBottom: 16 }}>
-                  <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />{error}
-                </div>
-              )}
-
-              {(decisionData || decisionLoading) && (
-                <DecisionCard
-                  data={decisionData}
-                  loading={decisionLoading}
-                  lang={lang}
-                  isPro={isPro}
-                  onApplyFix={applyFix}
-                  applyingFix={applyingFix}
-                  fixResults={fixResults}
-                  onUpgrade={openUpgrade}
-                />
-              )}
-
-              {alignmentScore !== null && analysisData && (
-                <DashboardResults
-                  data={analysisData}
-                  score={alignmentScore}
-                  matchedSkills={matchedSkills}
-                  missingSkills={missingSkills}
-                  topKeywords={topKeywords}
-                  result={result}
-                  optimizedCv={optimizedCv}
-                  learningPlan={learningPlan}
-                  downloadText={downloadText}
-                  lang={lang}
-                />
-              )}
-            </div>
-
-            <aside>
-              <div style={{ position: "sticky", top: 88 }}>
-                <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: 20 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "13px", fontWeight: 700 }}>
-                      <History size={14} color={T.blue} />{t.previousAnalyses}
-                    </div>
-                    <button onClick={clearHistory} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontWeight: 600, fontSize: "11px", fontFamily: "'DM Sans', sans-serif" }}>
-                      <Trash2 size={10} /> {t.clear}
-                    </button>
-                  </div>
-                  {history.length === 0 ? (
-                    <div style={{ color: "#334155", fontSize: "12px", textAlign: "center", padding: "24px 0" }}>{t.noAnalyses}</div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {history.map((item) => (
-                        <div key={item.id} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 12, padding: 12, cursor: "pointer", transition: "all 0.2s" }} onClick={() => loadHistoryItem(item)}>
-                          <div style={{ fontWeight: 700, marginBottom: 3, fontSize: "13px", color: "#f1f5f9" }}>{item.role}</div>
-                          <div style={{ fontSize: "11px", color: item.score >= 80 ? T.green : item.score >= 60 ? "#f59e0b" : "#f87171", marginBottom: 2, fontWeight: 600 }}>{item.score}/100</div>
-                          <div style={{ fontSize: "10px", color: "#334155" }}>{item.createdAt}</div>
-                          <a href={`/report/${item.id}`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: "11px", color: T.cyan, textDecoration: "none", display: "block", marginTop: 6, fontWeight: 600 }}>{t.viewReport}</a>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </aside>
-          </div>
+          {lang === "TR" ? "CV'n" : "Your CV"}
+        </label>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 10px", borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", cursor: "pointer", fontWeight: 600, fontSize: 11, color: "#94a3b8" }}>
+          <Upload size={10} />
+          {uploadingPdf ? t.reading : t.uploadPdf}
+          <input type="file" accept="application/pdf" onChange={handlePdfUpload} style={{ display: "none" }} />
+        </label>
+      </div>
+      <textarea
+        className="hf-textarea"
+        placeholder={t.pasteCv}
+        value={cvText}
+        onChange={(e) => setCvText(e.target.value)}
+        style={{ height: 200, resize: "none" }}
+      />
+      {cvText && (
+        <div style={{ marginTop: 6, fontSize: 11, color: "#10b981", display: "flex", alignItems: "center", gap: 5 }}>
+          <CheckCircle2 size={11} /> {cvText.split(" ").length} {t.wordsLoaded}
         </div>
       )}
     </div>
+
+    {/* JD INPUT */}
+    <div style={{ marginBottom: 24 }}>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 13, color: "#f1f5f9", marginBottom: 8 }}>
+        <div style={{ width: 26, height: 26, borderRadius: 8, background: "rgba(34,211,238,0.15)", border: "1px solid rgba(34,211,238,0.2)", display: "grid", placeItems: "center" }}>
+          <Briefcase size={12} color="#22d3ee" />
+        </div>
+        {lang === "TR" ? "İş İlanı" : "Job Description"}
+      </label>
+      <textarea
+        className="hf-textarea"
+        placeholder={t.pasteJd}
+        value={jdText}
+        onChange={(e) => setJdText(e.target.value)}
+        style={{ height: 200, resize: "none" }}
+      />
+    </div>
+
+    {/* ADVANCED OPTIONS */}
+    <div style={{ marginBottom: 24 }}>
+  <button
+    onClick={() => setShowAdvanced(v => !v)}
+    style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#475569", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, padding: 0, marginBottom: showAdvanced ? 16 : 0 }}
+  >
+    <span style={{ fontSize: 10, transition: "transform 0.2s", display: "inline-block", transform: showAdvanced ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+    {lang === "TR" ? "Gelişmiş seçenekler" : "Advanced options"}
+  </button>
+  {showAdvanced && (
+    <div style={{ padding: "16px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>{lang === "TR" ? "Sektör" : "Sector"}</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {sectorValues.map((s, idx) => (
+            <button key={s} onClick={() => setSector(s)} style={{ padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: sector === s ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)", border: `1px solid ${sector === s ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.07)"}`, color: sector === s ? "#a78bfa" : "#475569" }}>
+              {sectorLabels[idx]}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>{lang === "TR" ? "Başvuru Süresi" : "Deadline"}</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {[
+            { value: "urgent", label: lang === "TR" ? "🔴 Acil" : "🔴 Urgent" },
+            { value: "1_week", label: lang === "TR" ? "🟡 1 Hafta" : "🟡 1 Week" },
+            { value: "1_month", label: lang === "TR" ? "🟢 1 Ay" : "🟢 1 Month" },
+          ].map(({ value, label }) => (
+            <button key={value} onClick={() => setDeadline(value)} style={{ padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: deadline === value ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)", border: `1px solid ${deadline === value ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.07)"}`, color: deadline === value ? "#a78bfa" : "#475569" }}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )}
+</div>  
+
+    {/* FREE LIMIT WARNING */}
+    {!isPro && (() => {
+      const count = user ? Number(localStorage.getItem(`hirefit-count-${user.id}`) || 0) : Number(localStorage.getItem("hirefit-anon-count") || 0);
+      const remaining = Math.max(0, 2 - count);
+      if (remaining >= 2) return null;
+      return (
+        <div style={{ marginBottom: 16, padding: "8px 14px", borderRadius: 8, background: remaining === 0 ? "rgba(239,68,68,0.08)" : "rgba(245,158,11,0.08)", border: `1px solid ${remaining === 0 ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)"}`, fontSize: 13, color: remaining === 0 ? "#f87171" : "#fbbf24", fontWeight: 600 }}>
+          {remaining === 0 ? t.noFreeLeft : `⚡ ${remaining} ${t.freeLimitWarning}`}
+        </div>
+      );
+    })()}
+
+    {/* PRIMARY CTA */}
+    <button
+      onClick={analyze}
+      disabled={loading}
+      style={{
+        width: "100%", padding: "16px", borderRadius: 14, border: "none",
+        background: loading ? "rgba(99,102,241,0.3)" : "linear-gradient(135deg, #3b82f6, #6366f1)",
+        color: "white", fontSize: 16, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
+        fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+        boxShadow: loading ? "none" : "0 0 32px rgba(99,102,241,0.35)",
+        transition: "all 0.2s ease", marginBottom: 32,
+        opacity: loading ? 0.8 : 1,
+      }}
+    >
+      {loading ? <><Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} />{loadingMessage || t.analyzing}</> : <>{t.checkFit} <Sparkles size={16} /></>}
+    </button>
+
+    {/* ERROR */}
+    {error && (
+      <div style={{ display: "flex", gap: 10, padding: "14px 16px", borderRadius: 12, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", color: "#fca5a5", fontSize: 14, marginBottom: 16 }}>
+        <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />{error}
+      </div>
+    )}
+
+    {/* RESULTS */}
+    {(decisionData || decisionLoading) && (
+      <DecisionCard
+        data={decisionData}
+        loading={decisionLoading}
+        lang={lang}
+        isPro={isPro}
+        onApplyFix={applyFix}
+        applyingFix={applyingFix}
+        fixResults={fixResults}
+        onUpgrade={openUpgrade}
+      />
+    )}
+
+    {alignmentScore !== null && analysisData && (
+      <>
+        <DashboardResults
+          data={analysisData}
+          score={alignmentScore}
+          matchedSkills={matchedSkills}
+          missingSkills={missingSkills}
+          topKeywords={topKeywords}
+          result={result}
+          optimizedCv={optimizedCv}
+          learningPlan={learningPlan}
+          downloadText={downloadText}
+          lang={lang}
+        />
+
+        {/* SECONDARY ACTIONS — sadece analiz sonrası */}
+        <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
+          <button
+            onClick={optimizeCv}
+            disabled={optimizing}
+            style={{ flex: 1, minWidth: 160, padding: "12px 20px", borderRadius: 10, border: "1px solid rgba(34,211,238,0.25)", background: "rgba(34,211,238,0.06)", color: "#22d3ee", fontSize: 14, fontWeight: 600, cursor: optimizing ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: optimizing ? 0.7 : 1 }}
+          >
+            {optimizing ? <><Loader2 size={14} />{t.optimizing}</> : <><Wand2 size={14} />{t.optimizeCV}</>}
+          </button>
+          <button
+            onClick={generateLearningPlan}
+            disabled={roadmapLoading}
+            style={{ flex: 1, minWidth: 160, padding: "12px 20px", borderRadius: 10, border: "1px solid rgba(16,185,129,0.25)", background: "rgba(16,185,129,0.06)", color: "#10b981", fontSize: 14, fontWeight: 600, cursor: roadmapLoading ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: roadmapLoading ? 0.7 : 1 }}
+          >
+            {roadmapLoading ? <><Loader2 size={14} />{t.building}</> : <><Target size={14} />{t.learningRoadmap}</>}
+          </button>
+        </div>
+      </>
+    )}
+
+    {/* HISTORY — compact, en altta */}
+    {history.length > 0 && (
+      <div style={{ marginTop: 40, paddingTop: 32, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#334155", display: "flex", alignItems: "center", gap: 6 }}>
+            <History size={12} /> {t.previousAnalyses}
+          </div>
+          <button onClick={clearHistory} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontWeight: 600, fontSize: 11, fontFamily: "'DM Sans', sans-serif" }}>
+            <Trash2 size={10} /> {t.clear}
+          </button>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {history.slice(0, 3).map((item) => (
+            <div key={item.id} onClick={() => loadHistoryItem(item)} style={{ padding: "10px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 10, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0" }}>{item.role}</div>
+                <div style={{ fontSize: 11, color: "#334155", marginTop: 2 }}>{item.createdAt}</div>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: item.score >= 80 ? "#10b981" : item.score >= 60 ? "#f59e0b" : "#f87171" }}>{item.score}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+  </div>
+)}
+
+</div>
   );
 }
 
