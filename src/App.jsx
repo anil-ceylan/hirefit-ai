@@ -1135,8 +1135,12 @@ function NavBar({ view, user, logout, navigate, lang, setLang }) {
 
 function HeroSection({ navigate, lang }) {
   const [score, setScore] = useState(0);
-  const [animating, setAnimating] = useState(false);
-  const [showResult, setShowResult] = useState(false);
+const [animating, setAnimating] = useState(false);
+const [showResult, setShowResult] = useState(false);
+const [demoStep, setDemoStep] = useState(0);
+const demoSteps = lang === "TR"
+  ? ["CV yükleniyor...", "Recruiter gibi analiz ediliyor...", "Karar veriliyor...", "Sonuç hazır."]
+  : ["Loading CV...", "Analyzing like a recruiter...", "Reaching a verdict...", "Decision ready."];
 
   useEffect(() => {
     if (!document.getElementById("hero-styles")) {
@@ -1159,16 +1163,30 @@ function HeroSection({ navigate, lang }) {
   }, []);
 
   const handleDemo = () => {
-    setAnimating(true);
-    setShowResult(false);
-    let i = 0;
-    const target = 34;
-    const interval = setInterval(() => {
-      i += 2;
-      setScore(Math.min(i, target));
-      if (i >= target) { clearInterval(interval); setAnimating(false); setShowResult(true); }
-    }, 30);
-  };
+  setAnimating(true);
+  setShowResult(false);
+  setDemoStep(0);
+  setScore(0);
+
+  let step = 0;
+  const stepInterval = setInterval(() => {
+    step++;
+    setDemoStep(step);
+    if (step >= demoSteps.length - 1) {
+      clearInterval(stepInterval);
+      let i = 0;
+      const scoreInterval = setInterval(() => {
+        i += 2;
+        setScore(Math.min(i, 34));
+        if (i >= 34) {
+          clearInterval(scoreInterval);
+          setAnimating(false);
+          setShowResult(true);
+        }
+      }, 30);
+    }
+  }, 700);
+};
 
   const fakeResult = {
     EN: {
