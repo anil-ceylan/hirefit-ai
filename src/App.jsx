@@ -1342,6 +1342,24 @@ const demoSteps = lang === "TR"
             </button>
           </div>
 
+          {animating && (
+  <div style={{ marginTop: 12, marginBottom: 4 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#334155", marginBottom: 6, fontWeight: 700 }}>
+      <span>{demoSteps[demoStep]}</span>
+      <span>{Math.round((demoStep / (demoSteps.length - 1)) * 100)}%</span>
+    </div>
+    <div style={{ height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
+      <div style={{
+        height: "100%",
+        width: `${Math.round((demoStep / (demoSteps.length - 1)) * 100)}%`,
+        background: "linear-gradient(90deg, #3b82f6, #6366f1)",
+        borderRadius: 999,
+        transition: "width 0.6s ease"
+      }} />
+    </div>
+  </div>
+)}
+
           {/* Result Card */}
           {showResult && (
             <div style={{ background: "#0a0a0a", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 20, padding: 20, position: "relative", overflow: "hidden", animation: "resultReveal 0.4s ease" }}>
