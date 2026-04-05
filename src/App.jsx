@@ -193,6 +193,11 @@ const globalStyles = `
   .nav-link.active { color: white; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes rejectedPop { 
+  0% { opacity:0; transform:scale(0.5); } 
+  60% { transform:scale(1.15); } 
+  100% { opacity:1; transform:scale(1); } 
+}
 `;
 
 const styles = {
@@ -1134,7 +1139,7 @@ function NavBar({ view, user, logout, navigate, lang, setLang }) {
 }
 
 function HeroSection({ navigate, lang }) {
-  const [score, setScore] = useState(0);
+const [score, setScore] = useState(0);
 const [animating, setAnimating] = useState(false);
 const [showResult, setShowResult] = useState(false);
 const [demoStep, setDemoStep] = useState(0);
@@ -1161,6 +1166,28 @@ const demoSteps = lang === "TR"
       document.head.appendChild(el);
     }
   }, []);
+
+  {/* REJECTED MOMENT */}
+<div style={{
+  textAlign: "center",
+  padding: "20px 0 12px",
+  animation: "rejectedPop 0.4s cubic-bezier(0.34,1.56,0.64,1)"
+}}>
+  <div style={{
+    fontFamily: "'Syne', sans-serif",
+    fontSize: 42,
+    fontWeight: 900,
+    color: "#f87171",
+    letterSpacing: "-0.02em",
+    textShadow: "0 0 40px rgba(239,68,68,0.6)",
+    marginBottom: 4,
+  }}>❌ {lang === "TR" ? "REDDEDİLDİ" : "REJECTED"}</div>
+  <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>
+    {lang === "TR" ? "Bu CV ilk elemeyi geçemez." : "This CV would not pass first screening."}
+  </div>
+</div>
+
+
 
   const handleDemo = () => {
   setAnimating(true);
@@ -1240,13 +1267,15 @@ const demoSteps = lang === "TR"
               : "We analyze your CV like a recruiter and tell you the truth — before you waste your time applying."}
           </p>
 
-          <div className="hero-fade" style={{ animationDelay: "0.35s", marginBottom: 28, padding: "10px 16px", borderRadius: 10, background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.12)", display: "inline-block" }}>
-            <span style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.7 }}>
-              {lang === "TR"
-                ? "Çoğu CV, insanların göremediği nedenlerle başarısız oluyor. Biz tam olarak nerede kaybedeceğini gösteriyoruz."
-                : "Most CVs fail for reasons people don't see. We show you exactly where you're losing."}
-            </span>
-          </div>
+          <div className="hero-fade" style={{ animationDelay: "0.28s", marginBottom: 16 }}>
+  <span style={{ fontSize: 14, color: "#64748b", fontStyle: "italic" }}>
+    {lang === "TR"
+      ? "Fark etmeden reddediliyor olabilirsin. Çoğu insan habersizce başvurur — bu yüzden başarısız olur."
+      : "You might be getting rejected without realizing why. Most people apply blindly. That's why they fail."}
+  </span>
+</div>
+
+          
 
           <div className="hero-fade" style={{ animationDelay: "0.4s", display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }}>
             <button
