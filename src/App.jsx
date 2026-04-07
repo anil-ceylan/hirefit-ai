@@ -339,6 +339,25 @@ function getScoreFinalVerdict(score, lang) {
   };
 }
 
+function mapDecisionLabel(decision, lang) {
+  const raw = String(decision || "").trim().toLowerCase();
+  if (!raw) return "";
+  if (raw === "do_not_apply" || raw === "başvurma" || raw === "basvurma") {
+    return lang === "TR" ? "Başvurma" : "Do not apply";
+  }
+  if (raw === "apply_with_risk") return lang === "TR" ? "Riskli başvuru" : "Apply with risk";
+  if (raw === "apply_now") return lang === "TR" ? "Başvur" : "Apply now";
+  return String(decision || "");
+}
+
+function getConfidenceTierLabel(confidence, lang) {
+  const n = Number(confidence);
+  if (!Number.isFinite(n)) return null;
+  if (n >= 85) return { label: lang === "TR" ? "Yüksek Güven" : "High Confidence", color: "#10b981" };
+  if (n >= 65) return { label: lang === "TR" ? "Orta Güven" : "Medium Confidence", color: "#f59e0b" };
+  return { label: lang === "TR" ? "Düşük Güven" : "Low Confidence", color: "#ef4444" };
+}
+
 function buildShareResultText({ score, verdictLabel, biggestMistake, lang }) {
   const mistake = (biggestMistake && String(biggestMistake).trim()) || (lang === "TR" ? "Belirtilmedi" : "Not specified");
   return lang === "TR"
@@ -1300,8 +1319,10 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
   );
   if (!data) return null;
 
-  const isHigh = data.decision?.includes("High") || data.decision?.includes("Yüksek");
-  const isMed = data.decision?.includes("Medium") || data.decision?.includes("Orta");
+  const displayDecision = mapDecisionLabel(data.decision, lang);
+  const hideDecisionBadge = /^(do_not_apply|başvurma|basvurma)$/i.test(String(data.decision || ""));
+  const isHigh = displayDecision.includes("High") || displayDecision.includes("Yüksek");
+  const isMed = displayDecision.includes("Medium") || displayDecision.includes("Orta");
   const decisionColor = isHigh ? "#10b981" : isMed ? "#f59e0b" : "#f87171";
   const decisionBg = isHigh ? "rgba(16,185,129,0.08)" : isMed ? "rgba(245,158,11,0.08)" : "rgba(239,68,68,0.08)";
   const decisionBorder = isHigh ? "rgba(16,185,129,0.2)" : isMed ? "rgba(245,158,11,0.2)" : "rgba(239,68,68,0.2)";
@@ -1374,24 +1395,29 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
 {riskScore != null && <RejectionRiskPanel score={riskScore} lang={lang} />}
 
       {/* 1. DECISION */}
+      {!hideDecisionBadge && (
       <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
         <div style={{ padding: "12px 20px", borderRadius: 12, background: decisionBg, border: `1px solid ${decisionBorder}`, flexShrink: 0 }}>
           <div style={{ fontSize: 10, fontWeight: 700, color: decisionColor, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 3 }}>
             {lang === "TR" ? "Karar" : "Decision"}
           </div>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: decisionColor }}>{data.decision}</div>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: decisionColor }}>{displayDecision}</div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
-          {data.confidence !== undefined && (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
-                <div style={{ width: `${data.confidence}%`, height: "100%", background: `linear-gradient(90deg, ${decisionColor}, transparent)`, borderRadius: 999, transition: "width 0.8s ease" }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+          {(() => {
+            const tier = getConfidenceTierLabel(data.confidence, lang);
+            if (!tier) return null;
+            return (
+              <div
+                title={lang === "TR" ? "Analiz kalitesi CV ve JD netliğine göre değişir." : "Analysis quality can vary based on CV and JD clarity."}
+                style={{ fontSize: 12, color: tier.color, fontWeight: 700 }}
+              >
+                {tier.label} ⓘ
               </div>
-              <span style={{ fontSize: 11, color: "#475569", fontWeight: 700, flexShrink: 0 }}>{data.confidence}%</span>
-            </div>
-          )}
+            );
+          })()}
           <div style={{ fontSize: 11, color: "#475569", fontWeight: 600, letterSpacing: "0.04em" }}>
-            {lang === "TR" ? "Güven Skoru" : "Confidence"}
+            {lang === "TR" ? "Güven Değerlendirmesi" : "Confidence Assessment"}
           </div>
         </div>
         {data.fitScore !== undefined && !impactProj && (
@@ -1407,6 +1433,7 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
           </div>
         )}
       </div>
+      )}
 
       {/* 2. SUMMARY */}
       {data.summary && (
@@ -1908,7 +1935,7 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
   const roleRows = (data.role_matches || []).filter((r) => r && String(r.role || "").trim());
   const showRolesProLock = !!roleFitLocked && !isPro;
   const interviewRows = Array.isArray(data.interview_prep) ? data.interview_prep : [];
-  const showInterviewProLock = !!useV2Engine && !isPro;
+  const showInterviewProLock = false;
 
   const proLockBox = (desc) => (
     <div
@@ -1979,16 +2006,18 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
             <div style={{ fontSize: 10, color: "#7a7a7a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700 }}>{lang === "TR" ? "AI Güveni" : "AI Confidence"}</div>
-            {confidencePct != null ? (
-              <>
-                <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 38, color: "#d4af37", lineHeight: 1 }}>{confidencePct}%</div>
-                <div style={{ width: 110, height: 3, background: "#1c1c1c", borderRadius: 999, overflow: "hidden" }}>
-                  <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, confidencePct))}%`, borderRadius: 999, background: "linear-gradient(90deg, #d4af37, #f0d060)" }} />
+            {(() => {
+              const tier = getConfidenceTierLabel(confidencePct, lang);
+              if (!tier) return <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 28, color: "#6a6a6a", lineHeight: 1 }}>{t.confidenceNA}</div>;
+              return (
+                <div
+                  title={lang === "TR" ? "Analiz kalitesi CV ve JD netliğine göre değişir." : "Analysis quality can vary based on CV and JD clarity."}
+                  style={{ fontSize: 18, fontWeight: 800, color: tier.color, lineHeight: 1.2 }}
+                >
+                  {tier.label} ⓘ
                 </div>
-              </>
-            ) : (
-              <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 28, color: "#6a6a6a", lineHeight: 1 }}>{t.confidenceNA}</div>
-            )}
+              );
+            })()}
             {confidenceBasisText ? (
               <div style={{ fontSize: 11, color: "#7a7a7a", textAlign: "right", lineHeight: 1.5, maxWidth: 200 }}>{confidenceBasisText}</div>
             ) : null}
@@ -2066,7 +2095,11 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
             </div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 14px", borderRadius: 6, background: data.recruiter_simulation?.would_interview ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)", border: `1px solid ${data.recruiter_simulation?.would_interview ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)"}`, color: data.recruiter_simulation?.would_interview ? "#10b981" : "#f87171", fontSize: 12, fontWeight: 700 }}>
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: data.recruiter_simulation?.would_interview ? "#10b981" : "#f87171", display: "inline-block", flexShrink: 0 }} />
-              {data.recruiter_simulation?.decision || (data.recruiter_simulation?.would_interview ? (lang === "TR" ? "Listeye alır" : "Would shortlist") : (lang === "TR" ? "İlerlemez" : "Would not proceed"))}
+              {mapDecisionLabel(
+                data.recruiter_simulation?.decision ||
+                  (data.recruiter_simulation?.would_interview ? (lang === "TR" ? "Listeye alır" : "Would shortlist") : (lang === "TR" ? "İlerlemez" : "Would not proceed")),
+                lang
+              )}
             </div>
           </div>
           <div style={DB.card}>
@@ -2159,7 +2192,7 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #7c3aed)" }} />
             <div style={DB.cardTag}>{lang === "TR" ? "Mülakat Hazırlığı" : "Interview Prep"}</div>
             {showInterviewProLock ? (
-              proLockBox(t.proFeatureInterview)
+              <div style={{ fontSize: 13, color: "#6a6a6a", lineHeight: 1.5 }}>{t.proFeatureInterview}</div>
             ) : interviewRows.length ? (
               interviewRows.slice(0, 2).map((q, i) => (
                 <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i === 0 ? "1px solid #1c1c1c" : "none" }}>
@@ -3480,7 +3513,7 @@ const msgInterval = setInterval(() => {
         const high = reasons.filter((r) => r.impact === "high").map((r) => r.issue);
         const med = reasons.filter((r) => r.impact === "medium").map((r) => r.issue);
         const low = reasons.filter((r) => r.impact === "low").map((r) => r.issue);
-        const reportText = `HireFit Decision Engine\nVerdict: ${v2.Decision?.final_verdict}\nAlignment: ${fs}\n\n${v2.Decision?.reasoning || ""}`.trim();
+        const reportText = `HireFit Decision Engine\nVerdict: ${mapDecisionLabel(v2.Decision?.final_verdict, lang)}\nAlignment: ${fs}\n\n${v2.Decision?.reasoning || ""}`.trim();
         setResult(reportText);
         const roleMatchesFromV2 =
           !v2.RoleFit?.locked && Array.isArray(v2.RoleFit?.role_fit) && v2.RoleFit.role_fit.length
@@ -4370,18 +4403,8 @@ const msgInterval = setInterval(() => {
       </div>
     )}
     <AnimatePresence mode="wait">
-    {engineV2 && (
-      <motion.div key="engineV2" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.28 }}>
-        <CareerEngineCard
-          data={engineV2}
-          lang={lang}
-          isPro={isPro}
-          onUpgrade={openUpgrade}
-          onFixCv={optimizeCv}
-          optimizing={optimizing}
-          onSharePrompt={handleSharePrompt}
-        />
-      </motion.div>
+    {false && engineV2 && (
+      <motion.div key="engineV2" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.28 }} />
     )}
     {engineV2 && alignmentScore !== null && (
       <ShareYourResult
@@ -4436,11 +4459,21 @@ const msgInterval = setInterval(() => {
         {/* SECONDARY ACTIONS — sadece analiz sonrası */}
         <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
           <button
-            onClick={optimizeCv}
+            onClick={() => {
+              if (!isPro) {
+                openUpgrade();
+                return;
+              }
+              optimizeCv();
+            }}
             disabled={optimizing}
             style={{ flex: 1, minWidth: 160, padding: "12px 20px", borderRadius: 10, border: "1px solid rgba(34,211,238,0.25)", background: "rgba(34,211,238,0.06)", color: "#22d3ee", fontSize: 14, fontWeight: 600, cursor: optimizing ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: optimizing ? 0.7 : 1 }}
           >
-            {optimizing ? <><Loader2 size={14} />{t.optimizing}</> : <><Wand2 size={14} />{t.optimizeCV}</>}
+            {optimizing ? <><Loader2 size={14} />{t.optimizing}</> : (
+              !isPro
+                ? <><Wand2 size={14} />{lang === "TR" ? "👉 Fix My CV — Pro ile aç" : "👉 Fix My CV — unlock with Pro"}</>
+                : <><Wand2 size={14} />{t.optimizeCV}</>
+            )}
           </button>
           <button
             onClick={generateLearningPlan}
