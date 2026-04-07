@@ -858,42 +858,44 @@ const lemonWebhookHandler = async (req, res) => {
   console.log("[lemon-webhook] Signature verification: PASS");
 
   const userEmail = payload?.data?.attributes?.user_email;
+  console.log("[lemon-webhook] Event payload user:", userEmail || "no user_email");
 
-  if (eventName === "order_created" || eventName === "subscription_created" || eventName === "subscription_payment_success") {
+  const proEvents = new Set(["order_created", "subscription_created", "subscription_payment_success"]);
+  const freeEvents = new Set(["subscription_cancelled", "subscription_expired"]);
+  const targetPlan = proEvents.has(eventName) ? "pro" : freeEvents.has(eventName) ? "free" : null;
+
+  if (!targetPlan) {
+    console.log("[lemon-webhook] No plan change action for event:", eventName);
+    return res.json({ received: true, event: eventName, action: "ignored" });
+  }
+
+  if (!userEmail) {
+    console.warn("[lemon-webhook] Missing user_email for event:", eventName);
+    return res.json({ received: true, event: eventName, action: "no_user_email" });
+  }
+
+  try {
     const { createClient } = await import("@supabase/supabase-js");
     const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
     const { data: users } = await supabase.auth.admin.listUsers();
     const user = users?.users?.find(u => u.email === userEmail);
     if (user) {
-      const { error } = await supabase.from("user_plans").upsert({ user_id: user.id, plan: "pro" }, { onConflict: "user_id" });
+      const { error } = await supabase.from("user_plans").upsert({ user_id: user.id, plan: targetPlan }, { onConflict: "user_id" });
       if (error) {
-        console.error("[lemon-webhook] Supabase update error (pro):", error.message);
+        console.error(`[lemon-webhook] Supabase update error (${targetPlan}):`, error.message);
+        return res.status(500).json({ error: "Supabase update failed", event: eventName, plan: targetPlan });
       } else {
-        console.log("[lemon-webhook] Supabase update success (pro):", userEmail);
+        console.log(`[lemon-webhook] Supabase update success (${targetPlan}):`, userEmail);
+        return res.json({ received: true, event: eventName, action: "updated", plan: targetPlan });
       }
     } else {
       console.warn("[lemon-webhook] Supabase user not found for:", userEmail);
+      return res.json({ received: true, event: eventName, action: "user_not_found" });
     }
+  } catch (e) {
+    console.error("[lemon-webhook] Unexpected processing error:", e?.message || e);
+    return res.status(500).json({ error: "Webhook processing failed", event: eventName });
   }
-
-  if (eventName === "subscription_cancelled") {
-    const { createClient } = await import("@supabase/supabase-js");
-    const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-    const { data: users } = await supabase.auth.admin.listUsers();
-    const user = users?.users?.find(u => u.email === userEmail);
-    if (user) {
-      const { error } = await supabase.from("user_plans").upsert({ user_id: user.id, plan: "free" }, { onConflict: "user_id" });
-      if (error) {
-        console.error("[lemon-webhook] Supabase update error (free):", error.message);
-      } else {
-        console.log("[lemon-webhook] Supabase update success (free):", userEmail);
-      }
-    } else {
-      console.warn("[lemon-webhook] Supabase user not found for:", userEmail);
-    }
-  }
-
-  res.json({ received: true });
 };
 
 app.post("/api/webhook", express.raw({ type: "application/json" }), lemonWebhookHandler);
