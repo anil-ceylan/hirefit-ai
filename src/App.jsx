@@ -764,8 +764,9 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
             <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
               {(() => {
                 const dc = data.Decision?.confidence;
-                if (dc == null || dc === "") return lang === "TR" ? "Güven: N/A" : "Confidence: N/A";
-                return lang === "TR" ? `Güven %${dc}` : `Confidence ${dc}%`;
+                const tier = getConfidenceTierLabel(dc, lang);
+                if (!tier) return lang === "TR" ? "Güven: N/A" : "Confidence: N/A";
+                return tier.label;
               })()}
             </div>
             {score != null && Number.isFinite(Number(score)) ? (() => {
@@ -790,7 +791,7 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
             {lang === "TR" ? "ATS-stili analiz" : "ATS-style analysis"}
           </div>
           <div style={{ fontSize: 11, color: "#86efac", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(74,222,128,0.28)", background: "rgba(74,222,128,0.1)" }}>
-            {lang === "TR" ? `Güven: %${agreementConfidence}` : `Confidence: ${agreementConfidence}%`}
+            {getConfidenceTierLabel(agreementConfidence, lang)?.label || (lang === "TR" ? "Güven: N/A" : "Confidence: N/A")}
           </div>
           {data.Context?.sector ? (
             <div className="hf-sector-lens-chip" style={{ fontSize: 11, color: "#e9d5ff", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(233,213,255,0.35)", background: "rgba(139,92,246,0.12)" }}>
@@ -880,7 +881,7 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
             {locked ? (
               <div style={{ position: "relative", padding: 16, borderRadius: 10, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)", textAlign: "center" }}>
                 <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 10 }}>🔒 {lang === "TR" ? "Rol matrisi Pro'da" : "Role fit matrix on Pro"}</div>
-                <button type="button" onClick={onUpgrade} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, background: "linear-gradient(135deg,#d4af37,#f0d060)", border: "none", color: "#000", fontWeight: 700, fontSize: 12, cursor: "pointer" }}><Crown size={14} /> Pro</button>
+                <button type="button" onClick={onUpgrade} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, background: "linear-gradient(135deg,#d4af37,#f0d060)", border: "none", color: "#000", fontWeight: 700, fontSize: 12, cursor: "pointer" }}><Crown size={14} /> {lang === "TR" ? "Pro ile aç" : "Unlock with Pro"}</button>
               </div>
             ) : (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
@@ -921,12 +922,6 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
             ) : null}
           </ExpandableInsightCard>
         </div>
-        {!isPro && data.tier === "free" ? (
-          <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: "rgba(212,175,55,0.08)", border: "1px solid rgba(212,175,55,0.2)", fontSize: 12, color: "#fcd34d" }}>
-            {lang === "TR" ? "Pro: tüm red nedenleri, rol matrisi ve tam gerekçe." : "Pro: full rejection breakdown, role-fit matrix, and full reasoning."}{" "}
-            <button type="button" onClick={onUpgrade} style={{ marginLeft: 8, background: "linear-gradient(135deg,#d4af37,#f0d060)", border: "none", borderRadius: 6, padding: "4px 10px", fontWeight: 700, fontSize: 11, cursor: "pointer", color: "#000" }}>Pro</button>
-          </div>
-        ) : null}
       </div>
 
       <div style={{ padding: "0 20px 22px" }}>
@@ -4403,8 +4398,18 @@ const msgInterval = setInterval(() => {
       </div>
     )}
     <AnimatePresence mode="wait">
-    {false && engineV2 && (
-      <motion.div key="engineV2" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.28 }} />
+    {engineV2 && (
+      <motion.div key="engineV2" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.28 }}>
+        <CareerEngineCard
+          data={engineV2}
+          lang={lang}
+          isPro={isPro}
+          onUpgrade={openUpgrade}
+          onFixCv={optimizeCv}
+          optimizing={optimizing}
+          onSharePrompt={handleSharePrompt}
+        />
+      </motion.div>
     )}
     {engineV2 && alignmentScore !== null && (
       <ShareYourResult
@@ -4436,7 +4441,7 @@ const msgInterval = setInterval(() => {
     )}
     </AnimatePresence>
 
-    {alignmentScore !== null && analysisData && (
+    {!engineV2 && alignmentScore !== null && analysisData && (
       <>
         <DashboardResults
           data={analysisData}
