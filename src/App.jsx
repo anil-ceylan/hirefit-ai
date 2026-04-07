@@ -742,7 +742,13 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
           <div style={{ textAlign: "right", flexShrink: 0 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: "0.1em" }}>{lang === "TR" ? "HİZALAMA SKORU" : "ALIGNMENT SCORE"}</div>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 44, fontWeight: 800, color: "#93c5fd" }}>{score ?? "—"}</div>
-            <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{lang === "TR" ? `Güven %${data.Decision?.confidence ?? "—"}` : `Confidence ${data.Decision?.confidence ?? "—"}%`}</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+              {(() => {
+                const dc = data.Decision?.confidence;
+                if (dc == null || dc === "") return lang === "TR" ? "Güven: N/A" : "Confidence: N/A";
+                return lang === "TR" ? `Güven %${dc}` : `Confidence ${dc}%`;
+              })()}
+            </div>
             {score != null && Number.isFinite(Number(score)) ? (() => {
               const r = getRejectionRiskFromAlignmentScore(score, lang);
               return (
@@ -1030,6 +1036,13 @@ const translations = {
     anonSaveDesc: "Sign in to keep your analyses in your account and sync across devices.",
     anonSaveCta: "Sign in",
     anonSaveDismiss: "Not now",
+    unlockWithPro: "Unlock with Pro",
+    proFeatureRoles: "See which other roles your CV fits — included in Pro.",
+    proFeatureInterview: "Role-specific interview prep — included in Pro.",
+    rolesEmptyPro: "No alternative roles surfaced for this CV.",
+    rolesEmptyGeneric: "No cross-role matches in this report.",
+    interviewEmpty: "No interview prompts in this report.",
+    confidenceNA: "N/A",
   },
   TR: {
     slogan: "AI Career Decision Engine",
@@ -1113,6 +1126,13 @@ const translations = {
     anonSaveDesc: "Giriş yaparak analizlerini hesabında sakla ve cihazlar arası senkronize et.",
     anonSaveCta: "Giriş yap",
     anonSaveDismiss: "Şimdilik hayır",
+    unlockWithPro: "Pro ile aç",
+    proFeatureRoles: "CV'nin uyduğu diğer roller — Pro'da.",
+    proFeatureInterview: "Role özel mülakat soruları — Pro'da.",
+    rolesEmptyPro: "Bu CV için ek rol önerisi çıkmadı.",
+    rolesEmptyGeneric: "Bu raporda çapraz rol eşleşmesi yok.",
+    interviewEmpty: "Bu raporda mülakat sorusu yok.",
+    confidenceNA: "Yok",
   },
 };
 
@@ -1757,7 +1777,61 @@ function parseSingleLine(text, sectionName) {
   return match ? match[1].trim() : "";
 }
 
-function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywords, result, optimizedCv, learningPlan, downloadText, lang, navigate }) {
+/** First plausible job title line from pasted JD (labeled or heuristic). */
+function extractJobTitleFromJd(jd) {
+  const text = String(jd || "").trim();
+  if (!text) return "";
+  const labeled = text.match(
+    /(?:^|\n)\s*(?:job\s*title|position|role|title|pozisyon|ünvan|iş\s*unvanı)\s*[:：\-–]\s*(.+)/i
+  );
+  if (labeled) {
+    const t = labeled[1].trim().split(/\n|;|•|·/)[0].trim();
+    if (t.length >= 2 && t.length <= 120) return t;
+  }
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  for (const line of lines.slice(0, 22)) {
+    const L = line.replace(/^[-–—*•#]+\s*/, "").replace(/^\d+[.)]\s*/, "");
+    if (L.length < 4 || L.length > 100) continue;
+    if (/^https?:/i.test(L)) continue;
+    if (/^(about|company|overview|summary|requirements|qualifications|responsibilities|benefits|we\s+are|apply|location|employment\s*type)/i.test(L)) continue;
+    if (/^\d{4}\s*[-–]/.test(L)) continue;
+    if (/^page\s+\d/i.test(L)) continue;
+    return L;
+  }
+  return "";
+}
+
+function resolveSavedAnalysisRole(jdTitle, modelRole, lang) {
+  const j = String(jdTitle || "").trim();
+  if (j) return j.slice(0, 120);
+  const m = String(modelRole || "").trim();
+  if (m && !/^role$/i.test(m)) return m.slice(0, 120);
+  return lang === "TR" ? "İş ilanı" : "Job posting";
+}
+
+function buildInterviewPrepFromV2(v2, lang) {
+  if (!v2) return [];
+  const out = [];
+  const fix = (v2.Decision?.what_to_fix_first || [])[0];
+  const gap = (v2.Gaps?.rejection_reasons || [])[0]?.issue;
+  if (fix) {
+    out.push({
+      question: lang === "TR" ? `${fix} konusunda somut olarak ne yaptınız?` : `What concrete work did you do on: ${fix}?`,
+      why_asked: lang === "TR" ? "HireFit'in işaret ettiği öncelikle bağlantılı." : "Tied to the top priority HireFit flagged.",
+      personal_angle: lang === "TR" ? "CV'deki ölçülebilir sonuçlarla yanıt ver." : "Answer with measurable outcomes from your CV.",
+    });
+  }
+  if (gap && out.length < 2) {
+    out.push({
+      question: lang === "TR" ? `"${gap}" konusunda ne söylersiniz?` : `How would you address: ${gap}?`,
+      why_asked: lang === "TR" ? "Belirlenen red riskiyle doğrudan ilgili." : "Directly probes a rejection risk we surfaced.",
+      personal_angle: lang === "TR" ? "STAR + rakam kullan." : "Use STAR + numbers.",
+    });
+  }
+  return out.slice(0, 2);
+}
+
+function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywords, result, optimizedCv, learningPlan, downloadText, lang, navigate, isPro = false, onUpgrade = () => {}, roleFitLocked = false, useV2Engine = false }) {
   const t = translations[lang];
   useEffect(() => {
     if (!document.getElementById("db-fonts")) {
@@ -1807,6 +1881,58 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
     ? ["Beceri Eşleşmesi", "Anahtar Kelimeler", "Deneyim", "Biçimlendirme"]
     : ["Skills Match", "Keywords", "Experience", "Formatting"];
 
+  const rt = String(data.role_type || "").trim();
+  const displayRoleTitle =
+    rt && !/^role$/i.test(rt) ? rt : lang === "TR" ? "İş ilanı" : "Job posting";
+
+  const cs = data.confidence_score;
+  const hasConfidenceNum = typeof cs === "number" && !Number.isNaN(cs);
+  const cl = String(data.confidence_level || "").trim();
+  const inferredPct = cl === "High" ? 78 : cl === "Medium" ? 62 : cl === "Low" ? 45 : null;
+  const confidencePct = hasConfidenceNum ? cs : inferredPct;
+  const basisFromLevel =
+    cl && /^(low|medium|high)$/i.test(cl)
+      ? lang === "TR"
+        ? `${cl} güven seviyesi`
+        : `${cl} confidence level`
+      : "";
+  const confidenceBasisText = String(data.confidence_basis || "").trim() || basisFromLevel;
+
+  const roleRows = (data.role_matches || []).filter((r) => r && String(r.role || "").trim());
+  const showRolesProLock = !!roleFitLocked && !isPro;
+  const interviewRows = Array.isArray(data.interview_prep) ? data.interview_prep : [];
+  const showInterviewProLock = !!useV2Engine && !isPro;
+
+  const proLockBox = (desc) => (
+    <div
+      style={{
+        padding: 18,
+        borderRadius: 12,
+        border: "1px dashed rgba(212,175,55,0.35)",
+        background: "rgba(212,175,55,0.04)",
+        textAlign: "center",
+      }}
+    >
+      <div style={{ fontSize: 13, color: "#a8a29e", lineHeight: 1.55, marginBottom: 12 }}>{desc}</div>
+      <button
+        type="button"
+        onClick={onUpgrade}
+        style={{
+          padding: "8px 16px",
+          borderRadius: 10,
+          border: "none",
+          background: "linear-gradient(135deg, #d4af37, #f0d060)",
+          color: "#000",
+          fontWeight: 700,
+          fontSize: 13,
+          cursor: "pointer",
+        }}
+      >
+        {t.unlockWithPro}
+      </button>
+    </div>
+  );
+
   return (
     <>
       <div style={DB.root}>
@@ -1829,7 +1955,7 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
             })()}
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#d4af37", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>{data.role_type || "Role"}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#d4af37", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>{displayRoleTitle}</div>
             <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 26, color: "#e8e8e8", lineHeight: 1.3, marginBottom: 12, fontStyle: "italic" }}>
               <span style={{ fontStyle: "normal", color: "#cbd5e1", fontWeight: 600 }}>{fvDash.explanation}</span>
               {(data.missing_skills || []).length > 0 && score < 85 ? (
@@ -1846,11 +1972,19 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
             <div style={{ fontSize: 10, color: "#7a7a7a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700 }}>{lang === "TR" ? "AI Güveni" : "AI Confidence"}</div>
-            <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 38, color: "#d4af37", lineHeight: 1 }}>{data.confidence_score || (data.confidence_level === "High" ? 78 : data.confidence_level === "Medium" ? 62 : 45)}%</div>
-            <div style={{ width: 110, height: 3, background: "#1c1c1c", borderRadius: 999, overflow: "hidden" }}>
-              <div style={{ height: "100%", width: `${data.confidence_score || 70}%`, borderRadius: 999, background: "linear-gradient(90deg, #d4af37, #f0d060)" }} />
-            </div>
-            <div style={{ fontSize: 11, color: "#7a7a7a", textAlign: "right", lineHeight: 1.5 }}>{data.confidence_basis || (data.confidence_level + " confidence")}</div>
+            {confidencePct != null ? (
+              <>
+                <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 38, color: "#d4af37", lineHeight: 1 }}>{confidencePct}%</div>
+                <div style={{ width: 110, height: 3, background: "#1c1c1c", borderRadius: 999, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, confidencePct))}%`, borderRadius: 999, background: "linear-gradient(90deg, #d4af37, #f0d060)" }} />
+                </div>
+              </>
+            ) : (
+              <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 28, color: "#6a6a6a", lineHeight: 1 }}>{t.confidenceNA}</div>
+            )}
+            {confidenceBasisText ? (
+              <div style={{ fontSize: 11, color: "#7a7a7a", textAlign: "right", lineHeight: 1.5, maxWidth: 200 }}>{confidenceBasisText}</div>
+            ) : null}
           </div>
         </div>
 
@@ -1957,16 +2091,25 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
             <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#e8e8e8", marginBottom: 16, lineHeight: 1.25 }}>
               {lang === "TR" ? "CV'niz burada daha fazla kapı açabilir." : "Your CV may open more doors here."} <em style={{ color: "#8a8a8a", fontSize: 16 }}>{lang === "TR" ? "Başvurmadan önce bilin." : "Worth knowing before you apply."}</em>
             </div>
-            {(data.role_matches || []).slice(0, 4).map((r, i) => {
-              const colors = ["#10b981", "#60a5fa", "#f59e0b", "#555555"];
-              return (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                  <span style={{ fontFamily: "'Instrument Serif', serif", fontSize: 22, color: colors[i], width: 36, flexShrink: 0 }}>{r.match_score}</span>
-                  <span style={{ fontSize: 14, fontWeight: 600, color: i < 3 ? "#c8c8c8" : "#6a6a6a", flex: 1 }}>{r.role}</span>
-                  <div style={{ width: `${r.match_score * 0.6}px`, height: 2, borderRadius: 999, background: i < 3 ? `linear-gradient(90deg, #d4af37, ${colors[i]})` : "#1c1c1c" }} />
-                </div>
-              );
-            })}
+            {showRolesProLock ? (
+              proLockBox(t.proFeatureRoles)
+            ) : roleRows.length ? (
+              roleRows.slice(0, 4).map((r, i) => {
+                const colors = ["#10b981", "#60a5fa", "#f59e0b", "#555555"];
+                const ms = Number(r.match_score);
+                const scoreDisp = Number.isFinite(ms) ? ms : "—";
+                const barW = Number.isFinite(ms) ? Math.min(90, ms * 0.6) : 0;
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                    <span style={{ fontFamily: "'Instrument Serif', serif", fontSize: 22, color: colors[i], width: 36, flexShrink: 0 }}>{scoreDisp}</span>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: i < 3 ? "#c8c8c8" : "#6a6a6a", flex: 1 }}>{r.role}</span>
+                    <div style={{ width: `${barW}px`, height: 2, borderRadius: 999, background: i < 3 ? `linear-gradient(90deg, #d4af37, ${colors[i]})` : "#1c1c1c" }} />
+                  </div>
+                );
+              })
+            ) : (
+              <div style={{ fontSize: 13, color: "#6a6a6a", lineHeight: 1.5 }}>{isPro ? t.rolesEmptyPro : t.rolesEmptyGeneric}</div>
+            )}
           </div>
         </div>
 
@@ -1979,13 +2122,19 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
           <div style={DB.card}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #7c3aed)" }} />
             <div style={DB.cardTag}>{lang === "TR" ? "Mülakat Hazırlığı" : "Interview Prep"}</div>
-            {(data.interview_prep || []).slice(0, 2).map((q, i) => (
-              <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i === 0 ? "1px solid #1c1c1c" : "none" }}>
-                <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 15, color: "#e8e8e8", lineHeight: 1.5, marginBottom: 5, fontStyle: "italic" }}>"{q.question}"</div>
-                <div style={{ fontSize: 11, color: "#7a7a7a", marginBottom: 4, fontWeight: 500 }}>{q.why_asked}</div>
-                <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>{q.personal_angle}</div>
-              </div>
-            ))}
+            {showInterviewProLock ? (
+              proLockBox(t.proFeatureInterview)
+            ) : interviewRows.length ? (
+              interviewRows.slice(0, 2).map((q, i) => (
+                <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i === 0 ? "1px solid #1c1c1c" : "none" }}>
+                  <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 15, color: "#e8e8e8", lineHeight: 1.5, marginBottom: 5, fontStyle: "italic" }}>&quot;{q.question}&quot;</div>
+                  <div style={{ fontSize: 11, color: "#7a7a7a", marginBottom: 4, fontWeight: 500 }}>{q.why_asked}</div>
+                  <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>{q.personal_angle}</div>
+                </div>
+              ))
+            ) : (
+              <div style={{ fontSize: 13, color: "#6a6a6a", lineHeight: 1.5 }}>{t.interviewEmpty}</div>
+            )}
           </div>
           <div style={DB.card}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #22d3ee)" }} />
@@ -3227,6 +3376,7 @@ const msgInterval = setInterval(() => {
 
     let v2Ok = false;
     let creditConsumed = false;
+    const jdDerivedTitle = extractJobTitleFromJd(jdText);
     try {
       const v2Res = await fetch(`${HF_API_BASE}/api/analyze-v2`, {
         method: "POST",
@@ -3239,11 +3389,12 @@ const msgInterval = setInterval(() => {
         setEngineV2(v2);
         const fs = Number(v2["Final Alignment Score"]) || 0;
         setAlignmentScore(fs);
-        const roleLabel =
+        const modelRole =
           !v2.RoleFit?.locked && v2.RoleFit?.best_role
             ? v2.RoleFit.best_role
-            : v2.RoleFit?.role_fit?.[0]?.role || "Role";
-        setRoleType(roleLabel);
+            : v2.RoleFit?.role_fit?.[0]?.role || "";
+        const savedTitle = resolveSavedAnalysisRole(jdDerivedTitle, modelRole, lang);
+        setRoleType(savedTitle);
         setSeniority("");
         setMatchedSkills([]);
         setMissingSkills(v2.ATS?.missing_keywords ?? []);
@@ -3254,9 +3405,18 @@ const msgInterval = setInterval(() => {
         const low = reasons.filter((r) => r.impact === "low").map((r) => r.issue);
         const reportText = `HireFit Decision Engine\nVerdict: ${v2.Decision?.final_verdict}\nAlignment: ${fs}\n\n${v2.Decision?.reasoning || ""}`.trim();
         setResult(reportText);
+        const roleMatchesFromV2 =
+          !v2.RoleFit?.locked && Array.isArray(v2.RoleFit?.role_fit) && v2.RoleFit.role_fit.length
+            ? v2.RoleFit.role_fit.map((r) => ({
+                role: r.role,
+                match_score: typeof r.score === "number" ? r.score : Number(r.score) || 0,
+              }))
+            : [];
+        const dc = v2.Decision?.confidence;
+        const confNum = typeof dc === "number" && !Number.isNaN(dc) ? dc : undefined;
         setAnalysisData({
           alignment_score: fs,
-          role_type: roleLabel,
+          role_type: savedTitle,
           seniority: "",
           fit_summary: v2.Decision?.reasoning ?? "",
           strengths: v2.Recruiter?.strengths ?? [],
@@ -3277,12 +3437,15 @@ const msgInterval = setInterval(() => {
             decision: v2.Decision?.final_verdict,
             would_interview: v2.Decision?.final_verdict === "apply_now",
           },
+          role_matches: roleMatchesFromV2,
+          interview_prep: isPro ? buildInterviewPrepFromV2(v2, lang) : [],
+          confidence_score: confNum,
         });
         setScoreHistory((prev) =>
-          [{ score: fs, role: roleLabel || "Analysis", date: new Date().toLocaleDateString() }, ...prev].slice(0, 10)
+          [{ score: fs, role: savedTitle, date: new Date().toLocaleDateString() }, ...prev].slice(0, 10)
         );
         await supabase.from("analyses").insert({
-          role: roleLabel || "Analysis",
+          role: savedTitle,
           alignment_score: fs,
           cv_text: cvText,
           job_description: jdText,
@@ -3312,18 +3475,19 @@ const msgInterval = setInterval(() => {
         const data = await res.json();
         setEngineV2(null);
         setAlignmentScore(data.alignment_score ?? null);
-        setRoleType(data.role_type ?? "");
+        const legacySavedTitle = resolveSavedAnalysisRole(jdDerivedTitle, data.role_type, lang);
+        setRoleType(legacySavedTitle);
         setSeniority(data.seniority ?? "");
         setMatchedSkills(data.matched_skills ?? []);
         setMissingSkills(data.missing_skills ?? []);
         setTopKeywords(data.top_keywords ?? []);
         const reportText = `Fit Summary:\n${data.fit_summary ?? ""}\n\nStrengths:\n${(data.strengths ?? []).map((s) => `- ${s}`).join("\n")}\n\nImprovement Suggestions:\n${(data.improvements ?? []).map((s) => `- ${s}`).join("\n")}\n\nWhy You Might Get Rejected:\nHIGH: ${(data.rejection_reasons?.high ?? []).join(", ") || "None"}\nMEDIUM: ${(data.rejection_reasons?.medium ?? []).join(", ") || "None"}`.trim();
         setResult(reportText);
-        setAnalysisData(data);
-        const newEntry = { score: data.alignment_score ?? 0, role: data.role_type ?? "Unknown", date: new Date().toLocaleDateString() };
+        setAnalysisData({ ...data, role_type: legacySavedTitle });
+        const newEntry = { score: data.alignment_score ?? 0, role: legacySavedTitle, date: new Date().toLocaleDateString() };
         setScoreHistory((prev) => [newEntry, ...prev].slice(0, 10));
         await supabase.from("analyses").insert({
-          role: data.role_type ?? "Unknown",
+          role: legacySavedTitle,
           alignment_score: data.alignment_score ?? 0,
           cv_text: cvText,
           job_description: jdText,
@@ -4184,6 +4348,10 @@ const msgInterval = setInterval(() => {
           downloadText={downloadText}
           lang={lang}
           navigate={navigate}
+          isPro={isPro}
+          onUpgrade={openUpgrade}
+          roleFitLocked={!!engineV2?.RoleFit?.locked}
+          useV2Engine={!!engineV2}
         />
 
         {/* SECONDARY ACTIONS — sadece analiz sonrası */}
