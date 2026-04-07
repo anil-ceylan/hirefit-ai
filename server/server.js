@@ -838,18 +838,26 @@ return res.json(cleaned);
 
 const lemonWebhookHandler = async (req, res) => {
   const secret = process.env.LEMON_WEBHOOK_SECRET;
-  const signature = req.headers["x-signature"];
+  const signature = String(req.headers["x-signature"] || "");
+
+  // Be defensive: in some deployments express.json() may run first and req.body becomes an object.
+  // Signature must be computed from bytes, so we normalize body into a Buffer.
+  const rawBody = Buffer.isBuffer(req.body)
+    ? req.body
+    : typeof req.body === "string"
+      ? Buffer.from(req.body)
+      : Buffer.from(JSON.stringify(req.body || {}));
 
   let payload = null;
   try {
-    payload = JSON.parse(req.body.toString());
+    payload = JSON.parse(rawBody.toString());
   } catch {}
   const eventName = payload?.meta?.event_name || req.headers["x-event-name"] || "unknown";
   console.log("[lemon-webhook] Webhook received:", eventName);
 
   const crypto = await import("crypto");
   const hmac = crypto.default.createHmac("sha256", secret);
-  const digest = hmac.update(req.body).digest("hex");
+  const digest = hmac.update(rawBody).digest("hex");
 
   if (digest !== signature) {
     console.log("[lemon-webhook] Signature verification: FAIL");
