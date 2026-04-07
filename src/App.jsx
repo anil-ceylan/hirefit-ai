@@ -2007,8 +2007,23 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
 
         <div style={DB.grid4}>
           {[
-            { label: statLabels[0], val: data.score_breakdown?.skills_match ?? score, color: "#60a5fa", ctx: data.score_breakdown?.skills_explanation || `${(data.matched_skills || []).length} of ${(data.matched_skills || []).length + (data.missing_skills || []).length} matched` },
-            { label: statLabels[1], val: data.score_breakdown?.keyword_match ?? 100, color: "#10b981", ctx: `${(data.top_keywords || []).length} ${lang === "TR" ? "anahtar kelime" : "keywords detected"}` },
+            {
+              label: statLabels[0],
+              val: data.score_breakdown?.skills_match ?? score,
+              color: "#60a5fa",
+              ctx:
+                data.score_breakdown?.skills_explanation ||
+                (() => {
+                  const m = (data.matched_skills || []).length;
+                  const tot = m + (data.missing_skills || []).length;
+                  if (lang === "TR") {
+                    if (tot <= 0) return "Beceri eşleşmesi verisi yok";
+                    return `${tot}'dan ${m} eşleşti`;
+                  }
+                  return `${m} of ${tot} matched`;
+                })(),
+            },
+            { label: statLabels[1], val: data.score_breakdown?.keyword_match ?? 100, color: "#10b981", ctx: `${(data.top_keywords || []).length} ${lang === "TR" ? "anahtar kelime tespit edildi" : "keywords detected"}` },
             { label: statLabels[2], val: data.score_breakdown?.experience_depth ?? Math.max(35, score - 10), color: "#f59e0b", ctx: data.score_breakdown?.experience_explanation || (lang === "TR" ? "Derinlik değerlendirildi" : "Depth evaluated") },
             { label: statLabels[3], val: data.score_breakdown?.formatting ?? 75, color: "#60a5fa", ctx: data.language_analysis?.tone || (lang === "TR" ? "Biçimlendirme incelendi" : "Formatting reviewed") },
           ].map(({ label, val, color, ctx }) => (
@@ -2039,8 +2054,8 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
               );
             })()}
             <div style={{ borderLeft: "2px solid #d4af37", padding: "14px 16px", background: "rgba(212,175,55,0.03)", borderRadius: "0 10px 10px 0", marginBottom: 14 }}>
-              <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 15, color: "#8a8a8a", lineHeight: 1.7, fontStyle: "italic" }}>"{data.recruiter_simulation?.internal_monologue || data.fit_summary || "Analysis complete."}"</div>
-              <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700, marginTop: 8, letterSpacing: "0.04em" }}>— {data.recruiter_simulation?.sector || "Industry"} {lang === "TR" ? "İşe Alım Uzmanı" : "Recruiter"} · {data.seniority || "Junior"} {lang === "TR" ? "seviye işe alım" : "level hiring"}</div>
+              <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 15, color: "#8a8a8a", lineHeight: 1.7, fontStyle: "italic" }}>&quot;{data.recruiter_simulation?.internal_monologue || data.fit_summary || (lang === "TR" ? "Analiz tamamlandı." : "Analysis complete.")}&quot;</div>
+              <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700, marginTop: 8, letterSpacing: "0.04em" }}>— {data.recruiter_simulation?.sector || (lang === "TR" ? "Sektör" : "Industry")} {lang === "TR" ? "İşe Alım Uzmanı" : "Recruiter"} · {data.seniority || (lang === "TR" ? "Belirtilmedi" : "Junior")} {lang === "TR" ? "seviye işe alım" : "level hiring"}</div>
             </div>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 14px", borderRadius: 6, background: data.recruiter_simulation?.would_interview ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)", border: `1px solid ${data.recruiter_simulation?.would_interview ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)"}`, color: data.recruiter_simulation?.would_interview ? "#10b981" : "#f87171", fontSize: 12, fontWeight: 700 }}>
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: data.recruiter_simulation?.would_interview ? "#10b981" : "#f87171", display: "inline-block", flexShrink: 0 }} />
@@ -2073,16 +2088,30 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
             <div style={DB.cardTag}>{lang === "TR" ? "Siz ve hayal ettikleri aday" : "You vs the candidate they're picturing"}</div>
             <CriticalSkillsGapBlock skills={missingSkills.length ? missingSkills : data.missing_skills || []} lang={lang} />
             {(data.benchmark?.dimensions || [
-              { name: lang === "TR" ? "Beceri eşleşmesi" : "Skills match", candidate_level: matchedSkills.length > 2 ? "Good" : "Basic", ideal_level: "Advanced" },
-              { name: lang === "TR" ? "Etki kanıtı" : "Impact proof", candidate_level: "Missing", ideal_level: "Quantified" },
-            ]).slice(0, 4).map((dim, i) => (
+              {
+                name: lang === "TR" ? "Beceri eşleşmesi" : "Skills match",
+                candidate_level: matchedSkills.length > 2 ? (lang === "TR" ? "İyi" : "Good") : (lang === "TR" ? "Temel" : "Basic"),
+                ideal_level: lang === "TR" ? "İleri" : "Advanced",
+              },
+              {
+                name: lang === "TR" ? "Etki kanıtı" : "Impact proof",
+                candidate_level: lang === "TR" ? "Eksik" : "Missing",
+                ideal_level: lang === "TR" ? "Ölçümlenmiş" : "Quantified",
+              },
+            ]).slice(0, 4).map((dim, i) => {
+              const cand = dim.candidate_level;
+              const positive =
+                ["Strong ✓", "Good", "Some"].includes(cand) ||
+                (lang === "TR" && ["İyi", "Güçlü ✓", "Var", "Bazı"].includes(cand));
+              return (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, paddingBottom: 10, borderBottom: i < 3 ? "1px solid #1c1c1c" : "none" }}>
                 <span style={{ fontSize: 12, color: "#7a7a7a", width: 100, flexShrink: 0, fontWeight: 500 }}>{dim.name}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 4, background: ["Strong ✓","Good"].includes(dim.candidate_level) ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)", color: ["Strong ✓","Good"].includes(dim.candidate_level) ? "#10b981" : "#f87171", border: `1px solid ${["Strong ✓","Good"].includes(dim.candidate_level) ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)"}` }}>{dim.candidate_level}</span>
-                <span style={{ fontSize: 10, color: "#5a5a5a", fontWeight: 700 }}>vs</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 4, background: positive ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)", color: positive ? "#10b981" : "#f87171", border: `1px solid ${positive ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)"}` }}>{dim.candidate_level}</span>
+                <span style={{ fontSize: 10, color: "#5a5a5a", fontWeight: 700 }}>{lang === "TR" ? "karşı" : "vs"}</span>
                 <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 4, background: "rgba(16,185,129,0.08)", color: "#10b981", border: "1px solid rgba(16,185,129,0.15)" }}>{dim.ideal_level}</span>
               </div>
-            ))}
+            );
+            })}
             <div style={DB.moreLink}>{lang === "TR" ? `İlk 2'yi düzelt → tahmini skor: ${score} → ${data.benchmark?.before_after_estimate || Math.min(91, score + 9)} →` : `Fix top 2 → estimated score: ${score} → ${data.benchmark?.before_after_estimate || Math.min(91, score + 9)} →`}</div>
           </div>
           <div style={DB.card}>
@@ -2843,7 +2872,7 @@ const coachFeatures = lang === "TR"
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
               {proFeatures.map(f => (<li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#cbd5e1" }}><Star size={13} color="#818cf8" style={{ flexShrink: 0 }} />{f}</li>))}
             </ul>
-            <button className="hf-btn-primary" onClick={() => window.open("https://hirefit.lemonsqueezy.com/checkout/buy/19ee5972-0f76-4d2f-b2a0-9e08dc9a9a7d", "_blank")} style={{ width: "100%", justifyContent: "center", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 24px rgba(99,102,241,0.3)" }}>
+            <button className="hf-btn-primary" onClick={() => window.open(LEMONSQUEEZY_PRO_CHECKOUT, "_blank")} style={{ width: "100%", justifyContent: "center", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 24px rgba(99,102,241,0.3)" }}>
               {lang === "TR" ? "Pro'ya Geç" : "Upgrade to Pro"} <ArrowRight size={14} />
             </button>
           </div>
@@ -2865,54 +2894,88 @@ const coachFeatures = lang === "TR"
   );
 }
 
-function WaitlistSection({ lang }) {
-  const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
+const LEMONSQUEEZY_PRO_CHECKOUT =
+  "https://hirefit.lemonsqueezy.com/checkout/buy/19ee5972-0f76-4d2f-b2a0-9e08dc9a9a7d";
 
-  const handleSubmit = async () => {
-    if (!email.trim()) return;
-    setSubmitting(true);
-    try { await supabase.from("waitlist").insert({ email }); setSubmitted(true); }
-    catch { setSubmitted(true); }
-    finally { setSubmitting(false); }
-  };
-
+function ProLiveSection({ lang }) {
   return (
     <section style={{ padding: "80px 0 100px" }}>
       <div style={styles.container}>
-        <div style={{ borderRadius: 24, background: "linear-gradient(135deg, rgba(59,130,246,0.08), rgba(99,102,241,0.05))", border: "1px solid rgba(59,130,246,0.18)", padding: "64px 48px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center", position: "relative", overflow: "hidden" }}>
-          <div style={{ position: "absolute", top: "-80px", right: "-80px", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.15), transparent 70%)", pointerEvents: "none" }} />
-          <div style={{ position: "relative", zIndex: 2 }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 14px", borderRadius: 999, background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.25)", fontSize: "12px", fontWeight: 700, color: "#93c5fd", letterSpacing: "0.06em", marginBottom: 20, textTransform: "uppercase" }}>
-              <Zap size={12} /> {lang === "TR" ? "Pro Plan Çok Yakında" : "Pro Plan Coming Soon"}
+        <div
+          style={{
+            borderRadius: 24,
+            background: "linear-gradient(135deg, rgba(59,130,246,0.1), rgba(99,102,241,0.06))",
+            border: "1px solid rgba(99,102,241,0.22)",
+            padding: "56px 40px",
+            textAlign: "center",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: "-80px",
+              right: "-80px",
+              width: 300,
+              height: 300,
+              borderRadius: "50%",
+              background: "radial-gradient(circle, rgba(99,102,241,0.18), transparent 70%)",
+              pointerEvents: "none",
+            }}
+          />
+          <div style={{ position: "relative", zIndex: 2, maxWidth: 520, margin: "0 auto" }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 14px",
+                borderRadius: 999,
+                background: "rgba(16,185,129,0.12)",
+                border: "1px solid rgba(16,185,129,0.28)",
+                fontSize: "12px",
+                fontWeight: 700,
+                color: "#6ee7b7",
+                letterSpacing: "0.06em",
+                marginBottom: 20,
+                textTransform: "uppercase",
+              }}
+            >
+              <Zap size={12} /> {lang === "TR" ? "Pro yayında" : "Pro is live"}
             </div>
-            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "36px", fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 14, lineHeight: 1.15 }}>
-              {lang === "TR" ? <>Pro'nun ne zaman<br />çıktığını ilk öğren</> : <>Be first to know<br />when Pro launches</>}
+            <h2
+              style={{
+                fontFamily: "'Syne', sans-serif",
+                fontSize: "clamp(28px, 4vw, 40px)",
+                fontWeight: 800,
+                letterSpacing: "-0.02em",
+                marginBottom: 20,
+                lineHeight: 1.2,
+              }}
+            >
+              {lang === "TR" ? "Pro şu an yayında. Hemen başla." : "Pro is live. Start today."}
             </h2>
-            <p style={{ color: T.textSub, fontSize: "15px", lineHeight: 1.7 }}>
-              {lang === "TR" ? "Erken erişim, kurucu üye fiyatlandırması ve halka açılmadan önce özel özellikler edinin." : "Get early access, founding member pricing, and exclusive features before public launch."}
-            </p>
-          </div>
-          <div style={{ position: "relative", zIndex: 2 }}>
-            {submitted ? (
-              <div style={{ background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", borderRadius: 16, padding: "36px 32px", textAlign: "center" }}>
-                <div style={{ fontSize: 32, marginBottom: 12 }}>🎉</div>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, marginBottom: 8 }}>{lang === "TR" ? "Listedesiniz!" : "You're on the list!"}</div>
-                <div style={{ color: T.textSub, fontSize: 14 }}>{lang === "TR" ? "Pro yayına girdiğinde sizi bilgilendireceğiz." : "We'll notify you when Pro launches."}</div>
-              </div>
-            ) : (
-              <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: "36px 32px" }}>
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 6 }}>{lang === "TR" ? "Bekleme listesine katılın" : "Join the waitlist"}</div>
-                <div style={{ color: T.textSub, fontSize: 14, marginBottom: 24 }}>{lang === "TR" ? "Pro yayına girdiği anda haberdar olun." : "Be notified the moment Pro goes live."}</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  <input className="hf-input" type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSubmit()} />
-                  <button className="hf-btn-primary" onClick={handleSubmit} disabled={submitting} style={{ justifyContent: "center", opacity: submitting ? 0.7 : 1 }}>
-                    {submitting ? <><Loader2 size={14} />{lang === "TR" ? "Katılınıyor..." : "Joining..."}</> : <>{lang === "TR" ? "Beni Haberdar Et" : "Notify Me"} <ArrowRight size={14} /></>}
-                  </button>
-                </div>
-              </div>
-            )}
+            <a
+              href={LEMONSQUEEZY_PRO_CHECKOUT}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hf-btn-primary"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: "14px 28px",
+                fontSize: "15px",
+                fontWeight: 700,
+                textDecoration: "none",
+                background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+                boxShadow: "0 0 28px rgba(99,102,241,0.35)",
+              }}
+            >
+              {lang === "TR" ? "Pro'ya geç →" : "Upgrade to Pro →"}
+            </a>
           </div>
         </div>
       </div>
@@ -3381,7 +3444,13 @@ const msgInterval = setInterval(() => {
       const v2Res = await fetch(`${HF_API_BASE}/api/analyze-v2`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang, isPro }),
+        body: JSON.stringify({
+          cvText,
+          jobDescription: jdText,
+          sector,
+          lang: lang === "TR" ? "tr" : "en",
+          isPro,
+        }),
       });
       if (v2Res.ok) {
         const v2 = await v2Res.json();
@@ -3715,7 +3784,7 @@ const msgInterval = setInterval(() => {
     URL.revokeObjectURL(url);
   };
 
-  const openUpgrade = () => window.open("https://hirefit.lemonsqueezy.com/checkout/buy/19ee5972-0f76-4d2f-b2a0-9e08dc9a9a7d", "_blank");
+  const openUpgrade = () => window.open(LEMONSQUEEZY_PRO_CHECKOUT, "_blank");
 
   const sectorLabels = lang === "TR"
     ? ["Otomatik", "Teknoloji / Startup", "Danışmanlık", "Finans", "FMCG / Perakende", "Sağlık", "Kamu"]
@@ -3838,7 +3907,7 @@ const msgInterval = setInterval(() => {
           <HeroSection navigate={navigate} lang={lang} />
           <FeatureCards lang={lang} />
           <PricingSection navigate={navigate} lang={lang} />
-          <WaitlistSection lang={lang} />
+          <ProLiveSection lang={lang} />
           <Footer navigate={navigate} lang={lang} />
         </>
       )}

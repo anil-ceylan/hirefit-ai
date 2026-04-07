@@ -15,6 +15,7 @@ export default async function handler(req, res) {
     ).trim();
     const isPro = Boolean(body.isPro);
     const sector = body.sector;
+    const lang = body.lang;
 
     if (!cvText || !jobDescription) {
       return res.status(400).json({
@@ -27,6 +28,7 @@ export default async function handler(req, res) {
       jobDescription,
       isPro,
       sector,
+      lang,
     });
     return res.status(200).json(payload);
   } catch (e) {

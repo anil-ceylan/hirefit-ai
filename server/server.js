@@ -40,7 +40,7 @@ app.post("/api/analyze", async (req, res) => {
 
 app.post("/api/analyze-v2", async (req, res) => {
   try {
-    const { cvText, jobDescription, cv, jd, isPro, sector } = req.body || {};
+    const { cvText, jobDescription, cv, jd, isPro, sector, lang } = req.body || {};
     const c = String(cvText ?? cv ?? "").trim();
     const j = String(jobDescription ?? jd ?? "").trim();
     if (!c || !j) {
@@ -53,6 +53,7 @@ app.post("/api/analyze-v2", async (req, res) => {
       jobDescription: j,
       isPro: Boolean(isPro),
       sector,
+      lang,
     });
     return res.status(200).json(payload);
   } catch (e) {
