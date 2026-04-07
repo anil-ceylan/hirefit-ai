@@ -1777,6 +1777,13 @@ function parseSingleLine(text, sectionName) {
   return match ? match[1].trim() : "";
 }
 
+function firstTwoSentences(text) {
+  const t = String(text || "").trim();
+  if (!t) return "";
+  const parts = t.match(/[^.!?]+[.!?]?/g) || [t];
+  return parts.slice(0, 2).join(" ").trim();
+}
+
 /** First plausible job title line from pasted JD (labeled or heuristic). */
 function extractJobTitleFromJd(jd) {
   const text = String(jd || "").trim();
@@ -3468,7 +3475,7 @@ const msgInterval = setInterval(() => {
         const atsMatchedSkills = (v2.ATS?.matched_skills ?? []).filter(Boolean);
         setMatchedSkills(atsMatchedSkills);
         setMissingSkills(v2.ATS?.missing_keywords ?? []);
-        setTopKeywords([]);
+        setTopKeywords(v2.ATS?.top_keywords ?? []);
         const reasons = v2.Gaps?.rejection_reasons || [];
         const high = reasons.filter((r) => r.impact === "high").map((r) => r.issue);
         const med = reasons.filter((r) => r.impact === "medium").map((r) => r.issue);
@@ -3493,7 +3500,7 @@ const msgInterval = setInterval(() => {
           improvements: v2.Decision?.what_to_fix_first ?? [],
           matched_skills: atsMatchedSkills,
           missing_skills: v2.ATS?.missing_keywords ?? [],
-          top_keywords: (v2.ATS?.missing_keywords ?? []).slice(0, 12),
+          top_keywords: v2.ATS?.top_keywords ?? [],
           rejection_reasons: { high, medium: med, low },
           score_breakdown: {
             skills_match: v2.ATS?.keyword_match ?? 0,
@@ -3506,7 +3513,7 @@ const msgInterval = setInterval(() => {
           recruiter_simulation: {
             decision: v2.Decision?.final_verdict,
             would_interview: v2.Decision?.final_verdict === "apply_now",
-            internal_monologue: v2.Recruiter?.reasoning ?? "",
+            internal_monologue: firstTwoSentences(v2.Recruiter?.reasoning ?? ""),
             sector: v2.Context?.sector ?? "",
           },
           role_matches: roleMatchesFromV2,
@@ -3524,7 +3531,7 @@ const msgInterval = setInterval(() => {
           report: reportText,
           matched_skills: atsMatchedSkills,
           missing_skills: v2.ATS?.missing_keywords ?? [],
-          top_keywords: [],
+          top_keywords: v2.ATS?.top_keywords ?? [],
           rejection_reasons: { high, medium: med, low },
           seniority: "",
           user_id: user?.id ?? null,
