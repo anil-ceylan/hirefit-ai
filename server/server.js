@@ -836,34 +836,68 @@ return res.json(cleaned);
   }
 });
 
-app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+const lemonWebhookHandler = async (req, res) => {
   const secret = process.env.LEMON_WEBHOOK_SECRET;
   const signature = req.headers["x-signature"];
+
+  let payload = null;
+  try {
+    payload = JSON.parse(req.body.toString());
+  } catch {}
+  const eventName = payload?.meta?.event_name || req.headers["x-event-name"] || "unknown";
+  console.log("[lemon-webhook] Webhook received:", eventName);
 
   const crypto = await import("crypto");
   const hmac = crypto.default.createHmac("sha256", secret);
   const digest = hmac.update(req.body).digest("hex");
 
   if (digest !== signature) {
+    console.log("[lemon-webhook] Signature verification: FAIL");
     return res.status(401).json({ error: "Invalid signature" });
   }
+  console.log("[lemon-webhook] Signature verification: PASS");
 
-  const payload = JSON.parse(req.body.toString());
-  const eventName = payload.meta?.event_name;
-  const userEmail = payload.data?.attributes?.user_email;
+  const userEmail = payload?.data?.attributes?.user_email;
 
-  if (eventName === "order_created" || eventName === "subscription_created") {
+  if (eventName === "order_created" || eventName === "subscription_created" || eventName === "subscription_payment_success") {
     const { createClient } = await import("@supabase/supabase-js");
     const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
     const { data: users } = await supabase.auth.admin.listUsers();
     const user = users?.users?.find(u => u.email === userEmail);
     if (user) {
-      await supabase.from("user_plans").upsert({ user_id: user.id, plan: "pro" }, { onConflict: "user_id" });
+      const { error } = await supabase.from("user_plans").upsert({ user_id: user.id, plan: "pro" }, { onConflict: "user_id" });
+      if (error) {
+        console.error("[lemon-webhook] Supabase update error (pro):", error.message);
+      } else {
+        console.log("[lemon-webhook] Supabase update success (pro):", userEmail);
+      }
+    } else {
+      console.warn("[lemon-webhook] Supabase user not found for:", userEmail);
+    }
+  }
+
+  if (eventName === "subscription_cancelled") {
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const { data: users } = await supabase.auth.admin.listUsers();
+    const user = users?.users?.find(u => u.email === userEmail);
+    if (user) {
+      const { error } = await supabase.from("user_plans").upsert({ user_id: user.id, plan: "free" }, { onConflict: "user_id" });
+      if (error) {
+        console.error("[lemon-webhook] Supabase update error (free):", error.message);
+      } else {
+        console.log("[lemon-webhook] Supabase update success (free):", userEmail);
+      }
+    } else {
+      console.warn("[lemon-webhook] Supabase user not found for:", userEmail);
     }
   }
 
   res.json({ received: true });
-});
+};
+
+app.post("/api/webhook", express.raw({ type: "application/json" }), lemonWebhookHandler);
+app.post("/webhook", express.raw({ type: "application/json" }), lemonWebhookHandler);
 
 app.listen(3000, () => {
   console.log("🚀 Backend running on http://localhost:3000");
