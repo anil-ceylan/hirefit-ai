@@ -215,6 +215,7 @@ function CriticalSkillsGapBlock({ skills, lang }) {
 
 function ImpactProjectionPanel({ projection, lang }) {
   if (!projection) return null;
+  const t = translations[lang];
   const { current, projected, delta, narrative } = projection;
   return (
     <div
@@ -230,23 +231,23 @@ function ImpactProjectionPanel({ projection, lang }) {
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <TrendingUp size={18} color="#34d399" />
         <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", color: "#6ee7b7" }}>
-          {lang === "TR" ? "ETKİ TAHMİNİ" : "IMPACT PROJECTION"}
+          {t.impactProjection}
         </div>
       </div>
       <div style={{ fontSize: 11, fontWeight: 800, color: "#a7f3d0", letterSpacing: "0.06em", marginBottom: 8 }}>
-        {lang === "TR" ? "ŞİMDİ → SONRA" : "NOW → AFTER"}
+        {t.nowAfter}
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap", marginBottom: 12 }}>
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            {lang === "TR" ? "Mevcut skor" : "Current score"}
+            {t.currentScore}
           </div>
           <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 34, fontWeight: 800, color: "#fca5a5" }}>{current}</div>
         </div>
         <div style={{ fontSize: 26, color: "#64748b", fontWeight: 300, padding: "0 4px" }}>→</div>
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            {lang === "TR" ? "Hedef skor" : "Projected score"}
+            {t.projectedScore}
           </div>
           <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 34, fontWeight: 800, color: "#6ee7b7" }}>{projected}</div>
         </div>
@@ -265,7 +266,7 @@ function ImpactProjectionPanel({ projection, lang }) {
         </div>
       </div>
       <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
-        {lang === "TR" ? "Skor artışı" : "Score increase"}
+        {t.scoreIncrease}
       </div>
       <p style={{ margin: 0, fontSize: 14, color: "#e2e8f0", lineHeight: 1.6, fontWeight: 600 }}>{narrative}</p>
     </div>
@@ -722,6 +723,7 @@ function ExpandableInsightCard({
 
 function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, onSharePrompt }) {
   if (!data) return null;
+  const t = translations[lang];
   const [showJobs, setShowJobs] = useState(false);
   const [openCard, setOpenCard] = useState("recruiter");
   const score = data["Final Alignment Score"];
@@ -744,7 +746,7 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
   return (
     <div style={{ marginBottom: 20, borderRadius: 20, overflow: "hidden", border: `1px solid ${fv.border}`, background: "linear-gradient(165deg, rgba(15,23,42,0.98), rgba(10,12,20,0.99))", boxShadow: "0 24px 64px rgba(0,0,0,0.45)" }}>
       <div style={{ padding: "22px 22px 20px", background: fv.bg, borderBottom: `1px solid ${fv.border}` }}>
-        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", color: "#94a3b8", marginBottom: 8 }}>{lang === "TR" ? "FİNAL KARAR" : "FINAL VERDICT"}</div>
+        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", color: "#94a3b8", marginBottom: 8 }}>{t.finalVerdict}</div>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
           <div style={{ flex: "1 1 220px" }}>
             <div style={{ fontSize: 36, marginBottom: 6, lineHeight: 1 }}>{fv.icon}</div>
@@ -759,13 +761,13 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
             ) : null}
           </div>
           <div style={{ textAlign: "right", flexShrink: 0 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: "0.1em" }}>{lang === "TR" ? "HİZALAMA SKORU" : "ALIGNMENT SCORE"}</div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: "0.1em" }}>{t.alignmentScore}</div>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 44, fontWeight: 800, color: "#93c5fd" }}>{score ?? "—"}</div>
             <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
               {(() => {
                 const dc = data.Decision?.confidence;
                 const tier = getConfidenceTierLabel(dc, lang);
-                if (!tier) return lang === "TR" ? "Güven: N/A" : "Confidence: N/A";
+                if (!tier) return `${t.confidenceLabel}: ${t.confidenceNA}`;
                 return tier.label;
               })()}
             </div>
@@ -773,7 +775,7 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
               const r = getRejectionRiskFromAlignmentScore(score, lang);
               return (
                 <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.08)", textAlign: "right" }}>
-                  <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", color: "#64748b", marginBottom: 4 }}>{r.title}</div>
+                  <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", color: "#64748b", marginBottom: 4 }}>{t.rejectionRisk}</div>
                   <div style={{ fontSize: 13, fontWeight: 800, color: r.color, lineHeight: 1.35 }}>{r.mainLine}</div>
                 </div>
               );
@@ -785,17 +787,17 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
       <div style={{ padding: "18px 20px 12px" }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
           <div style={{ fontSize: 11, color: "#94a3b8", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(148,163,184,0.25)", background: "rgba(148,163,184,0.08)" }}>
-            {lang === "TR" ? "Simüle recruiter paternlerine dayalı" : "Based on simulated recruiter patterns"}
+            {t.simulatedRecruiterPatterns}
           </div>
           <div style={{ fontSize: 11, color: "#7dd3fc", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(34,211,238,0.28)", background: "rgba(34,211,238,0.1)" }}>
-            {lang === "TR" ? "ATS-stili analiz" : "ATS-style analysis"}
+            {t.atsStyleAnalysis}
           </div>
           <div style={{ fontSize: 11, color: "#86efac", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(74,222,128,0.28)", background: "rgba(74,222,128,0.1)" }}>
-            {getConfidenceTierLabel(agreementConfidence, lang)?.label || (lang === "TR" ? "Güven: N/A" : "Confidence: N/A")}
+            {getConfidenceTierLabel(agreementConfidence, lang)?.label || `${t.confidenceLabel}: ${t.confidenceNA}`}
           </div>
           {data.Context?.sector ? (
             <div className="hf-sector-lens-chip" style={{ fontSize: 11, color: "#e9d5ff", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(233,213,255,0.35)", background: "rgba(139,92,246,0.12)" }}>
-              {lang === "TR" ? "Sektör analizi: " : "Sector lens: "}
+              {t.sectorLens}
               <span style={{ fontWeight: 800 }}>{getSectorDisplayLabel(data.Context.sector, lang)}</span>
             </div>
           ) : null}
@@ -805,24 +807,24 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
         </div>
         <div style={{ height: 1, background: "rgba(255,255,255,0.08)", marginBottom: 12 }} />
         <div style={{ display: "grid", gap: 10 }}>
-          <ExpandableInsightCard id="recruiter" title={lang === "TR" ? "Recruiter Görüşü" : "Recruiter View"} subtitle={lang === "TR" ? "Gerçekte ne düşündükleri" : "What they actually think"} icon={<Eye size={14} />} openId={openCard} onToggle={setOpenCard}>
+          <ExpandableInsightCard id="recruiter" title={t.recruiterView} subtitle={t.whatTheyThink} icon={<Eye size={14} />} openId={openCard} onToggle={setOpenCard}>
             <div style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6 }}>{data.Recruiter?.reasoning || (lang === "TR" ? "Recruiter görüşü yok." : "No recruiter narrative.")}</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
               <div>
-                <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 6 }}>{lang === "TR" ? "Güçlü sinyaller" : "Strong signals"}</div>
+                <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 6 }}>{t.strongSignals}</div>
                 {(data.Recruiter?.strengths || []).slice(0, 4).map((s, i) => <div key={i} style={{ fontSize: 12, color: "#a7f3d0", marginBottom: 4 }}>+ {s}</div>)}
               </div>
               <div>
-                <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 6 }}>{lang === "TR" ? "Zayıf sinyaller" : "Weak signals"}</div>
+                <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 6 }}>{t.weakSignals}</div>
                 {(data.Recruiter?.weaknesses || []).slice(0, 4).map((s, i) => <div key={i} style={{ fontSize: 12, color: "#fca5a5", marginBottom: 4 }}>- {s}</div>)}
               </div>
             </div>
           </ExpandableInsightCard>
 
-          <ExpandableInsightCard id="deep" title={lang === "TR" ? "Derin Analiz" : "Deep Analysis"} subtitle={lang === "TR" ? "Neden eleniyorsun" : "Why you fail"} icon={<Layers size={14} />} openId={openCard} onToggle={setOpenCard}>
+          <ExpandableInsightCard id="deep" title={t.deepAnalysis} subtitle={t.whyYouFail} icon={<Layers size={14} />} openId={openCard} onToggle={setOpenCard}>
             {data.Decision?.reasoning ? (
               <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>
-                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "#94a3b8", marginBottom: 6 }}>{lang === "TR" ? "KARAR GEREKÇESİ" : "DECISION REASONING"}</div>
+                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "#94a3b8", marginBottom: 6 }}>{t.decisionReasoning}</div>
                 <div style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.65 }}>{data.Decision.reasoning}</div>
               </div>
             ) : null}
@@ -844,7 +846,7 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
             </div>
           </ExpandableInsightCard>
 
-          <ExpandableInsightCard id="plan" title={lang === "TR" ? "Aksiyon Planı" : "Action Plan"} subtitle={lang === "TR" ? "Sonraki adım" : "What to do next"} icon={<ListChecks size={14} />} openId={openCard} onToggle={setOpenCard}>
+          <ExpandableInsightCard id="plan" title={t.actionPlan} subtitle={t.whatToDoNext} icon={<ListChecks size={14} />} openId={openCard} onToggle={setOpenCard}>
             <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(99,102,241,0.1)", border: "1px solid rgba(129,140,248,0.25)" }}>
               <div style={{ fontSize: 15, color: "#f1f5f9", fontWeight: 800, lineHeight: 1.45 }}>
                 {one || (lang === "TR" ? "Önce bu ilan için tek bir kritik boşluğu kapat." : "Close one critical gap for this job first.")}
@@ -863,7 +865,7 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
             />
           </ExpandableInsightCard>
 
-          <ExpandableInsightCard id="skills" title={lang === "TR" ? "Beceriler & Anahtar Kelimeler" : "Skills & Keywords"} subtitle={lang === "TR" ? "Eksik sinyaller" : "Missing signals"} icon={<KeyRound size={14} />} openId={openCard} onToggle={setOpenCard}>
+          <ExpandableInsightCard id="skills" title={t.skillsKeywords} subtitle={t.missingSignals} icon={<KeyRound size={14} />} openId={openCard} onToggle={setOpenCard}>
             {(data.ATS?.missing_keywords || []).length > 0 ? (
               <CriticalSkillsGapBlock skills={data.ATS?.missing_keywords} lang={lang} />
             ) : (
@@ -877,7 +879,7 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
             ) : null}
           </ExpandableInsightCard>
 
-          <ExpandableInsightCard id="market" title={lang === "TR" ? "Pazar İçgörüleri" : "Market Insights"} subtitle={lang === "TR" ? "Kariyer yönü ve fırsatlar" : "Career lanes and opportunities"} icon={<LineChart size={14} />} openId={openCard} onToggle={setOpenCard}>
+          <ExpandableInsightCard id="market" title={t.marketInsights} subtitle={t.careerLanes} icon={<LineChart size={14} />} openId={openCard} onToggle={setOpenCard}>
             {locked ? (
               <div style={{ position: "relative", padding: 16, borderRadius: 10, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)", textAlign: "center" }}>
                 <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 10 }}>🔒 {lang === "TR" ? "Rol matrisi Pro'da" : "Role fit matrix on Pro"}</div>
@@ -1057,6 +1059,31 @@ const translations = {
     rolesEmptyGeneric: "No cross-role matches in this report.",
     interviewEmpty: "No interview prompts in this report.",
     confidenceNA: "N/A",
+    finalVerdict: "FINAL VERDICT",
+    alignmentScore: "ALIGNMENT SCORE",
+    rejectionRisk: "Rejection Risk",
+    confidenceLabel: "Confidence",
+    recruiterView: "Recruiter View",
+    whatTheyThink: "What they actually think",
+    deepAnalysis: "Deep Analysis",
+    whyYouFail: "Why you fail",
+    actionPlan: "Action Plan",
+    whatToDoNext: "What to do next",
+    skillsKeywords: "Skills & Keywords",
+    missingSignals: "Missing signals",
+    marketInsights: "Market Insights",
+    careerLanes: "Career lanes and opportunities",
+    decisionReasoning: "Decision Reasoning",
+    impactProjection: "IMPACT PROJECTION",
+    nowAfter: "NOW → AFTER",
+    currentScore: "Current Score",
+    projectedScore: "Projected Score",
+    scoreIncrease: "Score Increase",
+    strongSignals: "Strong signals",
+    weakSignals: "Weak signals",
+    simulatedRecruiterPatterns: "Based on simulated recruiter patterns",
+    atsStyleAnalysis: "ATS-style analysis",
+    sectorLens: "Sector lens: ",
   },
   TR: {
     slogan: "AI Career Decision Engine",
@@ -1147,6 +1174,31 @@ const translations = {
     rolesEmptyGeneric: "Bu raporda çapraz rol eşleşmesi yok.",
     interviewEmpty: "Bu raporda mülakat sorusu yok.",
     confidenceNA: "Yok",
+    finalVerdict: "FINAL KARAR",
+    alignmentScore: "HİZALAMA SKORU",
+    rejectionRisk: "Elenme Riski",
+    confidenceLabel: "Güven",
+    recruiterView: "Recruiter Görüşü",
+    whatTheyThink: "Gerçekte ne düşündükleri",
+    deepAnalysis: "Derin Analiz",
+    whyYouFail: "Neden eleniyorsun",
+    actionPlan: "Aksiyon Planı",
+    whatToDoNext: "Sonraki adım",
+    skillsKeywords: "Beceriler & Anahtar Kelimeler",
+    missingSignals: "Eksik sinyaller",
+    marketInsights: "Pazar İçgörüleri",
+    careerLanes: "Kariyer yönü ve fırsatlar",
+    decisionReasoning: "Karar Gerekçesi",
+    impactProjection: "ETKİ TAHMİNİ",
+    nowAfter: "ŞİMDİ → SONRA",
+    currentScore: "Mevcut Skor",
+    projectedScore: "Hedef Skor",
+    scoreIncrease: "Skor Artışı",
+    strongSignals: "Güçlü sinyaller",
+    weakSignals: "Zayıf sinyaller",
+    simulatedRecruiterPatterns: "Simüle recruiter paternlerine dayalı",
+    atsStyleAnalysis: "ATS-stili analiz",
+    sectorLens: "Sektör analizi: ",
   },
 };
 
@@ -4398,7 +4450,7 @@ const msgInterval = setInterval(() => {
       </div>
     )}
     <AnimatePresence mode="wait">
-    {engineV2 && (
+    {engineV2 && lang !== "TR" && (
       <motion.div key="engineV2" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.28 }}>
         <CareerEngineCard
           data={engineV2}
@@ -4441,7 +4493,7 @@ const msgInterval = setInterval(() => {
     )}
     </AnimatePresence>
 
-    {!engineV2 && alignmentScore !== null && analysisData && (
+    {((!engineV2) || lang === "TR") && alignmentScore !== null && analysisData && (
       <>
         <DashboardResults
           data={analysisData}
