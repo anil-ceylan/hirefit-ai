@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
+import { runMultiAnalyze } from "../lib/analyze/index.js";
+import { runAnalyzeV2ForClient } from "../lib/analyze-v2/index.js";
 
 dotenv.config();
 
@@ -12,6 +14,203 @@ app.use(express.json());
 if (!process.env.OPENROUTER_API_KEY) {
   console.error("❌ OPENROUTER_API_KEY missing!");
 }
+
+app.post("/api/analyze", async (req, res) => {
+  try {
+    const { cvText, jobDescription, cv, jd } = req.body || {};
+    const c = String(cvText ?? cv ?? "").trim();
+    const j = String(jobDescription ?? jd ?? "").trim();
+    if (!c || !j) {
+      return res
+        .status(400)
+        .json({ error: "Missing cvText or jobDescription" });
+    }
+    const result = await runMultiAnalyze({
+      cvText: c,
+      jobDescription: j,
+    });
+    return res.status(200).json(result);
+  } catch (e) {
+    console.error("/api/analyze", e);
+    return res.status(500).json({
+      error: e?.message || "Analysis failed",
+    });
+  }
+});
+
+app.post("/api/analyze-v2", async (req, res) => {
+  try {
+    const { cvText, jobDescription, cv, jd, isPro, sector } = req.body || {};
+    const c = String(cvText ?? cv ?? "").trim();
+    const j = String(jobDescription ?? jd ?? "").trim();
+    if (!c || !j) {
+      return res
+        .status(400)
+        .json({ error: "Missing cvText or jobDescription" });
+    }
+    const payload = await runAnalyzeV2ForClient({
+      cvText: c,
+      jobDescription: j,
+      isPro: Boolean(isPro),
+      sector,
+    });
+    return res.status(200).json(payload);
+  } catch (e) {
+    console.error("/api/analyze-v2", e);
+    return res.status(500).json({
+      error: e?.message || "Analyze v2 failed",
+    });
+  }
+});
+
+app.post("/api/extract-job", async (req, res) => {
+  try {
+    const { url } = req.body || {};
+    if (!url) {
+      return res.status(400).json({ error: "URL is required" });
+    }
+
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(url);
+    } catch {
+      return res.status(400).json({ error: "Invalid URL" });
+    }
+
+    const fetchWithTimeout = async (target, opts = {}, timeoutMs = 5000) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(target, { ...opts, signal: controller.signal });
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    const stripHtmlToVisibleText = (html) =>
+      String(html || "")
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+        .replace(/<svg[\s\S]*?<\/svg>/gi, " ")
+        .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+        .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
+        .replace(/<!--[\s\S]*?-->/g, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&amp;/gi, "&")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const getTitleFromHtml = (html, fallback = "Job Description") => {
+      const h1 = String(html || "").match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
+      const titleTag = String(html || "").match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
+      const candidate = (h1 || titleTag || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      return candidate || fallback;
+    };
+
+    const response = await fetchWithTimeout(
+      parsedUrl.toString(),
+      {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+      },
+      5000
+    );
+
+    if (!response.ok) {
+      return res
+        .status(400)
+        .json({ error: `Failed to fetch page: ${response.status}` });
+    }
+
+    const html = await response.text();
+    const visible = stripHtmlToVisibleText(html).slice(0, 4000);
+    const fallbackTitle = getTitleFromHtml(html);
+
+    let title = fallbackTitle;
+    let jobText = visible;
+
+    if (process.env.OPENROUTER_API_KEY && visible.length > 120) {
+      try {
+        const aiRes = await fetchWithTimeout(
+          "https://openrouter.ai/api/v1/chat/completions",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "openai/gpt-4o-mini",
+              temperature: 0.1,
+              response_format: { type: "json_object" },
+              messages: [
+                {
+                  role: "user",
+                  content: `Clean and extract a structured job description from this messy HTML text.
+
+Return valid JSON only:
+{
+  "title": "<role title>",
+  "responsibilities": ["<bullet>", "<bullet>"],
+  "requirements": ["<bullet>", "<bullet>"]
+}
+
+Rules:
+- Be concise and readable.
+- Remove boilerplate, legal text, navigation noise.
+- Keep only role-relevant content.
+- Max combined output length: 4000 chars.
+
+Text:
+${visible}`,
+                },
+              ],
+            }),
+          },
+          5000
+        );
+        const aiData = await aiRes.json();
+        const raw = aiData?.choices?.[0]?.message?.content || "";
+        const parsed = extractJSON(raw);
+
+        if (parsed) {
+          title = String(parsed.title || fallbackTitle).trim() || fallbackTitle;
+          const responsibilities = Array.isArray(parsed.responsibilities)
+            ? parsed.responsibilities.map((x) => String(x).trim()).filter(Boolean).slice(0, 10)
+            : [];
+          const requirements = Array.isArray(parsed.requirements)
+            ? parsed.requirements.map((x) => String(x).trim()).filter(Boolean).slice(0, 10)
+            : [];
+          const composed = [
+            responsibilities.length ? "Responsibilities:\n- " + responsibilities.join("\n- ") : "",
+            requirements.length ? "Requirements:\n- " + requirements.join("\n- ") : "",
+          ]
+            .filter(Boolean)
+            .join("\n\n")
+            .trim();
+          if (composed) {
+            jobText = composed.slice(0, 4000);
+          }
+        }
+      } catch {
+        // best-effort AI cleaning; fallback remains usable
+      }
+    }
+
+    return res.status(200).json({ title, jobText });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Server error while extracting job page",
+      details: error?.message || "Unknown error",
+    });
+  }
+});
 
 function extractJSON(text) {
   if (!text) return null;
@@ -107,10 +306,11 @@ app.post("/analyze", async (req, res) => {
 }` : "You have deep expertise across tech, consulting, finance, and FMCG sectors. Auto-detect the most relevant sector from the job description and apply appropriate standards."}
 
 TONE RULES — CRITICAL:
-- Write like a recruiter reviewing in 10 seconds. Short sentences. Direct. No filler.
+- Write like a recruiter who is tired and honest. Short sentences. Direct. Slightly uncomfortable truths — why this CV gets passed over, not gentle homework.
+- Frame gaps as rejection mechanics: "You are being filtered because…" / "Recruiters will assume…" — not "consider improving".
 - FORBIDDEN WORDS: optimize, enhance, leverage, consider, suggest, could, important to note, in order to, please note
 - BAD: "This CV could be improved by adding metrics" 
-- GOOD: "No metrics. Add numbers to every bullet."
+- GOOD: "No metrics on the page — you look like noise next to candidates who proved impact."
 
 CV:
 ${cvText}
@@ -128,7 +328,7 @@ Return ONLY valid JSON. No markdown, no explanation, no extra text.
   "confidence_level": "<Low|Medium|High>",
   "confidence_basis": "<1 sentence, direct>",
   "matched_skills": ["<skill>"],
-  "missing_skills": ["<skill>"],
+  "missing_skills": ["<concrete skill/tool from JD — e.g. Python, SQL, VBA — not vague labels>"],
   "top_keywords": ["<keyword>"],
   "score_breakdown": {
     "skills_match": <0-100>,
@@ -138,28 +338,28 @@ Return ONLY valid JSON. No markdown, no explanation, no extra text.
     "skills_explanation": "<direct 1 sentence>",
     "experience_explanation": "<direct 1 sentence>"
   },
-  "fit_summary": "<2-3 direct sentences, no filler>",
-  "strengths": ["<specific strength>"],
-  "improvements": ["<specific action, not suggestion>"],
+  "fit_summary": "<2-3 direct sentences: verdict-style, no filler — what happens if they apply today>",
+  "strengths": ["<specific strength, only if real>"],
+  "improvements": ["<specific imperative fix — what to do, not 'you might'>"],
   "rejection_reasons": {
-    "high": ["<critical reason, specific>"],
-    "medium": ["<moderate concern>"],
+    "high": ["<critical reason — why they get rejected, harsh but fair>"],
+    "medium": ["<moderate concern — real screen risk>"],
     "low": ["<minor issue>"]
   },
   "recruiter_simulation": {
     "sector": "<sector>",
-    "first_impression": "<what recruiter sees in 7 seconds>",
-    "internal_monologue": "<2-3 sentences, honest, direct, no corporate tone>",
+    "first_impression": "<7-second screen: blunt — pass, bin, or skeptical and why>",
+    "internal_monologue": "<2-3 sentences: real recruiter self-talk under pressure — selection not coaching; name the filter>",
     "would_interview": <true|false>,
     "decision": "<shortlist | reject | follow-up | strong yes>",
-    "red_flags": ["<specific red flag>"],
-    "standout_moments": ["<specific strength>"]
+    "red_flags": ["<credibility or fit killer, sharp phrasing>"],
+    "standout_moments": ["<only if genuinely rare proof — no hollow praise>"]
   },
   "blind_spots": [
     { "issue": "<specific issue>", "why_it_hurts": "<direct reason>", "fix": "<exact action>" }
   ],
   "benchmark": {
-    "gap_percentage": <0-60>,
+    "gap_percentage": <0-60, internal only — do not phrase user-facing copy as "gap %" — use missing_skills instead>,
     "before_after_estimate": <number>,
     "dimensions": [
       { "name": "<dimension>", "candidate_level": "<Basic|Some|Good|Strong|Missing>", "ideal_level": "<target>", "closeable": <true|false> }
@@ -211,7 +411,7 @@ Return ONLY valid JSON. No markdown, no explanation, no extra text.
 });
 
 app.post("/optimize", async (req, res) => {
-  const { cvText, jobDescription } = req.body;
+  const { cvText, jobDescription, lang } = req.body;
   if (!cvText || !jobDescription) return res.status(400).json({ error: "Missing CV or JD" });
 
   try {
@@ -223,11 +423,20 @@ app.post("/optimize", async (req, res) => {
       },
       body: JSON.stringify({
         model: "openai/gpt-4o-mini",
-        temperature: 0.3,
+        temperature: 0.35,
         messages: [
           {
             role: "user",
-            content: `You are an expert CV writer. Rewrite the following CV to be fully optimized for the job description below. Keep all real experience and facts — only improve wording, structure, and keyword alignment. Return ONLY the rewritten CV text, no explanations.
+            content: `You are a senior recruiter-turned-CV writer doing a "Fix My CV" pass for one specific job.
+
+TASK — rewrite the ENTIRE CV for this job description:
+1) Every bullet: strong action verb + outcome + metric (use plausible estimates like "~20%", "~15k users", "~$XM" only where reasonable from context; if unknown, still quantify scope: "across 3 teams", "weekly reports for leadership").
+2) Remove generic filler ("responsible for", "worked on", "helped with", "team player", "detail-oriented") — replace with concrete achievements tied to the JD keywords.
+3) Mirror critical language from the job description naturally (skills, tools, domains) without lying.
+4) Keep structure readable (headers, bullets). Preserve truthful employment/education facts — improve phrasing and emphasis only.
+5) Return ONLY the rewritten CV body text. No preamble, no markdown fences.
+
+${lang === "TR" ? "Write the CV in Turkish." : "Write the CV in English."}
 
 CV:
 ${cvText}
@@ -358,11 +567,17 @@ app.post("/decision", async (req, res) => {
         messages: [
           {
             role: "user",
-            content: `You are a senior recruiter. Review this CV against the job description. Be direct. No corporate language. Write like you're talking to a colleague.
+            content: `You are a senior recruiter under time pressure. Review this CV against the job description. Your job is to simulate who gets cut in screening — not to encourage the candidate.
 
 FORBIDDEN WORDS: optimize, enhance, leverage, consider, suggest, could, important to note, in order to
+FORBIDDEN TONE: motivational, gentle, "you have potential", hedging with "might"
 
-STYLE: Short sentences. Max 12 words each. Direct. Real.
+STYLE: Short sentences. Max 12 words each. Sharp. Uncomfortable but professional.
+SCREENING LOGIC: Say what fails the bar — e.g. missing must-have tools, weak proof, wrong seniority signal, generic bullets that die in ATS.
+EXAMPLES OF GOOD PHRASING:
+- "Would likely fail first screen — no automation proof."
+- "Profile is not competitive for this level yet."
+- BAD: "Could be improved with more technical skills."
 
 CV:
 ${cvText}
@@ -381,8 +596,8 @@ Return ONLY this JSON (no markdown):
   "confidence": <number 0-100>,
   "fitScore": <number 0-100>,
   "improvedScore": <number 0-100>,
-  "summary": "<1 strong sentence, max 15 words, no filler>",
-  "biggestMistake": "<single biggest issue, max 12 words, direct>",
+  "summary": "<1 sentence: blunt screening outcome — not encouragement, max 15 words>",
+  "biggestMistake": "<single main rejection driver, max 12 words — why they lose to other applicants>",
   "topFixes": [
     { "problem": "<specific problem, max 10 words>", "fix": "<exact action, max 12 words>", "impact": "High" | "Medium" },
     { "problem": "<specific problem>", "fix": "<exact action>", "impact": "High" | "Medium" },
@@ -390,9 +605,9 @@ Return ONLY this JSON (no markdown):
   ],
   "missingSkills": ["<skill>", "<skill>", "<skill>"],
   "recruiterInsight": [
-    "<direct recruiter thought, 1 sentence, honest>",
-    "<direct recruiter thought>",
-    "<direct recruiter thought>"
+    "<1 sentence: harsh realistic screen thought — selection pressure, not advice>",
+    "<1 sentence: what makes them a no or a maybe>",
+    "<1 sentence: credibility or fit killer if any>"
   ],
   "oneAction": "<single most important action, max 12 words>",
   "aiSuspicion": {
@@ -528,23 +743,26 @@ try {
       messages: [
         {
           role: "user",
-          content: `You are a recruiter reviewing a CV. You have 10 seconds. Say what matters.
+          content: `You are a recruiter reviewing a CV. You have 10 seconds. Say what matters for WHO GETS CUT.
 
 RULES:
 - Short sentences. Max 8-10 words each.
-- No filler words. No AI tone. No corporate language.
+- No filler. No AI tone. No corporate language. No motivation.
 - FORBIDDEN: optimize, enhance, leverage, improve, consider, suggest, could, would
-- Be direct. Slightly harsh but fair.
+- Direct. Screening pressure. Professional but sharp.
 
 EXAMPLES:
 ❌ "Good experience, but lacks project management skills."
-✅ "Experience exists. Wrong skills for this role."
+✅ "Wrong skill stack for this JD. Next."
 
 ❌ "Highlight specific data analysis tools used."
 ✅ "List exact tools. SQL, Python, Excel."
 
 ❌ "This CV contains generic phrases."
-✅ "Feels generic. Anyone could write this."
+✅ "Generic CV. Fails noisy shortlist."
+
+❌ "Could be improved with more technical skills."
+✅ "Would likely fail screen — missing must-have tools."
 
 Rewrite ONLY these text fields. Keep all numbers, arrays structure, and non-text fields EXACTLY the same.
 DO NOT change logic. DO NOT add insights. ONLY rewrite tone.

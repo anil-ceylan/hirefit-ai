@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HireFit — Ürün ve Teknik Raporu</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=Syne:wght@600;700;800&display=swap");
+    * { box-sizing: border-box; }
+    body {
+      font-family: "DM Sans", system-ui, sans-serif;
+      font-size: 11pt;
+      line-height: 1.45;
+      color: #0f172a;
+      background: #f8fafc;
+      margin: 0;
+      padding: 24px 32px 48px;
+      max-width: 210mm;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    h1 {
+      font-family: Syne, sans-serif;
+      font-size: 22pt;
+      font-weight: 800;
+      margin: 0 0 8px;
+      letter-spacing: -0.02em;
+    }
+    .meta { color: #64748b; font-size: 10pt; margin-bottom: 24px; }
+    h2 {
+      font-family: Syne, sans-serif;
+      font-size: 13pt;
+      font-weight: 700;
+      margin: 22px 0 10px;
+      padding-bottom: 4px;
+      border-bottom: 2px solid #6366f1;
+      color: #1e1b4b;
+    }
+    h3 { font-size: 11pt; font-weight: 700; margin: 14px 0 6px; color: #334155; }
+    p { margin: 0 0 8px; }
+    ul { margin: 6px 0 12px; padding-left: 20px; }
+    li { margin-bottom: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 10pt; margin: 10px 0; }
+    th, td { border: 1px solid #cbd5e1; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #e0e7ff; font-weight: 700; }
+    .page-break { break-before: page; }
+    .box {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin: 12px 0;
+    }
+    code { font-size: 9.5pt; background: #f1f5f9; padding: 1px 5px; border-radius: 4px; }
+    @media print {
+      body { background: #fff; padding: 12mm 16mm; max-width: none; }
+      .no-print { display: none; }
+      a[href^="http"] { color: #000; text-decoration: none; }
+    }
+  </style>
+</head>
+<body>
+  <p class="no-print" style="background:#eef2ff;padding:10px 14px;border-radius:8px;font-size:10pt;margin-bottom:20px;">
+    <strong>PDF oluşturma:</strong> Bu sayfayı tarayıcıda açın → <kbd>Ctrl+P</kbd> (Mac: <kbd>Cmd+P</kbd>) → Hedef: <strong>PDF olarak kaydet</strong> → Kaydet.
+  </p>
+
+  <h1>HireFit — Ürün ve Teknik Raporu</h1>
+  <p class="meta">Kod tabanına dayalı özet · Nisan 2026 · hirefit-ai</p>
+
+  <h2>1. Ürün kimliği</h2>
+  <p><strong>HireFit</strong>, “AI Career Decision Engine” olarak konumlanır: yalnızca CV skoru değil; iş ilanına göre <strong>başvur / riskli başvur / başvurma</strong> çerçevesinde karar, recruiter ve ATS tarzı geri bildirim ve öncelikli düzeltme önerileri sunar.</p>
+  <p><strong>Girdi:</strong> CV + iş ilanı (JD). <strong>Çıktı:</strong> Çok motorlu analiz (v2), sektör lensi, ücretsiz/Pro katmanlı detay.</p>
+
+  <h2>2. Teknoloji yığını</h2>
+  <table>
+    <thead><tr><th>Katman</th><th>Teknoloji</th></tr></thead>
+    <tbody>
+      <tr><td>Ön yüz</td><td>React 19, Vite 7, React Router 7</td></tr>
+      <tr><td>Stil</td><td>Tailwind CSS v4, özel <code>App.css</code></td></tr>
+      <tr><td>Animasyon</td><td>Framer Motion</td></tr>
+      <tr><td>PDF</td><td>pdfjs-dist (tarayıcıda metin çıkarma)</td></tr>
+      <tr><td>Kimlik / veri</td><td>Supabase (Auth, analiz kayıtları)</td></tr>
+      <tr><td>API</td><td>Railway (Express <code>server/server.js</code>), Vercel serverless <code>api/*.js</code></td></tr>
+      <tr><td>AI</td><td>OpenRouter; v2 motorlarında GPT-4o-mini ve Claude 3 Haiku</td></tr>
+    </tbody>
+  </table>
+
+  <h2>3. Rotalar ve sayfalar</h2>
+  <ul>
+    <li><code>/</code> — Landing</li>
+    <li><code>/app</code> — Ana analiz (CV + JD, pipeline, sonuçlar)</li>
+    <li><code>/dashboard</code> — Panel, geçmiş, roadmap girişi</li>
+    <li><code>/roadmap</code> — Öğrenme yol haritası modülü</li>
+    <li><code>/login</code> — Giriş</li>
+    <li><code>/report/:id</code> — Paylaşılabilir rapor (<code>ReportPage.jsx</code>)</li>
+    <li><code>/terms</code>, <code>/privacy</code> — Şartlar ve gizlilik</li>
+  </ul>
+
+  <h2>4. Analiz akışı (v2)</h2>
+  <p><strong>Endpoint:</strong> <code>POST /api/analyze-v2</code> — <code>cvText</code>, <code>jobDescription</code>, <code>sector</code>, <code>lang</code>, <code>isPro</code>.</p>
+  <p><strong>Paralel motorlar:</strong> ATS, Recruiter, Gap, Role fit → ardından Decision. Tümü <strong>sektör bağlamı</strong> (<code>lib/analyze-v2/sectorContext.js</code>) ile beslenir.</p>
+  <p><strong>Yedek:</strong> v2 başarısız olursa legacy <code>/analyze</code>.</p>
+  <p><strong>Çıktı şekillendirme:</strong> <code>tierGate.js</code> — Free’de kısıtlı alanlar; Pro’da tam nesne. <code>Context.sector</code> yanıtta döner.</p>
+
+  <h2>5. Kullanıcı deneyimi (/app)</h2>
+  <ul>
+    <li>İki sütun: sol girdi, sağ sonuç + <strong>canlı pipeline paneli</strong> (AiLivePipelinePanel)</li>
+    <li>CV: sürükle-bırak (PDF/.txt), yükleme, yapıştırma; “Parsing CV…” / yüklü checklist (bölüm sinyalleri)</li>
+    <li>JD: yapıştırma, .txt bırakma, URL ile <code>/api/extract-job</code> (localhost fallback)</li>
+    <li>Sol–sağ veri köprüsü animasyonu</li>
+    <li>Sonuç: <strong>CareerEngineCard</strong> — üstte özet + Fix My CV; altta 5 katlanır içgörü kartı</li>
+  </ul>
+
+  <h2>6. Sektörler</h2>
+  <p>Auto-detect, Tech/Startup, Consulting, Finance, FMCG/Retail, Healthcare, Government — UI chip’leri ve v2 prompt lensi ile uyumlu.</p>
+
+  <h2>7. Backend yüzeyi (özet)</h2>
+  <p>Railway <code>server.js</code>: <code>/api/analyze</code>, <code>/api/analyze-v2</code>, <code>/api/extract-job</code>; ayrıca <code>/optimize</code>, <code>/roadmap</code>, <code>/apply-fix</code>, <code>/decision</code>, webhook.</p>
+  <p>Vercel: <code>api/analyze-v2.js</code>, <code>api/extract-job.js</code>, vb.; SPA rewrite <code>vercel.json</code>.</p>
+
+  <h2>8. Dağıtım ve API tabanı</h2>
+  <p>Frontend varsayılan API: <code>VITE_API_URL</code> veya <code>https://hirefit-ai-production.up.railway.app</code>.</p>
+  <p>Genel erişim (repodaki varsayılan): <strong>https://hirefit-ai.vercel.app</strong> — uygulama: <strong>https://hirefit-ai.vercel.app/app</strong></p>
+
+  <h2>9. Monetizasyon ve limitler</h2>
+  <p>Lemon Squeezy; şartlarda ücretsiz analiz kotası ve Pro/Coach planları. Kodda ücretsiz kullanımda sınırlı analiz sayısı ve paywall akışı.</p>
+
+  <h2>10. Executive summary (tek paragraf)</h2>
+  <div class="box">
+    <p>HireFit, adayın CV’sini gerçek bir iş ilanıyla eşleştirerek çok motorlu bir AI hattı (ATS, recruiter, boşluklar, rol uyumu, nihai karar) ve sektör lensi ile “başvurmadan önce karar” sunar; Supabase, Vercel ve Railway üzerinde çalışan, premium iki sütunlu arayüz ve katmanlı sonuç kartlarıyla B2C abonelik modeline uygundur.</p>
+  </div>
+
+  <h2 class="page-break">11. Yatırımcı pitch — kısa outline</h2>
+  <ol>
+    <li><strong>Problem:</strong> Genel CV geri bildirimi gerçek ilan eşleşmesini ve eleme nedenini yansıtmıyor.</li>
+    <li><strong>Çözüm:</strong> CV+JD ile karar motoru; recruiter/ATS sinyalleri; sektör bağlamı.</li>
+    <li><strong>Ürün:</strong> Web app, dashboard, roadmap, rapor URL’si, optimize/fix.</li>
+    <li><strong>Model:</strong> Freemium → Pro (Lemon Squeezy).</li>
+    <li><strong>Moat:</strong> Çok motor + sektör lensi + ürünleşmiş pipeline UX.</li>
+    <li><strong>Traction / Ask:</strong> [Rakamlar ve talep buraya].</li>
+  </ol>
+
+  <p class="meta" style="margin-top:28px;">Bu belge HireFit kod deposundaki yapıya göre oluşturulmuştur. Üretim URL’leri ve fiyatlar canlı ortamda doğrulanmalıdır.</p>
+</body>
+</html>
