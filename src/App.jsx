@@ -2895,7 +2895,7 @@ const coachFeatures = lang === "TR"
 }
 
 const LEMONSQUEEZY_PRO_CHECKOUT =
-  "https://hirefit.lemonsqueezy.com/checkout/buy/19ee5972-0f76-4d2f-b2a0-9e08dc9a9a7d";
+  "https://hirefit.lemonsqueezy.com/checkout/buy/0e75f4ca-0209-486d-ae5f-00d609c9e2d0";
 
 function ProLiveSection({ lang }) {
   return (
