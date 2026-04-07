@@ -3027,28 +3027,38 @@ function MainApp() {
   const syncUserPlanForUser = useCallback(async (userId) => {
     if (!userId) return null;
     const nowIso = new Date().toISOString();
-    let { data: row, error } = await supabase.from("user_plans").select("id, user_id, plan, analysis_count, last_reset_at").eq("user_id", userId).maybeSingle();
+    let { data: row, error } = await supabase
+      .from("user_plans")
+      .select("id, user_id, plan, analysis_count, last_reset_at")
+      .eq("user_id", userId)
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
     if (error && error.code !== "PGRST116") {
       console.error("[user_plans]", error);
       return null;
     }
     if (!row) {
-      const { data: inserted, error: insErr } = await supabase
-        .from("user_plans")
-        .insert({ user_id: userId, plan: "free", analysis_count: 0, last_reset_at: nowIso })
-        .select("*")
-        .single();
-      if (insErr) {
-        if (insErr.code === "23505") {
-          const { data: again } = await supabase.from("user_plans").select("*").eq("user_id", userId).single();
-          row = again;
-        } else {
-          console.error("[user_plans insert]", insErr);
-          return null;
-        }
-      } else {
-        row = inserted;
+      const { error: upErr } = await supabase.from("user_plans").upsert(
+        { user_id: userId, plan: "free", analysis_count: 0, last_reset_at: nowIso },
+        { onConflict: "user_id", ignoreDuplicates: true }
+      );
+      if (upErr) {
+        console.error("[user_plans upsert]", upErr);
+        return null;
       }
+      const { data: fetched, error: fetchErr } = await supabase
+        .from("user_plans")
+        .select("id, user_id, plan, analysis_count, last_reset_at")
+        .eq("user_id", userId)
+        .order("id", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (fetchErr || !fetched) {
+        console.error("[user_plans refetch]", fetchErr);
+        return null;
+      }
+      row = fetched;
     }
     if (!row) return null;
 
@@ -3340,10 +3350,10 @@ const msgInterval = setInterval(() => {
 
     if (creditConsumed) {
       if (user?.id) {
-        const { data: pr } = await supabase.from("user_plans").select("plan, analysis_count").eq("user_id", user.id).maybeSingle();
-        if (pr && pr.plan !== "pro") {
-          await supabase.from("user_plans").update({ analysis_count: (pr.analysis_count ?? 0) + 1 }).eq("user_id", user.id);
-        }
+        const { error: rpcErr } = await supabase.rpc("increment_user_plan_analysis", {
+          p_user_id: user.id,
+        });
+        if (rpcErr) console.error("[increment_user_plan_analysis]", rpcErr);
         await syncUserPlanForUser(user.id);
       } else {
         const c = Number(localStorage.getItem("hirefit-anon-count") || 0);
