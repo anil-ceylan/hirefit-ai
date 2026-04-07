@@ -9,7 +9,12 @@ dotenv.config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+const jsonParser = express.json();
+app.use((req, res, next) => {
+  // Webhook must keep raw bytes for HMAC validation.
+  if (req.path === "/api/webhook" || req.path === "/webhook") return next();
+  return jsonParser(req, res, next);
+});
 
 if (!process.env.OPENROUTER_API_KEY) {
   console.error("❌ OPENROUTER_API_KEY missing!");
@@ -838,7 +843,9 @@ return res.json(cleaned);
 
 const lemonWebhookHandler = async (req, res) => {
   const secret = process.env.LEMON_WEBHOOK_SECRET;
-  const signature = String(req.headers["x-signature"] || "");
+  const signature = String(req.get("x-signature") || req.headers["x-signature"] || "")
+    .trim()
+    .toLowerCase();
 
   // Be defensive: in some deployments express.json() may run first and req.body becomes an object.
   // Signature must be computed from bytes, so we normalize body into a Buffer.
@@ -860,10 +867,14 @@ const lemonWebhookHandler = async (req, res) => {
   const computedSignature = crypto.default
     .createHmac("sha256", secret)
     .update(bodyString, "utf8")
-    .digest("hex");
+    .digest("hex")
+    .toLowerCase();
 
   if (computedSignature !== signature) {
-    console.log("[lemon-webhook] Signature verification: FAIL");
+    console.log("[lemon-webhook] Signature verification: FAIL", {
+      receivedSigLength: signature.length,
+      computedSigLength: computedSignature.length,
+    });
     return res.status(401).json({ error: "Invalid signature" });
   }
   console.log("[lemon-webhook] Signature verification: PASS");
