@@ -3465,7 +3465,8 @@ const msgInterval = setInterval(() => {
         const savedTitle = resolveSavedAnalysisRole(jdDerivedTitle, modelRole, lang);
         setRoleType(savedTitle);
         setSeniority("");
-        setMatchedSkills([]);
+        const atsMatchedSkills = (v2.ATS?.matched_skills ?? []).filter(Boolean);
+        setMatchedSkills(atsMatchedSkills);
         setMissingSkills(v2.ATS?.missing_keywords ?? []);
         setTopKeywords([]);
         const reasons = v2.Gaps?.rejection_reasons || [];
@@ -3490,7 +3491,7 @@ const msgInterval = setInterval(() => {
           fit_summary: v2.Decision?.reasoning ?? "",
           strengths: v2.Recruiter?.strengths ?? [],
           improvements: v2.Decision?.what_to_fix_first ?? [],
-          matched_skills: [],
+          matched_skills: atsMatchedSkills,
           missing_skills: v2.ATS?.missing_keywords ?? [],
           top_keywords: (v2.ATS?.missing_keywords ?? []).slice(0, 12),
           rejection_reasons: { high, medium: med, low },
@@ -3505,6 +3506,8 @@ const msgInterval = setInterval(() => {
           recruiter_simulation: {
             decision: v2.Decision?.final_verdict,
             would_interview: v2.Decision?.final_verdict === "apply_now",
+            internal_monologue: v2.Recruiter?.reasoning ?? "",
+            sector: v2.Context?.sector ?? "",
           },
           role_matches: roleMatchesFromV2,
           interview_prep: isPro ? buildInterviewPrepFromV2(v2, lang) : [],
@@ -3519,7 +3522,7 @@ const msgInterval = setInterval(() => {
           cv_text: cvText,
           job_description: jdText,
           report: reportText,
-          matched_skills: [],
+          matched_skills: atsMatchedSkills,
           missing_skills: v2.ATS?.missing_keywords ?? [],
           top_keywords: [],
           rejection_reasons: { high, medium: med, low },
