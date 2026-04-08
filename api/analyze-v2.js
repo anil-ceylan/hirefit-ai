@@ -1,4 +1,4 @@
-import { runAnalyzeV2ForClient } from "../lib/analyze-v2/index.js";
+import { runAnalyzeV2WithCompanyIntel } from "../lib/analyze-v2/withCompanyIntel.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -23,7 +23,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const payload = await runAnalyzeV2ForClient({
+    const payload = await runAnalyzeV2WithCompanyIntel({
       cvText,
       jobDescription,
       isPro,

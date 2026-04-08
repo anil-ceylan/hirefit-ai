@@ -3,7 +3,7 @@ import cors from "cors";
 import fetch from "node-fetch";
 import dotenv from "dotenv";
 import { runMultiAnalyze } from "../lib/analyze/index.js";
-import { runAnalyzeV2ForClient } from "../lib/analyze-v2/index.js";
+import { runAnalyzeV2WithCompanyIntel } from "../lib/analyze-v2/withCompanyIntel.js";
 
 dotenv.config();
 
@@ -53,7 +53,7 @@ app.post("/api/analyze-v2", async (req, res) => {
         .status(400)
         .json({ error: "Missing cvText or jobDescription" });
     }
-    const payload = await runAnalyzeV2ForClient({
+    const payload = await runAnalyzeV2WithCompanyIntel({
       cvText: c,
       jobDescription: j,
       isPro: Boolean(isPro),

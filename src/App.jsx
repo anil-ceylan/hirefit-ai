@@ -1059,6 +1059,18 @@ const translations = {
     rolesEmptyGeneric: "No cross-role matches in this report.",
     interviewEmpty: "No interview prompts in this report.",
     confidenceNA: "N/A",
+    companyIntelTitle: "Company Intelligence",
+    ciCompanyStructure: "Company overview",
+    ciEmployeeExperience: "Employee experience",
+    ciCareerOpportunities: "Career upside",
+    ciSectorPosition: "Sector position",
+    ciCvVsTrends: "Your CV vs sector demand",
+    ciPrepTitle: "Suggested steps to prepare for this role",
+    ciRoadmapCta: "Open learning roadmap",
+    ciUpgradeRoadmap: "Upgrade to Pro for a detailed roadmap",
+    detectedSectorLabel: "Detected sector",
+    sectorOverrideHint: "Override (optional)",
+    orPasteLinkHint: "or paste a job URL below",
     finalVerdict: "FINAL VERDICT",
     alignmentScore: "ALIGNMENT SCORE",
     rejectionRisk: "Rejection Risk",
@@ -1174,6 +1186,18 @@ const translations = {
     rolesEmptyGeneric: "Bu raporda çapraz rol eşleşmesi yok.",
     interviewEmpty: "Bu raporda mülakat sorusu yok.",
     confidenceNA: "Yok",
+    companyIntelTitle: "Şirket Analizi",
+    ciCompanyStructure: "Şirket genel yapısı",
+    ciEmployeeExperience: "Çalışan deneyimi",
+    ciCareerOpportunities: "Kariyer fırsatları",
+    ciSectorPosition: "Sektör konumu",
+    ciCvVsTrends: "CV'niz ve sektör talebi",
+    ciPrepTitle: "Bu role hazırlanmak için önerilen adımlar",
+    ciRoadmapCta: "Öğrenme Yol Haritası",
+    ciUpgradeRoadmap: "Detaylı yol haritası için Pro'ya geçin",
+    detectedSectorLabel: "Algılanan sektör",
+    sectorOverrideHint: "Manuel düzeltme (isteğe bağlı)",
+    orPasteLinkHint: "veya iş ilanı linkini yapıştırın",
     finalVerdict: "FINAL KARAR",
     alignmentScore: "HİZALAMA SKORU",
     rejectionRisk: "Elenme Riski",
@@ -1856,6 +1880,107 @@ function firstTwoSentences(text) {
   if (!t) return "";
   const parts = t.match(/[^.!?]+[.!?]?/g) || [t];
   return parts.slice(0, 2).join(" ").trim();
+}
+
+function CompanyIntelligenceSection({ intel, lang, t, isPro, onOpenRoadmap, onUpgrade }) {
+  if (!intel) return null;
+  const r = intel.report || {};
+  const ex = intel.extracted || {};
+  const st = intel.sector_trends || {};
+  const cvv = intel.cv_vs_sector || {};
+  const hasBody =
+    r.company_structure ||
+    r.employee_experience ||
+    r.career_opportunities ||
+    r.sector_position ||
+    cvv.narrative ||
+    st.key_insight ||
+    (ex.company_name && ex.company_name.length > 0);
+  if (!hasBody) return null;
+
+  const steps = Array.isArray(r.preparation_steps) ? r.preparation_steps : [];
+  const totalWeeks = steps.reduce((acc, x) => acc + (Number(x.weeks_estimate) || 0), 0);
+
+  const block = (title, body) =>
+    body ? (
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", color: "#94a3b8", marginBottom: 6 }}>{title}</div>
+        <div style={{ fontSize: 13, color: "#e2e8f0", lineHeight: 1.65 }}>{body}</div>
+      </div>
+    ) : null;
+
+  return (
+    <div
+      style={{
+        marginBottom: 20,
+        padding: 22,
+        borderRadius: 16,
+        border: "1px solid rgba(212,175,55,0.28)",
+        background: "linear-gradient(165deg, rgba(18,18,22,0.98), rgba(8,10,14,0.99))",
+        boxShadow: "0 18px 48px rgba(0,0,0,0.35)",
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", color: "#d4af37", marginBottom: 14 }}>{t.companyIntelTitle}</div>
+      {ex.company_name ? (
+        <div style={{ fontSize: 15, fontWeight: 800, color: "#f8fafc", marginBottom: 12 }}>
+          {ex.company_name}
+          {ex.sector_inferred ? <span style={{ fontWeight: 600, color: "#94a3b8", fontSize: 13 }}> · {ex.sector_inferred}</span> : null}
+        </div>
+      ) : null}
+      {block(t.ciCompanyStructure, r.company_structure)}
+      {block(t.ciEmployeeExperience, r.employee_experience)}
+      {block(t.ciCareerOpportunities, r.career_opportunities)}
+      {block(t.ciSectorPosition, r.sector_position)}
+      {cvv.narrative ? block(t.ciCvVsTrends, cvv.narrative) : null}
+      {st.key_insight ? (
+        <div style={{ marginBottom: 12, fontSize: 12, color: "#a8a29e", lineHeight: 1.55 }}>
+          <span style={{ color: "#d4af37", fontWeight: 700 }}>{st.source_summary ? `${st.source_summary} ` : ""}</span>
+          {st.key_insight}
+        </div>
+      ) : null}
+      {r.one_liner_value ? (
+        <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.2)", fontSize: 13, color: "#fde68a", lineHeight: 1.55, marginBottom: 14 }}>
+          {r.one_liner_value}
+        </div>
+      ) : null}
+      {steps.length > 0 ? (
+        <div style={{ padding: "14px 16px", borderRadius: 12, border: "1px solid rgba(99,102,241,0.25)", background: "rgba(99,102,241,0.06)", marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, color: "#c4b5fd", marginBottom: 10 }}>{r.preparation_intro || t.ciPrepTitle}</div>
+          <ol style={{ margin: 0, paddingLeft: 18, color: "#e2e8f0", fontSize: 13, lineHeight: 1.7 }}>
+            {steps.map((s, i) => (
+              <li key={i}>
+                <strong style={{ color: "#f1f5f9" }}>{s.skill || "—"}</strong>
+                {s.resource_path ? <span style={{ color: "#94a3b8" }}> → {s.resource_path}</span> : null}
+              </li>
+            ))}
+          </ol>
+          {totalWeeks > 0 ? (
+            <div style={{ marginTop: 10, fontSize: 12, color: "#a78bfa" }}>
+              {lang === "TR" ? `Tahmini hazırlık süresi: ${totalWeeks} hafta` : `Estimated prep time: ${totalWeeks} weeks`}
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => (isPro ? onOpenRoadmap() : onUpgrade())}
+            style={{
+              marginTop: 12,
+              width: "100%",
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: "1px solid rgba(212,175,55,0.35)",
+              background: "linear-gradient(135deg, rgba(212,175,55,0.15), rgba(245,158,11,0.1))",
+              color: "#fde68a",
+              fontWeight: 800,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            {isPro ? t.ciRoadmapCta : t.ciUpgradeRoadmap}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 /** First plausible job title line from pasted JD (labeled or heuristic). */
@@ -3225,6 +3350,7 @@ function MainApp() {
   const [history, setHistory] = useState([]);
   const [analysisData, setAnalysisData] = useState(null);
   const [sector, setSector] = useState("Auto-detect");
+  const [lastDetectedSector, setLastDetectedSector] = useState("");
   const [lang, setLang] = useState("EN");
   const [showPaywall, setShowPaywall] = useState(false);
   /** Logged-in users: row from user_plans (analysis_count, last_reset_at, plan). */
@@ -3507,8 +3633,8 @@ function MainApp() {
     setLoading(true); 
     // Loading messages
 const loadingMessages = lang === "TR"
-  ? ["CV'n analiz ediliyor...", "Recruiter gibi düşünülüyor...", "İş ilanıyla karşılaştırılıyor...", "Sonuçlar hazırlanıyor..."]
-  : ["Analyzing your CV...", "Thinking like a recruiter...", "Checking job alignment...", "Preparing your results..."];
+  ? ["Şirket ve sektör çıkarılıyor...", "Şirket araştırılıyor...", "Sektör trendleri analiz ediliyor...", "CV ve ilan eşleştiriliyor...", "Rapor hazırlanıyor..."]
+  : ["Extracting company & sector...", "Researching the company...", "Analyzing sector trends...", "Matching CV to the role...", "Preparing your report..."];
 let msgIndex = 0;
 setLoadingMessage(loadingMessages[0]);
 const msgInterval = setInterval(() => {
@@ -3523,6 +3649,7 @@ const msgInterval = setInterval(() => {
     setFixResults({});
     setDecisionData(null);
     setEngineV2(null);
+    setLastDetectedSector("");
 
     let v2Ok = false;
     let creditConsumed = false;
@@ -3543,6 +3670,7 @@ const msgInterval = setInterval(() => {
         const v2 = await v2Res.json();
         v2Ok = true;
         setEngineV2(v2);
+        setLastDetectedSector(v2.Context?.sector || v2.detected_sector || "");
         const fs = Number(v2["Final Alignment Score"]) || 0;
         setAlignmentScore(fs);
         const modelRole =
@@ -4188,7 +4316,10 @@ const msgInterval = setInterval(() => {
         <input ref={jdTxtInputRef} type="file" accept=".txt,text/plain" onChange={(e) => { handleJdTextFile(e.target.files?.[0]); e.target.value = ""; }} style={{ display: "none" }} />
       </div>
       <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 10 }}>
-        {lang === "TR" ? "Yapıştır, .txt bırak veya linkten çek — en doğru sonuç için tam metin." : "Paste, drop a .txt, or extract from a link — full text works best."}
+        {lang === "TR"
+          ? "Yapıştır, .txt bırak veya linkten çek — en doğru sonuç için tam metin. "
+          : "Paste, drop a .txt, or extract from a link — full text works best. "}
+        <span style={{ color: "#67e8f9", fontWeight: 700 }}>{t.orPasteLinkHint}</span>
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
         <input
@@ -4274,36 +4405,30 @@ const msgInterval = setInterval(() => {
   {showAdvanced && (
     <div style={{ padding: "16px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, display: "flex", flexDirection: "column", gap: 14 }}>
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>{lang === "TR" ? "Sektör" : "Sector"}</div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {sectorValues.map((s, idx) => {
-            const th = SECTOR_CHIP_THEME[s] || SECTOR_CHIP_THEME["Auto-detect"];
-            const active = sector === s;
-            return (
-              <button
-                key={s}
-                type="button"
-                className={`hf-sector-chip${active ? " hf-sector-chip--active" : ""}`}
-                onClick={() => setSector(s)}
-                style={{
-                  border: `1px solid ${active ? th.ring : "rgba(255,255,255,0.09)"}`,
-                  background: active ? th.bg : "rgba(255,255,255,0.03)",
-                  color: active ? th.dot : "#64748b",
-                }}
-              >
-                <span
-                  className="hf-sector-chip__dot"
-                  style={{
-                    background: active ? th.dot : "rgba(148,163,184,0.4)",
-                    boxShadow: active ? `0 0 12px ${th.dot}66` : "none",
-                  }}
-                  aria-hidden
-                />
-                {sectorLabels[idx]}
-              </button>
-            );
-          })}
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>{t.detectedSectorLabel}</div>
+        <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 10 }}>
+          {lastDetectedSector ? <strong style={{ color: "#d4af37" }}>{getSectorDisplayLabel(lastDetectedSector, lang)}</strong> : "—"}
         </div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>{t.sectorOverrideHint}</div>
+        <select
+          value={sector}
+          onChange={(e) => setSector(e.target.value)}
+          style={{
+            width: "100%",
+            maxWidth: 360,
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: "1px solid rgba(255,255,255,0.1)",
+            background: "rgba(0,0,0,0.35)",
+            color: "#e2e8f0",
+            fontSize: 13,
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          {sectorValues.map((s, idx) => (
+            <option key={s} value={s}>{sectorLabels[idx]}</option>
+          ))}
+        </select>
       </div>
       <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>{lang === "TR" ? "Başvuru Süresi" : "Deadline"}</div>
@@ -4473,6 +4598,16 @@ const msgInterval = setInterval(() => {
           ""
         }
         lang={lang}
+      />
+    )}
+    {engineV2?.CompanyIntel && alignmentScore !== null && (
+      <CompanyIntelligenceSection
+        intel={engineV2.CompanyIntel}
+        lang={lang}
+        t={t}
+        isPro={isPro}
+        onOpenRoadmap={generateLearningPlan}
+        onUpgrade={openUpgrade}
       />
     )}
     {!engineV2 && (decisionData || decisionLoading) && (
