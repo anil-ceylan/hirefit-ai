@@ -74,12 +74,12 @@ export default async function handler(req, res) {
 
     let title = fallbackTitle;
     let jobText = visible;
-    const key = process.env.OPENROUTER_API_KEY;
+    const key = process.env.GROQ_API_KEY;
 
     if (key && visible.length > 120) {
       try {
         const aiRes = await fetchWithTimeout(
-          "https://openrouter.ai/api/v1/chat/completions",
+          "https://api.groq.com/openai/v1/chat/completions",
           {
             method: "POST",
             headers: {
@@ -87,7 +87,8 @@ export default async function handler(req, res) {
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "openai/gpt-4o-mini",
+              model: "llama-3.1-70b-versatile",
+              max_tokens: 1000,
               temperature: 0.1,
               response_format: { type: "json_object" },
               messages: [

@@ -16,8 +16,8 @@ app.use((req, res, next) => {
   return jsonParser(req, res, next);
 });
 
-if (!process.env.OPENROUTER_API_KEY) {
-  console.error("❌ OPENROUTER_API_KEY missing!");
+if (!process.env.GROQ_API_KEY) {
+  console.error("❌ GROQ_API_KEY missing!");
 }
 
 app.post("/api/analyze", async (req, res) => {
@@ -141,18 +141,19 @@ app.post("/api/extract-job", async (req, res) => {
     let title = fallbackTitle;
     let jobText = visible;
 
-    if (process.env.OPENROUTER_API_KEY && visible.length > 120) {
+    if (process.env.GROQ_API_KEY && visible.length > 120) {
       try {
         const aiRes = await fetchWithTimeout(
-          "https://openrouter.ai/api/v1/chat/completions",
+          "https://api.groq.com/openai/v1/chat/completions",
           {
             method: "POST",
             headers: {
-              Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+              Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              model: "openai/gpt-4o-mini",
+              model: "llama-3.1-70b-versatile",
+              max_tokens: 1000,
               temperature: 0.1,
               response_format: { type: "json_object" },
               messages: [
@@ -287,14 +288,15 @@ app.post("/analyze", async (req, res) => {
   }
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
+        model: "llama-3.1-70b-versatile",
+        max_tokens: 1000,
         temperature: 0.1,
         response_format: { type: "json_object" },
         messages: [
@@ -421,14 +423,15 @@ app.post("/optimize", async (req, res) => {
   if (!cvText || !jobDescription) return res.status(400).json({ error: "Missing CV or JD" });
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
+        model: "llama-3.1-70b-versatile",
+        max_tokens: 1000,
         temperature: 0.35,
         messages: [
           {
@@ -469,14 +472,15 @@ app.post("/roadmap", async (req, res) => {
   if (!missingSkills?.length) return res.status(400).json({ error: "No missing skills provided" });
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
+        model: "llama-3.1-70b-versatile",
+        max_tokens: 1000,
         temperature: 0.4,
         messages: [
           {
@@ -504,14 +508,15 @@ app.post("/apply-fix", async (req, res) => {
   if (!cvText || !problem) return res.status(400).json({ error: "Missing data" });
 
   try {
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
+        model: "llama-3.1-70b-versatile",
+        max_tokens: 1000,
         temperature: 0.3,
         response_format: { type: "json_object" },
         messages: [
@@ -560,14 +565,15 @@ app.post("/decision", async (req, res) => {
 
   try {
     // STEP 1: GPT — Core decision (source of truth)
-    const gptResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const gptResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
+        model: "llama-3.1-70b-versatile",
+        max_tokens: 1000,
         temperature: 0.1,
         response_format: { type: "json_object" },
         messages: [
@@ -652,14 +658,15 @@ Return ONLY this JSON (no markdown):
 
 try {
   const [aiRes, gutRes] = await Promise.all([
-    fetch("https://openrouter.ai/api/v1/chat/completions", {
+    fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
+        model: "llama-3.1-70b-versatile",
+        max_tokens: 1000,
         temperature: 0.2,
         response_format: { type: "json_object" },
         messages: [
@@ -688,14 +695,15 @@ ${cvText}`
       })
     }),
 
-    fetch("https://openrouter.ai/api/v1/chat/completions", {
+    fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
+        model: "llama-3.1-70b-versatile",
+        max_tokens: 1000,
         temperature: 0.3,
         messages: [
           {
@@ -736,14 +744,15 @@ ${cvText}`
 
     // STEP 3: Tone rewriter — make output sound human
 try {
-  const toneResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+  const toneResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: "openai/gpt-4o-mini",
+      model: "llama-3.1-70b-versatile",
+      max_tokens: 1000,
       temperature: 0.2,
       response_format: { type: "json_object" },
       messages: [
