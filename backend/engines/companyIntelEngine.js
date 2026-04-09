@@ -12,6 +12,139 @@ const KNOWN_SECTORS = [
   "Government",
 ];
 
+const MISSING_COMPANY_EN = "Could not extract company name — check job posting header";
+const MISSING_COMPANY_TR = "Şirket adı çıkarılamadı — ilan başlığını kontrol edin";
+
+/** Job-title / boilerplate tokens — skip as company candidates */
+const JOB_TITLE_WORDS = new Set(
+  "senior junior mid staff principal lead staff intern the we our this role job position opening opportunity team remote hybrid onsite full time part contract permanent temporary software engineer developer engineering data science scientist analyst designer product manager director head vp chief executive founder cofounder co-founder machine learning ml ai stack frontend backend devops sre qa quality assurance architect consultant associate years experience required preferred plus nice have skills responsibilities qualifications about overview description summary location based global emea apac".split(
+    " "
+  )
+);
+
+function cleanCompanyCandidate(s) {
+  return String(s || "")
+    .replace(/^[\s,;:]+|[\s,;:]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isPlausibleCompanyName(name) {
+  const n = cleanCompanyCandidate(name);
+  if (n.length < 2 || n.length > 80) return false;
+  const low = n.toLowerCase();
+  if (/^(unknown|n\/a|na|not applicable|tbd|confidential|anonymous)\b/i.test(low)) return false;
+  if (/^about\s+us$/i.test(low)) return false;
+  const words = low.split(/\s+/);
+  if (words.length === 1 && JOB_TITLE_WORDS.has(words[0])) return false;
+  if (words.every((w) => JOB_TITLE_WORDS.has(w) || w.length < 2)) return false;
+  return true;
+}
+
+/**
+ * Rule-based company name hints from JD (before / after GPT).
+ */
+export function heuristicExtractCompanyName(jdText) {
+  const t = String(jdText || "").replace(/\r\n/g, "\n").trim();
+  if (!t) return "";
+
+  const tryName = (raw) => {
+    const c = cleanCompanyCandidate(raw);
+    return isPlausibleCompanyName(c) ? c : "";
+  };
+
+  let m;
+
+  m = t.match(/\b([A-Z][A-Za-z0-9&.'’-]+(?:\s+[A-Z][A-Za-z0-9&.'’-]+){0,4})\s+is\s+(looking|hiring|seeking|recruiting)\b/);
+  if (m) {
+    const hit = tryName(m[1]);
+    if (hit) return hit;
+  }
+
+  m = t.match(/\bat\s+([A-Z0-9][A-Za-z0-9&.'’-]*(?:\s+[A-Z0-9][A-Za-z0-9&.'’-]*){0,5})(?=\s*[,.]|\s+as\s|\s+for\s|\s+to\s|\s+and\s|\s+in\s|\s+on\s|\s*$|\n)/);
+  if (m) {
+    const hit = tryName(m[1]);
+    if (hit) return hit;
+  }
+
+  m = t.match(/\bjoin\s+([A-Z][A-Za-z0-9&.'’-]+(?:\s+[A-Z][A-Za-z0-9&.'’-]+){0,4})\b/);
+  if (m) {
+    const tail = m[1].trim();
+    if (!/^our\b/i.test(tail)) {
+      const hit = tryName(tail);
+      if (hit) return hit;
+    }
+  }
+
+  m = t.match(/\bAbout\s+([A-Z][A-Za-z0-9&.'’-]+(?:\s+[A-Z][A-Za-z0-9&.'’-]+){0,4})\b/);
+  if (m && m[1] && !/^us$/i.test(m[1].trim())) {
+    const hit = tryName(m[1]);
+    if (hit) return hit;
+  }
+
+  const aboutUs = t.match(/(?:^|\n)\s*About\s+Us\s*[:\n]\s*([\s\S]{0,500})/i);
+  if (aboutUs) {
+    const chunk = aboutUs[1];
+    const lines = chunk
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 3);
+    for (const line of lines.slice(0, 4)) {
+      if (/^(we|our|the\s+role|this\s+role)\b/i.test(line)) continue;
+      const head = line.split(/[—–\-–]/)[0].trim();
+      const titleCase = head.match(/^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\s*$/);
+      if (titleCase) {
+        const hit = tryName(titleCase[1]);
+        if (hit) return hit;
+      }
+    }
+  }
+
+  const firstBlock = (t.split(/\n\s*\n/)[0] || t).slice(0, 1200);
+  const capRe = /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\b/g;
+  let capM;
+  const capHits = [];
+  while ((capM = capRe.exec(firstBlock)) !== null) {
+    capHits.push(capM[1]);
+  }
+  for (const phrase of capHits.reverse()) {
+    const words = phrase.toLowerCase().split(/\s+/);
+    const nonJob = words.filter((w) => !JOB_TITLE_WORDS.has(w));
+    if (nonJob.length >= 1 && isPlausibleCompanyName(phrase)) return phrase;
+  }
+
+  return "";
+}
+
+function gptCompanyNameLooksEmpty(name) {
+  const s = String(name || "").trim();
+  if (!s) return true;
+  const low = s.toLowerCase();
+  if (/^n\/a$|^na$|^unknown$|^not\s+stated$|^not\s+available$|^none$|^—/.test(low)) return true;
+  if (/company\s+name\s+not\s+stated/i.test(s)) return true;
+  return false;
+}
+
+function resolveCompanyNameField(gptName, jd, langNorm) {
+  let name = String(gptName || "").trim();
+  if (gptCompanyNameLooksEmpty(name)) name = "";
+  if (!name) name = heuristicExtractCompanyName(jd);
+  if (!name) {
+    return langNorm === "tr" ? MISSING_COMPANY_TR : MISSING_COMPANY_EN;
+  }
+  return name;
+}
+
+/** Real employer string for Tavily etc.; empty when UI shows synthetic placeholder only. */
+export function companyNameForSearch(extracted) {
+  const n = String(extracted?.company_name || "").trim();
+  if (!n) return "";
+  if (n === MISSING_COMPANY_EN || n === MISSING_COMPANY_TR) return "";
+  if (/^Could not extract company name/i.test(n)) return "";
+  if (/^Şirket adı çıkarılamadı/i.test(n)) return "";
+  return n;
+}
+
 /**
  * Map free-text industry to HireFit sector lens key.
  */
@@ -57,6 +190,7 @@ Return ONLY valid JSON:
 Rules:
 - Infer only from JD text. If a field cannot be inferred, use "unknown" or empty string for company_name.
 - Do not invent a company name if JD is anonymous; leave company_name empty.
+- For company_name, actively check English phrasing such as: "at [Company]", "join [Company]", "[Company] is looking/hiring/seeking", a title-cased employer in the first paragraph, and headings like "About [Company]" or the first substantive line after "About us".
 - mapped_sector must be one of the listed English labels.`;
 
   const langHead =
@@ -88,7 +222,7 @@ Rules:
   }
 
   return {
-    company_name: String(p.company_name || "").trim(),
+    company_name: resolveCompanyNameField(p.company_name, jd, langNorm),
     sector_inferred: String(p.sector_inferred || "").trim(),
     subsector_niche: String(p.subsector_niche || "").trim(),
     region_likely: String(p.region_likely || "").trim(),

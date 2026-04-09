@@ -1,6 +1,7 @@
 /* eslint-env node */
 import { openaiChat } from "../../lib/analyze-v2/openaiClient.js";
 import { parseModelJson } from "../../lib/analyze-v2/json.js";
+import { companyNameForSearch } from "../engines/companyIntelEngine.js";
 
 const TAVILY_URL = "https://api.tavily.com/search";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -562,7 +563,7 @@ export function liteCompanyIntel(layer) {
 
 export async function buildCompanyIntelligenceLayer({ extracted, cvText, jobDescription, lang = "en" }) {
   const langNorm = lang === "tr" ? "tr" : "en";
-  const company = extracted?.company_name || "";
+  const company = companyNameForSearch(extracted);
   const sectorLabel = extracted?.sector_inferred || extracted?.mapped_sector || "";
 
   let companySearch = { insight: "", tone: "neutral", news_snippets: 0, culture_snippets: 0, trend_snippets: 0 };
