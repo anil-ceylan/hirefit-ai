@@ -61,8 +61,22 @@ async function tavilySearch(query) {
   }
 }
 
+/** Groq system prefix: single output language. */
+function systemLangDirective(lang) {
+  return lang === "tr"
+    ? "Tüm yanıtlarını YALNIZCA Türkçe olarak ver."
+    : "You must respond ONLY in English. Every single word must be in English.";
+}
+
+function buildSystemPrompt(baseInstruction, lang) {
+  return `${systemLangDirective(lang)}\n\n${baseInstruction}`;
+}
+
 async function summarizeInsights(prompt, lang) {
   const isTr = lang === "tr";
+  const base = isTr
+    ? "Sen bir iş analisti asistanısın. Sadece verilen arama özetlerinden çıkarım yap; uydurma. Çıktı JSON."
+    : "You are a workplace research assistant. Infer only from provided snippets; do not invent. JSON only.";
   const content = await openaiChat({
     model: "llama-3.3-70b-versatile",
     temperature: 0.2,
@@ -70,9 +84,7 @@ async function summarizeInsights(prompt, lang) {
     messages: [
       {
         role: "system",
-        content: isTr
-          ? "Sen bir iş analisti asistanısın. Sadece verilen arama özetlerinden çıkarım yap; uydurma. Çıktı JSON."
-          : "You are a workplace research assistant. Infer only from provided snippets; do not invent. JSON only.",
+        content: buildSystemPrompt(base, lang),
       },
       { role: "user", content: prompt },
     ],
@@ -232,7 +244,7 @@ Use only evidence present in CV. JSON:
     messages: [
       {
         role: "system",
-        content: "You compare CV evidence to a skill list. JSON only.",
+        content: buildSystemPrompt("You compare CV evidence to a skill list. JSON only.", lang),
       },
       { role: "user", content: prompt },
     ],
@@ -264,17 +276,32 @@ export async function buildCompanyIntelligenceReport({
     cvComparison,
   });
 
+  const qualityTr = `
+Alan kuralları (her biri için ayrı ayrı uy):
+- company_structure: Somut ol. Gerçek iş kolları, bilinen ürünler, pazar konumu ve kanıtlanabilir gerçekleri yaz. "Büyüme sinyalleri gösteriyor" gibi belirsiz ifadelerden kaçın. Veri sınırlıysa bunu dürüstçe söyle.
+- employee_experience: Arama sonuçlarına dayan; kültür, yan haklar veya çalışan yorumları hakkında bilinen somut gerçekleri yaz. Hiçbir şey yoksa genel laflar etme; "Kamuoyunda sınırlı veri mevcut" de.
+- career_opportunities: Somut ol. Burada çalışmak hangi becerileri geliştirir? Hangi kapıları açar? Bu rolden gerçekçi kariyer yolu ne? Uluslararası maruziyetten ancak kanıt varsa bahset.
+- sector_position: Gerçek rakipleri isimlendir. Sektörün büyüdüğünü, durağan olduğunu veya gerilediğini bir gerekçeyle belirt. Somut ol.`;
+
+  const qualityEn = `
+Field rules (apply to each string separately):
+- company_structure: Be specific. Mention actual business lines, known products, market position with facts. Avoid vague phrases like "shows growth signals". If data is limited, say so honestly.
+- employee_experience: Based on search results, mention specific known facts about culture, benefits, or employee reviews. If nothing found, say "Limited public data available" instead of making generic statements.
+- career_opportunities: Be concrete. What skills does working here build? What doors does it open? What is the realistic career path from this role? Mention international exposure only if there is evidence of it.
+- sector_position: Name actual competitors. State whether sector is growing, stable, or declining with a reason. Be specific.`;
+
   const prompt = isTr
-    ? `Aşağıdaki verilerle şirket/sektör raporu üret. Web verisi yoksa sadece JD çıkarımıyla devam et; "veri yok" demeden doğal yaz.
+    ? `Aşağıdaki verilerle şirket/sektör raporu üret. Web verisi zayıfsa yalnızca JD çıkarımına dayan; uydurma.
+${qualityTr}
 
 ${bundle}
 
 JSON formatı:
 {
-  "company_structure": "<ŞIRKET GENEL YAPISI: tip, büyüklük tahmini, ana faaliyet, büyüme/olgunluk>",
-  "employee_experience": "<ÇALIŞAN DENEYİMİ: itibar sinyalleri, faydalar, kültür — temkinli dil>",
-  "career_opportunities": "<KARIYER FIRSATLARI: CV'ye katkı, uluslararası bağlantı, sektör geçişi>",
-  "sector_position": "<SEKTÖR KONUMU: rekabet, büyüme/durgunluk sinyalleri>",
+  "company_structure": "<şirket genel görünümü — yukarıdaki kurallara uy>",
+  "employee_experience": "<çalışan deneyimi — yukarıdaki kurallara uy>",
+  "career_opportunities": "<kariyer üstü — yukarıdaki kurallara uy>",
+  "sector_position": "<sektör konumu — yukarıdaki kurallara uy>",
   "one_liner_value": "Bu şirket kariyerinize şunu katar: ...",
   "preparation_steps": [
     { "skill": "", "resource_path": "", "weeks_estimate": 2 }
@@ -282,7 +309,8 @@ JSON formatı:
   "preparation_intro": "Bu role hazırlanmak için önerilen adımlar:"
 }
 Maksimum 2 preparation_steps. Hafta tahmini gerçekçi olsun.`
-    : `Build a structured employer/sector report from the data below. If web data is thin, rely on JD extraction only; stay factual.
+    : `Build a structured employer/sector report from the data below. If web data is thin, rely on JD extraction only; do not invent.
+${qualityEn}
 
 ${bundle}
 
@@ -298,11 +326,18 @@ Return JSON:
 }
 Max 2 preparation_steps.`;
 
+  const reportSystemBase = isTr
+    ? "Yapılandırılmış işveren/sektör raporu üretiyorsun. Yalnızca geçerli JSON; kullanıcı mesajındaki alan kurallarına uy."
+    : "You produce a structured employer/sector report. Valid JSON only; follow the per-field rules in the user message.";
+
   const content = await openaiChat({
     model: "llama-3.3-70b-versatile",
     temperature: 0.25,
     responseFormat: { type: "json_object" },
-    messages: [{ role: "user", content: prompt }],
+    messages: [
+      { role: "system", content: buildSystemPrompt(reportSystemBase, lang) },
+      { role: "user", content: prompt },
+    ],
   });
   return parseModelJson(content) || {};
 }
@@ -340,7 +375,7 @@ export function liteCompanyIntel(layer) {
   };
 }
 
-export async function buildCompanyIntelligenceLayer({ extracted, cvText, jobDescription, lang }) {
+export async function buildCompanyIntelligenceLayer({ extracted, cvText, jobDescription, lang = "en" }) {
   const langNorm = lang === "tr" ? "tr" : "en";
   const company = extracted?.company_name || "";
   const sectorLabel = extracted?.sector_inferred || extracted?.mapped_sector || "";

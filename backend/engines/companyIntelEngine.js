@@ -59,6 +59,15 @@ Rules:
 - Do not invent a company name if JD is anonymous; leave company_name empty.
 - mapped_sector must be one of the listed English labels.`;
 
+  const langHead =
+    langNorm === "tr"
+      ? "Tüm yanıtlarını YALNIZCA Türkçe olarak ver."
+      : "You must respond ONLY in English. Every single word must be in English.";
+  const systemTail =
+    langNorm === "tr"
+      ? "İş ilanından işveren ve pazar bağlamı çıkar. Yalnızca JSON üret; JSON dışında düz metin yok."
+      : "You extract employer and market context from job postings. JSON only. No prose outside JSON.";
+
   const content = await openaiChat({
     model: "llama-3.3-70b-versatile",
     temperature: 0.1,
@@ -66,8 +75,7 @@ Rules:
     messages: [
       {
         role: "system",
-        content:
-          "You extract employer and market context from job postings. JSON only. No prose outside JSON.",
+        content: `${langHead}\n\n${systemTail}`,
       },
       { role: "user", content: user },
     ],
