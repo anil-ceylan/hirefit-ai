@@ -153,7 +153,7 @@ app.post("/api/extract-job", async (req, res) => {
             },
             body: JSON.stringify({
               model: "llama-3.3-70b-versatile",
-              max_tokens: 1000,
+              max_tokens: 800,
               temperature: 0.1,
               response_format: { type: "json_object" },
               messages: [
@@ -296,7 +296,7 @@ app.post("/analyze", async (req, res) => {
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        max_tokens: 1000,
+        max_tokens: 800,
         temperature: 0.1,
         response_format: { type: "json_object" },
         messages: [
@@ -431,7 +431,7 @@ app.post("/optimize", async (req, res) => {
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        max_tokens: 1000,
+        max_tokens: 800,
         temperature: 0.35,
         messages: [
           {
@@ -480,7 +480,7 @@ app.post("/roadmap", async (req, res) => {
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        max_tokens: 1000,
+        max_tokens: 800,
         temperature: 0.4,
         messages: [
           {
@@ -516,7 +516,7 @@ app.post("/apply-fix", async (req, res) => {
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        max_tokens: 1000,
+        max_tokens: 800,
         temperature: 0.3,
         response_format: { type: "json_object" },
         messages: [
@@ -573,7 +573,7 @@ app.post("/decision", async (req, res) => {
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        max_tokens: 1000,
+        max_tokens: 800,
         temperature: 0.1,
         response_format: { type: "json_object" },
         messages: [
@@ -666,7 +666,7 @@ try {
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        max_tokens: 1000,
+        max_tokens: 800,
         temperature: 0.2,
         response_format: { type: "json_object" },
         messages: [
@@ -703,7 +703,7 @@ ${cvText}`
       },
       body: JSON.stringify({
         model: "llama-3.3-70b-versatile",
-        max_tokens: 1000,
+        max_tokens: 800,
         temperature: 0.3,
         messages: [
           {
@@ -752,7 +752,7 @@ try {
     },
     body: JSON.stringify({
       model: "llama-3.3-70b-versatile",
-      max_tokens: 1000,
+      max_tokens: 800,
       temperature: 0.2,
       response_format: { type: "json_object" },
       messages: [
