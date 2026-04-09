@@ -60,7 +60,7 @@ Rules:
 - mapped_sector must be one of the listed English labels.`;
 
   const content = await openaiChat({
-    model: "gpt-4o",
+    model: "llama-3.3-70b-versatile",
     temperature: 0.1,
     responseFormat: { type: "json_object" },
     messages: [

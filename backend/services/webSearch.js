@@ -64,7 +64,7 @@ async function tavilySearch(query) {
 async function summarizeInsights(prompt, lang) {
   const isTr = lang === "tr";
   const content = await openaiChat({
-    model: "gpt-4o-mini",
+    model: "llama-3.3-70b-versatile",
     temperature: 0.2,
     responseFormat: { type: "json_object" },
     messages: [
@@ -226,7 +226,7 @@ Use only evidence present in CV. JSON:
 }`;
 
   const content = await openaiChat({
-    model: "gpt-4o-mini",
+    model: "llama-3.3-70b-versatile",
     temperature: 0.15,
     responseFormat: { type: "json_object" },
     messages: [
@@ -299,7 +299,7 @@ Return JSON:
 Max 2 preparation_steps.`;
 
   const content = await openaiChat({
-    model: "gpt-4o-mini",
+    model: "llama-3.3-70b-versatile",
     temperature: 0.25,
     responseFormat: { type: "json_object" },
     messages: [{ role: "user", content: prompt }],
