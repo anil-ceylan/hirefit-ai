@@ -257,6 +257,186 @@ Use only evidence present in CV. JSON:
   };
 }
 
+const TECH_HINT_RE =
+  /\b(React\.?js|React|Vue\.?js|Angular|Node\.?js|TypeScript|JavaScript|Python|Java\b|Kotlin|Swift|\bGo\b|Rust|C\+\+|C#|\.NET|PHP|Ruby|Rails|Django|Flask|FastAPI|Spring|Kubernetes|Docker|AWS|GCP|Azure|Terraform|Ansible|CI\/CD|Jenkins|GitLab|PostgreSQL|MySQL|MongoDB|Redis|Kafka|Elasticsearch|GraphQL|\bREST\b|Salesforce|SAP|Snowflake|Databricks|Power BI|Tableau|Machine Learning|\bML\b|\bAI\b|LLM|TensorFlow|PyTorch)\b/gi;
+
+const BENEFIT_LINE_RE =
+  /\b(health|dental|vision|insurance|401k|pension|pto|paid time off|paid leave|vacation|unlimited pto|stock options|equity|rsu|bonus|gym|fitness|wellness|snacks|meal|lunch|parental leave|sabbatical|learning budget|training budget|home office|stipend|commuter|transport|allowance)\b/i;
+
+function extractTechHintsFromJd(jd) {
+  const s = String(jd || "");
+  const seen = new Map();
+  let m;
+  const re = new RegExp(TECH_HINT_RE.source, "gi");
+  while ((m = re.exec(s)) !== null) {
+    const raw = m[0].trim();
+    const key = raw.toLowerCase();
+    if (!seen.has(key)) seen.set(key, raw);
+  }
+  return [...seen.values()].slice(0, 15);
+}
+
+function extractBenefitSnippets(jd, max = 5) {
+  const text = String(jd || "");
+  const parts = text.split(/(?<=[.!?\n])\s+/);
+  const out = [];
+  for (const p of parts) {
+    const t = p.trim();
+    if (t.length < 12 || t.length > 220) continue;
+    if (BENEFIT_LINE_RE.test(t)) out.push(t.replace(/\s+/g, " "));
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+function formatCompanyTypeLabel(raw, isTr) {
+  const r = String(raw || "unknown").toLowerCase();
+  if (isTr) {
+    const tr = {
+      startup: "startup",
+      scaleup: "ölçeklenen şirket",
+      enterprise: "büyük kurumsal organizasyon",
+      big4: "Big Four benzeri profesyonel hizmet firması",
+      bigtech: "büyük teknoloji şirketi",
+      unknown: "kuruluş",
+    };
+    return tr[r] || tr.unknown;
+  }
+  const en = {
+    startup: "startup",
+    scaleup: "scale-up",
+    enterprise: "large enterprise",
+    big4: "Big Four–style professional services firm",
+    bigtech: "large technology company",
+    unknown: "organization",
+  };
+  return en[r] || en.unknown;
+}
+
+function stripLimitedDataPhrases(s) {
+  return String(s || "")
+    .replace(/\bLimited public data available\.?\s*/gi, "")
+    .replace(/Kamuoyunda sınırlı veri[^.!?]*[.!?]?\s*/gi, "")
+    .replace(/\bsınırlı veri mevcut\.?\s*/gi, "")
+    .trim();
+}
+
+function shouldApplyJdFallbackToField(text) {
+  const t = String(text || "").trim();
+  if (!t) return true;
+  const low = t.toLowerCase();
+  if (low.includes("limited public data available")) return true;
+  if (low.includes("kamuoyunda sınırlı veri") || low.includes("sınırlı veri mevcut")) return true;
+  return false;
+}
+
+function mergeFieldWithJdFallback(modelText, jdBlock) {
+  const cleaned = stripLimitedDataPhrases(modelText);
+  if (!cleaned) return jdBlock;
+  return `${cleaned}\n\n${jdBlock}`.trim();
+}
+
+function buildJdCompanyOverviewFallback(extracted, jobDescription, isTr) {
+  const ex = extracted || {};
+  const jd = String(jobDescription || "").trim();
+  const name = String(ex.company_name || "").trim();
+  const sector = String(ex.sector_inferred || ex.mapped_sector || "").trim();
+  const sectorDisp = sector || (isTr ? "genel sektör" : "general sector");
+  const ctype = formatCompanyTypeLabel(ex.company_type_estimate, isTr);
+  const tech = extractTechHintsFromJd(jd);
+
+  const nameLine = name
+    ? isTr
+      ? `Şirket: ${name}.`
+      : `Company: ${name}.`
+    : isTr
+      ? "Şirket adı ilanda açık değil."
+      : "Company name not stated in the posting.";
+
+  const sectorLine = isTr
+    ? `İlandan anlaşılan sektör: ${sectorDisp}.`
+    : `Sector inferred from the posting: ${sectorDisp}.`;
+
+  const typeLine = isTr
+    ? `İş tanımına göre bu, ${sectorDisp} alanında bir ${ctype} gibi görünüyor.`
+    : `Based on the job description, this appears to be a ${ctype} in ${sectorDisp}.`;
+
+  const techLine = tech.length
+    ? isTr
+      ? `Pozisyonun öne çıkardığı araç veya teknolojiler: ${tech.join(", ")}.`
+      : `Tools and technologies emphasized for this role: ${tech.join(", ")}.`
+    : isTr
+      ? "İlanda net bir teknoloji yığını listesi çıkarılamadı; gereksinimler metninde geçen ifadelere bakın."
+      : "No clear technology stack list was extracted; refer to requirement wording in the posting.";
+
+  return [nameLine, sectorLine, typeLine, techLine].join("\n");
+}
+
+function buildJdEmployeeExperienceFallback(jobDescription, isTr) {
+  const jd = String(jobDescription || "").trim();
+  const prefix = isTr ? "İlan metnine göre sinyaller:" : "Based on job posting signals:";
+  const signals = [];
+
+  if (/\bhybrid\b/i.test(jd)) {
+    signals.push(isTr ? "Hibrit çalışma geçiyor." : "Posting mentions hybrid work.");
+  } else if (/\b(remote|work from home|wfh|fully remote|uzaktan)\b/i.test(jd)) {
+    signals.push(isTr ? "Uzaktan çalışma / WFH ifadeleri geçiyor." : "Remote or work-from-home language appears.");
+  } else if (/\b(on-?site|in-?office|office-?based|ofiste)\b/i.test(jd)) {
+    signals.push(isTr ? "Ofis / onsite vurgusu var." : "On-site or office-based work is referenced.");
+  }
+
+  if (/\b(startup|scale-?up|early-?stage)\b/i.test(jd)) {
+    signals.push(isTr ? "Startup veya scale-up tonuna yakın ifadeler var." : "Wording suggests startup or scale-up context.");
+  }
+  if (/\b(enterprise|Fortune|multinational|global leader|kurumsal)\b/i.test(jd)) {
+    signals.push(isTr ? "Kurumsal veya büyük ölçek diline işaretler var." : "Language points to corporate or large-enterprise context.");
+  }
+
+  if (/\b(fast-?paced|rapid|dynamic environment|yüksek tempo)\b/i.test(jd)) {
+    signals.push(isTr ? "Hızlı tempolu ortam vurgusu." : "Fast-paced environment is emphasized.");
+  }
+  if (/\b(structured|process-?driven|well-?defined|governance|süreç)\b/i.test(jd)) {
+    signals.push(isTr ? "Yapılandırılmış süreç / çerçeve vurgusu." : "Structured or process-driven signals appear.");
+  }
+
+  const benefits = extractBenefitSnippets(jd, 5);
+  let benefitBlock = "";
+  if (benefits.length) {
+    benefitBlock = isTr
+      ? `\nİlanda geçen yan hak / fayda ifadeleri: ${benefits.join("; ")}.`
+      : `\nBenefits or perks mentioned in the posting: ${benefits.join("; ")}.`;
+  }
+
+  if (!signals.length && !benefits.length) {
+    const tail = isTr
+      ? "İlan metninden belirgin kültür veya yan hak cümlesi çıkarılamadı; beklentileri rol gereksinimleri ve şirket özetiyle ilişkilendirin."
+      : "No strong culture or benefits phrases were detected in the posting; align expectations with stated role requirements and the company overview.";
+    return `${prefix}\n${tail}`;
+  }
+
+  const bullet = signals.map((x) => `- ${x}`).join("\n");
+  return `${prefix}\n${bullet}${benefitBlock}`;
+}
+
+function enrichReportWithJdFallbacks(report, extracted, jobDescription, lang) {
+  const isTr = lang === "tr";
+  const r = { ...(report || {}) };
+  const co = String(r.company_structure || "").trim();
+  const em = String(r.employee_experience || "").trim();
+
+  if (shouldApplyJdFallbackToField(co)) {
+    const jdCo = buildJdCompanyOverviewFallback(extracted, jobDescription, isTr);
+    r.company_structure = mergeFieldWithJdFallback(co, jdCo);
+  }
+
+  if (shouldApplyJdFallbackToField(em)) {
+    const jdEm = buildJdEmployeeExperienceFallback(jobDescription, isTr);
+    r.employee_experience = mergeFieldWithJdFallback(em, jdEm);
+  }
+
+  return r;
+}
+
 /**
  * Full report card sections + preparation box (GPT), with graceful degradation if search empty.
  */
@@ -265,15 +445,18 @@ export async function buildCompanyIntelligenceReport({
   companySearch,
   sectorTrends,
   cvComparison,
+  jobDescription = "",
   lang = "en",
 }) {
   const isTr = lang === "tr";
   const ex = extracted || {};
+  const jdExcerpt = String(jobDescription || "").trim().slice(0, 8000);
   const bundle = JSON.stringify({
     extracted: ex,
     companySearch,
     sectorTrends,
     cvComparison,
+    jobDescription_excerpt: jdExcerpt,
   });
 
   const qualityTr = `
@@ -339,7 +522,9 @@ Max 2 preparation_steps.`;
       { role: "user", content: prompt },
     ],
   });
-  return parseModelJson(content) || {};
+  const parsed = parseModelJson(content) || {};
+  const jdFull = String(jobDescription || "").trim();
+  return enrichReportWithJdFallbacks(parsed, ex, jdFull, lang);
 }
 
 /**
@@ -419,6 +604,7 @@ export async function buildCompanyIntelligenceLayer({ extracted, cvText, jobDesc
     companySearch,
     sectorTrends,
     cvComparison,
+    jobDescription: String(jobDescription || "").trim(),
     lang: langNorm,
   });
 
