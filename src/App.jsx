@@ -291,12 +291,12 @@ function getScoreFinalVerdict(score, lang) {
   if (s < 60) {
     return {
       icon: "❌",
-      title: lang === "TR" ? "Başvurma" : "Do not apply",
+      title: lang === "TR" ? "Başvurma" : "Application not recommended",
       explanation:
         lang === "TR"
           ? "Kritik gereksinimleri karşılamıyorsun. Şimdi başvurursan büyük ihtimalle elenirsin — önce boşlukları kapat."
           : "You are missing critical requirements. Applying now will likely lead to rejection.",
-      shareLabel: lang === "TR" ? "Başvurma" : "Do not apply",
+      shareLabel: lang === "TR" ? "Başvurma" : "Application not recommended",
       border: "rgba(239,68,68,0.45)",
       bg: "rgba(239,68,68,0.12)",
     };
@@ -344,10 +344,13 @@ function mapDecisionLabel(decision, lang) {
   const raw = String(decision || "").trim().toLowerCase();
   if (!raw) return "";
   if (raw === "do_not_apply" || raw === "başvurma" || raw === "basvurma") {
-    return lang === "TR" ? "Başvurma" : "Do not apply";
+    return lang === "TR" ? "Başvurma" : "Application not recommended";
   }
   if (raw === "apply_with_risk") return lang === "TR" ? "Riskli başvuru" : "Apply with risk";
   if (raw === "apply_now") return lang === "TR" ? "Başvur" : "Apply now";
+  if (/do\s*not\s*apply/i.test(String(decision || ""))) {
+    return lang === "TR" ? "Başvurma" : "Application not recommended";
+  }
   return String(decision || "");
 }
 
@@ -1060,6 +1063,7 @@ const translations = {
     interviewEmpty: "No interview prompts in this report.",
     confidenceNA: "N/A",
     companyIntelTitle: "Company Intelligence",
+    companyIntelSectorTitle: "Sector analysis",
     ciCompanyStructure: "Company overview",
     ciEmployeeExperience: "Employee experience",
     ciCareerOpportunities: "Career upside",
@@ -1187,6 +1191,7 @@ const translations = {
     interviewEmpty: "Bu raporda mülakat sorusu yok.",
     confidenceNA: "Yok",
     companyIntelTitle: "Şirket Analizi",
+    companyIntelSectorTitle: "Sektör analizi",
     ciCompanyStructure: "Şirket genel yapısı",
     ciEmployeeExperience: "Çalışan deneyimi",
     ciCareerOpportunities: "Kariyer fırsatları",
@@ -1898,6 +1903,9 @@ function CompanyIntelligenceSection({ intel, lang, t, isPro, onOpenRoadmap, onUp
     (ex.company_name && ex.company_name.length > 0);
   if (!hasBody) return null;
 
+  const hasCompanyName = Boolean(ex.company_name && String(ex.company_name).trim());
+  const intelHeading = hasCompanyName ? t.companyIntelTitle : t.companyIntelSectorTitle;
+
   const steps = Array.isArray(r.preparation_steps) ? r.preparation_steps : [];
   const totalWeeks = steps.reduce((acc, x) => acc + (Number(x.weeks_estimate) || 0), 0);
 
@@ -1920,12 +1928,14 @@ function CompanyIntelligenceSection({ intel, lang, t, isPro, onOpenRoadmap, onUp
         boxShadow: "0 18px 48px rgba(0,0,0,0.35)",
       }}
     >
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", color: "#d4af37", marginBottom: 14 }}>{t.companyIntelTitle}</div>
-      {ex.company_name ? (
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.14em", color: "#d4af37", marginBottom: 14 }}>{intelHeading}</div>
+      {hasCompanyName ? (
         <div style={{ fontSize: 15, fontWeight: 800, color: "#f8fafc", marginBottom: 12 }}>
           {ex.company_name}
           {ex.sector_inferred ? <span style={{ fontWeight: 600, color: "#94a3b8", fontSize: 13 }}> · {ex.sector_inferred}</span> : null}
         </div>
+      ) : ex.sector_inferred ? (
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#94a3b8", marginBottom: 12 }}>{ex.sector_inferred}</div>
       ) : null}
       {block(t.ciCompanyStructure, r.company_structure)}
       {block(t.ciEmployeeExperience, r.employee_experience)}

@@ -648,6 +648,9 @@ export default function ReportPage() {
     );
   }
 
+  const sanitizeReportText = (txt) =>
+    String(txt || "").replace(/\bDo not apply\b/gi, "Application not recommended");
+
   const score = report.alignment_score || 0;
   const matchedSkills = Array.isArray(report.matched_skills) ? report.matched_skills : [];
   const missingSkills = Array.isArray(report.missing_skills) ? report.missing_skills : [];
@@ -820,7 +823,7 @@ export default function ReportPage() {
         {report.report && (
           <div className="rp-card rp-report" style={{ marginBottom: 16 }}>
             <div className="rp-card-title" style={{ color: "#94a3b8" }}>Full Analysis</div>
-            <div className="rp-report-text">{report.report}</div>
+            <div className="rp-report-text">{sanitizeReportText(report.report)}</div>
           </div>
         )}
 

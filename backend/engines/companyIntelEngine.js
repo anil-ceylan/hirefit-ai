@@ -12,9 +12,6 @@ const KNOWN_SECTORS = [
   "Government",
 ];
 
-const MISSING_COMPANY_EN = "Could not extract company name — check job posting header";
-const MISSING_COMPANY_TR = "Şirket adı çıkarılamadı — ilan başlığını kontrol edin";
-
 /** Job-title / boilerplate tokens — skip as company candidates */
 const JOB_TITLE_WORDS = new Set(
   "senior junior mid staff principal lead staff intern the we our this role job position opening opportunity team remote hybrid onsite full time part contract permanent temporary software engineer developer engineering data science scientist analyst designer product manager director head vp chief executive founder cofounder co-founder machine learning ml ai stack frontend backend devops sre qa quality assurance architect consultant associate years experience required preferred plus nice have skills responsibilities qualifications about overview description summary location based global emea apac".split(
@@ -125,21 +122,18 @@ function gptCompanyNameLooksEmpty(name) {
   return false;
 }
 
-function resolveCompanyNameField(gptName, jd, langNorm) {
+function resolveCompanyNameField(gptName, jd) {
   let name = String(gptName || "").trim();
   if (gptCompanyNameLooksEmpty(name)) name = "";
   if (!name) name = heuristicExtractCompanyName(jd);
-  if (!name) {
-    return langNorm === "tr" ? MISSING_COMPANY_TR : MISSING_COMPANY_EN;
-  }
+  if (!name) return "";
   return name;
 }
 
-/** Real employer string for Tavily etc.; empty when UI shows synthetic placeholder only. */
+/** Real employer string for Tavily etc.; empty when unknown. */
 export function companyNameForSearch(extracted) {
   const n = String(extracted?.company_name || "").trim();
   if (!n) return "";
-  if (n === MISSING_COMPANY_EN || n === MISSING_COMPANY_TR) return "";
   if (/^Could not extract company name/i.test(n)) return "";
   if (/^Şirket adı çıkarılamadı/i.test(n)) return "";
   return n;
@@ -222,7 +216,7 @@ Rules:
   }
 
   return {
-    company_name: resolveCompanyNameField(p.company_name, jd, langNorm),
+    company_name: resolveCompanyNameField(p.company_name, jd),
     sector_inferred: String(p.sector_inferred || "").trim(),
     subsector_niche: String(p.subsector_niche || "").trim(),
     region_likely: String(p.region_likely || "").trim(),

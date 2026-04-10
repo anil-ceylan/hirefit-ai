@@ -350,9 +350,7 @@ function buildJdCompanyOverviewFallback(extracted, jobDescription, isTr) {
     ? isTr
       ? `Şirket: ${name}.`
       : `Company: ${name}.`
-    : isTr
-      ? "Şirket adı ilanda açık değil."
-      : "Company name not stated in the posting.";
+    : "";
 
   const sectorLine = isTr
     ? `İlandan anlaşılan sektör: ${sectorDisp}.`
@@ -370,7 +368,7 @@ function buildJdCompanyOverviewFallback(extracted, jobDescription, isTr) {
       ? "İlanda net bir teknoloji yığını listesi çıkarılamadı; gereksinimler metninde geçen ifadelere bakın."
       : "No clear technology stack list was extracted; refer to requirement wording in the posting.";
 
-  return [nameLine, sectorLine, typeLine, techLine].join("\n");
+  return [nameLine, sectorLine, typeLine, techLine].filter(Boolean).join("\n");
 }
 
 function buildJdEmployeeExperienceFallback(jobDescription, isTr) {
