@@ -160,7 +160,7 @@ const styles = `
     background: rgba(255,255,255,0.02);
     border: 1px solid rgba(255,255,255,0.07);
     border-radius: 24px;
-    padding: 40px;
+    padding: 48px 44px;
     margin-bottom: 20px;
     display: grid;
     grid-template-columns: auto 1fr;
@@ -216,7 +216,7 @@ const styles = `
 
   .rp-score-num {
     font-family: 'Syne', sans-serif;
-    font-size: 36px;
+    font-size: clamp(52px, 12vw, 96px);
     font-weight: 800;
     line-height: 1;
   }
@@ -241,7 +241,7 @@ const styles = `
     font-size: 26px;
     font-weight: 800;
     letter-spacing: -0.02em;
-    margin-bottom: 10px;
+    margin-bottom: 14px;
   }
 
   .rp-score-desc {
@@ -249,7 +249,7 @@ const styles = `
     font-size: 14px;
     line-height: 1.6;
     max-width: 460px;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
 
   .rp-score-bars {
@@ -657,7 +657,7 @@ export default function ReportPage() {
   const topKeywords = Array.isArray(report.top_keywords) ? report.top_keywords : [];
   const rejectionReasons = report.rejection_reasons || {};
 
-  const scoreColor = score >= 80 ? "#10b981" : score >= 60 ? "#f59e0b" : "#ef4444";
+  const scoreColor = score <= 40 ? "#ef4444" : score <= 69 ? "#f97316" : "#22c55e";
   const verdict = score >= 80 ? "Strong Match" : score >= 60 ? "Moderate Match" : "Needs Work";
   const verdictDesc = score >= 80
     ? "Your CV is well-aligned with this role. Focus on tailoring your narrative."

@@ -615,7 +615,7 @@ function HeroStaggeredHeadline({ lang }) {
   );
 }
 
-function AnimatedAlignmentScore({ alignmentScore }) {
+function AnimatedAlignmentScore({ alignmentScore, fontSize = "clamp(48px, 11vw, 88px)" }) {
   const [n, setN] = useState(0);
   const [pop, setPop] = useState(false);
 
@@ -656,7 +656,7 @@ function AnimatedAlignmentScore({ alignmentScore }) {
   return (
     <span
       className={`hf-score-animated${pop ? " hf-score-animated--pop" : ""}`}
-      style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, color }}
+      style={{ fontFamily: "'Syne', sans-serif", fontSize, fontWeight: 800, color, lineHeight: 1 }}
     >
       {n}
     </span>
@@ -860,28 +860,43 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
   const agreementConfidence = getAgreementConfidence(data.ATS, data.Recruiter, data.Decision?.confidence);
   const jobSuggestions = getMockJobsForRole(best || roles?.[0]?.role, lang);
   const oneLineSummary = String(data.Decision?.reasoning || data.Recruiter?.reasoning || "").split(/[.!?]/).find(Boolean)?.trim() || (lang === "TR" ? "Bu rol için kritik boşlukların var." : "There are critical gaps for this role.");
+  const scoreN = Number(score);
+  const scoreHue =
+    score == null || !Number.isFinite(scoreN) ? "#93c5fd" : scoreN <= 40 ? "#ef4444" : scoreN <= 69 ? "#f97316" : "#22c55e";
+  const agreementTier = getConfidenceTierLabel(agreementConfidence, lang);
+  const agreementN = Number(agreementConfidence);
 
   return (
     <div style={{ marginBottom: 20, borderRadius: 20, overflow: "hidden", border: `1px solid ${fv.border}`, background: "linear-gradient(165deg, rgba(15,23,42,0.98), rgba(10,12,20,0.99))", boxShadow: "0 24px 64px rgba(0,0,0,0.45)" }}>
-      <div style={{ padding: "22px 22px 20px", background: fv.bg, borderBottom: `1px solid ${fv.border}` }}>
-        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", color: "#94a3b8", marginBottom: 8 }}>{t.finalVerdict}</div>
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+      <div style={{ padding: "26px 24px 22px", background: fv.bg, borderBottom: `1px solid ${fv.border}` }}>
+        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", color: "#94a3b8", marginBottom: 10 }}>{t.finalVerdict}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
           <div style={{ flex: "1 1 220px" }}>
-            <div style={{ fontSize: 36, marginBottom: 6, lineHeight: 1 }}>{fv.icon}</div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(20px,4vw,28px)", fontWeight: 800, color: "#f8fafc", lineHeight: 1.2 }}>{fv.title}</div>
-            <p style={{ margin: "12px 0 0", fontSize: 14, lineHeight: 1.65, color: "#e2e8f0", fontWeight: 700 }}>{oneLineSummary}</p>
+            <div style={{ fontSize: 36, marginBottom: 14, lineHeight: 1 }}>{fv.icon}</div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(20px,4vw,28px)", fontWeight: 800, color: "#f8fafc", lineHeight: 1.2, marginBottom: 10 }}>{fv.title}</div>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.65, color: "#e2e8f0", fontWeight: 700 }}>{oneLineSummary}</p>
             {biggest ? (
-              <div style={{ marginTop: 10, fontSize: 12, color: "#fca5a5", fontWeight: 700, lineHeight: 1.45 }}>
+              <div
+                style={{
+                  marginTop: 22,
+                  paddingTop: 14,
+                  borderTop: "1px solid rgba(255,255,255,0.08)",
+                  fontSize: 12,
+                  color: "#fca5a5",
+                  fontWeight: 700,
+                  lineHeight: 1.5,
+                }}
+              >
                 {lang === "TR"
                   ? `Bu role özel risk: ${biggest}`
                   : `For this specific role, the biggest blocker is: ${biggest}`}
               </div>
             ) : null}
           </div>
-          <div style={{ textAlign: "right", flexShrink: 0 }}>
+          <div style={{ textAlign: "center", flexShrink: 0, minWidth: 112, paddingTop: 4 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: "0.1em" }}>{t.alignmentScore}</div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 44, fontWeight: 800, color: "#93c5fd" }}>{score ?? "—"}</div>
-            <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(52px, 12vw, 96px)", fontWeight: 800, color: scoreHue, lineHeight: 1.02 }}>{score ?? "—"}</div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>
               {(() => {
                 const dc = data.Decision?.confidence;
                 const tier = getConfidenceTierLabel(dc, lang);
@@ -892,7 +907,7 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
             {score != null && Number.isFinite(Number(score)) ? (() => {
               const r = getRejectionRiskFromAlignmentScore(score, lang);
               return (
-                <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px solid rgba(255,255,255,0.08)", textAlign: "right" }}>
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)", textAlign: "center" }}>
                   <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", color: "#64748b", marginBottom: 4 }}>{t.rejectionRisk}</div>
                   <div style={{ fontSize: 13, fontWeight: 800, color: r.color, lineHeight: 1.35 }}>{r.mainLine}</div>
                 </div>
@@ -902,23 +917,60 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
         </div>
       </div>
 
-      <div style={{ padding: "18px 20px 12px" }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-          <div style={{ fontSize: 11, color: "#94a3b8", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(148,163,184,0.25)", background: "rgba(148,163,184,0.08)" }}>
-            {t.simulatedRecruiterPatterns}
-          </div>
-          <div style={{ fontSize: 11, color: "#7dd3fc", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(34,211,238,0.28)", background: "rgba(34,211,238,0.1)" }}>
-            {t.atsStyleAnalysis}
-          </div>
-          <div style={{ fontSize: 11, color: "#86efac", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(74,222,128,0.28)", background: "rgba(74,222,128,0.1)" }}>
-            {getConfidenceTierLabel(agreementConfidence, lang)?.label || `${t.confidenceLabel}: ${t.confidenceNA}`}
-          </div>
+      <div style={{ padding: "20px 22px 14px" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 16 }}>
+          {agreementTier ? (
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 800,
+                color: agreementTier.color,
+                padding: "8px 14px",
+                borderRadius: 999,
+                background:
+                  agreementN >= 85
+                    ? "rgba(16,185,129,0.16)"
+                    : agreementN >= 65
+                      ? "rgba(245,158,11,0.14)"
+                      : "rgba(239,68,68,0.12)",
+                border:
+                  agreementN >= 85
+                    ? "1px solid rgba(16,185,129,0.3)"
+                    : agreementN >= 65
+                      ? "1px solid rgba(245,158,11,0.28)"
+                      : "1px solid rgba(239,68,68,0.22)",
+              }}
+            >
+              {agreementTier.label}
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", padding: "8px 12px", borderRadius: 999, border: "1px solid rgba(148,163,184,0.2)", background: "rgba(148,163,184,0.08)" }}>
+              {t.confidenceLabel}: {t.confidenceNA}
+            </div>
+          )}
           {data.Context?.sector ? (
-            <div className="hf-sector-lens-chip" style={{ fontSize: 11, color: "#e9d5ff", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(233,213,255,0.35)", background: "rgba(139,92,246,0.12)" }}>
+            <div
+              className="hf-sector-lens-chip"
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#d4af37",
+                padding: "7px 12px",
+                borderRadius: 999,
+                border: "1px solid rgba(212,175,55,0.35)",
+                background: "rgba(212,175,55,0.1)",
+              }}
+            >
               {t.sectorLens}
               <span style={{ fontWeight: 800 }}>{getSectorDisplayLabel(data.Context.sector, lang)}</span>
             </div>
           ) : null}
+          <div style={{ fontSize: 10, fontWeight: 600, color: "#64748b", padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(100,116,139,0.2)", background: "rgba(148,163,184,0.06)" }}>
+            {t.simulatedRecruiterPatterns}
+          </div>
+          <div style={{ fontSize: 10, fontWeight: 600, color: "#64748b", padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(100,116,139,0.2)", background: "rgba(148,163,184,0.06)" }}>
+            {t.atsStyleAnalysis}
+          </div>
         </div>
         <div style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", fontWeight: 700, marginBottom: 10 }}>
           {lang === "TR" ? "Daha fazla içgörü göster" : "Show more insights"}
@@ -1197,13 +1249,13 @@ const translations = {
     recruiterView: "Recruiter View",
     whatTheyThink: "What they actually think",
     deepAnalysis: "Deep Analysis",
-    whyYouFail: "Why you fail",
+    whyYouFail: "Why you're getting filtered out",
     actionPlan: "Action Plan",
-    whatToDoNext: "What to do next",
+    whatToDoNext: "Your next move",
     skillsKeywords: "Skills & Keywords",
-    missingSignals: "Missing signals",
+    missingSignals: "Where you match and where you don't",
     marketInsights: "Market Insights",
-    careerLanes: "Career lanes and opportunities",
+    careerLanes: "How this role fits your career",
     decisionReasoning: "Decision Reasoning",
     impactProjection: "IMPACT PROJECTION",
     nowAfter: "NOW → AFTER",
@@ -1325,13 +1377,13 @@ const translations = {
     recruiterView: "Recruiter Görüşü",
     whatTheyThink: "Gerçekte ne düşündükleri",
     deepAnalysis: "Derin Analiz",
-    whyYouFail: "Neden eleniyorsun",
+    whyYouFail: "Neden elemeye takılıyorsun",
     actionPlan: "Aksiyon Planı",
-    whatToDoNext: "Sonraki adım",
+    whatToDoNext: "Bir sonraki adımın",
     skillsKeywords: "Beceriler & Anahtar Kelimeler",
-    missingSignals: "Eksik sinyaller",
+    missingSignals: "Nerede tutuyorsun, nerede kaçırıyorsun",
     marketInsights: "Pazar İçgörüleri",
-    careerLanes: "Kariyer yönü ve fırsatlar",
+    careerLanes: "Bu rol kariyerine nasıl oturuyor",
     decisionReasoning: "Karar Gerekçesi",
     impactProjection: "ETKİ TAHMİNİ",
     nowAfter: "ŞİMDİ → SONRA",
@@ -1521,40 +1573,65 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
   const scoreFv = alignmentScore != null ? getScoreFinalVerdict(alignmentScore, lang) : null;
   const impactProj =
     alignmentScore != null && impactContext ? computeImpactProjection(alignmentScore, impactContext, lang) : null;
+  const confTier = getConfidenceTierLabel(data.confidence, lang);
+  const confN = Number(data.confidence);
 
   return (
     <div style={{ background: "#0a0a0a", border: `1px solid ${decisionBorder}`, borderRadius: 20, padding: 24, marginBottom: 16, position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg, ${decisionColor}, transparent)` }} />
       {scoreFv && (
-        <div style={{ marginBottom: 20, padding: "18px 20px", borderRadius: 14, background: scoreFv.bg, border: `1px solid ${scoreFv.border}` }}>
-          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", color: "#94a3b8", marginBottom: 8 }}>{lang === "TR" ? "FİNAL KARAR" : "FINAL VERDICT"}</div>
+        <div style={{ marginBottom: 20, padding: "26px 24px 24px", borderRadius: 14, background: scoreFv.bg, border: `1px solid ${scoreFv.border}` }}>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", color: "#94a3b8", marginBottom: 12 }}>{lang === "TR" ? "FİNAL KARAR" : "FINAL VERDICT"}</div>
           <div
             key={`${alignmentScore}-${data.decision}`}
-            style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 14, justifyContent: "space-between" }}
+            style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 20, justifyContent: "space-between" }}
           >
             <div style={{ flex: "1 1 200px" }}>
-              <div className="hf-verdict-reveal__icon">{scoreFv.icon}</div>
-              <div className="hf-verdict-reveal__title" style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#f8fafc" }}>
+              <div className="hf-verdict-reveal__icon" style={{ marginBottom: 18 }}>
+                {scoreFv.icon}
+              </div>
+              <div
+                className="hf-verdict-reveal__title"
+                style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#f8fafc", marginBottom: 12 }}
+              >
                 {scoreFv.title}
               </div>
-              <p className="hf-verdict-reveal__body" style={{ margin: "10px 0 0", fontSize: 14, color: "#e2e8f0", lineHeight: 1.55, fontWeight: 600 }}>
+              <p className="hf-verdict-reveal__body" style={{ margin: "4px 0 0", fontSize: 14, color: "#e2e8f0", lineHeight: 1.55, fontWeight: 600 }}>
                 {scoreFv.explanation}
               </p>
             </div>
-            <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{ textAlign: "center", flexShrink: 0, minWidth: 120, paddingTop: 2 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: "0.1em" }}>{lang === "TR" ? "SKOR" : "SCORE"}</div>
-              <div style={{ marginTop: 2 }}>
+              <div style={{ marginTop: 6 }}>
                 <AnimatedAlignmentScore alignmentScore={alignmentScore} />
               </div>
             </div>
           </div>
-          <ImpactProjectionPanel projection={impactProj} lang={lang} />
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
-            <div style={{ fontSize: 11, color: "#94a3b8", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(148,163,184,0.25)", background: "rgba(148,163,184,0.08)" }}>
-              {lang === "TR" ? "Simüle recruiter paternlerine dayalı" : "Based on simulated recruiter patterns"}
+          <div style={{ marginTop: 22 }}>
+            <ImpactProjectionPanel projection={impactProj} lang={lang} />
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 20 }}>
+            {confTier ? (
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: confTier.color,
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  background: confN >= 85 ? "rgba(16,185,129,0.16)" : confN >= 65 ? "rgba(245,158,11,0.14)" : "rgba(239,68,68,0.12)",
+                  border:
+                    confN >= 85 ? "1px solid rgba(16,185,129,0.3)" : confN >= 65 ? "1px solid rgba(245,158,11,0.28)" : "1px solid rgba(239,68,68,0.22)",
+                }}
+              >
+                {confTier.label}
+              </div>
+            ) : null}
+            <div style={{ fontSize: 10, fontWeight: 600, color: "#64748b", padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(100,116,139,0.2)", background: "rgba(148,163,184,0.06)" }}>
+              {t.simulatedRecruiterPatterns}
             </div>
-            <div style={{ fontSize: 11, color: "#7dd3fc", padding: "6px 10px", borderRadius: 999, border: "1px solid rgba(34,211,238,0.28)", background: "rgba(34,211,238,0.1)" }}>
-              {lang === "TR" ? "ATS-stili analiz" : "ATS-style analysis"}
+            <div style={{ fontSize: 10, fontWeight: 600, color: "#64748b", padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(100,116,139,0.2)", background: "rgba(148,163,184,0.06)" }}>
+              {t.atsStyleAnalysis}
             </div>
           </div>
         </div>
@@ -1645,16 +1722,16 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
 
       {/* 3. BIGGEST MISTAKE */}
       {data.biggestMistake && (
-        <div style={{ marginBottom: 16, padding: "14px 18px", background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.22)", borderRadius: 12 }}>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#f87171", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8 }}>
+        <div style={{ marginBottom: 16, padding: "22px 22px", background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.22)", borderRadius: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#f87171", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 12 }}>
             {lang === "TR" ? "ELENMENİN ANA NEDENİ" : "THE MAIN REASON YOU GET REJECTED"}
           </div>
-          <div style={{ fontSize: 12, color: "#fca5a5", fontWeight: 600, marginBottom: 8, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 12, color: "#fca5a5", fontWeight: 600, marginBottom: 12, lineHeight: 1.5 }}>
             {lang === "TR"
               ? "Bunu düzeltmeden diğer her şey yarım kalır."
               : "This is the main reason you're being rejected."}
           </div>
-          <div style={{ fontSize: 15, color: "#fef2f2", fontWeight: 700, lineHeight: 1.45 }}>{data.biggestMistake}</div>
+          <div style={{ fontSize: 15, color: "#fef2f2", fontWeight: 700, lineHeight: 1.5 }}>{data.biggestMistake}</div>
         </div>
       )}
 
