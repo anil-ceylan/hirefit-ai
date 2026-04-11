@@ -41,6 +41,11 @@ if (!process.env.GROQ_API_KEY) {
   console.error("❌ GROQ_API_KEY missing!");
 }
 
+/** Railway (and similar) set PORT; health checks often need a simple 200. */
+app.get("/health", (_req, res) => {
+  res.status(200).type("text/plain").send("ok");
+});
+
 app.post("/api/analyze", async (req, res) => {
   try {
     const { cvText, jobDescription, cv, jd } = req.body || {};
@@ -953,9 +958,15 @@ const lemonWebhookHandler = async (req, res) => {
 app.post("/api/webhook", express.raw({ type: "application/json" }), lemonWebhookHandler);
 app.post("/webhook", express.raw({ type: "application/json" }), lemonWebhookHandler);
 
+const PORT = Number(process.env.PORT) || 3000;
+
 try {
-  app.listen(3000, () => {
-    console.log("🚀 Backend running on http://localhost:3000");
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Backend listening on 0.0.0.0:${PORT} (health: /health)`);
+  });
+  server.on("error", (err) => {
+    console.error("SERVER LISTEN ERROR:", err.message, err.stack);
+    process.exit(1);
   });
 } catch (err) {
   console.error("LISTEN ERROR:", err.message);
