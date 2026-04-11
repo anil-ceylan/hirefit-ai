@@ -15,6 +15,16 @@ import { logPromptBeingSent } from "../lib/aiPromptLog.js";
 import { buildRecruiterSystemPrompt } from "../lib/recruiterSystemPrompt.js";
 import { normalizeAnalyzeLang } from "../lib/analyze-v2/lang.js";
 
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err.message, err.stack);
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("UNHANDLED REJECTION:", reason);
+  process.exit(1);
+});
+
 /** Groq output budget — must be ≥2000 so long postings are not cut off mid-generation */
 const EXTRACT_JOB_MAX_TOKENS = 8192;
 
@@ -943,6 +953,11 @@ const lemonWebhookHandler = async (req, res) => {
 app.post("/api/webhook", express.raw({ type: "application/json" }), lemonWebhookHandler);
 app.post("/webhook", express.raw({ type: "application/json" }), lemonWebhookHandler);
 
-app.listen(3000, () => {
-  console.log("🚀 Backend running on http://localhost:3000");
-});
+try {
+  app.listen(3000, () => {
+    console.log("🚀 Backend running on http://localhost:3000");
+  });
+} catch (err) {
+  console.error("LISTEN ERROR:", err.message);
+  process.exit(1);
+}
