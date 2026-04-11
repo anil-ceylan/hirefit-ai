@@ -95,3 +95,139 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* HireFit — hero / results / pipeline (pure CSS animations) */
+@keyframes wordReveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+@keyframes hfScorePop {
+  0% {
+    transform: scale(1);
+  }
+  55% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes hfVerdictIconScale {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes hfVerdictTextReveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hfPipelineCheckPop {
+  from {
+    transform: scale(0.35);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes hfPipelineRowFlash {
+  0% {
+    background: rgba(34, 197, 94, 0.1);
+  }
+  100% {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+@keyframes hfPipelineBorderPulse {
+  0%,
+  100% {
+    border-left-color: rgba(167, 139, 250, 0.4);
+  }
+  50% {
+    border-left-color: rgba(224, 204, 255, 0.95);
+  }
+}
+
+.hf-hero-word {
+  display: inline-block;
+  margin-right: 0.28em;
+  opacity: 0;
+  animation: wordReveal 0.42s ease-out forwards;
+}
+
+.hf-hero-word:last-child {
+  margin-right: 0;
+}
+
+.hf-hero-line2-wrap {
+  display: inline;
+  animation: pulse 2.2s ease-in-out infinite;
+  animation-delay: var(--hf-hero-pulse-delay, 0s);
+}
+
+.hf-hero-line2-wrap .hf-hero-word {
+  color: #fb923c;
+}
+
+.hf-score-animated {
+  display: inline-block;
+  transform-origin: center;
+}
+
+.hf-score-animated--pop {
+  animation: hfScorePop 0.32s ease-out both;
+}
+
+.hf-verdict-reveal__icon {
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 8px;
+  transform-origin: center;
+  animation: hfVerdictIconScale 0.4s ease-out both;
+}
+
+.hf-verdict-reveal__title {
+  animation: hfVerdictTextReveal 0.4s ease-out both;
+}
+
+.hf-verdict-reveal__body {
+  animation: hfVerdictTextReveal 0.4s ease-out both;
+}
+
+.hf-pipeline-check {
+  display: grid;
+  place-items: center;
+  animation: hfPipelineCheckPop 0.38s cubic-bezier(0.34, 1.45, 0.64, 1) both;
+}

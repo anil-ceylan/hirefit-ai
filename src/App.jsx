@@ -578,6 +578,91 @@ function countCvSections(cvText) {
   return n;
 }
 
+const HF_HERO_WORD_DELAY_MS = 80;
+const HF_HERO_WORD_REVEAL_MS = 420;
+
+function HeroStaggeredHeadline({ lang }) {
+  const line1 =
+    lang === "TR"
+      ? "CV'n neden reddediliyor?".split(/\s+/).filter(Boolean)
+      : "Why does your CV get rejected?".split(/\s+/).filter(Boolean);
+  const line2 =
+    lang === "TR"
+      ? "Artık bileceksin.".split(/\s+/).filter(Boolean)
+      : "Now you'll know.".split(/\s+/).filter(Boolean);
+  const totalWords = line1.length + line2.length;
+  const pulseDelayMs = (totalWords - 1) * HF_HERO_WORD_DELAY_MS + HF_HERO_WORD_REVEAL_MS;
+
+  return (
+    <>
+      {line1.map((w, i) => (
+        <span key={`h1-${i}`} className="hf-hero-word" style={{ animationDelay: `${i * HF_HERO_WORD_DELAY_MS}ms` }}>
+          {w}
+        </span>
+      ))}
+      <br />
+      <span className="hf-hero-line2-wrap" style={{ ["--hf-hero-pulse-delay"]: `${pulseDelayMs}ms` }}>
+        {line2.map((w, j) => {
+          const idx = line1.length + j;
+          return (
+            <span key={`h2-${j}`} className="hf-hero-word" style={{ animationDelay: `${idx * HF_HERO_WORD_DELAY_MS}ms` }}>
+              {w}
+            </span>
+          );
+        })}
+      </span>
+    </>
+  );
+}
+
+function AnimatedAlignmentScore({ alignmentScore }) {
+  const [n, setN] = useState(0);
+  const [pop, setPop] = useState(false);
+
+  useEffect(() => {
+    if (alignmentScore == null) return;
+    const tgt = Math.min(100, Math.max(0, Math.round(Number(alignmentScore) || 0)));
+    let cancelled = false;
+    setN(0);
+    setPop(false);
+    let start = null;
+    let raf = 0;
+    const duration = 1200;
+    const easeOut = (t) => 1 - (1 - t) * (1 - t);
+    const tick = (now) => {
+      if (cancelled) return;
+      if (start == null) start = now;
+      const p = Math.min(1, (now - start) / duration);
+      setN(Math.round(easeOut(p) * tgt));
+      if (p < 1) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        setN(tgt);
+        setPop(true);
+        window.setTimeout(() => {
+          if (!cancelled) setPop(false);
+        }, 320);
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
+  }, [alignmentScore]);
+
+  const color = n <= 40 ? "#ef4444" : n <= 69 ? "#f97316" : "#22c55e";
+
+  return (
+    <span
+      className={`hf-score-animated${pop ? " hf-score-animated--pop" : ""}`}
+      style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, color }}
+    >
+      {n}
+    </span>
+  );
+}
+
 function AiLivePipelinePanel({ lang, loading, hasOutput, cvReady, jdReady, extractingJob }) {
   const [step, setStep] = useState(0);
   useEffect(() => {
@@ -643,19 +728,23 @@ function AiLivePipelinePanel({ lang, loading, hasOutput, cvReady, jdReady, extra
           const active = loading && step === i;
           const pending = !loading && !hasOutput && !done;
           return (
-            <motion.div
-              key={s.key}
+            <div
+              key={`${s.key}-${done ? "1" : "0"}`}
               className={`hf-ai-pipeline-step${done ? " hf-ai-pipeline-step--done" : ""}${active ? " hf-ai-pipeline-step--active" : ""}${pending ? " hf-ai-pipeline-step--pending" : ""}`}
-              initial={false}
-              animate={active ? { scale: [1, 1.01, 1] } : {}}
-              transition={{ duration: 0.6, repeat: active ? Infinity : 0 }}
-              style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}
             >
               <div style={{ width: 22, height: 22, display: "grid", placeItems: "center" }}>
-                {done ? <CheckCircle2 size={16} color="#34d399" /> : active ? <Loader2 size={14} color="#a78bfa" style={{ animation: "spin 0.8s linear infinite" }} /> : <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(148,163,184,0.35)" }} />}
+                {done ? (
+                  <span className="hf-pipeline-check">
+                    <CheckCircle2 size={16} color="#34d399" />
+                  </span>
+                ) : active ? (
+                  <Loader2 size={14} color="#a78bfa" style={{ animation: "spin 0.8s linear infinite" }} />
+                ) : (
+                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(148,163,184,0.35)" }} />
+                )}
               </div>
               <div style={{ fontSize: 13, fontWeight: done || active ? 700 : 600, color: done ? "#a7f3d0" : active ? "#e9d5ff" : "#64748b" }}>{s.label}</div>
-            </motion.div>
+            </div>
           );
         })}
       </div>
@@ -1439,15 +1528,24 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
       {scoreFv && (
         <div style={{ marginBottom: 20, padding: "18px 20px", borderRadius: 14, background: scoreFv.bg, border: `1px solid ${scoreFv.border}` }}>
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", color: "#94a3b8", marginBottom: 8 }}>{lang === "TR" ? "FİNAL KARAR" : "FINAL VERDICT"}</div>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 14, justifyContent: "space-between" }}>
+          <div
+            key={`${alignmentScore}-${data.decision}`}
+            style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", gap: 14, justifyContent: "space-between" }}
+          >
             <div style={{ flex: "1 1 200px" }}>
-              <div style={{ fontSize: 28, lineHeight: 1, marginBottom: 8 }}>{scoreFv.icon}</div>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#f8fafc" }}>{scoreFv.title}</div>
-              <p style={{ margin: "10px 0 0", fontSize: 14, color: "#e2e8f0", lineHeight: 1.55, fontWeight: 600 }}>{scoreFv.explanation}</p>
+              <div className="hf-verdict-reveal__icon">{scoreFv.icon}</div>
+              <div className="hf-verdict-reveal__title" style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: "#f8fafc" }}>
+                {scoreFv.title}
+              </div>
+              <p className="hf-verdict-reveal__body" style={{ margin: "10px 0 0", fontSize: 14, color: "#e2e8f0", lineHeight: 1.55, fontWeight: 600 }}>
+                {scoreFv.explanation}
+              </p>
             </div>
             <div style={{ textAlign: "right", flexShrink: 0 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: "0.1em" }}>{lang === "TR" ? "SKOR" : "SCORE"}</div>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, color: "#93c5fd" }}>{alignmentScore}</div>
+              <div style={{ marginTop: 2 }}>
+                <AnimatedAlignmentScore alignmentScore={alignmentScore} />
+              </div>
             </div>
           </div>
           <ImpactProjectionPanel projection={impactProj} lang={lang} />
@@ -2834,19 +2932,7 @@ function HeroSection({ navigate, lang }) {
                 textAlign: "left",
               }}
             >
-              {lang === "TR" ? (
-                <>
-                  {"CV'n neden reddediliyor?"}
-                  <br />
-                  <span className="shimmer-text">Artık bileceksin.</span>
-                </>
-              ) : (
-                <>
-                  Why does your CV get rejected?
-                  <br />
-                  <span className="shimmer-text">Now you&apos;ll know.</span>
-                </>
-              )}
+              <HeroStaggeredHeadline lang={lang} />
             </h1>
             <button
               type="button"
