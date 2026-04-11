@@ -1,6 +1,7 @@
 /* eslint-env node */
 import { openaiChat } from "../../lib/analyze-v2/openaiClient.js";
 import { parseModelJson } from "../../lib/analyze-v2/json.js";
+import { criticalOutputLanguageInstruction, MANDATORY_TURKISH_AI_OUTPUT } from "../../lib/analyze-v2/lang.js";
 
 const KNOWN_SECTORS = [
   "Auto-detect",
@@ -165,7 +166,9 @@ export async function extractCompanyIntelFromJd(jdText, lang = "en") {
       ? "Yanıtını Türkçe ver, İngilizce kelime karıştırma. JSON değerleri Türkçe olsun (mapped_sector hariç — o İngilizce sabit listeden biri olmalı)."
       : "Respond in English only for natural-language string values.";
 
-  const user = `${trRule}
+  const user = `${langNorm === "tr" ? `${MANDATORY_TURKISH_AI_OUTPUT}\n\n` : ""}${criticalOutputLanguageInstruction(langNorm)}
+
+${trRule}
 
 Job description (JD):
 ${jd}
@@ -203,7 +206,7 @@ Rules:
     messages: [
       {
         role: "system",
-        content: `${langHead}\n\n${systemTail}`,
+        content: `${langNorm === "tr" ? `${MANDATORY_TURKISH_AI_OUTPUT}\n\n` : ""}${criticalOutputLanguageInstruction(langNorm)}\n\n${langHead}\n\n${systemTail}`,
       },
       { role: "user", content: user },
     ],

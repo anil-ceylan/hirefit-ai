@@ -20,7 +20,8 @@ export default async function handler(req, res) {
       });
     }
 
-    const result = await runMultiAnalyze({ cvText, jobDescription });
+    const { lang } = body;
+    const result = await runMultiAnalyze({ cvText, jobDescription, lang });
     return res.status(200).json(result);
   } catch (e) {
     console.error("[api/analyze]", e);

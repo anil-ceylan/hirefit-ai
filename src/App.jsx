@@ -1,7 +1,8 @@
 import "./App.css";
 import supabase from "./supabaseClient";
 import RoadmapPage from "./RoadmapPage.jsx";
-import { useNavigate, useLocation } from "react-router-dom";
+import { TrustSection, ComparisonSection } from "./HireFitSections";
+import { useNavigate, useLocation, Outlet, useOutletContext } from "react-router-dom";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -41,6 +42,8 @@ const HF_SECTOR_VALUES = [
   "FMCG / Retail",
   "Healthcare",
   "Government",
+  "Telecom / Hardware",
+  "Product Design / UX",
 ];
 
 const SECTOR_CHIP_THEME = {
@@ -51,12 +54,14 @@ const SECTOR_CHIP_THEME = {
   "FMCG / Retail": { dot: "#f472b6", ring: "rgba(244,114,182,0.7)", bg: "rgba(244,114,182,0.14)" },
   Healthcare: { dot: "#2dd4bf", ring: "rgba(45,212,191,0.7)", bg: "rgba(45,212,191,0.14)" },
   Government: { dot: "#94a3b8", ring: "rgba(148,163,184,0.75)", bg: "rgba(148,163,184,0.12)" },
+  "Telecom / Hardware": { dot: "#22d3ee", ring: "rgba(34,211,238,0.65)", bg: "rgba(34,211,238,0.12)" },
+  "Product Design / UX": { dot: "#e879f9", ring: "rgba(232,121,249,0.65)", bg: "rgba(232,121,249,0.12)" },
 };
 
 function getSectorDisplayLabel(sectorKey, lang) {
   const idx = HF_SECTOR_VALUES.indexOf(String(sectorKey || ""));
-  const tr = ["Otomatik (ilan)", "Teknoloji / Startup", "Danışmanlık", "Finans", "FMCG / Perakende", "Sağlık", "Kamu"];
-  const en = ["Auto (from job)", "Tech / Startup", "Consulting", "Finance", "FMCG / Retail", "Healthcare", "Government"];
+  const tr = ["Otomatik (ilan)", "Teknoloji / Startup", "Danışmanlık", "Finans", "FMCG / Perakende", "Sağlık", "Kamu", "Telekom / Donanım", "Ürün Tasarımı / UX"];
+  const en = ["Auto (from job)", "Tech / Startup", "Consulting", "Finance", "FMCG / Retail", "Healthcare", "Government", "Telecom / Hardware", "Product Design / UX"];
   if (idx >= 0) return lang === "TR" ? tr[idx] : en[idx];
   return String(sectorKey || "");
 }
@@ -273,17 +278,22 @@ function ImpactProjectionPanel({ projection, lang }) {
   );
 }
 
+function isUiTurkish(lang) {
+  return String(lang || "").toUpperCase() === "TR";
+}
+
 function getScoreFinalVerdict(score, lang) {
+  const tr = isUiTurkish(lang);
   const s = Number(score);
   if (Number.isNaN(s)) {
     return {
       icon: "—",
-      title: lang === "TR" ? "Skor bekleniyor" : "Score pending",
+      title: tr ? "Skor bekleniyor" : "Score pending",
       explanation:
-        lang === "TR"
+        tr
           ? "Analiz bitince net karar burada görünecek."
           : "Complete an analysis to see your verdict.",
-      shareLabel: lang === "TR" ? "Beklemede" : "Pending",
+      shareLabel: tr ? "Beklemede" : "Pending",
       border: "rgba(148,163,184,0.35)",
       bg: "rgba(148,163,184,0.08)",
     };
@@ -291,12 +301,12 @@ function getScoreFinalVerdict(score, lang) {
   if (s < 60) {
     return {
       icon: "❌",
-      title: lang === "TR" ? "Başvurma" : "Application not recommended",
+      title: tr ? "Başvurma" : "Application not recommended",
       explanation:
-        lang === "TR"
+        tr
           ? "Kritik gereksinimleri karşılamıyorsun. Şimdi başvurursan büyük ihtimalle elenirsin — önce boşlukları kapat."
           : "You are missing critical requirements. Applying now will likely lead to rejection.",
-      shareLabel: lang === "TR" ? "Başvurma" : "Application not recommended",
+      shareLabel: tr ? "Başvurma" : "Application not recommended",
       border: "rgba(239,68,68,0.45)",
       bg: "rgba(239,68,68,0.12)",
     };
@@ -304,12 +314,12 @@ function getScoreFinalVerdict(score, lang) {
   if (s < 75) {
     return {
       icon: "⚠️",
-      title: lang === "TR" ? "Riskli başvuru" : "Risky apply",
+      title: tr ? "Riskli başvuru" : "Risky apply",
       explanation:
-        lang === "TR"
+        tr
           ? "İlk elemede çoğu recruiter seni saniyeler içinde eleyecek. Kanıt ve anahtar kelimeleri güçlendirmeden gönderme."
           : "You are not competitive on the first screen yet — most recruiters will bin this CV unless you fix the gaps first.",
-      shareLabel: lang === "TR" ? "Riskli başvuru" : "Risky apply",
+      shareLabel: tr ? "Riskli başvuru" : "Risky apply",
       border: "rgba(245,158,11,0.45)",
       bg: "rgba(245,158,11,0.1)",
     };
@@ -317,41 +327,57 @@ function getScoreFinalVerdict(score, lang) {
   if (s < 85) {
     return {
       icon: "🟡",
-      title: lang === "TR" ? "Düzeltmelerle başvur" : "Apply with fixes",
+      title: tr ? "Düzeltmelerle başvur" : "Apply with fixes",
       explanation:
-        lang === "TR"
+        tr
           ? "Yakınsın ama henüz ikna edici değil. Birkaç net düzeltme — ölçülebilir etki ve ilan dili — sonra başvur."
           : "You are close but not sharp enough to win the pile. Fix the highest-impact gaps, then apply.",
-      shareLabel: lang === "TR" ? "Düzeltmelerle başvur" : "Apply with fixes",
+      shareLabel: tr ? "Düzeltmelerle başvur" : "Apply with fixes",
       border: "rgba(234,179,8,0.45)",
       bg: "rgba(234,179,8,0.1)",
     };
   }
   return {
     icon: "✅",
-    title: lang === "TR" ? "Güçlü başvuru" : "Strong apply",
+    title: tr ? "Güçlü başvuru" : "Strong apply",
     explanation:
-      lang === "TR"
+      tr
         ? "Bu ilan için güçlü aday sinyali veriyorsun. Son bir sıkılaştırma ile gönder."
         : "Strong candidate signal for this role — tighten the CV once more and send it.",
-    shareLabel: lang === "TR" ? "Güçlü başvuru" : "Strong apply",
+    shareLabel: tr ? "Güçlü başvuru" : "Strong apply",
     border: "rgba(16,185,129,0.45)",
     bg: "rgba(16,185,129,0.12)",
   };
 }
 
 function mapDecisionLabel(decision, lang) {
+  const tr = isUiTurkish(lang);
   const raw = String(decision || "").trim().toLowerCase();
   if (!raw) return "";
   if (raw === "do_not_apply" || raw === "başvurma" || raw === "basvurma") {
-    return lang === "TR" ? "Başvurma" : "Application not recommended";
+    return tr ? "Başvurma" : "Application not recommended";
   }
-  if (raw === "apply_with_risk") return lang === "TR" ? "Riskli başvuru" : "Apply with risk";
-  if (raw === "apply_now") return lang === "TR" ? "Başvur" : "Apply now";
+  if (raw === "apply_with_risk") return tr ? "Riskli başvuru" : "Apply with risk";
+  if (raw === "apply_now") return tr ? "Başvur" : "Apply now";
   if (/do\s*not\s*apply/i.test(String(decision || ""))) {
-    return lang === "TR" ? "Başvurma" : "Application not recommended";
+    return tr ? "Başvurma" : "Application not recommended";
   }
   return String(decision || "");
+}
+
+/** If API/UI ever passes English verdict strings while UI is Turkish, normalize for share copy */
+function normalizeShareVerdictLabel(verdictLabel, lang) {
+  const tr = isUiTurkish(lang);
+  if (!tr) return String(verdictLabel || "").trim();
+  const s = String(verdictLabel || "").trim();
+  if (!s) return s;
+  if (/application\s+not\s+recommended/i.test(s)) return "Başvurma";
+  if (/^do\s*not\s*apply$/i.test(s)) return "Başvurma";
+  if (/risky\s*apply/i.test(s)) return "Riskli başvuru";
+  if (/apply\s+with\s+(fixes|risk)/i.test(s)) return s.toLowerCase().includes("risk") ? "Riskli başvuru" : "Düzeltmelerle başvur";
+  if (/^strong\s*apply$/i.test(s) || /strong\s+candidate/i.test(s)) return "Güçlü başvuru";
+  if (/^apply\s*now$/i.test(s)) return "Başvur";
+  return s;
 }
 
 function getConfidenceTierLabel(confidence, lang) {
@@ -363,12 +389,14 @@ function getConfidenceTierLabel(confidence, lang) {
 }
 
 function buildShareResultText({ score, verdictLabel, biggestMistake, lang }) {
-  const mistake = (biggestMistake && String(biggestMistake).trim()) || (lang === "TR" ? "Belirtilmedi" : "Not specified");
-  return lang === "TR"
+  const tr = isUiTurkish(lang);
+  const v = normalizeShareVerdictLabel(verdictLabel, lang);
+  const mistake = (biggestMistake && String(biggestMistake).trim()) || (tr ? "Belirtilmedi" : "Not specified");
+  return tr
     ? `HireFit ile CV'mi test ettim.
 
 Skor: ${score}
-Karar: ${verdictLabel}
+Karar: ${v}
 En büyük hata: ${mistake}
 
 Acımasızca dürüsttü.
@@ -377,7 +405,7 @@ Acımasızca dürüsttü.
     : `I just tested my CV with HireFit.
 
 Score: ${score}
-Verdict: ${verdictLabel}
+Verdict: ${v}
 Biggest mistake: ${mistake}
 
 This was brutally honest.
@@ -392,7 +420,7 @@ function buildLinkedInShareUrl(shareText) {
 
 function ShareYourResult({ score, verdictLabel, biggestMistake, lang }) {
   const [copied, setCopied] = useState(false);
-  const ui = SHARE_RESULT_UI[lang] || SHARE_RESULT_UI.EN;
+  const ui = SHARE_RESULT_UI[isUiTurkish(lang) ? "TR" : "EN"];
   const text = buildShareResultText({ score, verdictLabel, biggestMistake, lang });
   const linkedInUrl = buildLinkedInShareUrl(text);
   const copy = async () => {
@@ -644,9 +672,7 @@ function AiLivePipelinePanel({ lang, loading, hasOutput, cvReady, jdReady, extra
 function SharePromptModal({ open, lang, score, verdictLabel, biggestMistake, onClose }) {
   const [copied, setCopied] = useState(false);
   if (!open) return null;
-  const text = lang === "TR"
-    ? `HireFit ile CV'mi test ettim.\n\nKarar: ${verdictLabel}\nEn büyük hata: ${biggestMistake || "Belirtilmedi"}\n\nAcımasızca dürüsttü.\n\n→ hirefit.ai`
-    : `I tested my CV with HireFit.\n\nVerdict: ${verdictLabel}\nBiggest mistake: ${biggestMistake || "Not specified"}\n\nThat was brutally honest.\n\n→ hirefit.ai`;
+  const text = buildShareResultText({ score, verdictLabel, biggestMistake, lang });
   const li = buildLinkedInShareUrl(text);
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.78)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
@@ -725,10 +751,10 @@ function ExpandableInsightCard({
 }
 
 function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, onSharePrompt }) {
-  if (!data) return null;
-  const t = translations[lang];
   const [showJobs, setShowJobs] = useState(false);
   const [openCard, setOpenCard] = useState("recruiter");
+  if (!data) return null;
+  const t = translations[lang];
   const score = data["Final Alignment Score"];
   const fv = getScoreFinalVerdict(score, lang);
   const gaps = data.Gaps?.rejection_reasons || [];
@@ -1278,7 +1304,7 @@ const globalStyles = `
 `;
 
 const styles = {
-  page: { minHeight: "100vh", background: T.bg, color: T.text, fontFamily: "'DM Sans', sans-serif" },
+  page: { minHeight: "100vh", width: "100%", maxWidth: "none", margin: 0, overflowX: "hidden", background: T.bg, color: T.text, fontFamily: "'DM Sans', sans-serif" },
   container: { maxWidth: "1500px", margin: "0 auto", padding: "0 24px", width: "100%" },
 };
 
@@ -1385,8 +1411,6 @@ function PaywallModal({ onClose, onUpgrade, lang }) {
 
 function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fixResults, onUpgrade, alignmentScore, impactContext }) {
   const t = translations[lang];
-  const [shareCopied, setShareCopied] = useState(false);
-
   if (loading) return (
     <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 20, marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
       <div style={{ width: 16, height: 16, borderRadius: "50%", border: "2px solid #3b82f6", borderTopColor: "transparent", animation: "spin 0.8s linear infinite", flexShrink: 0 }} />
@@ -1680,110 +1704,6 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
           : "Most tools give you a score. HireFit tells you why you're getting rejected."}
       </p>
 
-      {/* 📤 SHARE — viral format */}
-      {(() => {
-        const shareScore = alignmentScore ?? data.fitScore ?? "—";
-        const shareV = getScoreFinalVerdict(Number(shareScore), lang).shareLabel;
-        const shareMistake = data.biggestMistake || (lang === "TR" ? "Belirtilmedi" : "Not specified");
-        const shareText = buildShareResultText({
-          score: shareScore,
-          verdictLabel: shareV,
-          biggestMistake: shareMistake,
-          lang,
-        });
-        const shareUi = SHARE_RESULT_UI[lang] || SHARE_RESULT_UI.EN;
-        const liUrl = buildLinkedInShareUrl(shareText);
-        return (
-          <div
-            style={{
-              marginTop: 8,
-              padding: "16px 18px",
-              borderRadius: 14,
-              background: "linear-gradient(145deg, rgba(15,23,42,0.6), rgba(5,5,5,0.95))",
-              border: "1px solid rgba(99,102,241,0.25)",
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", color: "#a78bfa", marginBottom: 10 }}>{shareUi.title.toUpperCase()}</div>
-            <pre
-              style={{
-                margin: "0 0 12px",
-                padding: "12px 14px",
-                borderRadius: 10,
-                background: "rgba(0,0,0,0.45)",
-                border: "1px solid rgba(255,255,255,0.06)",
-                fontSize: 12,
-                lineHeight: 1.55,
-                color: "#cbd5e1",
-                whiteSpace: "pre-wrap",
-                fontFamily: "'DM Sans', sans-serif",
-              }}
-            >
-              {shareText}
-            </pre>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await navigator.clipboard.writeText(shareText);
-                    setShareCopied(true);
-                    setTimeout(() => setShareCopied(false), 2200);
-                  } catch {
-                    setShareCopied(false);
-                  }
-                }}
-                style={{
-                  flex: 1,
-                  minWidth: 130,
-                  padding: "9px 14px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(148,163,184,0.25)",
-                  background: "rgba(255,255,255,0.04)",
-                  color: "#e2e8f0",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontFamily: "'DM Sans', sans-serif",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                }}
-              >
-                <Copy size={14} />
-                {shareCopied ? shareUi.copied : shareUi.copy}
-              </button>
-              <a
-                href={liUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  flex: 1,
-                  minWidth: 130,
-                  padding: "9px 14px",
-                  borderRadius: 10,
-                  border: "1px solid rgba(10,102,194,0.35)",
-                  background: "rgba(10,102,194,0.12)",
-                  color: "#7dd3fc",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontFamily: "'DM Sans', sans-serif",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  textDecoration: "none",
-                }}
-              >
-                <Linkedin size={14} />
-                {shareUi.linkedIn}
-              </a>
-            </div>
-          </div>
-        );
-      })()}
-
     </div>
   );
 
@@ -2017,6 +1937,20 @@ function extractJobTitleFromJd(jd) {
   return "";
 }
 
+/** LinkedIn job URLs — server-side extraction is unreliable; users should paste the JD text. */
+function isLinkedInJobUrl(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return false;
+  try {
+    const withProto = /^https?:\/\//i.test(s) ? s : `https://${s}`;
+    const u = new URL(withProto);
+    const h = u.hostname.toLowerCase();
+    return h === "linkedin.com" || h.endsWith(".linkedin.com");
+  } catch {
+    return /(^|[/.])linkedin\.com(\/|$|[:?#])/i.test(s);
+  }
+}
+
 function resolveSavedAnalysisRole(jdTitle, modelRole, lang) {
   const j = String(jdTitle || "").trim();
   if (j) return j.slice(0, 120);
@@ -2117,7 +2051,8 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
   const roleRows = (data.role_matches || []).filter((r) => r && String(r.role || "").trim());
   const showRolesProLock = !!roleFitLocked && !isPro;
   const interviewRows = Array.isArray(data.interview_prep) ? data.interview_prep : [];
-  const showInterviewProLock = false;
+  const showInterviewProLock = !isPro;
+  const showInterviewCard = showInterviewProLock || interviewRows.length > 0;
 
   const proLockBox = (desc) => (
     <div
@@ -2369,24 +2304,24 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
           <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.14em" }}>{lang === "TR" ? "Aksiyon Planı" : "Action Plan"}</div>
           <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(212,175,55,0.2), transparent)" }} />
         </div>
-        <div style={DB.grid2}>
-          <div style={DB.card}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #7c3aed)" }} />
-            <div style={DB.cardTag}>{lang === "TR" ? "Mülakat Hazırlığı" : "Interview Prep"}</div>
-            {showInterviewProLock ? (
-              <div style={{ fontSize: 13, color: "#6a6a6a", lineHeight: 1.5 }}>{t.proFeatureInterview}</div>
-            ) : interviewRows.length ? (
-              interviewRows.slice(0, 2).map((q, i) => (
-                <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i === 0 ? "1px solid #1c1c1c" : "none" }}>
-                  <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 15, color: "#e8e8e8", lineHeight: 1.5, marginBottom: 5, fontStyle: "italic" }}>&quot;{q.question}&quot;</div>
-                  <div style={{ fontSize: 11, color: "#7a7a7a", marginBottom: 4, fontWeight: 500 }}>{q.why_asked}</div>
-                  <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>{q.personal_angle}</div>
-                </div>
-              ))
-            ) : (
-              <div style={{ fontSize: 13, color: "#6a6a6a", lineHeight: 1.5 }}>{t.interviewEmpty}</div>
-            )}
-          </div>
+        <div style={{ ...DB.grid2, gridTemplateColumns: showInterviewCard ? "1fr 1fr" : "1fr" }}>
+          {showInterviewCard ? (
+            <div style={DB.card}>
+              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #7c3aed)" }} />
+              <div style={DB.cardTag}>{lang === "TR" ? "Mülakat Hazırlığı" : "Interview Prep"}</div>
+              {showInterviewProLock ? (
+                proLockBox(t.proFeatureInterview)
+              ) : (
+                interviewRows.slice(0, 2).map((q, i) => (
+                  <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i === 0 ? "1px solid #1c1c1c" : "none" }}>
+                    <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 15, color: "#e8e8e8", lineHeight: 1.5, marginBottom: 5, fontStyle: "italic" }}>&quot;{q.question}&quot;</div>
+                    <div style={{ fontSize: 11, color: "#7a7a7a", marginBottom: 4, fontWeight: 500 }}>{q.why_asked}</div>
+                    <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>{q.personal_angle}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : null}
           <div style={DB.card}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #22d3ee)" }} />
             <div style={DB.cardTag}>{lang === "TR" ? "Pazar İstihbaratı" : "Market Intelligence"}</div>
@@ -2487,8 +2422,9 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
   );
 }
 
-function NavBar({ view, user, logout, navigate, lang, setLang }) {
+function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
   const t = translations[lang];
+  const navTab = pathname === "/roadmap" ? "roadmap" : pathname === "/dashboard" ? "dashboard" : pathname === "/" ? "landing" : null;
   const [scrolled, setScrolled] = useState(false);
   const [hovered, setHovered] = useState(null);
   const [navLinkHover, setNavLinkHover] = useState(null);
@@ -2500,7 +2436,7 @@ function NavBar({ view, user, logout, navigate, lang, setLang }) {
   const updateActiveTabIndicator = () => {
     const container = navTabsRef.current;
     if (!container) return;
-    const idx = view === "landing" ? 0 : view === "roadmap" ? 1 : view === "dashboard" ? 2 : -1;
+    const idx = navTab === "landing" ? 0 : navTab === "roadmap" ? 1 : navTab === "dashboard" ? 2 : -1;
     if (idx < 0) {
       setActiveTabPosition((p) => ({ ...p, width: 0, visible: false }));
       return;
@@ -2528,7 +2464,7 @@ function NavBar({ view, user, logout, navigate, lang, setLang }) {
       if (container && ro) ro.disconnect();
       window.removeEventListener("resize", updateActiveTabIndicator);
     };
-  }, [view, lang]);
+  }, [pathname, lang]);
 
   useEffect(() => {
     const clearPress = () => setNavLinkPressed(null);
@@ -2560,14 +2496,37 @@ function NavBar({ view, user, logout, navigate, lang, setLang }) {
       .hf-nav-pill.active { color: #0f172a !important; background: rgba(255,255,255,0.92) !important; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
       .hf-nav-pill.active::after { content: ''; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 16px; height: 2px; background: linear-gradient(90deg, #3b82f6, #8b5cf6); border-radius: 999px; }
       .hf-monogram { background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6, #ec4899); background-size: 300% 300%; animation: gradientShift 4s ease infinite; }
+      .hf-nav-inner-row { position: relative; display: flex; align-items: center; flex-wrap: nowrap; height: 72px; min-height: 72px; box-sizing: border-box; }
+      .hf-nav-logo-cluster { position: relative; z-index: 2; flex-shrink: 0; }
+      .hf-nav-tabs-wrap { position: absolute; left: 50%; transform: translateX(-50%); z-index: 1; }
+      .hf-nav-right-cluster { position: relative; z-index: 2; margin-left: auto; display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+      .hf-nav-sep { width: 1px; height: 26px; background: rgba(255,255,255,0.12); flex-shrink: 0; }
+      @media (max-width: 900px) {
+        .hf-nav-inner-row { flex-wrap: wrap; row-gap: 10px; align-items: center; padding-left: 16px !important; padding-right: 16px !important; height: auto !important; min-height: 72px !important; }
+        .hf-nav-logo-cluster { order: 1; }
+        .hf-nav-right-cluster { order: 2; margin-left: auto; }
+        .hf-nav-tabs-wrap { position: static; transform: none; order: 3; flex-basis: 100%; width: 100%; display: flex; justify-content: center; margin-top: 2px; }
+      }
     `;
     document.head.appendChild(el);
   }, []);
 
   return (
-    <nav className="hf-nav-root" style={{ position: "sticky", top: 0, zIndex: 100, background: scrolled ? "rgba(6,9,16,0.94)" : "rgba(6,9,16,0.65)", backdropFilter: "blur(28px)", WebkitBackdropFilter: "blur(28px)", borderBottom: scrolled ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent", transition: "all 0.4s ease" }}>
-      <div style={{ ...styles.container, display: "flex", alignItems: "center", justifyContent: "space-between", height: "80px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }} onClick={() => navigate("/")}>
+    <nav className="hf-nav-root" style={{ width: "100%", position: "sticky", top: 0, zIndex: 100, maxWidth: "none", overflowX: "hidden", boxSizing: "border-box", background: scrolled ? "rgba(6,9,16,0.94)" : "rgba(6,9,16,0.65)", backdropFilter: "blur(28px)", WebkitBackdropFilter: "blur(28px)", borderBottom: scrolled ? "1px solid rgba(255,255,255,0.08)" : "1px solid transparent", transition: "all 0.4s ease" }}>
+      <div
+        className="hf-nav-inner-row"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          width: "100%",
+          maxWidth: "none",
+          margin: 0,
+          padding: "0 48px",
+          boxSizing: "border-box",
+          height: "72px",
+        }}
+      >
+        <div className="hf-nav-logo-cluster" style={{ display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }} onClick={() => navigate("/")}>
           <div className="hf-logo-wrap hf-monogram" style={{ width: 48, height: 48, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden", flexShrink: 0, transform: hovered === "logo" ? "scale(1.1) rotate(-5deg)" : "scale(1)", transition: "transform 0.3s cubic-bezier(0.34,1.56,0.64,1)" }} onMouseEnter={() => setHovered("logo")} onMouseLeave={() => setHovered(null)}>
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, rgba(255,255,255,0.25) 0%, transparent 60%)", zIndex: 1 }} />
             <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "18px", color: "white", letterSpacing: "-0.04em", position: "relative", zIndex: 2 }}>HF</span>
@@ -2579,8 +2538,8 @@ function NavBar({ view, user, logout, navigate, lang, setLang }) {
         </div>
         <div
           ref={navTabsRef}
+          className="hf-nav-tabs-wrap"
           style={{
-            position: "relative",
             display: "flex",
             gap: 6,
             background: "rgba(255,255,255,0.04)",
@@ -2609,7 +2568,7 @@ function NavBar({ view, user, logout, navigate, lang, setLang }) {
             }}
           />
           {[{ label: t.home, path: "/", viewKey: "landing" }, { label: t.product, path: "/roadmap", viewKey: "roadmap" }, { label: t.dashboard, path: "/dashboard", viewKey: "dashboard" }].map(({ label, path, viewKey }, i) => {
-            const isActive = view === viewKey;
+            const isActive = navTab === viewKey;
             const isHovered = navLinkHover === viewKey;
             const isPressed = navLinkPressed === viewKey;
             let scale = 1;
@@ -2652,10 +2611,23 @@ function NavBar({ view, user, logout, navigate, lang, setLang }) {
             );
           })}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="hf-nav-right-cluster">
           <button
+            type="button"
             onClick={() => setLang(lang === "EN" ? "TR" : "EN")}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 14px", borderRadius: 10, border: `1px solid ${lang === "TR" ? "rgba(220,38,38,0.3)" : "rgba(59,130,246,0.3)"}`, background: lang === "TR" ? "rgba(220,38,38,0.08)" : "rgba(59,130,246,0.08)", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", transition: "all 0.3s ease" }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 16px",
+              borderRadius: 10,
+              border: `1px solid ${lang === "TR" ? "rgba(248,113,113,0.45)" : "rgba(147,197,253,0.45)"}`,
+              background: lang === "TR" ? "rgba(220,38,38,0.1)" : "rgba(59,130,246,0.12)",
+              boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.06)",
+              cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+              transition: "all 0.3s ease",
+            }}
           >
             {lang === "EN" ? (
               <svg width="20" height="14" viewBox="0 0 20 14" fill="none">
@@ -2673,10 +2645,11 @@ function NavBar({ view, user, logout, navigate, lang, setLang }) {
                 <path d="M10,0 V14 M0,7 H20" stroke="#C8102E" strokeWidth="2.5"/>
               </svg>
             )}
-            <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.06em", color: lang === "EN" ? "#f87171" : "#93c5fd" }}>
+            <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.06em", color: lang === "EN" ? "#f87171" : "#93c5fd" }}>
               {lang === "EN" ? "Türkçe" : "English"}
             </span>
           </button>
+          <div className="hf-nav-sep" aria-hidden />
           {user ? (
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ width: 36, height: 36, borderRadius: "50%", flexShrink: 0, background: "linear-gradient(135deg, #3b82f6, #8b5cf6)", display: "grid", placeItems: "center", fontSize: "14px", fontWeight: 800, color: "white", boxShadow: "0 0 16px rgba(99,102,241,0.5)", fontFamily: "'Syne', sans-serif" }}>
@@ -2685,7 +2658,7 @@ function NavBar({ view, user, logout, navigate, lang, setLang }) {
               <button className="hf-btn-ghost" onClick={logout} style={{ padding: "9px 18px", fontSize: "13px" }}><LogOut size={13} /> {t.signOut}</button>
             </div>
           ) : (
-            <button className="hf-btn-primary" onClick={() => navigate("/login")} style={{ padding: "11px 24px", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 24px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.15)", borderRadius: 12 }}>
+            <button className="hf-btn-primary" onClick={() => navigate("/login")} style={{ padding: "10px 24px", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 24px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.15)", borderRadius: 999 }}>
               <LogIn size={14} /> {t.login}
             </button>
           )}
@@ -2698,82 +2671,29 @@ function NavBar({ view, user, logout, navigate, lang, setLang }) {
 const Navbar = NavBar;
 
 function HeroSection({ navigate, lang }) {
-const [score, setScore] = useState(0);
-const [animating, setAnimating] = useState(false);
-const [showResult, setShowResult] = useState(false);
-const [demoStep, setDemoStep] = useState(0);
-const t = translations[lang];
-const demoSteps = lang === "TR"
-  ? ["CV yükleniyor...", "Recruiter gibi analiz ediliyor...", "Karar veriliyor...", "Sonuç hazır."]
-  : ["Loading CV...", "Analyzing like a recruiter...", "Reaching a verdict...", "Decision ready."];
-
   useEffect(() => {
-    if (!document.getElementById("hero-styles")) {
-      const el = document.createElement("style");
+    let el = document.getElementById("hero-styles");
+    if (!el) {
+      el = document.createElement("style");
       el.id = "hero-styles";
-      el.textContent = `
+      document.head.appendChild(el);
+    }
+    el.textContent = `
         @keyframes heroFadeUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
         @keyframes floatY { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
         @keyframes shimmer { 0%{background-position:-200% 0;} 100%{background-position:200% 0;} }
-        @keyframes orb1 { 0%,100%{transform:translate(0,0);} 33%{transform:translate(40px,-30px);} 66%{transform:translate(-20px,20px);} }
-        @keyframes orb2 { 0%,100%{transform:translate(0,0);} 33%{transform:translate(-30px,40px);} 66%{transform:translate(30px,-20px);} }
-        @keyframes resultReveal { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-        @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
+        .hf-hero-col-left { flex: 1; min-width: 0; padding-left: 0; padding-right: 0; position: relative; z-index: 1; }
+        .hf-hero-col-right { flex: 0 0 400px; max-width: 400px; min-width: 0; position: relative; z-index: 1; flex-shrink: 0; }
+        @media (max-width: 900px) {
+          .hf-hero-inner { flex-direction: column !important; align-items: stretch !important; padding: 0 24px !important; gap: 32px !important; min-height: auto !important; }
+          .hf-hero-col-right { flex: 1 1 auto !important; max-width: 100% !important; width: 100%; }
+          .hf-hero-headline { font-size: clamp(28px, 7vw, 40px) !important; line-height: 1.05 !important; }
+        }
         .hero-fade { animation: heroFadeUp 0.6s ease both; }
         .shimmer-text { background: linear-gradient(90deg, #f87171 0%, #fb923c 25%, #f87171 50%, #fb923c 75%, #f87171 100%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 3s linear infinite; }
         .shimmer-blue { background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 25%, #f472b6 50%, #a78bfa 75%, #60a5fa 100%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 4s linear infinite; }
       `;
-      document.head.appendChild(el);
-    }
   }, []);
-
-  {/* REJECTED MOMENT */}
-<div style={{
-  textAlign: "center",
-  padding: "20px 0 12px",
-  animation: "rejectedPop 0.4s cubic-bezier(0.34,1.56,0.64,1)"
-}}>
-  <div style={{
-    fontFamily: "'Syne', sans-serif",
-    fontSize: 42,
-    fontWeight: 900,
-    color: "#f87171",
-    letterSpacing: "-0.02em",
-    textShadow: "0 0 40px rgba(239,68,68,0.6)",
-    marginBottom: 4,
-  }}>❌ {lang === "TR" ? "REDDEDİLDİ" : "REJECTED"}</div>
-  <div style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>
-    {lang === "TR" ? "Bu CV ilk elemeyi geçemez." : "This CV would not pass first screening."}
-  </div>
-</div>
-
-
-
-  const handleDemo = () => {
-  setAnimating(true);
-  setShowResult(false);
-  setDemoStep(0);
-  setScore(0);
-
-  let step = 0;
-  const stepInterval = setInterval(() => {
-    step++;
-    setDemoStep(step);
-    if (step >= demoSteps.length - 1) {
-      clearInterval(stepInterval);
-      let i = 0;
-      const scoreInterval = setInterval(() => {
-        i += 2;
-        setScore(Math.min(i, 34));
-        if (i >= 34) {
-          clearInterval(scoreInterval);
-          setAnimating(false);
-          setShowResult(true);
-        }
-      }, 30);
-    }
-  }, 700);
-};
 
   const fakeResult = {
     EN: {
@@ -2799,195 +2719,327 @@ const demoSteps = lang === "TR"
   const r = fakeResult[lang];
 
   return (
-    <section style={{ position: "relative", padding: "80px 0 60px", overflow: "hidden" }}>
-      <div style={{ position: "absolute", top: "-150px", left: "-100px", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(239,68,68,0.06), transparent 65%)", animation: "orb1 12s ease-in-out infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: "-100px", right: "-100px", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.08), transparent 65%)", animation: "orb2 15s ease-in-out infinite", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)", backgroundSize: "48px 48px", pointerEvents: "none" }} />
+    <section
+      style={{
+        width: "100vw",
+        minHeight: "100vh",
+        background: "#0A0A0B",
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          overflow: "hidden",
+          pointerEvents: "none",
+          zIndex: 0,
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            width: "700px",
+            height: "700px",
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(109, 40, 217, 0.1) 0%, transparent 65%)",
+            top: "-200px",
+            left: "-150px",
+            filter: "blur(90px)",
+            animation: "blobFloat1 12s ease-in-out infinite alternate",
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            width: "600px",
+            height: "600px",
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(29, 78, 216, 0.08) 0%, transparent 65%)",
+            bottom: "-150px",
+            right: "-50px",
+            filter: "blur(80px)",
+            animation: "blobFloat2 15s ease-in-out infinite alternate",
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            width: "400px",
+            height: "400px",
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(15, 118, 110, 0.07) 0%, transparent 65%)",
+            top: "30%",
+            left: "35%",
+            filter: "blur(70px)",
+            animation: "blobFloat1 20s ease-in-out infinite alternate-reverse",
+            pointerEvents: "none",
+          }}
+        />
+      </div>
+      <div aria-hidden style={{ position: "absolute", inset: 0, background: "#0A0A0B", pointerEvents: "none", zIndex: 0 }} />
+      <div aria-hidden style={{ position: "absolute", inset: 0, background: "rgba(10,10,11,0.5)", pointerEvents: "none", zIndex: 0 }} />
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px)",
+          backgroundSize: "64px 64px",
+          opacity: 0.4,
+          pointerEvents: "none",
+          zIndex: 0,
+        }}
+      />
 
-      <div style={{ ...styles.container, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 60, alignItems: "center", position: "relative", zIndex: 2 }}>
-
-        {/* LEFT */}
-        <div>
-          <div className="hero-fade" style={{ animationDelay: "0.1s", display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 14px", borderRadius: 999, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", fontSize: "11px", fontWeight: 700, color: "#f87171", marginBottom: 24, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#f87171", display: "inline-block", animation: "pulse 2s infinite" }} />
-            {lang === "TR" ? "Kariyer Karar Motoru" : "Career Decision Engine"}
-          </div>
-
-          <div style={{
-            color: "#3b82f6",
-            marginBottom: 10,
-            fontSize: 12,
-            fontWeight: 600,
-            letterSpacing: "0.1em",
-            textTransform: "uppercase"
-          }}>
-            {t.slogan}
-          </div>
-
-          <h1 className="hero-fade" style={{ animationDelay: "0.2s", fontFamily: "'Syne', sans-serif", fontSize: "clamp(36px, 4.5vw, 62px)", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-0.03em", marginBottom: 20 }}>
-            {lang === "TR" ? (
-              <>CV'n neden reddediliyor?<br /><span className="shimmer-text">Artık bileceksin.</span></>
-            ) : (
-              <>Stop guessing why<br />your CV gets<br /><span className="shimmer-text">rejected.</span></>
-            )}
-          </h1>
-
-          <p className="hero-fade" style={{ animationDelay: "0.3s", fontSize: "17px", lineHeight: 1.75, color: "#64748b", maxWidth: "440px", marginBottom: 16 }}>
-            {lang === "TR"
-              ? "CV'ni bir recruiter gibi analiz ediyoruz ve gerçeği söylüyoruz — başvurmadan önce."
-              : "We analyze your CV like a recruiter and tell you the truth — before you waste your time applying."}
-          </p>
-
-          <div className="hero-fade" style={{ animationDelay: "0.28s", marginBottom: 16 }}>
-  <span style={{ fontSize: 14, color: "#64748b", fontStyle: "italic" }}>
-    {lang === "TR"
-      ? "Fark etmeden reddediliyor olabilirsin. Çoğu insan habersizce başvurur — bu yüzden başarısız olur."
-      : "You might be getting rejected without realizing why. Most people apply blindly. That's why they fail."}
-  </span>
-</div>
-
-          
-
-          <div className="hero-fade" style={{ animationDelay: "0.4s", display: "flex", flexDirection: "column", gap: 12, marginBottom: 32 }}>
+      <div
+        className="hf-hero-inner"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          flex: 1,
+          padding: "0 80px",
+          gap: "80px",
+          width: "100%",
+          boxSizing: "border-box",
+        }}
+      >
+          <div
+            className="hero-fade hf-hero-col-left"
+            style={{
+              animationDelay: "0.08s",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "flex-start",
+            }}
+          >
+            <h1
+              className="hf-hero-headline"
+              style={{
+                fontFamily: "'Syne', sans-serif",
+                fontSize: "clamp(40px, 5vw, 72px)",
+                fontWeight: 800,
+                lineHeight: 1.05,
+                letterSpacing: "-0.035em",
+                margin: 0,
+                color: "#f8fafc",
+                maxWidth: "100%",
+                textAlign: "left",
+              }}
+            >
+              {lang === "TR" ? (
+                <>
+                  {"CV'n neden reddediliyor?"}
+                  <br />
+                  <span className="shimmer-text">Artık bileceksin.</span>
+                </>
+              ) : (
+                <>
+                  Why does your CV get rejected?
+                  <br />
+                  <span className="shimmer-text">Now you&apos;ll know.</span>
+                </>
+              )}
+            </h1>
             <button
+              type="button"
               onClick={() => navigate("/app")}
-              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "16px 36px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", border: "none", borderRadius: 14, cursor: "pointer", color: "white", fontWeight: 700, fontSize: 16, fontFamily: "'DM Sans', sans-serif", boxShadow: "0 0 40px rgba(99,102,241,0.4), inset 0 1px 0 rgba(255,255,255,0.15)", transition: "all 0.2s ease", width: "fit-content" }}
+              style={{
+                marginTop: 24,
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                alignSelf: "flex-start",
+                gap: 8,
+                padding: "15px 26px",
+                background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+                border: "none",
+                borderRadius: 12,
+                cursor: "pointer",
+                color: "white",
+                fontWeight: 700,
+                fontSize: 15,
+                fontFamily: "'DM Sans', sans-serif",
+                boxShadow: "0 0 36px rgba(99,102,241,0.32), inset 0 1px 0 rgba(255,255,255,0.12)",
+                transition: "transform 0.2s ease, box-shadow 0.2s ease",
+              }}
             >
-              {lang === "TR" ? "Kararını öğren" : "Get your decision"} <ArrowRight size={16} />
-            </button>
-            <div style={{ display: "flex", gap: 16 }}>
-              {(lang === "TR"
-                ? ["⚡ 10 saniye sürer", "🎯 Gerçek recruiter mantığı", "🔓 Kayıt gerekmez"]
-                : ["⚡ Takes 10 seconds", "🎯 Real recruiter logic", "🔓 No signup needed"]
-              ).map(item => (
-                <span key={item} style={{ fontSize: 12, color: "#475569", fontWeight: 600 }}>{item}</span>
-              ))}
-            </div>
-          </div>
-
-          <div className="hero-fade" style={{ animationDelay: "0.5s", display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ display: "flex" }}>
-              {["#3b82f6","#8b5cf6","#ec4899","#10b981"].map((c,i) => (
-                <div key={i} style={{ width: 28, height: 28, borderRadius: "50%", background: c, border: "2px solid #060910", marginLeft: i===0?0:-8, display: "grid", placeItems: "center", fontSize: "10px", fontWeight: 700, color: "white" }}>{["A","B","C","D"][i]}</div>
-              ))}
-            </div>
-            <div style={{ fontSize: 13, color: "#475569" }}>
-              <span style={{ color: "#f1f5f9", fontWeight: 600 }}>2,400+</span> {lang === "TR" ? "CV bu hafta analiz edildi" : "CVs analyzed this week"}
-            </div>
-          </div>
-        </div>
-
-        {/* RIGHT — Result Preview */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-
-          {/* Mock Input */}
-          <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 20, padding: 24, position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.4), transparent)" }} />
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>
-              {lang === "TR" ? "Canlı Önizleme" : "Live Preview"}
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-              {[
-                { label: lang === "TR" ? "CV" : "CV", lines: [70, 90, 55, 80] },
-                { label: lang === "TR" ? "İş İlanı" : "Job Description", lines: [85, 65, 75, 50] },
-              ].map(({ label, lines }) => (
-                <div key={label} style={{ background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 10, padding: "10px 12px" }}>
-                  <div style={{ fontSize: 10, color: "#334155", fontWeight: 700, marginBottom: 8 }}>{label}</div>
-                  {lines.map((w, i) => (
-                    <div key={i} style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,0.06)", marginBottom: 6, width: `${w}%` }} />
-                  ))}
-                </div>
-              ))}
-            </div>
-
-            <button
-              onClick={handleDemo}
-              disabled={animating}
-              style={{ width: "100%", padding: "10px", borderRadius: 10, border: "none", background: animating ? "rgba(99,102,241,0.3)" : "linear-gradient(135deg, #3b82f6, #6366f1)", color: "white", fontSize: 13, fontWeight: 700, cursor: animating ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
-            >
-              {animating
-              ? <><div style={{ width: 12, height: 12, borderRadius: "50%", border: "2px solid white", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />{demoSteps[demoStep]}</>
-              : <>{lang === "TR" ? "👁 Bir CV'nin nasıl reddedildiğini gör →" : "👁 Watch this CV get rejected →"}</>}
-
+              {lang === "TR" ? "Kararını öğren →" : "Get your verdict →"}
             </button>
           </div>
 
-          {animating && (
-  <div style={{ marginTop: 12, marginBottom: 4 }}>
-    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#334155", marginBottom: 6, fontWeight: 700 }}>
-      <span>{demoSteps[demoStep]}</span>
-      <span>{Math.round((demoStep / (demoSteps.length - 1)) * 100)}%</span>
-    </div>
-    <div style={{ height: 3, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
-      <div style={{
-        height: "100%",
-        width: `${Math.round((demoStep / (demoSteps.length - 1)) * 100)}%`,
-        background: "linear-gradient(90deg, #3b82f6, #6366f1)",
-        borderRadius: 999,
-        transition: "width 0.6s ease"
-      }} />
-    </div>
-  </div>
-)}
+          <div className="hf-hero-col-right">
+            <div
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                borderRadius: 20,
+                padding: "16px 16px 14px",
+                position: "relative",
+                overflow: "hidden",
+                boxShadow: "0 24px 48px rgba(0,0,0,0.35)",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 1,
+                  background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.45), transparent)",
+                }}
+              />
 
-          {/* Result Card */}
-          {showResult && (
-            <div style={{ background: "#0a0a0a", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 20, padding: 20, position: "relative", overflow: "hidden", animation: "resultReveal 0.4s ease" }}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, #f87171, transparent)" }} />
-
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
-                <div style={{ padding: "8px 16px", borderRadius: 10, background: r.decisionBg, border: `1px solid ${r.decisionBorder}` }}>
-                  <div style={{ fontSize: 9, fontWeight: 700, color: r.decisionColor, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 2 }}>{lang === "TR" ? "Karar" : "Decision"}</div>
-                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: r.decisionColor }}>{r.decision}</div>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <div style={{ flex: 1, height: 4, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
-                      <div style={{ width: `${score}%`, height: "100%", background: "linear-gradient(90deg, #f87171, transparent)", borderRadius: 999, transition: "width 0.3s ease" }} />
-                    </div>
-                    <span style={{ fontSize: 11, color: "#475569", fontWeight: 700 }}>{score}%</span>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                {[
+                  { label: "CV", lines: [70, 90, 55, 80] },
+                  { label: lang === "TR" ? "İş İlanı" : "Job Description", lines: [85, 65, 75, 50] },
+                ].map(({ label, lines }) => (
+                  <div
+                    key={label}
+                    style={{
+                      background: "rgba(0,0,0,0.25)",
+                      border: "1px solid rgba(255,255,255,0.06)",
+                      borderRadius: 8,
+                      padding: "8px 10px",
+                    }}
+                  >
+                    <div style={{ fontSize: 9, color: "#64748b", fontWeight: 700, marginBottom: 6 }}>{label}</div>
+                    {lines.map((w, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          height: 4,
+                          borderRadius: 999,
+                          background: "rgba(255,255,255,0.07)",
+                          marginBottom: 5,
+                          width: `${w}%`,
+                        }}
+                      />
+                    ))}
                   </div>
-                  <div style={{ fontSize: 10, color: "#334155", fontWeight: 600 }}>{lang === "TR" ? "Uyum Skoru" : "Fit Score"}</div>
+                ))}
+              </div>
+
+              <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "12px 0 10px" }} />
+
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  marginBottom: 10,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                  <span
+                    style={{
+                      fontSize: 9,
+                      fontWeight: 700,
+                      color: "#64748b",
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {lang === "TR" ? "Karar" : "Decision"}
+                  </span>
+                  <span
+                    style={{
+                      fontFamily: "'Syne', sans-serif",
+                      fontSize: 16,
+                      fontWeight: 800,
+                      color: r.decisionColor,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {r.decision}
+                  </span>
                 </div>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: "#e2e8f0", flexShrink: 0 }}>
+                  34%
+                </span>
               </div>
 
-              <div style={{ marginBottom: 10, padding: "10px 12px", background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.12)", borderRadius: 8 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#f87171", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>⚡ {lang === "TR" ? "En Büyük Sorun" : "Biggest Mistake"}</div>
-                <div style={{ fontSize: 12, color: "#fca5a5", fontWeight: 600 }}>{r.mistake}</div>
+              <div style={{ marginBottom: 8 }}>
+                <div
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    color: "#f87171",
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    marginBottom: 4,
+                  }}
+                >
+                  {lang === "TR" ? "En büyük sorun" : "Biggest mistake"}
+                </div>
+                <div style={{ fontSize: 12, color: "#fca5a5", fontWeight: 500, lineHeight: 1.4 }}>{r.mistake}</div>
               </div>
 
-              <div style={{ marginBottom: 10, padding: "10px 12px", background: "rgba(16,185,129,0.05)", border: "1px solid rgba(16,185,129,0.12)", borderRadius: 8 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#10b981", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>→ {lang === "TR" ? "Düzeltme" : "Fix"}</div>
-                <div style={{ fontSize: 12, color: "#6ee7b7", fontWeight: 600 }}>{r.fix}</div>
+              <div style={{ marginBottom: 8 }}>
+                <div
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    color: "#10b981",
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    marginBottom: 4,
+                  }}
+                >
+                  {lang === "TR" ? "Düzeltme" : "Fix"}
+                </div>
+                <div style={{ fontSize: 12, color: "#6ee7b7", fontWeight: 500, lineHeight: 1.4 }}>{r.fix}</div>
               </div>
 
-              <div style={{ padding: "10px 12px", background: "rgba(212,175,55,0.04)", border: "1px solid rgba(212,175,55,0.1)", borderRadius: 8 }}>
-                <div style={{ fontSize: 9, fontWeight: 700, color: "#d4af37", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>💬 {lang === "TR" ? "Recruiter Görüşü" : "Recruiter Insight"}</div>
-                <div style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic" }}>"{r.insight}"</div>
+              <div style={{ marginBottom: 12 }}>
+                <div
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    color: "#94a3b8",
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    marginBottom: 4,
+                  }}
+                >
+                  {lang === "TR" ? "Recruiter içgörüsü" : "Recruiter insight"}
+                </div>
+                <div style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic", lineHeight: 1.45 }}>&quot;{r.insight}&quot;</div>
               </div>
 
-              <button onClick={() => navigate("/app")} style={{ marginTop: 14, width: "100%", padding: "10px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #3b82f6, #6366f1)", color: "white", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+              <button
+                type="button"
+                onClick={() => navigate("/app")}
+                style={{
+                  width: "100%",
+                  padding: "11px 12px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+                  color: "white",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "'DM Sans', sans-serif",
+                }}
+              >
                 {lang === "TR" ? "Kendi CV'ni analiz et →" : "Analyze your own CV →"}
               </button>
             </div>
-          )}
-
-          {!showResult && !animating && (
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
-              {[
-                { label: lang === "TR" ? "Ort. skor artışı" : "Avg. score boost", value: "+23pts", color: "#10b981", bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.15)" },
-                { label: lang === "TR" ? "Analiz süresi" : "Analysis time", value: "~8sec", color: "#3b82f6", bg: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.15)" },
-                { label: lang === "TR" ? "Ücretsiz" : "Free to use", value: "100%", color: "#8b5cf6", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.15)" },
-              ].map(({ label, value, color, bg, border }) => (
-                <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 14, padding: "14px 12px", textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color, marginBottom: 4 }}>{value}</div>
-                  <div style={{ fontSize: 11, color: "#475569", lineHeight: 1.3 }}>{label}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+          </div>
       </div>
     </section>
   );
@@ -3119,7 +3171,7 @@ const coachFeatures = lang === "TR"
 const LEMONSQUEEZY_PRO_CHECKOUT =
   "https://hirefit.lemonsqueezy.com/checkout/buy/0e75f4ca-0209-486d-ae5f-00d609c9e2d0";
 
-function ProLiveSection({ lang }) {
+function ProLiveSection({ navigate, lang }) {
   return (
     <section style={{ padding: "80px 0 100px" }}>
       <div style={styles.container}>
@@ -3146,7 +3198,7 @@ function ProLiveSection({ lang }) {
               pointerEvents: "none",
             }}
           />
-          <div style={{ position: "relative", zIndex: 2, maxWidth: 520, margin: "0 auto" }}>
+          <div style={{ position: "relative", zIndex: 2, maxWidth: 560, margin: "0 auto" }}>
             <div
               style={{
                 display: "inline-flex",
@@ -3164,7 +3216,7 @@ function ProLiveSection({ lang }) {
                 textTransform: "uppercase",
               }}
             >
-              <Zap size={12} /> {lang === "TR" ? "Pro yayında" : "Pro is live"}
+              <Zap size={12} /> {lang === "TR" ? "Karar odaklı" : "Decision-first"}
             </div>
             <h2
               style={{
@@ -3172,16 +3224,30 @@ function ProLiveSection({ lang }) {
                 fontSize: "clamp(28px, 4vw, 40px)",
                 fontWeight: 800,
                 letterSpacing: "-0.02em",
-                marginBottom: 20,
+                marginBottom: 16,
                 lineHeight: 1.2,
               }}
             >
-              {lang === "TR" ? "Pro şu an yayında. Hemen başla." : "Pro is live. Start today."}
+              {lang === "TR" ? "Rakipler skor verir. Biz karar veririz." : "Competitors give you a score. We give you a decision."}
             </h2>
-            <a
-              href={LEMONSQUEEZY_PRO_CHECKOUT}
-              target="_blank"
-              rel="noopener noreferrer"
+            <p
+              style={{
+                color: "#94a3b8",
+                fontSize: "16px",
+                lineHeight: 1.65,
+                marginBottom: 28,
+                maxWidth: 480,
+                marginLeft: "auto",
+                marginRight: "auto",
+              }}
+            >
+              {lang === "TR"
+                ? "Piyasadaki benzer araçlar ortalama $49/ay. HireFit $9.99."
+                : "Similar tools in the market average around $49/mo. HireFit is $9.99."}
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate("/app")}
               className="hf-btn-primary"
               style={{
                 display: "inline-flex",
@@ -3191,13 +3257,16 @@ function ProLiveSection({ lang }) {
                 padding: "14px 28px",
                 fontSize: "15px",
                 fontWeight: 700,
-                textDecoration: "none",
+                border: "none",
+                cursor: "pointer",
+                borderRadius: 12,
                 background: "linear-gradient(135deg, #3b82f6, #6366f1)",
                 boxShadow: "0 0 28px rgba(99,102,241,0.35)",
+                color: "#fff",
               }}
             >
-              {lang === "TR" ? "Pro'ya geç →" : "Upgrade to Pro →"}
-            </a>
+              {lang === "TR" ? "Ücretsiz dene →" : "Try for free →"}
+            </button>
           </div>
         </div>
       </div>
@@ -3289,37 +3358,12 @@ function Footer({ navigate, lang }) {
   );
 }
 
-function MainApp() {  
+function HireFitLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const getInitialView = () => {
-    const path = window.location.pathname;
-    if (path === "/app") return "app";
-    if (path === "/roadmap") return "roadmap";
-    if (path === "/dashboard") return "dashboard";
-    if (path === "/login") return "login";
-    if (path === "/terms") return "terms";
-    if (path === "/privacy") return "privacy";
-
-    return "landing";
-  };
-
-  const [view, setView] = useState(getInitialView);
-
   useEffect(() => {
-    const path = location.pathname;
-    if (path === "/app") setView("app");
-    else if (path === "/roadmap") setView("roadmap");
-    else if (path === "/dashboard") setView("dashboard");
-    else if (path === "/login") setView("login");
-    else if (path === "/terms") setView("terms");
-    else if (path === "/privacy") setView("privacy");
-    else setView("landing");
-  }, [location.pathname]);
-
-  useEffect(() => {
-    if (view !== "app") return;
+    if (location.pathname !== "/app") return;
     if (location.hash !== "#hirefit-apply-focus") return;
     const timer = window.setTimeout(() => {
       const el = document.getElementById("hirefit-apply-focus");
@@ -3329,7 +3373,7 @@ function MainApp() {
       if (ta && typeof ta.focus === "function") ta.focus({ preventScroll: true });
     }, 200);
     return () => window.clearTimeout(timer);
-  }, [view, location.hash, location.pathname]);
+  }, [location.hash, location.pathname]);
 
   const [user, setUser] = useState(null);
   const [isPro, setIsPro] = useState(false);
@@ -3391,6 +3435,7 @@ function MainApp() {
   const t = translations[lang];
   const cvLoaded = cvText.trim().length > 24;
   const jdLoaded = jdText.trim().length > 40;
+  const jobUrlIsLinkedIn = useMemo(() => isLinkedInJobUrl(jobUrl), [jobUrl]);
   const cvSectionCount = useMemo(() => countCvSections(cvText), [cvText]);
   const cvSectionsOk = cvSectionCount >= 2;
   const hasOutput = Boolean(
@@ -3584,6 +3629,7 @@ function MainApp() {
 
   const extractJobFromUrl = async () => {
     if (!jobUrl.trim()) { setError(lang === "TR" ? "Lütfen önce bir iş URL'si yapıştırın." : "Please paste a job URL first."); return; }
+    if (isLinkedInJobUrl(jobUrl)) return;
     setExtractingJob(true); setError("");
     try {
       const normalizedUrl = /^https?:\/\//i.test(jobUrl.trim()) ? jobUrl.trim() : `https://${jobUrl.trim()}`;
@@ -4015,13 +4061,107 @@ const msgInterval = setInterval(() => {
   const openUpgrade = () => window.open(LEMONSQUEEZY_PRO_CHECKOUT, "_blank");
 
   const sectorLabels = lang === "TR"
-    ? ["Otomatik", "Teknoloji / Startup", "Danışmanlık", "Finans", "FMCG / Perakende", "Sağlık", "Kamu"]
-    : ["Auto-detect", "Tech / Startup", "Consulting", "Finance", "FMCG / Retail", "Healthcare", "Government"];
+    ? ["Otomatik", "Teknoloji / Startup", "Danışmanlık", "Finans", "FMCG / Perakende", "Sağlık", "Kamu", "Telekom / Donanım", "Ürün Tasarımı / UX"]
+    : ["Auto-detect", "Tech / Startup", "Consulting", "Finance", "FMCG / Retail", "Healthcare", "Government", "Telecom / Hardware", "Product Design / UX"];
   const sectorValues = HF_SECTOR_VALUES;
+
+  const hireFitOutletContext = {
+    navigate,
+    location,
+    lang,
+    setLang,
+    t,
+    user,
+    logout,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    error,
+    login,
+    loginWithGoogle,
+    isPro,
+    plan,
+    waitlist,
+    history,
+    loadHistoryItem,
+    clearHistory,
+    averageScore,
+    scoreHistory,
+    learningPlan,
+    roleType,
+    seniority,
+    cvText,
+    setCvText,
+    jdText,
+    setJdText,
+    jobUrl,
+    setJobUrl,
+    jobUrlIsLinkedIn,
+    extractingJob,
+    extractJobFromUrl,
+    cvLoaded,
+    jdLoaded,
+    cvSectionCount,
+    cvSectionsOk,
+    hasOutput,
+    cvDragOver,
+    setCvDragOver,
+    jdDragOver,
+    setJdDragOver,
+    cvPdfInputRef,
+    jdTxtInputRef,
+    uploadingPdf,
+    handlePdfUpload,
+    handleJdTextFile,
+    onCvDrop,
+    onJdDrop,
+    activeInput,
+    setActiveInput,
+    showAdvanced,
+    setShowAdvanced,
+    lastDetectedSector,
+    sector,
+    setSector,
+    sectorLabels,
+    sectorValues,
+    deadline,
+    setDeadline,
+    userPlanRow,
+    analyze,
+    loading,
+    loadingMessage,
+    engineV2,
+    alignmentScore,
+    decisionData,
+    decisionLoading,
+    openUpgrade,
+    optimizeCv,
+    optimizing,
+    handleSharePrompt,
+    fixResults,
+    applyingFix,
+    applyFix,
+    showAnonSavePrompt,
+    setShowAnonSavePrompt,
+    analysisData,
+    matchedSkills,
+    missingSkills,
+    topKeywords,
+    result,
+    optimizedCv,
+    downloadText,
+    reanalyzeAfterFix,
+    roadmapLoading,
+    generateLearningPlan,
+    decisionImpactContext,
+    reanalysisResult,
+    setError,
+  };
 
   return (
     <div style={styles.page}>
-      <Navbar view={view} setView={setView} user={user} logout={logout} navigate={navigate} lang={lang} setLang={setLang} />
+      <Navbar pathname={location.pathname} user={user} logout={logout} navigate={navigate} lang={lang} setLang={setLang} />
 
       {showPaywall && (
         <PaywallModal
@@ -4044,8 +4184,40 @@ const msgInterval = setInterval(() => {
         onClose={() => setShowSharePrompt(false)}
       />
 
-      {view === "terms" && (
-        <div style={{ ...styles.container, padding: "60px 24px", maxWidth: 800 }}>
+      <Outlet context={hireFitOutletContext} />
+
+
+</div>
+  );
+}
+
+
+export function LandingPage() {
+  const { navigate, lang } = useOutletContext();
+  return (
+    <div
+      style={{
+        width: "100%",
+        minHeight: "100vh",
+        overflowX: "hidden",
+        background: "#0A0A0B",
+      }}
+    >
+      <HeroSection navigate={navigate} lang={lang} />
+      <FeatureCards lang={lang} />
+      <TrustSection lang={lang} />
+      <ComparisonSection lang={lang} />
+      <PricingSection navigate={navigate} lang={lang} />
+      <ProLiveSection navigate={navigate} lang={lang} />
+      <Footer navigate={navigate} lang={lang} />
+    </div>
+  );
+}
+
+export function TermsPage() {
+  const { navigate, lang, t } = useOutletContext();
+  return (
+        <div style={{ width: "100%", maxWidth: "none", margin: 0, padding: "60px clamp(20px, 5vw, 80px)", boxSizing: "border-box" }}>
           <button onClick={() => navigate("/")} style={{ marginBottom: 32, background: "none", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>{lang === "TR" ? "← Geri" : "← Back"}</button>
           <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, marginBottom: 8 }}>{t.terms}</h1>
           <p style={{ color: "#475569", marginBottom: 40, fontSize: 14 }}>{lang === "TR" ? "Son güncelleme: Nisan 2026" : "Last updated: April 2026"}</p>
@@ -4083,10 +4255,13 @@ const msgInterval = setInterval(() => {
             </div>
           ))}
         </div>
-      )}
+  );
+}
 
-      {view === "privacy" && (
-        <div style={{ ...styles.container, padding: "60px 24px", maxWidth: 800 }}>
+export function PrivacyPage() {
+  const { navigate, lang, t } = useOutletContext();
+  return (
+        <div style={{ width: "100%", maxWidth: "none", margin: 0, padding: "60px clamp(20px, 5vw, 80px)", boxSizing: "border-box" }}>
           <button onClick={() => navigate("/")} style={{ marginBottom: 32, background: "none", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>{lang === "TR" ? "← Geri" : "← Back"}</button>
           <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, marginBottom: 8 }}>{t.privacy}</h1>
           <p style={{ color: "#475569", marginBottom: 40, fontSize: 14 }}>{lang === "TR" ? "Son güncelleme: Nisan 2026" : "Last updated: April 2026"}</p>
@@ -4124,23 +4299,17 @@ const msgInterval = setInterval(() => {
             </div>
           ))}
         </div>
-      )}
+  );
+}
 
-      {view === "roadmap" && (
-        <RoadmapPage navigate={navigate} lang={lang} t={t} learningPlan={learningPlan} roleType={roleType} seniority={seniority} />
-      )}
+export function RoadmapRoute() {
+  const { navigate, lang, t, learningPlan, roleType, seniority } = useOutletContext();
+  return <RoadmapPage navigate={navigate} lang={lang} t={t} learningPlan={learningPlan} roleType={roleType} seniority={seniority} />;
+}
 
-      {view === "landing" && (
-        <>
-          <HeroSection navigate={navigate} lang={lang} />
-          <FeatureCards lang={lang} />
-          <PricingSection navigate={navigate} lang={lang} />
-          <ProLiveSection lang={lang} />
-          <Footer navigate={navigate} lang={lang} />
-        </>
-      )}
-
-      {view === "login" && (
+export function LoginPage() {
+  const { t, T, lang, email, setEmail, password, setPassword, error, login, loginWithGoogle } = useOutletContext();
+  return (
         <div style={{ ...styles.container, padding: "80px 24px" }}>
           <div style={{ maxWidth: 440, margin: "0 auto" }}>
             <div className="hf-card" style={{ padding: 40 }}>
@@ -4159,9 +4328,14 @@ const msgInterval = setInterval(() => {
             </div>
           </div>
         </div>
-      )}
+  );
+}
 
-      {view === "dashboard" && (
+export function DashboardPage() {
+  const {
+    t, lang, T, history, loadHistoryItem, clearHistory, averageScore, isPro, plan, waitlist, scoreHistory, navigate,
+  } = useOutletContext();
+  return (
         <div style={{ ...styles.container, padding: "48px 24px" }}>
           <div style={{ marginBottom: 32 }}>
             <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: "42px", fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 8 }}>{t.dashboard}</h1>
@@ -4194,28 +4368,42 @@ const msgInterval = setInterval(() => {
             </div>
           </div>
         </div>
-      )}
+  );
+}
 
-      {view === "app" && (
-  <div style={{ maxWidth: 1320, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
+export function AnalyzerPage() {
+  const {
+    navigate, lang, t, activeInput, cvLoaded, uploadingPdf, cvPdfInputRef, cvDragOver, setCvDragOver,
+    handlePdfUpload, onCvDrop, cvText, setCvText, setActiveInput, cvSectionsOk, jdLoaded, jdDragOver, setJdDragOver, onJdDrop,
+    jdText, setJdText, jobUrl, setJobUrl, jobUrlIsLinkedIn, extractingJob, extractJobFromUrl, jdTxtInputRef, handleJdTextFile,
+    showAdvanced, setShowAdvanced, lastDetectedSector, sector, setSector, sectorLabels, sectorValues,
+    deadline, setDeadline, isPro, user, userPlanRow, analyze, loading, loadingMessage, error, hasOutput,
+    engineV2, alignmentScore, decisionData, decisionLoading, openUpgrade, optimizeCv, optimizing,
+    handleSharePrompt, fixResults, applyingFix, applyFix, showAnonSavePrompt, setShowAnonSavePrompt,
+    analysisData, matchedSkills, missingSkills, topKeywords, result, optimizedCv, learningPlan,
+    downloadText, reanalyzeAfterFix, roadmapLoading, generateLearningPlan, decisionImpactContext,
+    reanalysisResult, history, clearHistory, loadHistoryItem,
+  } = useOutletContext();
+  return (
+  <div className="hf-analyzer-page" style={{ maxWidth: 1320, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
 
     {/* HEADER */}
-    <div style={{ textAlign: "center", marginBottom: 40 }}>
+    <div className="hf-analyzer-hero">
       <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 14px", borderRadius: 999, background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)", fontSize: "11px", fontWeight: 700, color: "#a78bfa", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>
         <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#8b5cf6", boxShadow: "0 0 6px #8b5cf6", display: "inline-block" }} />
         {lang === "TR" ? "AI Kariyer Analizi" : "AI Career Analysis"}
       </div>
-      <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 12 }}>
+      <h1 className="hf-analyzer-hero-title" style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 12 }}>
         {lang === "TR" ? "Başvurmadan önce gerçekten şansın var mı öğren." : "Know if you should apply - before you waste time."}
       </h1>
-      <p style={{ color: "#475569", fontSize: 15, maxWidth: 480, margin: "0 auto" }}>
+      <p className="hf-analyzer-hero-sub">
         {lang === "TR" ? "Recruiter'ların CV'ni saniyeler içinde nasıl değerlendirdiğini net gör." : "See exactly how recruiters evaluate your CV in seconds."}
       </p>
     </div>
 
-    <div className="hf-app-workspace">
+    <div className="hf-analyzer-layout">
     <motion.div
-      className={`hf-input-panel ${activeInput ? "hf-input-panel--active" : ""}`}
+      className={`hf-input-panel hf-analyzer-cv ${activeInput === "cv" ? "hf-input-panel--active" : ""}`}
       initial={{ opacity: 0, x: -16 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.35 }}
@@ -4285,7 +4473,7 @@ const msgInterval = setInterval(() => {
         )}
 
         <textarea
-          className="hf-textarea hf-dropzone__textarea"
+          className="hf-textarea hf-dropzone__textarea hf-analyzer-textarea"
           placeholder={t.pasteCv}
           value={cvText}
           onChange={(e) => setCvText(e.target.value)}
@@ -4293,11 +4481,17 @@ const msgInterval = setInterval(() => {
           onBlur={() => setActiveInput((v) => (v === "cv" ? null : v))}
           onClick={(e) => e.stopPropagation()}
           readOnly={uploadingPdf}
-          style={{ minHeight: cvText.trim() ? 140 : 100, resize: "vertical", transition: "all 220ms ease" }}
         />
       </div>
     </motion.div>
+    </motion.div>
 
+    <motion.div
+      className={`hf-input-panel hf-analyzer-jd ${activeInput === "jd" ? "hf-input-panel--active" : ""}`}
+      initial={{ opacity: 0, x: -12 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.35 }}
+    >
     {/* JD INPUT — drop / paste / link */}
     <motion.div
       id="hirefit-apply-focus"
@@ -4341,19 +4535,38 @@ const msgInterval = setInterval(() => {
         <motion.button
           type="button"
           onClick={extractJobFromUrl}
-          disabled={extractingJob}
-          whileHover={{ scale: extractingJob ? 1 : 1.02 }}
-          whileTap={{ scale: extractingJob ? 1 : 0.98 }}
-          style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(34,211,238,0.45)", background: "linear-gradient(135deg, rgba(34,211,238,0.2), rgba(59,130,246,0.16))", color: "#67e8f9", fontWeight: 800, cursor: extractingJob ? "not-allowed" : "pointer", boxShadow: "0 0 18px rgba(34,211,238,0.2)" }}
+          disabled={extractingJob || jobUrlIsLinkedIn}
+          whileHover={{ scale: extractingJob || jobUrlIsLinkedIn ? 1 : 1.02 }}
+          whileTap={{ scale: extractingJob || jobUrlIsLinkedIn ? 1 : 0.98 }}
+          style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(34,211,238,0.45)", background: jobUrlIsLinkedIn ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg, rgba(34,211,238,0.2), rgba(59,130,246,0.16))", color: jobUrlIsLinkedIn ? "#64748b" : "#67e8f9", fontWeight: 800, cursor: extractingJob || jobUrlIsLinkedIn ? "not-allowed" : "pointer", boxShadow: jobUrlIsLinkedIn ? "none" : "0 0 18px rgba(34,211,238,0.2)" }}
         >
           <Link2 size={12} />
           {extractingJob ? (lang === "TR" ? "İlan detayları çekiliyor..." : "Extracting job details...") : (lang === "TR" ? "Linkten İlanı Analiz Et" : "Analyze Job from Link")}
         </motion.button>
       </div>
+      {jobUrlIsLinkedIn ? (
+        <div
+          role="status"
+          style={{
+            marginBottom: 10,
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: "1px solid rgba(251,191,36,0.35)",
+            background: "rgba(251,191,36,0.08)",
+            fontSize: 13,
+            lineHeight: 1.45,
+            color: "#fde68a",
+          }}
+        >
+          {lang === "TR"
+            ? "LinkedIn ilanları tam olarak çekilemeyebilir. En iyi sonuç için ilanı LinkedIn'den kopyalayıp buraya yapıştırın."
+            : "LinkedIn job posts can't be fully extracted. For best results, copy and paste the job description directly."}
+        </div>
+      ) : null}
       <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10 }}>
         {lang === "TR"
-          ? "Bazı siteler (LinkedIn, Indeed) çıkarmaya izin vermez; olmazsa yapıştırın."
-          : "Some sites (LinkedIn, Indeed) block extraction — paste manually if needed."}
+          ? "Diğer siteler (Kariyer.net, Indeed, Glassdoor vb.) için link genelde çalışır; olmazsa yapıştırın."
+          : "URL extraction works for many job boards (e.g. Kariyer.net, Indeed, Glassdoor); paste the text if it doesn’t."}
       </div>
 
       <div
@@ -4391,17 +4604,48 @@ const msgInterval = setInterval(() => {
         )}
 
         <textarea
-          className="hf-textarea hf-dropzone__textarea"
+          className="hf-textarea hf-dropzone__textarea hf-analyzer-textarea"
           placeholder={t.pasteJd}
           value={jdText}
           onChange={(e) => setJdText(e.target.value)}
           onFocus={() => setActiveInput("jd")}
           onBlur={() => setActiveInput((v) => (v === "jd" ? null : v))}
           readOnly={extractingJob}
-          style={{ minHeight: jdText.trim() ? 140 : 100, resize: "vertical", transition: "all 220ms ease" }}
         />
       </div>
     </motion.div>
+    </motion.div>
+
+    <motion.div
+      className="hf-output-panel hf-analyzer-pipeline"
+      initial={{ opacity: 0, x: 16 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.35 }}
+    >
+    <AiLivePipelinePanel
+      lang={lang}
+      loading={loading}
+      hasOutput={hasOutput}
+      cvReady={cvLoaded}
+      jdReady={jdLoaded}
+      extractingJob={extractingJob}
+    />
+    <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginTop: 14, display: "flex", alignItems: "center", gap: 8, lineHeight: 1.45 }}>
+      <Workflow size={14} color="#a78bfa" />
+      {lang === "TR" ? "Recruiter'ın 7 saniyede gördüğü ekran bu." : "This is what a recruiter sees in 7 seconds."}
+    </div>
+    </motion.div>
+
+    <div className="hf-analyzer-post-grid">
+    <div className={`hf-data-bridge${loading || (cvLoaded && jdLoaded) ? " hf-data-bridge--hot" : ""}`} aria-hidden>
+      <div className="hf-data-bridge__line" />
+      <motion.span
+        className="hf-data-bridge__pulse"
+        animate={{ x: ["0%", "98%"] }}
+        transition={{ repeat: Infinity, duration: loading ? 1.35 : 2.3, ease: "linear" }}
+      />
+      {(loading || (cvLoaded && jdLoaded)) ? <span className="hf-data-bridge__pulse hf-data-bridge__pulse--trail" /> : null}
+    </div>
 
     {/* ADVANCED OPTIONS */}
     <div style={{ marginBottom: 24 }}>
@@ -4477,6 +4721,7 @@ const msgInterval = setInterval(() => {
     })()}
 
     {/* PRIMARY CTA */}
+    <div className="hf-analyzer-analyze-wrap">
     <button
       onClick={analyze}
       disabled={loading}
@@ -4486,12 +4731,13 @@ const msgInterval = setInterval(() => {
         color: "white", fontSize: 16, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
         fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
         boxShadow: loading ? "none" : "0 0 32px rgba(99,102,241,0.35)",
-        transition: "all 0.2s ease", marginBottom: 32,
+        transition: "all 0.2s ease", marginBottom: 0,
         opacity: loading ? 0.8 : 1,
       }}
     >
       {loading ? <><Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} />{lang === "TR" ? "CV + İlan uyumu analiz ediliyor..." : "Analyzing CV + Job Match..."} {loadingMessage ? `• ${loadingMessage}` : ""}</> : <>{t.checkFit} <Sparkles size={16} /></>}
     </button>
+    </div>
 
     {/* ERROR */}
     {error && (
@@ -4500,36 +4746,15 @@ const msgInterval = setInterval(() => {
       </div>
     )}
 
-    </motion.div>
-    <div className={`hf-data-bridge${loading || (cvLoaded && jdLoaded) ? " hf-data-bridge--hot" : ""}`} aria-hidden>
-      <div className="hf-data-bridge__line" />
-      <motion.span
-        className="hf-data-bridge__pulse"
-        animate={{ x: ["0%", "98%"] }}
-        transition={{ repeat: Infinity, duration: loading ? 1.35 : 2.3, ease: "linear" }}
-      />
-      {(loading || (cvLoaded && jdLoaded)) ? <span className="hf-data-bridge__pulse hf-data-bridge__pulse--trail" /> : null}
+    </div>
     </div>
 
     <motion.div
-      className="hf-output-panel"
+      className="hf-output-panel hf-analyzer-results"
       initial={{ opacity: 0, x: 16 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.35 }}
     >
-    <AiLivePipelinePanel
-      lang={lang}
-      loading={loading}
-      hasOutput={hasOutput}
-      cvReady={cvLoaded}
-      jdReady={jdLoaded}
-      extractingJob={extractingJob}
-    />
-    <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "14px 0 12px" }} />
-    <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 10, display: "flex", alignItems: "center", gap: 8 }}>
-      <Workflow size={14} color="#a78bfa" />
-      {lang === "TR" ? "Recruiter'ın 7 saniyede gördüğü ekran bu." : "This is what a recruiter sees in 7 seconds."}
-    </div>
     {showAnonSavePrompt && !user && (
       <div
         style={{
@@ -4707,7 +4932,6 @@ const msgInterval = setInterval(() => {
       </>
     )}
     </motion.div>
-    </div>
 
     {/* HISTORY — compact, en altta */}
     {history.length > 0 && (
@@ -4735,10 +4959,7 @@ const msgInterval = setInterval(() => {
     )}
 
   </div>
-)}
-
-</div>
   );
 }
 
-export default MainApp;
+export default HireFitLayout;

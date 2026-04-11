@@ -1,3 +1,15 @@
+import {
+  EXTRACT_JOB_SYSTEM,
+  buildExtractJobUserMessage,
+  normalizeVerbatimExtract,
+  parseTitleFromVerbatimExtract,
+  stripHtmlToJobVisibleText,
+} from "../lib/extractJobCompose.js";
+import { logPromptBeingSent } from "../lib/aiPromptLog.js";
+
+/** Groq output budget — must be ≥2000 so long postings are not cut off mid-generation */
+const EXTRACT_MAX_TOKENS = 8192;
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -27,21 +39,6 @@ export default async function handler(req, res) {
       }
     };
 
-    const stripHtmlToVisibleText = (html) =>
-      String(html || "")
-        .replace(/<script[\s\S]*?<\/script>/gi, " ")
-        .replace(/<style[\s\S]*?<\/style>/gi, " ")
-        .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-        .replace(/<svg[\s\S]*?<\/svg>/gi, " ")
-        .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
-        .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
-        .replace(/<!--[\s\S]*?-->/g, " ")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&nbsp;/gi, " ")
-        .replace(/&amp;/gi, "&")
-        .replace(/\s+/g, " ")
-        .trim();
-
     const getTitleFromHtml = (html, fallback = "Job Description") => {
       const h1 = String(html || "").match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
       const titleTag = String(html || "").match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
@@ -69,7 +66,7 @@ export default async function handler(req, res) {
     }
 
     const html = await response.text();
-    const visible = stripHtmlToVisibleText(html).slice(0, 4000);
+    const visible = stripHtmlToJobVisibleText(html).slice(0, 50000);
     const fallbackTitle = getTitleFromHtml(html);
 
     let title = fallbackTitle;
@@ -78,6 +75,14 @@ export default async function handler(req, res) {
 
     if (key && visible.length > 120) {
       try {
+        const extractMessages = [
+          { role: "system", content: EXTRACT_JOB_SYSTEM },
+          {
+            role: "user",
+            content: buildExtractJobUserMessage(visible),
+          },
+        ];
+        logPromptBeingSent(extractMessages);
         const aiRes = await fetchWithTimeout(
           "https://api.groq.com/openai/v1/chat/completions",
           {
@@ -88,70 +93,21 @@ export default async function handler(req, res) {
             },
             body: JSON.stringify({
               model: "llama-3.3-70b-versatile",
-              max_tokens: 800,
+              max_tokens: EXTRACT_MAX_TOKENS,
               temperature: 0.1,
-              response_format: { type: "json_object" },
-              messages: [
-                {
-                  role: "user",
-                  content: `Clean and extract a structured job description from this messy HTML text.
-
-Return valid JSON only:
-{
-  "title": "<role title>",
-  "responsibilities": ["<bullet>", "<bullet>"],
-  "requirements": ["<bullet>", "<bullet>"]
-}
-
-Rules:
-- Be concise and readable.
-- Remove boilerplate, legal text, navigation noise.
-- Keep only role-relevant content.
-- Max combined output length: 4000 chars.
-
-Text:
-${visible}`,
-                },
-              ],
+              messages: extractMessages,
             }),
           },
-          5000
+          45000
         );
 
         const aiData = await aiRes.json();
         const raw = aiData?.choices?.[0]?.message?.content || "";
-        const parsed = (() => {
-          try {
-            return JSON.parse(raw);
-          } catch {
-            const match = String(raw).match(/\{[\s\S]*\}/);
-            if (!match) return null;
-            try {
-              return JSON.parse(match[0]);
-            } catch {
-              return null;
-            }
-          }
-        })();
-
-        if (parsed) {
-          title = String(parsed.title || fallbackTitle).trim() || fallbackTitle;
-          const responsibilities = Array.isArray(parsed.responsibilities)
-            ? parsed.responsibilities.map((x) => String(x).trim()).filter(Boolean).slice(0, 10)
-            : [];
-          const requirements = Array.isArray(parsed.requirements)
-            ? parsed.requirements.map((x) => String(x).trim()).filter(Boolean).slice(0, 10)
-            : [];
-          const composed = [
-            responsibilities.length ? "Responsibilities:\n- " + responsibilities.join("\n- ") : "",
-            requirements.length ? "Requirements:\n- " + requirements.join("\n- ") : "",
-          ]
-            .filter(Boolean)
-            .join("\n\n")
-            .trim();
-          if (composed) {
-            jobText = composed.slice(0, 4000);
-          }
+        const normalized = normalizeVerbatimExtract(raw);
+        if (normalized.length > 80) {
+          jobText = normalized;
+          const fromRole = parseTitleFromVerbatimExtract(jobText);
+          if (fromRole) title = fromRole;
         }
       } catch {
         // AI cleanup is best-effort; return usable fallback.

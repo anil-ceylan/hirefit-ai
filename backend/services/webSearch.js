@@ -1,7 +1,9 @@
 /* eslint-env node */
 import { openaiChat } from "../../lib/analyze-v2/openaiClient.js";
 import { parseModelJson } from "../../lib/analyze-v2/json.js";
+import { criticalOutputLanguageInstruction, MANDATORY_TURKISH_AI_OUTPUT } from "../../lib/analyze-v2/lang.js";
 import { companyNameForSearch } from "../engines/companyIntelEngine.js";
+import { truncateIntelField } from "../../lib/sentenceTruncate.js";
 
 const TAVILY_URL = "https://api.tavily.com/search";
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -70,7 +72,9 @@ function systemLangDirective(lang) {
 }
 
 function buildSystemPrompt(baseInstruction, lang) {
-  return `${systemLangDirective(lang)}\n\n${baseInstruction}`;
+  const langNorm = lang === "tr" ? "tr" : "en";
+  const trLead = langNorm === "tr" ? `${MANDATORY_TURKISH_AI_OUTPUT}\n\n` : "";
+  return `${trLead}${criticalOutputLanguageInstruction(langNorm)}\n\n${systemLangDirective(lang)}\n\n${baseInstruction}`;
 }
 
 async function summarizeInsights(prompt, lang) {
@@ -529,29 +533,24 @@ Max 2 preparation_steps.`;
 /**
  * Orchestrate: search + trends + CV compare + report card.
  */
-function truncateStr(s, n) {
-  const t = String(s || "");
-  return t.length <= n ? t : `${t.slice(0, n - 1)}…`;
-}
-
-/** Free tier: shorter company intel payload. */
+/** Free tier: shorter company intel payload (full sentences only — no mid-sentence "…"). */
 export function liteCompanyIntel(layer) {
   if (!layer) return null;
   const rep = layer.report || {};
   return {
     extracted: layer.extracted,
-    company_search: { insight: truncateStr(layer.company_search?.insight, 400) },
+    company_search: { insight: truncateIntelField(layer.company_search?.insight, 2, 520) },
     sector_trends: {
       key_insight: layer.sector_trends?.key_insight,
       trending_skills: (layer.sector_trends?.trending_skills || []).slice(0, 4),
       source_summary: layer.sector_trends?.source_summary,
     },
-    cv_vs_sector: { narrative: layer.cv_vs_sector?.narrative },
+    cv_vs_sector: { narrative: truncateIntelField(layer.cv_vs_sector?.narrative, 2, 520) },
     report: {
-      company_structure: truncateStr(rep.company_structure, 320),
-      employee_experience: truncateStr(rep.employee_experience, 320),
-      career_opportunities: truncateStr(rep.career_opportunities, 320),
-      sector_position: truncateStr(rep.sector_position, 320),
+      company_structure: truncateIntelField(rep.company_structure, 2, 420),
+      employee_experience: truncateIntelField(rep.employee_experience, 2, 420),
+      career_opportunities: truncateIntelField(rep.career_opportunities, 2, 420),
+      sector_position: truncateIntelField(rep.sector_position, 2, 420),
       one_liner_value: rep.one_liner_value,
       preparation_intro: rep.preparation_intro,
       preparation_steps: (rep.preparation_steps || []).slice(0, 1),

@@ -1,5 +1,27 @@
 @import "tailwindcss";
 
+html {
+  overflow-x: hidden;
+}
+
+@keyframes blobFloat1 {
+  from {
+    transform: translate(0px, 0px) scale(1);
+  }
+  to {
+    transform: translate(70px, 50px) scale(1.2);
+  }
+}
+
+@keyframes blobFloat2 {
+  from {
+    transform: translate(0px, 0px) scale(1);
+  }
+  to {
+    transform: translate(-50px, -70px) scale(1.15);
+  }
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -25,11 +47,16 @@ a:hover {
 }
 
 body {
+  width: 100%;
+  overflow-x: hidden;
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
+  padding: 0;
+}
+
+#root {
+  width: 100%;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 h1 {

@@ -1,11 +1,22 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
-import dotenv from "dotenv";
 import { runMultiAnalyze } from "../lib/analyze/index.js";
 import { runAnalyzeV2WithCompanyIntel } from "../lib/analyze-v2/withCompanyIntel.js";
+import {
+  EXTRACT_JOB_SYSTEM,
+  buildExtractJobUserMessage,
+  normalizeVerbatimExtract,
+  parseTitleFromVerbatimExtract,
+  stripHtmlToJobVisibleText,
+} from "../lib/extractJobCompose.js";
+import { logPromptBeingSent } from "../lib/aiPromptLog.js";
+import { buildRecruiterSystemPrompt } from "../lib/recruiterSystemPrompt.js";
+import { normalizeAnalyzeLang } from "../lib/analyze-v2/lang.js";
 
-dotenv.config();
+/** Groq output budget — must be ≥2000 so long postings are not cut off mid-generation */
+const EXTRACT_JOB_MAX_TOKENS = 8192;
 
 const app = express();
 app.use(cors());
@@ -30,9 +41,11 @@ app.post("/api/analyze", async (req, res) => {
         .status(400)
         .json({ error: "Missing cvText or jobDescription" });
     }
+    const { lang } = req.body || {};
     const result = await runMultiAnalyze({
       cvText: c,
       jobDescription: j,
+      lang,
     });
     return res.status(200).json(result);
   } catch (e) {
@@ -62,7 +75,11 @@ app.post("/api/analyze-v2", async (req, res) => {
     });
     return res.status(200).json(payload);
   } catch (e) {
-    console.error("/api/analyze-v2", e);
+    console.error("/api/analyze-v2 FULL ERROR:", {
+      message: e?.message,
+      stack: e?.stack,
+      cause: e?.cause,
+    });
     return res.status(500).json({
       error: e?.message || "Analyze v2 failed",
     });
@@ -93,21 +110,6 @@ app.post("/api/extract-job", async (req, res) => {
       }
     };
 
-    const stripHtmlToVisibleText = (html) =>
-      String(html || "")
-        .replace(/<script[\s\S]*?<\/script>/gi, " ")
-        .replace(/<style[\s\S]*?<\/style>/gi, " ")
-        .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-        .replace(/<svg[\s\S]*?<\/svg>/gi, " ")
-        .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
-        .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
-        .replace(/<!--[\s\S]*?-->/g, " ")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/&nbsp;/gi, " ")
-        .replace(/&amp;/gi, "&")
-        .replace(/\s+/g, " ")
-        .trim();
-
     const getTitleFromHtml = (html, fallback = "Job Description") => {
       const h1 = String(html || "").match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
       const titleTag = String(html || "").match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1];
@@ -135,7 +137,7 @@ app.post("/api/extract-job", async (req, res) => {
     }
 
     const html = await response.text();
-    const visible = stripHtmlToVisibleText(html).slice(0, 4000);
+    const visible = stripHtmlToJobVisibleText(html).slice(0, 50000);
     const fallbackTitle = getTitleFromHtml(html);
 
     let title = fallbackTitle;
@@ -143,6 +145,19 @@ app.post("/api/extract-job", async (req, res) => {
 
     if (process.env.GROQ_API_KEY && visible.length > 120) {
       try {
+        const extractGroqBody = {
+          model: "llama-3.3-70b-versatile",
+          max_tokens: EXTRACT_JOB_MAX_TOKENS,
+          temperature: 0.1,
+          messages: [
+            { role: "system", content: EXTRACT_JOB_SYSTEM },
+            {
+              role: "user",
+              content: buildExtractJobUserMessage(visible),
+            },
+          ],
+        };
+        logPromptBeingSent(extractGroqBody.messages);
         const aiRes = await fetchWithTimeout(
           "https://api.groq.com/openai/v1/chat/completions",
           {
@@ -151,59 +166,17 @@ app.post("/api/extract-job", async (req, res) => {
               Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({
-              model: "llama-3.3-70b-versatile",
-              max_tokens: 800,
-              temperature: 0.1,
-              response_format: { type: "json_object" },
-              messages: [
-                {
-                  role: "user",
-                  content: `Clean and extract a structured job description from this messy HTML text.
-
-Return valid JSON only:
-{
-  "title": "<role title>",
-  "responsibilities": ["<bullet>", "<bullet>"],
-  "requirements": ["<bullet>", "<bullet>"]
-}
-
-Rules:
-- Be concise and readable.
-- Remove boilerplate, legal text, navigation noise.
-- Keep only role-relevant content.
-- Max combined output length: 4000 chars.
-
-Text:
-${visible}`,
-                },
-              ],
-            }),
+            body: JSON.stringify(extractGroqBody),
           },
-          5000
+          45000
         );
         const aiData = await aiRes.json();
         const raw = aiData?.choices?.[0]?.message?.content || "";
-        const parsed = extractJSON(raw);
-
-        if (parsed) {
-          title = String(parsed.title || fallbackTitle).trim() || fallbackTitle;
-          const responsibilities = Array.isArray(parsed.responsibilities)
-            ? parsed.responsibilities.map((x) => String(x).trim()).filter(Boolean).slice(0, 10)
-            : [];
-          const requirements = Array.isArray(parsed.requirements)
-            ? parsed.requirements.map((x) => String(x).trim()).filter(Boolean).slice(0, 10)
-            : [];
-          const composed = [
-            responsibilities.length ? "Responsibilities:\n- " + responsibilities.join("\n- ") : "",
-            requirements.length ? "Requirements:\n- " + requirements.join("\n- ") : "",
-          ]
-            .filter(Boolean)
-            .join("\n\n")
-            .trim();
-          if (composed) {
-            jobText = composed.slice(0, 4000);
-          }
+        const normalized = normalizeVerbatimExtract(raw);
+        if (normalized.length > 80) {
+          jobText = normalized;
+          const fromRole = parseTitleFromVerbatimExtract(jobText);
+          if (fromRole) title = fromRole;
         }
       } catch {
         // best-effort AI cleaning; fallback remains usable
@@ -288,21 +261,8 @@ app.post("/analyze", async (req, res) => {
   }
 
   try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        max_tokens: 800,
-        temperature: 0.1,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "user",
-            content: `You are an expert career analyst and senior recruiter with 15+ years of experience.
+    const langNorm = normalizeAnalyzeLang(lang);
+    const legacyAnalyzeUserContent = `You are an expert career analyst and senior recruiter with 15+ years of experience.
             ${sector && sector !== "Auto-detect" ? `You are specifically evaluating this CV as a ${sector} sector recruiter. ${
   sector === "Tech / Startup" ? "Focus on: technical skills, GitHub/portfolio, startup experience, problem-solving ability, specific tech stack match, side projects. Red flags: no technical projects, vague descriptions, no measurable impact." :
   sector === "Consulting" ? "Focus on: structured thinking, quantified impact, prestigious education, leadership, case experience, communication skills. Red flags: no numbers/metrics, weak academic background, poor formatting." :
@@ -357,7 +317,7 @@ Return ONLY valid JSON. No markdown, no explanation, no extra text.
   "recruiter_simulation": {
     "sector": "<sector>",
     "first_impression": "<7-second screen: blunt — pass, bin, or skeptical and why>",
-    "internal_monologue": "<2-3 sentences: real recruiter self-talk under pressure — selection not coaching; name the filter>",
+    "internal_monologue": "<2-3 sentences: I/you only — recruiter self-talk to the applicant, never 'the candidate'; selection not coaching; name the filter>",
     "would_interview": <true|false>,
     "decision": "<shortlist | reject | follow-up | strong yes>",
     "red_flags": ["<credibility or fit killer, sharp phrasing>"],
@@ -396,10 +356,32 @@ Return ONLY valid JSON. No markdown, no explanation, no extra text.
     "missing_impact_metrics": <true|false>,
     "tone": "<Professional|Too casual|Too formal|Appropriate>"
   }
-}`
-          }
-        ]
-      })
+}`;
+
+    const legacyAnalyzeMessages = [
+      {
+        role: "system",
+        content: `${buildRecruiterSystemPrompt(langNorm)}
+
+Use I/you for all narrative JSON fields (recruiter_simulation, fit_summary, rejection reasons, strengths, improvements, etc.).`,
+      },
+      { role: "user", content: legacyAnalyzeUserContent },
+    ];
+    logPromptBeingSent(legacyAnalyzeMessages);
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        max_tokens: 800,
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        messages: legacyAnalyzeMessages,
+      }),
     });
 
     const data = await response.json();
@@ -423,20 +405,14 @@ app.post("/optimize", async (req, res) => {
   if (!cvText || !jobDescription) return res.status(400).json({ error: "Missing CV or JD" });
 
   try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        max_tokens: 800,
-        temperature: 0.35,
-        messages: [
-          {
-            role: "user",
-            content: `You are a senior recruiter-turned-CV writer doing a "Fix My CV" pass for one specific job.
+    const optimizeGroqBody = {
+      model: "llama-3.3-70b-versatile",
+      max_tokens: 800,
+      temperature: 0.35,
+      messages: [
+        {
+          role: "user",
+          content: `You are a senior recruiter-turned-CV writer doing a "Fix My CV" pass for one specific job.
 
 TASK — rewrite the ENTIRE CV for this job description:
 1) Every bullet: strong action verb + outcome + metric (use plausible estimates like "~20%", "~15k users", "~$XM" only where reasonable from context; if unknown, still quantify scope: "across 3 teams", "weekly reports for leadership").
@@ -451,10 +427,18 @@ CV:
 ${cvText}
 
 Job Description:
-${jobDescription}`
-          }
-        ]
-      })
+${jobDescription}`,
+        },
+      ],
+    };
+    logPromptBeingSent(optimizeGroqBody.messages);
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(optimizeGroqBody),
     });
 
     const data = await response.json();
@@ -472,25 +456,27 @@ app.post("/roadmap", async (req, res) => {
   if (!missingSkills?.length) return res.status(400).json({ error: "No missing skills provided" });
 
   try {
+    const roadmapGroqBody = {
+      model: "llama-3.3-70b-versatile",
+      max_tokens: 800,
+      temperature: 0.4,
+      messages: [
+        {
+          role: "user",
+          content: `Create a concise 30-day learning roadmap for someone targeting a ${seniority || "Junior"} ${roleType || "role"} who is missing these skills: ${missingSkills.join(", ")}.
+
+For each skill provide: week number, specific resource (course/book/project), and estimated hours. Be practical and specific. Return as plain text, no JSON.`,
+        },
+      ],
+    };
+    logPromptBeingSent(roadmapGroqBody.messages);
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        max_tokens: 800,
-        temperature: 0.4,
-        messages: [
-          {
-            role: "user",
-            content: `Create a concise 30-day learning roadmap for someone targeting a ${seniority || "Junior"} ${roleType || "role"} who is missing these skills: ${missingSkills.join(", ")}.
-
-For each skill provide: week number, specific resource (course/book/project), and estimated hours. Be practical and specific. Return as plain text, no JSON.`
-          }
-        ]
-      })
+      body: JSON.stringify(roadmapGroqBody),
     });
 
     const data = await response.json();
@@ -508,21 +494,15 @@ app.post("/apply-fix", async (req, res) => {
   if (!cvText || !problem) return res.status(400).json({ error: "Missing data" });
 
   try {
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        max_tokens: 800,
-        temperature: 0.3,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "user",
-            content: `You are an expert CV writer.
+    const applyFixGroqBody = {
+      model: "llama-3.3-70b-versatile",
+      max_tokens: 800,
+      temperature: 0.3,
+      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "user",
+          content: `You are an expert CV writer.
 
 Problem in this CV: "${problem}"
 Fix to apply: "${fix}"
@@ -538,10 +518,18 @@ Return ONLY this JSON:
   "original_section": "exact original text from CV",
   "rewritten_section": "improved version",
   "explanation": "1 sentence: what changed"
-}`
-          }
-        ]
-      })
+}`,
+        },
+      ],
+    };
+    logPromptBeingSent(applyFixGroqBody.messages);
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(applyFixGroqBody),
     });
 
     const data = await response.json();
@@ -564,22 +552,8 @@ app.post("/decision", async (req, res) => {
   const deadlineType = deadline || "1_week";
 
   try {
-    // STEP 1: GPT — Core decision (source of truth)
-    const gptResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        max_tokens: 800,
-        temperature: 0.1,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "user",
-            content: `You are a senior recruiter under time pressure. Review this CV against the job description. Your job is to simulate who gets cut in screening — not to encourage the candidate.
+    const langNorm = normalizeAnalyzeLang(lang);
+    const decisionUserContent = `You are a senior recruiter under time pressure. Review this CV against the job description. Your job is to simulate who gets cut in screening — not to encourage the candidate. Follow your system instructions for voice (I/you only).
 
 FORBIDDEN WORDS: optimize, enhance, leverage, consider, suggest, could, important to note, in order to
 FORBIDDEN TONE: motivational, gentle, "you have potential", hedging with "might"
@@ -617,9 +591,9 @@ Return ONLY this JSON (no markdown):
   ],
   "missingSkills": ["<skill>", "<skill>", "<skill>"],
   "recruiterInsight": [
-    "<1 sentence: harsh realistic screen thought — selection pressure, not advice>",
-    "<1 sentence: what makes them a no or a maybe>",
-    "<1 sentence: credibility or fit killer if any>"
+    "<1 sentence: I/you only — harsh realistic screen thought to the applicant, never 'the candidate'>",
+    "<1 sentence: I/you — what makes you a no or a maybe>",
+    "<1 sentence: I/you — credibility or fit killer if any>"
   ],
   "oneAction": "<single most important action, max 12 words>",
   "aiSuspicion": {
@@ -635,10 +609,32 @@ Return ONLY this JSON (no markdown):
       { "day": "<timeframe>", "action": "<specific action>" }
     ]
   }
-}`
-          }
-        ]
-      })
+}`;
+
+    const decisionMessages = [
+      {
+        role: "system",
+        content: `${buildRecruiterSystemPrompt(langNorm)}
+
+Apply this voice to summary, biggestMistake, topFixes, recruiterInsight, oneAction, aiSuspicion, and deadlinePlan text.`,
+      },
+      { role: "user", content: decisionUserContent },
+    ];
+    logPromptBeingSent(decisionMessages);
+
+    const gptResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "llama-3.3-70b-versatile",
+        max_tokens: 800,
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        messages: decisionMessages,
+      }),
     });
 
     const gptData = await gptResponse.json();
@@ -657,24 +653,21 @@ Return ONLY this JSON (no markdown):
 // =========================
 
 try {
-  const [aiRes, gutRes] = await Promise.all([
-    fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        max_tokens: 800,
-        temperature: 0.2,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "user",
-            content: `You are a recruiter detecting AI-written CVs.
+  const aiDetectGroqBody = {
+    model: "llama-3.3-70b-versatile",
+    max_tokens: 800,
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: `${buildRecruiterSystemPrompt(langNorm)}
 
-Return STRICT JSON:
+You detect AI-written CVs. Return only the JSON shape in the user message. In "reasons" and "fix" arrays use I/you only; never "the candidate", "this applicant", or "the applicant".`,
+      },
+      {
+        role: "user",
+        content: `Return STRICT JSON:
 {
   "aiScore": number (0-100),
   "aiLevel": "Low" | "Medium" | "High",
@@ -689,40 +682,50 @@ Rules:
 - Be harsh
 
 CV:
-${cvText}`
-          }
-        ]
-      })
+${cvText}`,
+      },
+    ],
+  };
+  const gutGroqBody = {
+    model: "llama-3.3-70b-versatile",
+    max_tokens: 800,
+    temperature: 0.3,
+    messages: [
+      {
+        role: "system",
+        content: `${buildRecruiterSystemPrompt(langNorm)}
+
+Reply with one short plain sentence only (not JSON). Max 10 words. I/you only.`,
+      },
+      {
+        role: "user",
+        content: `Say your gut feeling about this CV.
+
+CV:
+${cvText}`,
+      },
+    ],
+  };
+  logPromptBeingSent(aiDetectGroqBody.messages);
+  logPromptBeingSent(gutGroqBody.messages);
+  const [aiRes, gutRes] = await Promise.all([
+    fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(aiDetectGroqBody),
     }),
 
     fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        max_tokens: 800,
-        temperature: 0.3,
-        messages: [
-          {
-            role: "user",
-            content: `You are a recruiter.
-
-Say your gut feeling about this CV in ONE short sentence.
-
-Rules:
-- Max 10 words
-- Direct
-- Slightly harsh
-
-CV:
-${cvText}`
-          }
-        ]
-      })
-    })
+      body: JSON.stringify(gutGroqBody),
+    }),
   ]);
 
   const aiData = await aiRes.json();
@@ -744,21 +747,21 @@ ${cvText}`
 
     // STEP 3: Tone rewriter — make output sound human
 try {
-  const toneResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
-      max_tokens: 800,
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "user",
-          content: `You are a recruiter reviewing a CV. You have 10 seconds. Say what matters for WHO GETS CUT.
+  const toneGroqBody = {
+    model: "llama-3.3-70b-versatile",
+    max_tokens: 800,
+    temperature: 0.2,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: `${buildRecruiterSystemPrompt(langNorm)}
+
+You rewrite JSON string values only. Keep keys, numbers, booleans, and array shapes identical. Every narrative string stays recruiter-first-person ("I") addressing the applicant ("you"). Never "the candidate", "this applicant", or "the applicant".`,
+      },
+      {
+        role: "user",
+        content: `You have 10 seconds. Say what matters for WHO GETS CUT.
 
 RULES:
 - Short sentences. Max 8-10 words each.
@@ -796,13 +799,21 @@ ${JSON.stringify({
   aiLevel: cleaned.aiLevel,
   aiReasons: cleaned.aiReasons,
   aiFix: cleaned.aiFix,
-  gutFeeling: cleaned.gutFeeling
+  gutFeeling: cleaned.gutFeeling,
 })}
 
-Return ONLY a JSON object with the same keys and rewritten values. No markdown.`
-        }
-      ]
-    })
+Return ONLY a JSON object with the same keys and rewritten values. No markdown.`,
+      },
+    ],
+  };
+  logPromptBeingSent(toneGroqBody.messages);
+  const toneResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(toneGroqBody),
   });
 
   const toneData = await toneResponse.json();

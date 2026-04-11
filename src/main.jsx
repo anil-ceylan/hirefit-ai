@@ -1,7 +1,15 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import MainApp from './App.jsx'
+import HireFitLayout, {
+  LandingPage,
+  AnalyzerPage,
+  DashboardPage,
+  LoginPage,
+  RoadmapRoute,
+  TermsPage,
+  PrivacyPage,
+} from './App.jsx'
 import ReportPage from './ReportPage.jsx'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
@@ -9,14 +17,16 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<MainApp />} />
-        <Route path="/app" element={<MainApp />} />
-        <Route path="/roadmap" element={<MainApp />} />
-        <Route path="/dashboard" element={<MainApp />} />
-        <Route path="/login" element={<MainApp />} />
+        <Route path="/" element={<HireFitLayout />}>
+          <Route index element={<LandingPage />} />
+          <Route path="app" element={<AnalyzerPage />} />
+          <Route path="dashboard" element={<DashboardPage />} />
+          <Route path="login" element={<LoginPage />} />
+          <Route path="roadmap" element={<RoadmapRoute />} />
+          <Route path="terms" element={<TermsPage />} />
+          <Route path="privacy" element={<PrivacyPage />} />
+        </Route>
         <Route path="/report/:id" element={<ReportPage />} />
-        <Route path="/terms" element={<MainApp />} />
-        <Route path="/privacy" element={<MainApp />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,
