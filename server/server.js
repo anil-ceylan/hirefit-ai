@@ -29,7 +29,22 @@ process.on("unhandledRejection", (reason) => {
 const EXTRACT_JOB_MAX_TOKENS = 8192;
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "https://hirefit-ai.vercel.app",
+      "http://localhost:5173",
+      "http://localhost:5174",
+      "http://localhost:5175",
+      "http://localhost:5176",
+      "http://localhost:5177",
+      "http://localhost:5178",
+      "http://localhost:5179",
+      "http://localhost:5180",
+    ],
+    credentials: true,
+  })
+);
 const jsonParser = express.json();
 app.use((req, res, next) => {
   // Webhook must keep raw bytes for HMAC validation.
