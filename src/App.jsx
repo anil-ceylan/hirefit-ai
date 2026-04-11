@@ -19,8 +19,10 @@ import workerSrc from "pdfjs-dist/build/pdf.worker?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
-/** TEMP: hardcoded Railway API for env debugging — revert to VITE_API_URL ternary after confirming. */
-const HF_API_BASE = "https://hirefit-ai-production.up.railway.app";
+const HF_API_BASE =
+  typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL
+    ? String(import.meta.env.VITE_API_URL).replace(/\/$/, "")
+    : "https://hirefit-ai-production.up.railway.app";
 
 /** 30-day rolling window for free-tier analysis_count reset (user_plans.last_reset_at). */
 const USER_PLAN_RESET_MS = 30 * 24 * 60 * 60 * 1000;
