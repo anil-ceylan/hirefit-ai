@@ -101,6 +101,38 @@ function rsAlpha(hex, a) {
   return `rgba(${rsRgb(hex)},${a})`;
 }
 
+/** Normalize action_plan from API (same shape as lib/analyze-v2/decisionEngine.parseActionPlan). */
+function parseActionPlan(raw) {
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    const normResource = (v) => {
+      if (v == null) return null;
+      const s = String(v).trim();
+      if (!s || /^null$/i.test(s)) return null;
+      return s;
+    };
+    const normNote = (v) => {
+      if (v == null) return null;
+      const s = String(v).trim();
+      if (!s || /^null$/i.test(s)) return null;
+      return s;
+    };
+    return {
+      priority_callout: parsed?.priority_callout?.trim() || null,
+      fixes: Array.isArray(parsed?.fixes)
+        ? parsed.fixes.slice(0, 3).map((f) => ({
+            issue: f && f.issue != null ? String(f.issue).trim() : "",
+            fix: f && f.fix != null ? String(f.fix).trim() : "",
+            resource: normResource(f?.resource),
+          }))
+        : [],
+      interview_note: normNote(parsed?.interview_note),
+    };
+  } catch {
+    return { priority_callout: null, fixes: [], interview_note: null };
+  }
+}
+
 /**
  * Deterministic score lift (5–20) from prioritized gaps / missing signals — not random.
  */
@@ -968,7 +1000,8 @@ function CareerEngineCard({
   const roles = data.RoleFit?.role_fit || [];
   const best = data.RoleFit?.best_role;
   const locked = data.RoleFit?.locked;
-  const one = (data.Decision?.what_to_fix_first || [])[0];
+  const actionPlan = parseActionPlan(data.Decision?.action_plan);
+  const previewFix = actionPlan.fixes[0]?.fix?.trim();
   const biggest =
     (data.Gaps?.biggest_gap && String(data.Gaps.biggest_gap).trim()) ||
     (gaps[0]?.issue ? String(gaps[0].issue) : "");
@@ -982,8 +1015,7 @@ function CareerEngineCard({
   const matchedDisplay = (Array.isArray(matchedSkills) && matchedSkills.length > 0 ? matchedSkills : data.ATS?.matched_skills) || [];
   const missingDisplay = (Array.isArray(missingSkills) && missingSkills.length > 0 ? missingSkills : data.ATS?.missing_keywords) || [];
   const keywordsDisplay = (Array.isArray(topKeywords) && topKeywords.length > 0 ? topKeywords : data.ATS?.top_keywords) || [];
-  const fixesList = (Array.isArray(data.Decision?.what_to_fix_first) ? data.Decision.what_to_fix_first : []).map((x) => String(x).trim()).filter(Boolean);
-  const planLines = fixesList.length ? fixesList : gaps.map((g) => String(g.issue || "").trim()).filter(Boolean).slice(0, 5);
+  const planFixes = actionPlan.fixes.filter((f) => f.issue || f.fix);
   const na = t.notAvailableForAnalysis;
   const unlockLabel = t.unlockProArrow;
   const tabSpecs = [
@@ -1057,6 +1089,30 @@ function CareerEngineCard({
                   <span style={{ fontWeight: 500, color: RS.red }}>{t.biggestBlockerLead}</span>
                   <span style={{ fontWeight: 400, color: RS.redDim }}>{biggest}</span>
                 </span>
+              </div>
+            ) : null}
+            {previewFix ? (
+              <div style={{ marginTop: 14, marginLeft: 64, maxWidth: "100%" }}>
+                <div style={{ ...labelStyle, marginBottom: 6 }}>{t.doThisNext}</div>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 10 }}>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>{previewFix}</span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("plan")}
+                    style={{
+                      border: "none",
+                      background: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: RS.indigo,
+                      fontFamily: RS.fontUi,
+                    }}
+                  >
+                    {t.seeFullPlan}
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>
@@ -1225,51 +1281,56 @@ function CareerEngineCard({
         </div>
 
         <div style={{ display: activeTab === "plan" ? "block" : "none" }}>
-          <div style={sectionTitleStyle}>{t.whatToDoNext}</div>
-          <div
-            style={{
-              marginBottom: 16,
-              padding: "14px 16px",
-              borderRadius: 8,
-              border: `1px solid ${rsAlpha(RS.indigo, 0.25)}`,
-              background: rsAlpha(RS.indigo, 0.08),
-            }}
-          >
-            <div style={{ fontSize: 15, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.45 }}>
-              {one || (lang === "TR" ? "Önce bu ilan için tek bir kritik boşluğu kapat." : "Close one critical gap for this job first.")}
+          {actionPlan.priority_callout ? (
+            <div style={{ marginBottom: 16, padding: "14px 16px", borderRadius: 8, background: RS.bgElevated, border: `1px solid ${RS.borderSubtle}` }}>
+              <div style={{ ...labelStyle, marginBottom: 8 }}>{t.whatToDoNext}</div>
+              <div style={{ fontSize: 14, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.55 }}>{actionPlan.priority_callout}</div>
             </div>
-          </div>
-          <div style={sectionTitleStyle}>{lang === "TR" ? "Öncelikli düzeltmeler" : "Priority fixes"}</div>
-          {!isPro ? (
-            <ProBlurGate active onUpgrade={onUpgrade} unlockLabel={unlockLabel}>
-              <div style={{ minHeight: 100 }}>
-                {planLines[0] ? (
-                  <ResultsBulletRow sentiment="warning">
-                    <span style={{ color: RS.textPrimary }}>{planLines[0]}</span>
-                  </ResultsBulletRow>
-                ) : (
-                  <ResultsBulletRow sentiment="neutral">
-                    <span style={{ color: RS.textSecondary }}>{na}</span>
-                  </ResultsBulletRow>
-                )}
-                <div style={{ ...sectionTitleStyle, marginTop: 16 }}>{lang === "TR" ? "Mülakat hazırlığı" : "Interview prep"}</div>
-                <ResultsBulletRow sentiment="neutral">
-                  <span style={{ color: RS.textSecondary }}>{t.proFeatureInterview}</span>
-                </ResultsBulletRow>
+          ) : null}
+          <div style={sectionTitleStyle}>{t.priorityFixes}</div>
+          {planFixes.length ? (
+            planFixes.map((f, i) => (
+              <div
+                key={i}
+                style={{
+                  padding: "10px 0",
+                  borderBottom: i < planFixes.length - 1 ? `1px solid ${RS.border}` : "none",
+                }}
+              >
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: RS.red, flexShrink: 0, marginTop: 6 }} aria-hidden />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>{f.issue || "—"}</div>
+                    {f.fix ? (
+                      <div style={{ fontSize: 13, color: RS.textSecondary, paddingLeft: 13, marginTop: 4, lineHeight: 1.5 }}>
+                        → {f.fix}
+                      </div>
+                    ) : null}
+                    {f.resource ? (
+                      <div style={{ fontSize: 12, color: RS.indigo, paddingLeft: 13, marginTop: 4, lineHeight: 1.45, cursor: "pointer" }}>→ {f.resource}</div>
+                    ) : null}
+                  </div>
+                </div>
               </div>
-            </ProBlurGate>
-          ) : planLines.length ? (
-            planLines.map((line, i) => (
-              <ResultsBulletRow key={i} sentiment="neutral">
-                <span style={{ color: RS.textPrimary }}>{line}</span>
-              </ResultsBulletRow>
             ))
           ) : (
-            <div style={{ fontSize: 14, color: RS.textSecondary }}>{na}</div>
+            <div style={{ fontSize: 14, color: RS.textMuted, marginBottom: 16 }}>{na}</div>
           )}
+          {actionPlan.interview_note ? (
+            <div style={{ marginTop: 20 }}>
+              <div style={sectionTitleStyle}>{t.interviewPrepShort}</div>
+              {!isPro ? (
+                <ProBlurGate active onUpgrade={onUpgrade} unlockLabel={unlockLabel}>
+                  <div style={{ fontSize: 13, color: RS.textSecondary, lineHeight: 1.6, minHeight: 48 }}>{actionPlan.interview_note}</div>
+                </ProBlurGate>
+              ) : (
+                <div style={{ fontSize: 13, color: RS.textSecondary, lineHeight: 1.6 }}>{actionPlan.interview_note}</div>
+              )}
+            </div>
+          ) : null}
           {isPro && (interviewPrep || []).length > 0 ? (
             <div style={{ marginTop: 20 }}>
-              <div style={sectionTitleStyle}>{lang === "TR" ? "Mülakat hazırlığı" : "Interview prep"}</div>
+              <div style={sectionTitleStyle}>{lang === "TR" ? "Mülakat soruları" : "Interview questions"}</div>
               {(interviewPrep || []).slice(0, 4).map((q, i) => (
                 <div key={i} style={{ marginBottom: 12 }}>
                   <ResultsBulletRow sentiment="neutral">
@@ -1730,6 +1791,10 @@ const translations = {
     missingFromCv: "Missing from your CV",
     detectedInCv: "Detected in your CV",
     unlockProArrow: "Unlock with Pro →",
+    doThisNext: "Do this next",
+    seeFullPlan: "→ See full plan",
+    priorityFixes: "Priority fixes",
+    interviewPrepShort: "Interview prep",
   },
   TR: {
     slogan: "AI Career Decision Engine",
@@ -1863,6 +1928,10 @@ const translations = {
     missingFromCv: "CV'nizde eksik",
     detectedInCv: "CV'nizde tespit edilen",
     unlockProArrow: "Pro ile aç →",
+    doThisNext: "Önce bunu yap",
+    seeFullPlan: "→ Tam planı gör",
+    priorityFixes: "Öncelikli düzeltmeler",
+    interviewPrepShort: "Mülakat hazırlığı",
   },
 };
 
