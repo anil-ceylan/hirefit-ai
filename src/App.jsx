@@ -170,23 +170,56 @@ function analysisExecutionFingerprint(cv, jd, alignmentScore) {
 
 const LS_FIX_PROGRESS = "hirefit-fix-progress-";
 
-function loadFixProgressArray(fp, n) {
-  if (!fp || !n) return Array.from({ length: n }, () => false);
+function emptyStepProofGrid(fixes) {
+  return fixes.map((f) => Array(Math.max(0, f.steps?.length || 0)).fill(""));
+}
+
+function loadExecutionPlanState(fp, fixes) {
+  const n = fixes.length;
+  const blank = () => ({
+    completed: Array.from({ length: n }, () => false),
+    fixProofs: Array.from({ length: n }, () => ""),
+    stepProofs: emptyStepProofGrid(fixes),
+  });
+  if (!fp || !n) return blank();
   try {
     const raw = localStorage.getItem(LS_FIX_PROGRESS + fp);
-    if (!raw) return Array.from({ length: n }, () => false);
+    if (!raw) return blank();
     const o = JSON.parse(raw);
-    if (!Array.isArray(o.completed) || o.completed.length !== n) return Array.from({ length: n }, () => false);
-    return o.completed.map(Boolean);
+    const completed =
+      Array.isArray(o.completed) && o.completed.length === n
+        ? o.completed.map(Boolean)
+        : Array.from({ length: n }, () => false);
+    const fixProofs =
+      Array.isArray(o.fixProofs) && o.fixProofs.length === n
+        ? o.fixProofs.map((x) => String(x ?? ""))
+        : Array.from({ length: n }, () => "");
+    let stepProofs = emptyStepProofGrid(fixes);
+    if (Array.isArray(o.stepProofs) && o.stepProofs.length === n) {
+      stepProofs = fixes.map((f, fi) => {
+        const row = Array.isArray(o.stepProofs[fi]) ? o.stepProofs[fi] : [];
+        const sn = Math.max(0, f.steps?.length || 0);
+        return Array.from({ length: sn }, (_, si) => String(row[si] ?? ""));
+      });
+    }
+    return { completed, fixProofs, stepProofs };
   } catch {
-    return Array.from({ length: n }, () => false);
+    return blank();
   }
 }
 
-function saveFixProgressArray(fp, completed) {
-  if (!fp || !Array.isArray(completed)) return;
+function saveExecutionPlanState(fp, state) {
+  if (!fp || !state?.completed || !Array.isArray(state.completed)) return;
   try {
-    localStorage.setItem(LS_FIX_PROGRESS + fp, JSON.stringify({ completed, updatedAt: Date.now() }));
+    localStorage.setItem(
+      LS_FIX_PROGRESS + fp,
+      JSON.stringify({
+        completed: state.completed,
+        fixProofs: Array.isArray(state.fixProofs) ? state.fixProofs : [],
+        stepProofs: Array.isArray(state.stepProofs) ? state.stepProofs : [],
+        updatedAt: Date.now(),
+      }),
+    );
   } catch {
     /* ignore */
   }
@@ -1084,7 +1117,11 @@ function CareerEngineCard({
 }) {
   const [showJobs, setShowJobs] = useState(false);
   const [activeTab, setActiveTab] = useState("recruiter");
-  const [fixedDone, setFixedDone] = useState(() => []);
+  const [execState, setExecState] = useState(() => ({
+    completed: [],
+    fixProofs: [],
+    stepProofs: [],
+  }));
 
   const actionPlanMemo = useMemo(() => {
     if (!data) return { priority_callout: null, fixes: [], interview_note: null };
@@ -1117,15 +1154,46 @@ function CareerEngineCard({
 
   useEffect(() => {
     if (!nPlanFixes) {
-      setFixedDone([]);
+      setExecState({ completed: [], fixProofs: [], stepProofs: [] });
       return;
     }
     if (!fp) {
-      setFixedDone(Array.from({ length: nPlanFixes }, () => false));
+      setExecState({
+        completed: Array.from({ length: nPlanFixes }, () => false),
+        fixProofs: Array.from({ length: nPlanFixes }, () => ""),
+        stepProofs: emptyStepProofGrid(planFixesMemo),
+      });
       return;
     }
-    setFixedDone(loadFixProgressArray(fp, nPlanFixes));
-  }, [fp, nPlanFixes]);
+    setExecState(loadExecutionPlanState(fp, planFixesMemo));
+  }, [fp, nPlanFixes, planFixesMemo]);
+
+  const roleFitRows = data?.RoleFit?.role_fit;
+  const roleFitBest = data?.RoleFit?.best_role;
+
+  const betterRoleAlternatives = useMemo(() => {
+    const rows = Array.isArray(roleFitRows) ? roleFitRows : [];
+    if (!rows.length) return [];
+    const align = scoreNumeric;
+    const sorted = [...rows].sort((a, b) => Number(b.score) - Number(a.score));
+    if (align != null) {
+      const alts = sorted.filter((r) => Number(r.score) > align + 2);
+      if (alts.length) return alts.slice(0, 4);
+    }
+    return sorted.filter((r) => !roleFitBest || String(r.role) !== String(roleFitBest)).slice(0, 3);
+  }, [roleFitRows, scoreNumeric, roleFitBest]);
+
+  const dynamicProgressScore = useMemo(() => {
+    if (scoreNumeric == null || !planFixesMemo.length) return null;
+    let acc = scoreNumeric;
+    planFixesMemo.forEach((f, idx) => {
+      if (execState.completed[idx]) {
+        const imp = Math.max(1, Math.min(18, Math.round(Number(f?.score_impact) || 0)));
+        acc = Math.min(100, acc + imp);
+      }
+    });
+    return Math.round(acc);
+  }, [scoreNumeric, planFixesMemo, execState.completed]);
 
   if (!data) return null;
 
@@ -1478,14 +1546,24 @@ function CareerEngineCard({
                 <span style={{ fontSize: 12, fontWeight: 600, color: RS.textSecondary }}>{t.executionProgress}</span>
                 <span style={{ fontSize: 12, fontWeight: 600, color: RS.indigo, fontFamily: RS.fontMono }}>
                   {t.fixesCompletedCount
-                    .replace("{done}", String(fixedDone.filter(Boolean).length))
+                    .replace("{done}", String(execState.completed.filter(Boolean).length))
                     .replace("{total}", String(planFixes.length))}
                 </span>
               </div>
               {scoreNumeric != null && cumulativeProjected.length ? (
-                <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 14, lineHeight: 1.55, fontFamily: RS.fontMono }}>
-                  {t.executionLadder}: ~{Math.round(scoreNumeric)}
-                  {cumulativeProjected.map((c) => ` → ~${Math.round(c)}`).join("")}
+                <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 8, lineHeight: 1.55, fontFamily: RS.fontMono }}>
+                  {t.executionLadder}: {Math.round(scoreNumeric)}
+                  {cumulativeProjected.map((c) => ` → ${Math.round(c)}`).join("")}
+                </div>
+              ) : null}
+              {scoreNumeric != null && dynamicProgressScore != null ? (
+                <div style={{ fontSize: 12, fontWeight: 600, color: RS.green, marginBottom: 14, fontFamily: RS.fontMono }}>
+                  {t.progressScoreLive
+                    .replace("{score}", String(dynamicProgressScore))
+                    .replace(
+                      "{delta}",
+                      dynamicProgressScore > scoreNumeric ? `+${dynamicProgressScore - scoreNumeric}` : "0",
+                    )}
                 </div>
               ) : null}
               {planFixes.map((f, i) => {
@@ -1540,16 +1618,46 @@ function CareerEngineCard({
                           >
                             <input
                               type="checkbox"
-                              checked={!!fixedDone[i]}
-                              onChange={() => {
-                                setFixedDone((prev) => {
-                                  const base =
-                                    prev.length === planFixes.length ? prev : Array.from({ length: planFixes.length }, (_, j) => !!prev[j]);
-                                  const next = [...base];
-                                  next[i] = !next[i];
-                                  if (fp) saveFixProgressArray(fp, next);
-                                  return next;
-                                });
+                              checked={!!execState.completed[i]}
+                              onChange={(e) => {
+                                const want = e.target.checked;
+                                const n = planFixes.length;
+                                if (want) {
+                                  const existing = String(execState.fixProofs[i] || "");
+                                  const proof = window.prompt(t.proofPromptWhenDone, existing);
+                                  if (proof === null) return;
+                                  const trimmed = String(proof).trim();
+                                  if (!trimmed) {
+                                    window.alert(t.proofRequiredShort);
+                                    return;
+                                  }
+                                  setExecState((prev) => {
+                                    const completed = Array.from({ length: n }, (_, j) => !!prev.completed[j]);
+                                    completed[i] = true;
+                                    const fixProofs = Array.from({ length: n }, (_, j) => String(prev.fixProofs[j] ?? ""));
+                                    fixProofs[i] = trimmed;
+                                    const stepProofs =
+                                      prev.stepProofs.length === n
+                                        ? prev.stepProofs.map((row) => [...row])
+                                        : emptyStepProofGrid(planFixes);
+                                    const next = { completed, fixProofs, stepProofs };
+                                    if (fp) saveExecutionPlanState(fp, next);
+                                    return next;
+                                  });
+                                } else {
+                                  setExecState((prev) => {
+                                    const completed = Array.from({ length: n }, (_, j) => !!prev.completed[j]);
+                                    completed[i] = false;
+                                    const fixProofs = Array.from({ length: n }, (_, j) => String(prev.fixProofs[j] ?? ""));
+                                    fixProofs[i] = "";
+                                    const stepProofs = prev.stepProofs.length === n
+                                      ? prev.stepProofs.map((row, ri) => (ri === i ? row.map(() => "") : [...row]))
+                                      : emptyStepProofGrid(planFixes);
+                                    const next = { completed, fixProofs, stepProofs };
+                                    if (fp) saveExecutionPlanState(fp, next);
+                                    return next;
+                                  });
+                                }
                               }}
                               aria-label={t.markFixDoneAria.replace("{n}", String(i + 1))}
                               style={{
@@ -1562,9 +1670,39 @@ function CareerEngineCard({
                             />
                             <span style={{ fontSize: 12, fontWeight: 500, color: RS.textMuted }}>{t.markFixComplete}</span>
                           </label>
-                          <div style={{ fontSize: 13, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>
-                            {humanizeUserFacingReason(f.issue || "—", lang)}
+                          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
+                            <div style={{ fontSize: 13, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5, flex: "1 1 160px", minWidth: 0 }}>
+                              {humanizeUserFacingReason(f.issue || "—", lang)}
+                            </div>
+                            <span
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: RS.green,
+                                fontFamily: RS.fontMono,
+                                flexShrink: 0,
+                              }}
+                            >
+                              +{impPts}
+                            </span>
                           </div>
+                          {execState.fixProofs[i] ? (
+                            <div
+                              style={{
+                                fontSize: 11,
+                                color: RS.textMuted,
+                                marginTop: 4,
+                                padding: "8px 10px",
+                                borderRadius: 6,
+                                background: rsAlpha(RS.indigo, 0.08),
+                                border: `1px solid ${rsAlpha(RS.indigo, 0.2)}`,
+                                lineHeight: 1.45,
+                                wordBreak: "break-word",
+                              }}
+                            >
+                              <span style={{ fontWeight: 600, color: RS.indigo }}>{t.proofStoredLabel}</span> {execState.fixProofs[i]}
+                            </div>
+                          ) : null}
                           {score != null && Number.isFinite(Number(score)) ? (
                             <>
                               <div style={{ fontSize: 12, color: RS.green, fontWeight: 600, marginTop: 6, lineHeight: 1.4 }}>
@@ -1599,29 +1737,130 @@ function CareerEngineCard({
                                 return f.steps.map((step, si) => {
                                   const inc = stepIncrements[si] ?? 0;
                                   const next = Math.min(100, prev + inc);
-                                  const hint =
+                                  const rangeHint =
                                     scoreNumeric != null
                                       ? t.projectedStepHint.replace("{from}", String(Math.round(prev))).replace("{to}", String(Math.round(next)))
                                       : "";
+                                  const stepVal = String(execState.stepProofs[i]?.[si] ?? "");
                                   const line = (
-                                    <div
-                                      key={si}
-                                      style={{
-                                        fontSize: 13,
-                                        color: RS.textSecondary,
-                                        paddingLeft: 13,
-                                        marginTop: si ? 4 : 0,
-                                        lineHeight: 1.5,
-                                        display: "flex",
-                                        flexWrap: "wrap",
-                                        alignItems: "baseline",
-                                        gap: 8,
-                                      }}
-                                    >
-                                      <span>→ {step}</span>
-                                      {hint ? (
-                                        <span style={{ fontSize: 11, color: RS.textMuted, fontFamily: RS.fontMono }}>{hint}</span>
-                                      ) : null}
+                                    <div key={si} style={{ marginTop: si ? 10 : 0, paddingLeft: 13 }}>
+                                      <div
+                                        style={{
+                                          fontSize: 13,
+                                          color: RS.textSecondary,
+                                          lineHeight: 1.5,
+                                          display: "flex",
+                                          flexWrap: "wrap",
+                                          alignItems: "baseline",
+                                          gap: 8,
+                                        }}
+                                      >
+                                        <span>→ {step}</span>
+                                        {inc > 0 ? (
+                                          <span style={{ fontSize: 11, fontWeight: 700, color: RS.green, fontFamily: RS.fontMono }}>+{inc}</span>
+                                        ) : null}
+                                        {rangeHint ? (
+                                          <span style={{ fontSize: 11, color: RS.textMuted, fontFamily: RS.fontMono }}>{rangeHint}</span>
+                                        ) : null}
+                                      </div>
+                                      <div style={{ marginTop: 8, paddingLeft: 2 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 600, color: RS.textMuted, marginBottom: 4, textTransform: "uppercase" }}>
+                                          {t.proofStepHeading}
+                                        </div>
+                                        <input
+                                          type="text"
+                                          value={stepVal}
+                                          placeholder={t.proofPasteLinkPlaceholder}
+                                          onChange={(ev) => {
+                                            const v = ev.target.value;
+                                            setExecState((prev) => {
+                                              const nF = planFixes.length;
+                                              const stepProofs =
+                                                prev.stepProofs.length === nF
+                                                  ? prev.stepProofs.map((row) => [...row])
+                                                  : emptyStepProofGrid(planFixes);
+                                              if (!stepProofs[i]) stepProofs[i] = [];
+                                              const row = [...(stepProofs[i] || [])];
+                                              while (row.length <= si) row.push("");
+                                              row[si] = v;
+                                              stepProofs[i] = row;
+                                              const next = { ...prev, stepProofs };
+                                              if (fp) saveExecutionPlanState(fp, next);
+                                              return next;
+                                            });
+                                          }}
+                                          style={{
+                                            width: "100%",
+                                            maxWidth: 420,
+                                            boxSizing: "border-box",
+                                            padding: "8px 10px",
+                                            borderRadius: 6,
+                                            border: `1px solid ${RS.borderSubtle}`,
+                                            background: RS.bgBase,
+                                            color: RS.textSecondary,
+                                            fontSize: 12,
+                                            fontFamily: RS.fontUi,
+                                          }}
+                                        />
+                                        <label
+                                          style={{
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: 8,
+                                            marginTop: 6,
+                                            fontSize: 11,
+                                            color: RS.textMuted,
+                                            cursor: "pointer",
+                                          }}
+                                        >
+                                          <input
+                                            type="file"
+                                            accept=".txt,.pdf,image/*"
+                                            style={{ fontSize: 11, maxWidth: 220 }}
+                                            onChange={(ev) => {
+                                              const file = ev.target.files?.[0];
+                                              ev.target.value = "";
+                                              if (!file) return;
+                                              const name = file.name || "file";
+                                              if (file.type === "text/plain" || /\.txt$/i.test(name)) {
+                                                file.text().then((txt) => {
+                                                  const snippet = String(txt || "").trim().slice(0, 1800);
+                                                  setExecState((prev) => {
+                                                    const nF = planFixes.length;
+                                                    const stepProofs =
+                                                      prev.stepProofs.length === nF
+                                                        ? prev.stepProofs.map((row) => [...row])
+                                                        : emptyStepProofGrid(planFixes);
+                                                    const row = [...(stepProofs[i] || [])];
+                                                    while (row.length <= si) row.push("");
+                                                    row[si] = snippet || `${t.proofFileLabel}: ${name}`;
+                                                    stepProofs[i] = row;
+                                                    const next = { ...prev, stepProofs };
+                                                    if (fp) saveExecutionPlanState(fp, next);
+                                                    return next;
+                                                  });
+                                                });
+                                              } else {
+                                                setExecState((prev) => {
+                                                  const nF = planFixes.length;
+                                                  const stepProofs =
+                                                    prev.stepProofs.length === nF
+                                                      ? prev.stepProofs.map((row) => [...row])
+                                                      : emptyStepProofGrid(planFixes);
+                                                  const row = [...(stepProofs[i] || [])];
+                                                  while (row.length <= si) row.push("");
+                                                  row[si] = `${t.proofFileLabel}: ${name}`;
+                                                  stepProofs[i] = row;
+                                                  const next = { ...prev, stepProofs };
+                                                  if (fp) saveExecutionPlanState(fp, next);
+                                                  return next;
+                                                });
+                                              }
+                                            }}
+                                          />
+                                          <span>{t.proofUploadFile}</span>
+                                        </label>
+                                      </div>
                                     </div>
                                   );
                                   prev = next;
@@ -1657,6 +1896,33 @@ function CareerEngineCard({
                   </div>
                 );
               })}
+              {betterRoleAlternatives.length ? (
+                <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${RS.borderSubtle}` }}>
+                  <div style={sectionTitleStyle}>{t.betterRoleAlternatives}</div>
+                  <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 12, lineHeight: 1.5 }}>{t.betterRoleAlternativesSub}</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {betterRoleAlternatives.map((r, ri) => (
+                      <div
+                        key={`${r.role}-${ri}`}
+                        style={{
+                          padding: "12px 14px",
+                          borderRadius: 8,
+                          border: `1px solid ${RS.borderSubtle}`,
+                          background: RS.bgSurface,
+                        }}
+                      >
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 6 }}>
+                          <span style={{ fontSize: 14, fontWeight: 600, color: RS.textPrimary }}>{r.role}</span>
+                          <span style={{ fontSize: 15, fontWeight: 700, color: RS.green, fontFamily: RS.fontMono }}>{Number(r.score) || 0}</span>
+                        </div>
+                        {r.evidence ? (
+                          <div style={{ fontSize: 12, color: RS.textSecondary, lineHeight: 1.5 }}>{humanizeUserFacingReason(r.evidence, lang)}</div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </>
           ) : (
             <EmptyGuidance primary={t.emptyPlanFallback} action={t.emptyPlanNext} />
@@ -2206,8 +2472,20 @@ const translations = {
     executionProgress: "Execution",
     fixesCompletedCount: "{done}/{total} fixes marked done",
     executionLadder: "Projected alignment if you complete fixes in order",
-    projectedStepHint: "~{from} → ~{to}",
-    projectedAfterFixOrder: "After this fix (and all prior in order): ~{score}",
+    projectedStepHint: "{from} → {to}",
+    projectedAfterFixOrder: "After this fix (and all prior in order): {score}",
+    progressScoreLive: "Progress score (marked fixes): {score} ({delta})",
+    proofPromptWhenDone:
+      "Paste a link (portfolio, PR, cert) or one line of proof — required to mark this fix done:",
+    proofRequiredShort: "Proof cannot be empty. Fix was not marked done.",
+    proofStoredLabel: "Proof on file:",
+    proofStepHeading: "Proof — link or upload",
+    proofPasteLinkPlaceholder: "Paste link or short note…",
+    proofUploadFile: "Upload proof (.txt / PDF / image)",
+    proofFileLabel: "File",
+    betterRoleAlternatives: "Better role alternatives (CV fit)",
+    betterRoleAlternativesSub:
+      "Lanes where your CV evidence scores higher than this posting alignment — use as pivot ideas, not guarantees.",
     reanalysisScoreHint: "Compared with your previous Check Fit in this browser.",
     markFixComplete: "Mark this fix done",
     markFixDoneAria: "Mark fix {n} as done",
@@ -2407,8 +2685,20 @@ const translations = {
     executionProgress: "İlerleme",
     fixesCompletedCount: "{done}/{total} düzeltme tamamlandı olarak işaretlendi",
     executionLadder: "Düzeltmeleri sırayla tamamlarsanız tahmini hizalama",
-    projectedStepHint: "~{from} → ~{to}",
-    projectedAfterFixOrder: "Bu düzeltme (ve öncekiler sırayla) sonrası: ~{score}",
+    projectedStepHint: "{from} → {to}",
+    projectedAfterFixOrder: "Bu düzeltme (ve öncekiler sırayla) sonrası: {score}",
+    progressScoreLive: "İlerleme skoru (işaretlenen düzeltmeler): {score} ({delta})",
+    proofPromptWhenDone:
+      "Portföy, PR veya sertifika linki ya da tek satır kanıt yapıştırın — düzeltmeyi tamamlamak için gerekli:",
+    proofRequiredShort: "Kanıt boş olamaz. Düzeltme tamamlanmadı olarak bırakıldı.",
+    proofStoredLabel: "Kayıtlı kanıt:",
+    proofStepHeading: "Kanıt — link veya yükleme",
+    proofPasteLinkPlaceholder: "Link veya kısa not yapıştırın…",
+    proofUploadFile: "Kanıt dosyası yükle (.txt / PDF / görsel)",
+    proofFileLabel: "Dosya",
+    betterRoleAlternatives: "Daha iyi rol alternatifleri (CV uyumu)",
+    betterRoleAlternativesSub:
+      "CV kanıtınıza göre bu ilan hizalamasından daha yüksek skorlanan hatlar — pivot fikri olarak düşünün, garanti değildir.",
     reanalysisScoreHint: "Bu tarayıcıdaki önceki Uyumu Kontrol Et ile karşılaştırma.",
     markFixComplete: "Bu düzeltmeyi tamamlandı işaretle",
     markFixDoneAria: "{n}. düzeltmeyi tamamlandı olarak işaretle",
