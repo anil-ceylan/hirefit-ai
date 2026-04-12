@@ -516,20 +516,6 @@ function ShareYourResult({ score, verdictLabel, biggestMistake, lang }) {
   );
 }
 
-function getAgreementConfidence(ats, recruiter, fallback = 72) {
-  const a = Number(ats?.ats_score ?? 50);
-  const k = Number(ats?.keyword_match ?? 50);
-  const f = Number(ats?.formatting_score ?? 50);
-  const atsComposite = Math.round(0.45 * a + 0.35 * k + 0.2 * f);
-  const rv = String(recruiter?.recruiter_verdict || "").toLowerCase();
-  const recruiterScore = rv === "strong_yes" ? 85 : rv === "no" ? 42 : 63;
-  const agreementGap = Math.abs(atsComposite - recruiterScore);
-  const agreementBoost = Math.max(0, 16 - Math.round(agreementGap * 0.35));
-  const blended = Math.round(0.55 * atsComposite + 0.45 * recruiterScore + agreementBoost);
-  const safe = Number.isFinite(blended) ? blended : Number(fallback || 72);
-  return Math.max(52, Math.min(96, safe));
-}
-
 function getMockJobsForRole(role, lang) {
   const r = String(role || "").toLowerCase();
   if (r.includes("product")) {
@@ -839,9 +825,22 @@ function ExpandableInsightCard({
   );
 }
 
-function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, onSharePrompt }) {
+function CareerEngineCard({
+  data,
+  lang,
+  isPro,
+  onUpgrade,
+  onFixCv,
+  optimizing,
+  onSharePrompt,
+  onOpenRoadmap = () => {},
+  matchedSkills = [],
+  missingSkills = [],
+  topKeywords = [],
+  interviewPrep = [],
+}) {
   const [showJobs, setShowJobs] = useState(false);
-  const [openCard, setOpenCard] = useState("recruiter");
+  const [activeTab, setActiveTab] = useState("recruiter");
   if (!data) return null;
   const t = translations[lang];
   const score = data["Final Alignment Score"];
@@ -857,97 +856,91 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
 
   const impactColor = (imp) =>
     imp === "high" ? { bg: "rgba(239,68,68,0.15)", c: "#f87171", b: "rgba(239,68,68,0.25)" } : imp === "low" ? { bg: "rgba(16,185,129,0.12)", c: "#6ee7b7", b: "rgba(16,185,129,0.25)" } : { bg: "rgba(245,158,11,0.12)", c: "#fbbf24", b: "rgba(245,158,11,0.25)" };
-  const agreementConfidence = getAgreementConfidence(data.ATS, data.Recruiter, data.Decision?.confidence);
   const jobSuggestions = getMockJobsForRole(best || roles?.[0]?.role, lang);
   const oneLineSummary = String(data.Decision?.reasoning || data.Recruiter?.reasoning || "").split(/[.!?]/).find(Boolean)?.trim() || (lang === "TR" ? "Bu rol için kritik boşlukların var." : "There are critical gaps for this role.");
   const scoreN = Number(score);
   const scoreHue =
     score == null || !Number.isFinite(scoreN) ? "#93c5fd" : scoreN <= 40 ? "#ef4444" : scoreN <= 69 ? "#f97316" : "#22c55e";
-  const agreementTier = getConfidenceTierLabel(agreementConfidence, lang);
-  const agreementN = Number(agreementConfidence);
+  const aiConfidence = data.Decision?.confidence;
+  const confidenceTier = getConfidenceTierLabel(aiConfidence, lang);
+  const rej = score != null && Number.isFinite(Number(score)) ? getRejectionRiskFromAlignmentScore(score, lang) : null;
+  const matchedDisplay = (Array.isArray(matchedSkills) && matchedSkills.length > 0 ? matchedSkills : data.ATS?.matched_skills) || [];
+  const missingDisplay = (Array.isArray(missingSkills) && missingSkills.length > 0 ? missingSkills : data.ATS?.missing_keywords) || [];
+  const keywordsDisplay = (Array.isArray(topKeywords) && topKeywords.length > 0 ? topKeywords : data.ATS?.top_keywords) || [];
+  const tabSpecs = [
+    { id: "recruiter", label: t.recruiterView },
+    { id: "deep", label: t.deepAnalysis },
+    { id: "plan", label: t.actionPlan },
+    { id: "skills", label: t.skillsKeywords },
+    { id: "market", label: t.marketInsights },
+  ];
 
   return (
     <div style={{ marginBottom: 20, borderRadius: 20, overflow: "hidden", border: `1px solid ${fv.border}`, background: "linear-gradient(165deg, rgba(15,23,42,0.98), rgba(10,12,20,0.99))", boxShadow: "0 24px 64px rgba(0,0,0,0.45)" }}>
-      <div style={{ padding: "26px 24px 22px", background: fv.bg, borderBottom: `1px solid ${fv.border}` }}>
-        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", color: "#94a3b8", marginBottom: 10 }}>{t.finalVerdict}</div>
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 20 }}>
-          <div style={{ flex: "1 1 220px" }}>
-            <div style={{ fontSize: 36, marginBottom: 14, lineHeight: 1 }}>{fv.icon}</div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(20px,4vw,28px)", fontWeight: 800, color: "#f8fafc", lineHeight: 1.2, marginBottom: 10 }}>{fv.title}</div>
-            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.65, color: "#e2e8f0", fontWeight: 700 }}>{oneLineSummary}</p>
-            {biggest ? (
-              <div
-                style={{
-                  marginTop: 22,
-                  paddingTop: 14,
-                  borderTop: "1px solid rgba(255,255,255,0.08)",
-                  fontSize: 12,
-                  color: "#fca5a5",
-                  fontWeight: 700,
-                  lineHeight: 1.5,
-                }}
-              >
-                {lang === "TR"
-                  ? `Bu role özel risk: ${biggest}`
-                  : `For this specific role, the biggest blocker is: ${biggest}`}
-              </div>
-            ) : null}
-          </div>
-          <div style={{ textAlign: "center", flexShrink: 0, minWidth: 112, paddingTop: 4 }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: "0.1em" }}>{t.alignmentScore}</div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(52px, 12vw, 96px)", fontWeight: 800, color: scoreHue, lineHeight: 1.02 }}>{score ?? "—"}</div>
-            <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>
-              {(() => {
-                const dc = data.Decision?.confidence;
-                const tier = getConfidenceTierLabel(dc, lang);
-                if (!tier) return `${t.confidenceLabel}: ${t.confidenceNA}`;
-                return tier.label;
-              })()}
-            </div>
-            {score != null && Number.isFinite(Number(score)) ? (() => {
-              const r = getRejectionRiskFromAlignmentScore(score, lang);
-              return (
-                <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.08)", textAlign: "center" }}>
-                  <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.1em", color: "#64748b", marginBottom: 4 }}>{t.rejectionRisk}</div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: r.color, lineHeight: 1.35 }}>{r.mainLine}</div>
-                </div>
-              );
-            })() : null}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ padding: "20px 22px 14px" }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginBottom: 16 }}>
-          {agreementTier ? (
+      <div style={{ padding: "30px 26px 26px", background: fv.bg, borderBottom: `1px solid ${fv.border}` }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 24, marginBottom: 22 }}>
+          <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flex: "1 1 220px", minWidth: 0 }}>
             <div
               style={{
-                fontSize: 12,
-                fontWeight: 800,
-                color: agreementTier.color,
-                padding: "8px 14px",
-                borderRadius: 999,
-                background:
-                  agreementN >= 85
-                    ? "rgba(16,185,129,0.16)"
-                    : agreementN >= 65
-                      ? "rgba(245,158,11,0.14)"
-                      : "rgba(239,68,68,0.12)",
-                border:
-                  agreementN >= 85
-                    ? "1px solid rgba(16,185,129,0.3)"
-                    : agreementN >= 65
-                      ? "1px solid rgba(245,158,11,0.28)"
-                      : "1px solid rgba(239,68,68,0.22)",
+                width: 52,
+                height: 52,
+                borderRadius: 14,
+                display: "grid",
+                placeItems: "center",
+                flexShrink: 0,
+                fontSize: 28,
+                lineHeight: 1,
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.1)",
               }}
             >
-              {agreementTier.label}
+              {fv.icon}
             </div>
-          ) : (
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#64748b", padding: "8px 12px", borderRadius: 999, border: "1px solid rgba(148,163,184,0.2)", background: "rgba(148,163,184,0.08)" }}>
-              {t.confidenceLabel}: {t.confidenceNA}
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", color: "#94a3b8", marginBottom: 10 }}>{t.finalVerdict}</div>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(20px,4vw,28px)", fontWeight: 800, color: "#f8fafc", lineHeight: 1.2 }}>
+                {fv.title}
+              </div>
             </div>
-          )}
+          </div>
+          <div style={{ textAlign: "right", flexShrink: 0, minWidth: 100 }}>
+            <div
+              style={{
+                fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+                fontSize: "clamp(52px, 12vw, 96px)",
+                fontWeight: 800,
+                color: scoreHue,
+                lineHeight: 1.02,
+              }}
+            >
+              {score ?? "—"}
+            </div>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: "0.1em", marginTop: 10 }}>{t.alignmentScore}</div>
+          </div>
+        </div>
+        <p style={{ margin: "0 0 22px", fontSize: 14, lineHeight: 1.65, color: "#e2e8f0", fontWeight: 700 }}>{oneLineSummary}</p>
+        {biggest ? (
+          <div
+            style={{
+              padding: "16px 18px",
+              borderRadius: 12,
+              background: "rgba(239,68,68,0.1)",
+              border: "1px solid rgba(239,68,68,0.25)",
+              fontSize: 12,
+              color: "#fca5a5",
+              fontWeight: 700,
+              lineHeight: 1.55,
+            }}
+          >
+            {lang === "TR"
+              ? `Bu role özel risk: ${biggest}`
+              : `For this specific role, the biggest blocker is: ${biggest}`}
+          </div>
+        ) : null}
+      </div>
+
+      <div style={{ padding: "18px 22px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
           {data.Context?.sector ? (
             <div
               className="hf-sector-lens-chip"
@@ -972,36 +965,102 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
             {t.atsStyleAnalysis}
           </div>
         </div>
-        <div style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "#64748b", fontWeight: 700, marginBottom: 10 }}>
-          {lang === "TR" ? "Daha fazla içgörü göster" : "Show more insights"}
-        </div>
-        <div style={{ height: 1, background: "rgba(255,255,255,0.08)", marginBottom: 12 }} />
-        <div style={{ display: "grid", gap: 10 }}>
-          <ExpandableInsightCard id="recruiter" title={t.recruiterView} subtitle={t.whatTheyThink} icon={<Eye size={14} />} openId={openCard} onToggle={setOpenCard}>
-            <div style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6 }}>{data.Recruiter?.reasoning || (lang === "TR" ? "Recruiter görüşü yok." : "No recruiter narrative.")}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
-              <div>
-                <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 6 }}>{t.strongSignals}</div>
-                {(data.Recruiter?.strengths || []).slice(0, 4).map((s, i) => <div key={i} style={{ fontSize: 12, color: "#a7f3d0", marginBottom: 4 }}>+ {s}</div>)}
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 6 }}>{t.weakSignals}</div>
-                {(data.Recruiter?.weaknesses || []).slice(0, 4).map((s, i) => <div key={i} style={{ fontSize: 12, color: "#fca5a5", marginBottom: 4 }}>- {s}</div>)}
-              </div>
-            </div>
-          </ExpandableInsightCard>
+      </div>
 
-          <ExpandableInsightCard id="deep" title={t.deepAnalysis} subtitle={t.whyYouFail} icon={<Layers size={14} />} openId={openCard} onToggle={setOpenCard}>
-            {data.Decision?.reasoning ? (
-              <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>
-                <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "#94a3b8", marginBottom: 6 }}>{t.decisionReasoning}</div>
-                <div style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.65 }}>{data.Decision.reasoning}</div>
-              </div>
-            ) : null}
-            <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
-              {gaps.length === 0 ? (
-                <div style={{ fontSize: 12, color: "#94a3b8" }}>{lang === "TR" ? "Gap verisi yok." : "No gap data."}</div>
-              ) : gaps.map((g, i) => {
+      <div style={{ padding: "18px 22px 18px", borderBottom: "1px solid rgba(255,255,255,0.08)", background: "rgba(15,23,42,0.55)" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#64748b", marginBottom: 8 }}>
+              {lang === "TR" ? "Güven seviyesi" : "Confidence Level"}
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: confidenceTier?.color || "#94a3b8" }}>
+              {confidenceTier?.label || `${t.confidenceLabel}: ${t.confidenceNA}`}
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#64748b", marginBottom: 8 }}>{t.rejectionRisk}</div>
+            {rej ? (
+              <>
+                <div style={{ fontSize: 24, fontWeight: 800, color: rej.color, fontFamily: "'Syne', sans-serif" }}>{rej.pct}%</div>
+                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6, lineHeight: 1.45 }}>{rej.sub}</div>
+              </>
+            ) : (
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#64748b" }}>—</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 6,
+          background: "linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(15,23,42,0.96) 100%)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <div style={{ display: "flex", overflowX: "auto", gap: 4, padding: "0 8px", WebkitOverflowScrolling: "touch" }}>
+          {tabSpecs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                flex: "1 0 auto",
+                padding: "12px 14px",
+                border: "none",
+                borderBottom: activeTab === tab.id ? "2px solid #6366f1" : "2px solid transparent",
+                background: "transparent",
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 700,
+                color: activeTab === tab.id ? "#f8fafc" : "#64748b",
+                fontFamily: "'DM Sans', sans-serif",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ padding: "20px 22px 18px" }}>
+        <div style={{ display: activeTab === "recruiter" ? "block" : "none" }}>
+          <div style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.6 }}>{data.Recruiter?.reasoning || (lang === "TR" ? "Recruiter görüşü yok." : "No recruiter narrative.")}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+            <div>
+              <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 6 }}>{t.strongSignals}</div>
+              {(data.Recruiter?.strengths || []).slice(0, 4).map((s, i) => (
+                <div key={i} style={{ fontSize: 12, color: "#a7f3d0", marginBottom: 4 }}>
+                  + {s}
+                </div>
+              ))}
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 6 }}>{t.weakSignals}</div>
+              {(data.Recruiter?.weaknesses || []).slice(0, 4).map((s, i) => (
+                <div key={i} style={{ fontSize: 12, color: "#fca5a5", marginBottom: 4 }}>
+                  - {s}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: activeTab === "deep" ? "block" : "none" }}>
+          {data.Decision?.reasoning ? (
+            <div style={{ marginBottom: 12, padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "#94a3b8", marginBottom: 6 }}>{t.decisionReasoning}</div>
+              <div style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.65 }}>{data.Decision.reasoning}</div>
+            </div>
+          ) : null}
+          <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+            {gaps.length === 0 ? (
+              <div style={{ fontSize: 12, color: "#94a3b8" }}>{lang === "TR" ? "Gap verisi yok." : "No gap data."}</div>
+            ) : (
+              gaps.map((g, i) => {
                 const ic = impactColor(g.impact);
                 return (
                   <div key={i} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}>
@@ -1012,87 +1071,249 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, o
                     <div style={{ fontSize: 12, color: "#94a3b8" }}>{g.explanation}</div>
                   </div>
                 );
+              })
+            )}
+          </div>
+        </div>
+
+        <div style={{ display: activeTab === "plan" ? "block" : "none" }}>
+          <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(99,102,241,0.1)", border: "1px solid rgba(129,140,248,0.25)" }}>
+            <div style={{ fontSize: 15, color: "#f1f5f9", fontWeight: 800, lineHeight: 1.45 }}>
+              {one || (lang === "TR" ? "Önce bu ilan için tek bir kritik boşluğu kapat." : "Close one critical gap for this job first.")}
+            </div>
+          </div>
+          <ImpactProjectionPanel
+            projection={computeImpactProjection(score, {
+              gaps,
+              missingKeywords: data.ATS?.missing_keywords || [],
+              missingSkills: data.ATS?.missing_keywords || [],
+              improvements: data.Decision?.what_to_fix_first || [],
+              rejectionHigh: (gaps || []).filter((g) => String(g.impact || "").toLowerCase() === "high").map((g) => g.issue),
+              rejectionMedium: (gaps || []).filter((g) => String(g.impact || "").toLowerCase() === "medium").map((g) => g.issue),
+            }, lang)}
+            lang={lang}
+          />
+          {!isPro || (Array.isArray(interviewPrep) && interviewPrep.length > 0) ? (
+            <div style={{ marginTop: 16, padding: "14px 16px", borderRadius: 12, border: "1px dashed rgba(212,175,55,0.35)", background: "rgba(212,175,55,0.04)" }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", color: "#d4af37", marginBottom: 10 }}>
+                {lang === "TR" ? "Mülakat Hazırlığı" : "Interview Prep"}
+              </div>
+              {!isPro ? (
+                <>
+                  <div style={{ fontSize: 13, color: "#a8a29e", lineHeight: 1.55, marginBottom: 12 }}>{t.proFeatureInterview}</div>
+                  <button
+                    type="button"
+                    onClick={onUpgrade}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "8px 16px",
+                      borderRadius: 8,
+                      background: "linear-gradient(135deg,#d4af37,#f0d060)",
+                      border: "none",
+                      color: "#000",
+                      fontWeight: 700,
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Crown size={14} /> {lang === "TR" ? "Pro ile aç" : "Unlock with Pro"}
+                  </button>
+                </>
+              ) : (
+                (interviewPrep || []).slice(0, 2).map((q, i) => (
+                  <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i === 0 && interviewPrep.length > 1 ? "1px solid rgba(255,255,255,0.08)" : "none" }}>
+                    <div style={{ fontSize: 15, color: "#e2e8f0", lineHeight: 1.5, marginBottom: 5, fontStyle: "italic" }}>&quot;{q.question}&quot;</div>
+                    <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4, fontWeight: 500 }}>{q.why_asked}</div>
+                    <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>{q.personal_angle}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <div style={{ display: activeTab === "skills" ? "block" : "none" }}>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "#94a3b8", marginBottom: 8 }}>
+            {lang === "TR" ? "Eşleşen beceriler" : "Matched skills"}
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            {matchedDisplay.length ? (
+              matchedDisplay.slice(0, 12).map((s, i) => (
+                <span
+                  key={i}
+                  style={{
+                    display: "inline-flex",
+                    padding: "5px 12px",
+                    borderRadius: 999,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    margin: "3px 3px 0 0",
+                    background: "rgba(16,185,129,0.1)",
+                    border: "1px solid rgba(16,185,129,0.2)",
+                    color: "#6ee7b7",
+                  }}
+                >
+                  {s}
+                </span>
+              ))
+            ) : (
+              <div style={{ fontSize: 12, color: "#94a3b8" }}>{lang === "TR" ? "Liste yok." : "None listed."}</div>
+            )}
+          </div>
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "#94a3b8", marginBottom: 8 }}>
+            {lang === "TR" ? "Eksik beceriler / anahtar kelimeler" : "Missing skills / keywords"}
+          </div>
+          {missingDisplay.length > 0 ? (
+            <CriticalSkillsGapBlock skills={missingDisplay} lang={lang} />
+          ) : (
+            <div style={{ fontSize: 12, color: "#94a3b8" }}>{lang === "TR" ? "Eksik anahtar kelime bulunamadı." : "No missing keywords found."}</div>
+          )}
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "#94a3b8", margin: "14px 0 8px" }}>
+            {lang === "TR" ? "Öne çıkan anahtar kelimeler" : "Top keywords"}
+          </div>
+          <div style={{ marginBottom: 4 }}>
+            {keywordsDisplay.length ? (
+              keywordsDisplay.slice(0, 14).map((s, i) => (
+                <span
+                  key={i}
+                  style={{
+                    display: "inline-flex",
+                    padding: "5px 12px",
+                    borderRadius: 999,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    margin: "3px 3px 0 0",
+                    background: "rgba(59,130,246,0.1)",
+                    border: "1px solid rgba(59,130,246,0.2)",
+                    color: "#93c5fd",
+                  }}
+                >
+                  {s}
+                </span>
+              ))
+            ) : (
+              <div style={{ fontSize: 12, color: "#94a3b8" }}>{lang === "TR" ? "Yok." : "None."}</div>
+            )}
+          </div>
+          {(data.ATS?.parsing_issues || []).length > 0 ? (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 6 }}>{lang === "TR" ? "Parsing sorunları" : "Parsing issues"}</div>
+              {data.ATS.parsing_issues.map((p, i) => (
+                <div key={i} style={{ fontSize: 12, color: "#fbbf24", marginBottom: 4 }}>
+                  • {p}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        <div style={{ display: activeTab === "market" ? "block" : "none" }}>
+          {data.CompanyIntel ? (
+            <div style={{ marginBottom: 16 }}>
+              <CompanyIntelligenceSection intel={data.CompanyIntel} lang={lang} t={t} isPro={isPro} onOpenRoadmap={onOpenRoadmap} onUpgrade={onUpgrade} />
+            </div>
+          ) : null}
+          {(data.ATS?.ats_score != null || data.ATS?.keyword_match != null || data.ATS?.formatting_score != null) && (
+            <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "#94a3b8", marginBottom: 10 }}>
+                {lang === "TR" ? "ATS uyumluluğu" : "ATS compatibility"}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 13, color: "#e2e8f0" }}>
+                {data.ATS?.ats_score != null ? (
+                  <span>
+                    <span style={{ color: "#64748b", fontWeight: 600 }}>{lang === "TR" ? "ATS skoru: " : "ATS score: "}</span>
+                    <strong style={{ color: "#93c5fd" }}>{data.ATS.ats_score}%</strong>
+                  </span>
+                ) : null}
+                {data.ATS?.keyword_match != null ? (
+                  <span>
+                    <span style={{ color: "#64748b", fontWeight: 600 }}>{lang === "TR" ? "Kelime eşleşmesi: " : "Keyword match: "}</span>
+                    <strong style={{ color: "#a7f3d0" }}>{data.ATS.keyword_match}%</strong>
+                  </span>
+                ) : null}
+                {data.ATS?.formatting_score != null ? (
+                  <span>
+                    <span style={{ color: "#64748b", fontWeight: 600 }}>{lang === "TR" ? "Biçim: " : "Formatting: "}</span>
+                    <strong style={{ color: "#fde68a" }}>{data.ATS.formatting_score}%</strong>
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          )}
+          {locked ? (
+            <div style={{ position: "relative", padding: 16, borderRadius: 10, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)", textAlign: "center" }}>
+              <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 10 }}>🔒 {lang === "TR" ? "Rol matrisi Pro'da" : "Role fit matrix on Pro"}</div>
+              <button type="button" onClick={onUpgrade} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, background: "linear-gradient(135deg,#d4af37,#f0d060)", border: "none", color: "#000", fontWeight: 700, fontSize: 12, cursor: "pointer" }}>
+                <Crown size={14} /> {lang === "TR" ? "Pro ile aç" : "Unlock with Pro"}
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+              {roles.map((r, i) => {
+                const isBest = best && r.role === best;
+                return (
+                  <motion.div
+                    key={i}
+                    className={`hf-role-tag ${isBest ? "hf-role-tag--best" : ""}`}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.05, duration: 0.28 }}
+                    whileHover={{ y: -3, scale: 1.01 }}
+                    style={{
+                      padding: "12px 14px",
+                      borderRadius: 12,
+                      background: isBest ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.03)",
+                      border: `1px solid ${isBest ? "rgba(52,211,153,0.35)" : "rgba(255,255,255,0.06)"}`,
+                    }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 700, color: isBest ? "#6ee7b7" : "#94a3b8", marginBottom: 6 }}>
+                      {r.role}
+                      {isBest ? " ★" : ""}
+                    </div>
+                    <div style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${Math.min(100, r.score)}%` }}
+                        transition={{ delay: 0.15 + i * 0.06, duration: 0.55, ease: "easeOut" }}
+                        style={{
+                          height: "100%",
+                          background: isBest ? "linear-gradient(90deg,#34d399,#22d3ee)" : "linear-gradient(90deg,#6366f1,#3b82f6)",
+                          borderRadius: 999,
+                        }}
+                      />
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: "#e2e8f0", marginTop: 6, fontFamily: "'Syne',sans-serif" }}>{r.score}</div>
+                  </motion.div>
+                );
               })}
             </div>
-          </ExpandableInsightCard>
-
-          <ExpandableInsightCard id="plan" title={t.actionPlan} subtitle={t.whatToDoNext} icon={<ListChecks size={14} />} openId={openCard} onToggle={setOpenCard}>
-            <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(99,102,241,0.1)", border: "1px solid rgba(129,140,248,0.25)" }}>
-              <div style={{ fontSize: 15, color: "#f1f5f9", fontWeight: 800, lineHeight: 1.45 }}>
-                {one || (lang === "TR" ? "Önce bu ilan için tek bir kritik boşluğu kapat." : "Close one critical gap for this job first.")}
-              </div>
-            </div>
-            <ImpactProjectionPanel
-              projection={computeImpactProjection(score, {
-                gaps,
-                missingKeywords: data.ATS?.missing_keywords || [],
-                missingSkills: data.ATS?.missing_keywords || [],
-                improvements: data.Decision?.what_to_fix_first || [],
-                rejectionHigh: (gaps || []).filter((g) => String(g.impact || "").toLowerCase() === "high").map((g) => g.issue),
-                rejectionMedium: (gaps || []).filter((g) => String(g.impact || "").toLowerCase() === "medium").map((g) => g.issue),
-              }, lang)}
-              lang={lang}
-            />
-          </ExpandableInsightCard>
-
-          <ExpandableInsightCard id="skills" title={t.skillsKeywords} subtitle={t.missingSignals} icon={<KeyRound size={14} />} openId={openCard} onToggle={setOpenCard}>
-            {(data.ATS?.missing_keywords || []).length > 0 ? (
-              <CriticalSkillsGapBlock skills={data.ATS?.missing_keywords} lang={lang} />
-            ) : (
-              <div style={{ fontSize: 12, color: "#94a3b8" }}>{lang === "TR" ? "Eksik anahtar kelime bulunamadı." : "No missing keywords found."}</div>
-            )}
-            {(data.ATS?.parsing_issues || []).length > 0 ? (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 10, color: "#94a3b8", marginBottom: 6 }}>{lang === "TR" ? "Parsing sorunları" : "Parsing issues"}</div>
-                {data.ATS.parsing_issues.map((p, i) => <div key={i} style={{ fontSize: 12, color: "#fbbf24", marginBottom: 4 }}>• {p}</div>)}
-              </div>
-            ) : null}
-          </ExpandableInsightCard>
-
-          <ExpandableInsightCard id="market" title={t.marketInsights} subtitle={t.careerLanes} icon={<LineChart size={14} />} openId={openCard} onToggle={setOpenCard}>
-            {locked ? (
-              <div style={{ position: "relative", padding: 16, borderRadius: 10, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)", textAlign: "center" }}>
-                <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 10 }}>🔒 {lang === "TR" ? "Rol matrisi Pro'da" : "Role fit matrix on Pro"}</div>
-                <button type="button" onClick={onUpgrade} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 8, background: "linear-gradient(135deg,#d4af37,#f0d060)", border: "none", color: "#000", fontWeight: 700, fontSize: 12, cursor: "pointer" }}><Crown size={14} /> {lang === "TR" ? "Pro ile aç" : "Unlock with Pro"}</button>
-              </div>
-            ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
-                {roles.map((r, i) => {
-                  const isBest = best && r.role === best;
-                  return (
-                    <motion.div key={i} className={`hf-role-tag ${isBest ? "hf-role-tag--best" : ""}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05, duration: 0.28 }} whileHover={{ y: -3, scale: 1.01 }} style={{ padding: "12px 14px", borderRadius: 12, background: isBest ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.03)", border: `1px solid ${isBest ? "rgba(52,211,153,0.35)" : "rgba(255,255,255,0.06)"}` }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: isBest ? "#6ee7b7" : "#94a3b8", marginBottom: 6 }}>{r.role}{isBest ? " ★" : ""}</div>
-                      <div style={{ height: 6, borderRadius: 999, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-                        <motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, r.score)}%` }} transition={{ delay: 0.15 + i * 0.06, duration: 0.55, ease: "easeOut" }} style={{ height: "100%", background: isBest ? "linear-gradient(90deg,#34d399,#22d3ee)" : "linear-gradient(90deg,#6366f1,#3b82f6)", borderRadius: 999 }} />
-                      </div>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: "#e2e8f0", marginTop: 6, fontFamily: "'Syne',sans-serif" }}>{r.score}</div>
-                    </motion.div>
-                  );
-                })}
-              </div>
-            )}
-            <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button type="button" onClick={() => onSharePrompt?.()} style={{ flex: 1, minWidth: 150, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(99,102,241,0.28)", background: "rgba(99,102,241,0.12)", color: "#c4b5fd", fontWeight: 700, cursor: "pointer" }}>
-                {lang === "TR" ? "Sonucu paylaş" : "Share this result"}
-              </button>
-              <button type="button" onClick={() => setShowJobs((v) => !v)} style={{ flex: 1, minWidth: 150, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(16,185,129,0.28)", background: "rgba(16,185,129,0.12)", color: "#6ee7b7", fontWeight: 700, cursor: "pointer" }}>
-                {lang === "TR" ? "Gerçek işlere başvur" : "Apply to Real Jobs"}
-              </button>
-            </div>
-            {showJobs ? (
-              <div style={{ marginTop: 10, padding: "12px 12px", borderRadius: 10, border: "1px solid rgba(16,185,129,0.25)", background: "rgba(16,185,129,0.08)" }}>
-                <div style={{ fontSize: 12, color: "#a7f3d0", fontWeight: 700, marginBottom: 8 }}>{lang === "TR" ? "Bu boşlukları kapatırsan başvuruya hazırsın." : "You are ready to apply after fixing these gaps."}</div>
-                <div style={{ display: "grid", gap: 7 }}>
-                  {jobSuggestions.map((j, idx) => (
-                    <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9, padding: "9px 10px", background: "rgba(15,23,42,0.5)" }}>
-                      <div><div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 700 }}>{j.title}</div><div style={{ fontSize: 10, color: "#94a3b8" }}>{j.location}</div></div>
-                      <div style={{ fontSize: 12, fontWeight: 800, color: "#6ee7b7" }}>{j.fit}%</div>
+          )}
+          <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button type="button" onClick={() => onSharePrompt?.()} style={{ flex: 1, minWidth: 150, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(99,102,241,0.28)", background: "rgba(99,102,241,0.12)", color: "#c4b5fd", fontWeight: 700, cursor: "pointer" }}>
+              {lang === "TR" ? "Sonucu paylaş" : "Share this result"}
+            </button>
+            <button type="button" onClick={() => setShowJobs((v) => !v)} style={{ flex: 1, minWidth: 150, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(16,185,129,0.28)", background: "rgba(16,185,129,0.12)", color: "#6ee7b7", fontWeight: 700, cursor: "pointer" }}>
+              {lang === "TR" ? "Gerçek işlere başvur" : "Apply to Real Jobs"}
+            </button>
+          </div>
+          {showJobs ? (
+            <div style={{ marginTop: 10, padding: "12px 12px", borderRadius: 10, border: "1px solid rgba(16,185,129,0.25)", background: "rgba(16,185,129,0.08)" }}>
+              <div style={{ fontSize: 12, color: "#a7f3d0", fontWeight: 700, marginBottom: 8 }}>{lang === "TR" ? "Bu boşlukları kapatırsan başvuruya hazırsın." : "You are ready to apply after fixing these gaps."}</div>
+              <div style={{ display: "grid", gap: 7 }}>
+                {jobSuggestions.map((j, idx) => (
+                  <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 9, padding: "9px 10px", background: "rgba(15,23,42,0.5)" }}>
+                    <div>
+                      <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 700 }}>{j.title}</div>
+                      <div style={{ fontSize: 10, color: "#94a3b8" }}>{j.location}</div>
                     </div>
-                  ))}
-                </div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: "#6ee7b7" }}>{j.fit}%</div>
+                  </div>
+                ))}
               </div>
-            ) : null}
-          </ExpandableInsightCard>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -1678,23 +1899,25 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
           </div>
           <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, color: decisionColor }}>{displayDecision}</div>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-          {(() => {
-            const tier = getConfidenceTierLabel(data.confidence, lang);
-            if (!tier) return null;
-            return (
-              <div
-                title={lang === "TR" ? "Analiz kalitesi CV ve JD netliğine göre değişir." : "Analysis quality can vary based on CV and JD clarity."}
-                style={{ fontSize: 12, color: tier.color, fontWeight: 700 }}
-              >
-                {tier.label} ⓘ
-              </div>
-            );
-          })()}
-          <div style={{ fontSize: 11, color: "#475569", fontWeight: 600, letterSpacing: "0.04em" }}>
-            {lang === "TR" ? "Güven Değerlendirmesi" : "Confidence Assessment"}
+        {alignmentScore == null ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+            {(() => {
+              const tier = getConfidenceTierLabel(data.confidence, lang);
+              if (!tier) return null;
+              return (
+                <div
+                  title={lang === "TR" ? "Analiz kalitesi CV ve JD netliğine göre değişir." : "Analysis quality can vary based on CV and JD clarity."}
+                  style={{ fontSize: 12, color: tier.color, fontWeight: 700 }}
+                >
+                  {tier.label} ⓘ
+                </div>
+              );
+            })()}
+            <div style={{ fontSize: 11, color: "#475569", fontWeight: 600, letterSpacing: "0.04em" }}>
+              {lang === "TR" ? "Güven Değerlendirmesi" : "Confidence Assessment"}
+            </div>
           </div>
-        </div>
+        ) : null}
         {data.fitScore !== undefined && !impactProj && (
           <div style={{ textAlign: "center", flexShrink: 0 }}>
             <div style={{ fontSize: 10, color: "#475569", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>
@@ -4983,6 +5206,11 @@ export function AnalyzerPage() {
           onFixCv={optimizeCv}
           optimizing={optimizing}
           onSharePrompt={handleSharePrompt}
+          onOpenRoadmap={generateLearningPlan}
+          matchedSkills={matchedSkills}
+          missingSkills={missingSkills}
+          topKeywords={topKeywords}
+          interviewPrep={analysisData?.interview_prep ?? []}
         />
       </motion.div>
     )}
@@ -4998,7 +5226,7 @@ export function AnalyzerPage() {
         lang={lang}
       />
     )}
-    {engineV2?.CompanyIntel && alignmentScore !== null && (
+    {engineV2?.CompanyIntel && alignmentScore !== null && lang === "TR" && (
       <CompanyIntelligenceSection
         intel={engineV2.CompanyIntel}
         lang={lang}
