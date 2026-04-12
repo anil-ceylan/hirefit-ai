@@ -5197,6 +5197,7 @@ const msgInterval = setInterval(() => {
     decisionImpactContext,
     reanalysisResult,
     setError,
+    scoreRunProgress,
   };
 
   return (
@@ -5422,7 +5423,7 @@ export function AnalyzerPage() {
     handleSharePrompt, fixResults, applyingFix, applyFix, showAnonSavePrompt, setShowAnonSavePrompt,
     analysisData, matchedSkills, missingSkills, topKeywords, result, optimizedCv, learningPlan,
     downloadText, reanalyzeAfterFix, roadmapLoading, generateLearningPlan, decisionImpactContext,
-    reanalysisResult, history, clearHistory, loadHistoryItem,
+    reanalysisResult, history, clearHistory, loadHistoryItem, scoreRunProgress,
   } = useOutletContext();
   return (
   <div className="hf-analyzer-page" style={{ maxWidth: 1320, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
