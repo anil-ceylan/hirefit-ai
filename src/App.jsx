@@ -902,6 +902,7 @@ function CareerEngineCard({
             </div>
           </div>
           <div style={{ textAlign: "right", flexShrink: 0, minWidth: 100 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: "0.1em", marginBottom: 8 }}>{t.alignmentScore}</div>
             <div
               style={{
                 fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
@@ -913,26 +914,52 @@ function CareerEngineCard({
             >
               {score ?? "—"}
             </div>
-            <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", letterSpacing: "0.1em", marginTop: 10 }}>{t.alignmentScore}</div>
           </div>
         </div>
         <p style={{ margin: "0 0 22px", fontSize: 14, lineHeight: 1.65, color: "#e2e8f0", fontWeight: 700 }}>{oneLineSummary}</p>
         {biggest ? (
           <div
             style={{
-              padding: "16px 18px",
-              borderRadius: 12,
-              background: "rgba(239,68,68,0.1)",
-              border: "1px solid rgba(239,68,68,0.25)",
-              fontSize: 12,
-              color: "#fca5a5",
-              fontWeight: 700,
-              lineHeight: 1.55,
+              display: "inline-flex",
+              alignItems: "flex-start",
+              gap: 10,
+              maxWidth: "100%",
+              marginTop: 4,
+              padding: "10px 14px",
+              borderRadius: 8,
+              border: "1px solid rgba(239,68,68,0.22)",
+              background: "transparent",
             }}
           >
-            {lang === "TR"
-              ? `Bu role özel risk: ${biggest}`
-              : `For this specific role, the biggest blocker is: ${biggest}`}
+            <span
+              aria-hidden
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "#ef4444",
+                flexShrink: 0,
+                marginTop: 5,
+              }}
+            />
+            <span
+              style={{
+                fontSize: 12,
+                color: "#fca5a5",
+                fontWeight: 600,
+                lineHeight: 1.45,
+                fontFamily: "'DM Sans', sans-serif",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                textAlign: "left",
+              }}
+            >
+              {lang === "TR"
+                ? `Bu role özel risk: ${biggest}`
+                : `For this specific role, the biggest blocker is: ${biggest}`}
+            </span>
           </div>
         ) : null}
       </div>
@@ -979,7 +1006,7 @@ function CareerEngineCard({
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#64748b", marginBottom: 8 }}>{t.rejectionRisk}</div>
             {rej ? (
               <>
-                <div style={{ fontSize: 24, fontWeight: 800, color: rej.color, fontFamily: "'Syne', sans-serif" }}>{rej.pct}%</div>
+                <div style={{ fontFamily: "'DM Mono', ui-monospace, monospace", fontSize: 28, fontWeight: 500, color: rej.color, lineHeight: 1.2 }}>{rej.pct}%</div>
                 <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 6, lineHeight: 1.45 }}>{rej.sub}</div>
               </>
             ) : (
@@ -1632,7 +1659,7 @@ const T = {
 };
 
 const globalStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: ${T.bg}; font-family: 'DM Sans', sans-serif; color: ${T.text}; -webkit-font-smoothing: antialiased; }
   .hf-btn-primary { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; background: ${T.blue}; border: none; border-radius: 10px; cursor: pointer; color: white; font-weight: 600; font-size: 15px; font-family: 'DM Sans', sans-serif; transition: all 0.2s ease; }
