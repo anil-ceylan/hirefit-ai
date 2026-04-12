@@ -155,6 +155,74 @@ function formatBlockerTransform(currentScore, impactPts, lang) {
     : `Fixing this can move your score from ${cur} → ${nxt} (+${imp}).`;
 }
 
+/** Stable key for persisting per-fix checklists for this run. */
+function analysisExecutionFingerprint(cv, jd, alignmentScore) {
+  const a = String(cv || "").slice(0, 2400);
+  const b = String(jd || "").slice(0, 2400);
+  const s = `${Math.round(Number(alignmentScore) || 0)}|${a}|${b}`;
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return `v1_${(h >>> 0).toString(16)}`;
+}
+
+const LS_FIX_PROGRESS = "hirefit-fix-progress-";
+
+function loadFixProgressArray(fp, n) {
+  if (!fp || !n) return Array.from({ length: n }, () => false);
+  try {
+    const raw = localStorage.getItem(LS_FIX_PROGRESS + fp);
+    if (!raw) return Array.from({ length: n }, () => false);
+    const o = JSON.parse(raw);
+    if (!Array.isArray(o.completed) || o.completed.length !== n) return Array.from({ length: n }, () => false);
+    return o.completed.map(Boolean);
+  } catch {
+    return Array.from({ length: n }, () => false);
+  }
+}
+
+function saveFixProgressArray(fp, completed) {
+  if (!fp || !Array.isArray(completed)) return;
+  try {
+    localStorage.setItem(LS_FIX_PROGRESS + fp, JSON.stringify({ completed, updatedAt: Date.now() }));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Cumulative projected alignment after completing fixes 0..i (inclusive). */
+function cumulativeScoresAfterFixes(baseScore, fixes) {
+  const base = Math.min(100, Math.max(0, Math.round(Number(baseScore) || 0)));
+  const out = [];
+  let run = base;
+  for (const f of fixes) {
+    const imp = Math.max(1, Math.min(18, Math.round(Number(f?.score_impact) || 0)));
+    run = Math.min(100, run + imp);
+    out.push(run);
+  }
+  return out;
+}
+
+function splitImpactAcrossSteps(impPts, stepCount) {
+  const n = Math.max(0, Math.floor(stepCount));
+  if (n <= 0) return [];
+  const total = Math.max(1, Math.min(18, Math.round(Number(impPts) || 0)));
+  const base = Math.floor(total / n);
+  let rem = total - base * n;
+  return Array.from({ length: n }, (_, i) => base + (i < rem ? 1 : 0));
+}
+
+const RAW_PARSE_FAIL_RE = /\b(parsing failed|gpt parsing failed|parse failed|json parse)\b/i;
+
+function humanizeUserFacingReason(text, lang) {
+  const raw = String(text || "").trim();
+  if (!raw) return raw;
+  if (RAW_PARSE_FAIL_RE.test(raw)) return translations[lang]?.sanitizeParsingFailed || raw;
+  return raw;
+}
+
 /**
  * Deterministic score lift (5–20) from prioritized gaps / missing signals — not random.
  */
@@ -1012,30 +1080,71 @@ function CareerEngineCard({
   topKeywords = [],
   interviewPrep = [],
   scoreRunProgress = { prior: null, delta: null },
+  progressFingerprint = "",
 }) {
   const [showJobs, setShowJobs] = useState(false);
   const [activeTab, setActiveTab] = useState("recruiter");
+  const [fixedDone, setFixedDone] = useState(() => []);
+
+  const actionPlanMemo = useMemo(() => {
+    if (!data) return { priority_callout: null, fixes: [], interview_note: null };
+    return enrichActionPlan(parseActionPlan(data.Decision?.action_plan), {
+      lang: lang === "TR" ? "tr" : "en",
+      roleFit: data.RoleFit,
+      gaps: data.Gaps,
+      verdict: data.Decision?.final_verdict,
+    });
+  }, [data, lang]);
+
+  const planFixesMemo = useMemo(
+    () => actionPlanMemo.fixes.filter((f) => f.issue || (f.steps && f.steps.length)),
+    [actionPlanMemo],
+  );
+
+  const scoreNumeric = useMemo(() => {
+    if (!data) return null;
+    const s = data["Final Alignment Score"];
+    return s != null && Number.isFinite(Number(s)) ? Number(s) : null;
+  }, [data]);
+
+  const cumulativeProjected = useMemo(() => {
+    if (scoreNumeric == null || !planFixesMemo.length) return [];
+    return cumulativeScoresAfterFixes(scoreNumeric, planFixesMemo);
+  }, [scoreNumeric, planFixesMemo]);
+
+  const fp = progressFingerprint || "";
+  const nPlanFixes = planFixesMemo.length;
+
+  useEffect(() => {
+    if (!nPlanFixes) {
+      setFixedDone([]);
+      return;
+    }
+    if (!fp) {
+      setFixedDone(Array.from({ length: nPlanFixes }, () => false));
+      return;
+    }
+    setFixedDone(loadFixProgressArray(fp, nPlanFixes));
+  }, [fp, nPlanFixes]);
+
   if (!data) return null;
+
   const t = translations[lang];
   const score = data["Final Alignment Score"];
+  const actionPlan = actionPlanMemo;
+  const planFixes = planFixesMemo;
   const fv = getScoreFinalVerdict(score, lang);
   const gaps = data.Gaps?.rejection_reasons || [];
   const roles = data.RoleFit?.role_fit || [];
   const best = data.RoleFit?.best_role;
   const locked = data.RoleFit?.locked;
-  const actionPlan = enrichActionPlan(parseActionPlan(data.Decision?.action_plan), {
-    lang: lang === "TR" ? "tr" : "en",
-    roleFit: data.RoleFit,
-    gaps: data.Gaps,
-    verdict: data.Decision?.final_verdict,
-  });
-  const planFixes = actionPlan.fixes.filter((f) => f.issue || (f.steps && f.steps.length));
   const previewStep = pickDoThisNextStep(actionPlan.fixes);
   const highFix = actionPlan.fixes.find((f) => f.priority === "high");
   const highImpactPts = Math.max(1, Math.min(18, Math.round(Number(highFix?.score_impact) || 0)));
-  const biggest =
+  const biggestRaw =
     (data.Gaps?.biggest_gap && String(data.Gaps.biggest_gap).trim()) ||
     (gaps[0]?.issue ? String(gaps[0].issue) : "");
+  const biggest = biggestRaw ? humanizeUserFacingReason(biggestRaw, lang) : "";
 
   const jobSuggestions = getMockJobsForRole(best || roles?.[0]?.role, lang);
   const oneLineSummary = String(data.Decision?.reasoning || data.Recruiter?.reasoning || "").split(/[.!?]/).find(Boolean)?.trim() || (lang === "TR" ? "Bu rol için kritik boşlukların var." : "There are critical gaps for this role.");
@@ -1164,13 +1273,16 @@ function CareerEngineCard({
                   color: scoreRunProgress.delta >= 0 ? RS.green : RS.red,
                   fontFamily: RS.fontUi,
                   lineHeight: 1.35,
-                  maxWidth: 200,
+                  maxWidth: 220,
                   marginLeft: "auto",
                 }}
               >
-                {t.scoreVsLastRun
-                  .replace("{delta}", scoreRunProgress.delta >= 0 ? `+${scoreRunProgress.delta}` : String(scoreRunProgress.delta))
-                  .replace("{prior}", String(scoreRunProgress.prior))}
+                <div>
+                  {t.scoreVsLastRun
+                    .replace("{delta}", scoreRunProgress.delta >= 0 ? `+${scoreRunProgress.delta}` : String(scoreRunProgress.delta))
+                    .replace("{prior}", String(scoreRunProgress.prior))}
+                </div>
+                <div style={{ fontSize: 10, fontWeight: 400, color: RS.textMuted, marginTop: 4 }}>{t.reanalysisScoreHint}</div>
               </div>
             ) : null}
           </div>
@@ -1282,7 +1394,9 @@ function CareerEngineCard({
             <>
               <div style={sectionTitleStyle}>{t.whatTheyThink}</div>
               <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 10, lineHeight: 1.5, maxWidth: 560 }}>{t.recruiterBluntBanner}</div>
-              <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65, marginBottom: 14 }}>{data.Recruiter.reasoning}</div>
+              <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65, marginBottom: 14 }}>
+                {humanizeUserFacingReason(data.Recruiter.reasoning, lang)}
+              </div>
             </>
           ) : null}
           <div style={sectionTitleStyle}>{lang === "TR" ? "Sinyaller" : "Signals"}</div>
@@ -1296,7 +1410,7 @@ function CareerEngineCard({
             }
             return rows.map((row, i) => (
               <ResultsBulletRow key={i} sentiment={row.sentiment}>
-                {row.text}
+                {humanizeUserFacingReason(row.text, lang)}
               </ResultsBulletRow>
             ));
           })()}
@@ -1306,7 +1420,9 @@ function CareerEngineCard({
           {data.Decision?.reasoning ? (
             <>
               <div style={sectionTitleStyle}>{t.decisionReasoning}</div>
-              <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65, marginBottom: 16 }}>{data.Decision.reasoning}</div>
+              <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65, marginBottom: 16 }}>
+                {humanizeUserFacingReason(data.Decision.reasoning, lang)}
+              </div>
             </>
           ) : null}
           <div style={sectionTitleStyle}>{t.whyYouFail}</div>
@@ -1316,8 +1432,10 @@ function CareerEngineCard({
             <ProBlurGate active onUpgrade={onUpgrade} unlockLabel={unlockLabel}>
               <div style={{ padding: "12px 14px", borderRadius: 8, border: `1px solid ${RS.border}`, background: RS.bgSurface }}>
                 <ResultsBulletRow sentiment={String(gaps[0].impact || "").toLowerCase() === "high" ? "negative" : String(gaps[0].impact || "").toLowerCase() === "medium" ? "warning" : "neutral"}>
-                  <span style={{ fontWeight: 500, color: RS.textPrimary }}>{gaps[0].issue}</span>
-                  {gaps[0].explanation ? <span style={{ display: "block", marginTop: 4, fontSize: 13 }}>{gaps[0].explanation}</span> : null}
+                  <span style={{ fontWeight: 500, color: RS.textPrimary }}>{humanizeUserFacingReason(gaps[0].issue, lang)}</span>
+                  {gaps[0].explanation ? (
+                    <span style={{ display: "block", marginTop: 4, fontSize: 13 }}>{humanizeUserFacingReason(gaps[0].explanation, lang)}</span>
+                  ) : null}
                 </ResultsBulletRow>
               </div>
             </ProBlurGate>
@@ -1327,8 +1445,10 @@ function CareerEngineCard({
               const sentiment = imp === "high" ? "negative" : imp === "medium" ? "warning" : "neutral";
               return (
                 <ResultsBulletRow key={i} sentiment={sentiment}>
-                  <span style={{ fontWeight: 500, color: RS.textPrimary }}>{g.issue}</span>
-                  {g.explanation ? <span style={{ display: "block", marginTop: 4, fontSize: 13 }}>{g.explanation}</span> : null}
+                  <span style={{ fontWeight: 500, color: RS.textPrimary }}>{humanizeUserFacingReason(g.issue, lang)}</span>
+                  {g.explanation ? (
+                    <span style={{ display: "block", marginTop: 4, fontSize: 13 }}>{humanizeUserFacingReason(g.explanation, lang)}</span>
+                  ) : null}
                 </ResultsBulletRow>
               );
             })
@@ -1344,112 +1464,200 @@ function CareerEngineCard({
           ) : null}
           <div style={sectionTitleStyle}>{t.priorityFixes}</div>
           {planFixes.length ? (
-            planFixes.map((f, i) => {
-              const sev = f.severity === "critical" || f.severity === "major" || f.severity === "minor" ? f.severity : "major";
-              const sevColor = sev === "critical" ? RS.red : sev === "major" ? RS.amber : RS.textMuted;
-              const priorityLabel = sev === "critical" ? t.fixFirst : sev === "major" ? t.priorityImportant : t.priorityOptional;
-              const res = f.resource;
-              const hasRes = res && (String(res.label || "").trim() || res.url);
-              const impPts = Math.max(1, Math.min(18, Math.round(Number(f.score_impact) || 0)));
-              return (
-                <div key={i} style={{ marginBottom: i < planFixes.length - 1 ? 16 : 0 }}>
-                  {i === 0 && sev === "critical" ? (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  marginBottom: 10,
+                }}
+              >
+                <span style={{ fontSize: 12, fontWeight: 600, color: RS.textSecondary }}>{t.executionProgress}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: RS.indigo, fontFamily: RS.fontMono }}>
+                  {t.fixesCompletedCount
+                    .replace("{done}", String(fixedDone.filter(Boolean).length))
+                    .replace("{total}", String(planFixes.length))}
+                </span>
+              </div>
+              {scoreNumeric != null && cumulativeProjected.length ? (
+                <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 14, lineHeight: 1.55, fontFamily: RS.fontMono }}>
+                  {t.executionLadder}: ~{Math.round(scoreNumeric)}
+                  {cumulativeProjected.map((c) => ` → ~${Math.round(c)}`).join("")}
+                </div>
+              ) : null}
+              {planFixes.map((f, i) => {
+                const sev = f.severity === "critical" || f.severity === "major" || f.severity === "minor" ? f.severity : "major";
+                const sevColor = sev === "critical" ? RS.red : sev === "major" ? RS.amber : RS.textMuted;
+                const priorityLabel = sev === "critical" ? t.fixFirst : sev === "major" ? t.priorityImportant : t.priorityOptional;
+                const res = f.resource;
+                const hasRes = res && (String(res.label || "").trim() || res.url);
+                const impPts = Math.max(1, Math.min(18, Math.round(Number(f.score_impact) || 0)));
+                const scoreBeforeFix = i === 0 ? (scoreNumeric ?? 0) : cumulativeProjected[i - 1];
+                const stepIncrements = f.steps?.length ? splitImpactAcrossSteps(impPts, f.steps.length) : [];
+                return (
+                  <div key={i} style={{ marginBottom: i < planFixes.length - 1 ? 16 : 0 }}>
+                    {i === 0 && sev === "critical" ? (
+                      <div
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 500,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.08em",
+                          color: RS.red,
+                          marginBottom: 6,
+                          fontFamily: RS.fontUi,
+                        }}
+                      >
+                        {t.primaryBlocker}
+                      </div>
+                    ) : null}
                     <div
                       style={{
-                        fontSize: 10,
-                        fontWeight: 500,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                        color: RS.red,
-                        marginBottom: 6,
-                        fontFamily: RS.fontUi,
+                        padding: "14px 16px",
+                        borderRadius: 8,
+                        background: RS.bgElevated,
+                        border: `1px solid ${RS.borderSubtle}`,
                       }}
                     >
-                      {t.primaryBlocker}
-                    </div>
-                  ) : null}
-                  <div
-                    style={{
-                      padding: "14px 16px",
-                      borderRadius: 8,
-                      background: RS.bgElevated,
-                      border: `1px solid ${RS.borderSubtle}`,
-                    }}
-                  >
-                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                      <span
-                        style={{ width: 5, height: 5, borderRadius: "50%", background: sevColor, flexShrink: 0, marginTop: 6 }}
-                        aria-hidden
-                      />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>{f.issue || "—"}</div>
-                        {score != null && Number.isFinite(Number(score)) ? (
-                          <>
-                            <div style={{ fontSize: 12, color: RS.green, fontWeight: 600, marginTop: 6, lineHeight: 1.4 }}>
-                              {t.fixScoreImpactApprox.replace("{pts}", String(impPts))}
-                            </div>
-                            <div style={{ fontSize: 12, color: RS.textMuted, marginTop: 4, lineHeight: 1.45 }}>
-                              {formatBlockerTransform(score, impPts, lang)}
-                            </div>
-                          </>
-                        ) : null}
-                        {f.steps && f.steps.length ? (
-                          <>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, marginBottom: 8 }}>
-                              <span
-                                aria-hidden
-                                style={{ width: 4, height: 4, borderRadius: "50%", background: sevColor, flexShrink: 0 }}
-                              />
-                              <span
-                                style={{
-                                  fontSize: 10,
-                                  fontWeight: 500,
-                                  textTransform: "uppercase",
-                                  color: sevColor,
-                                  fontFamily: RS.fontUi,
-                                }}
-                              >
-                                {priorityLabel}
-                              </span>
-                            </div>
-                            {f.steps.map((step, si) => (
-                              <div
-                                key={si}
-                                style={{
-                                  fontSize: 13,
-                                  color: RS.textSecondary,
-                                  paddingLeft: 13,
-                                  marginTop: si ? 4 : 0,
-                                  lineHeight: 1.5,
-                                }}
-                              >
-                                → {step}
-                              </div>
-                            ))}
-                          </>
-                        ) : null}
-                        {hasRes ? (
-                          <div style={{ fontSize: 13, paddingLeft: 13, marginTop: 8, lineHeight: 1.45 }}>
-                            {res.url ? (
-                              <a
-                                href={res.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{ color: RS.indigo, textDecoration: "none", cursor: "pointer" }}
-                              >
-                                → {String(res.label || "").trim() || res.url}
-                              </a>
-                            ) : (
-                              <span style={{ color: RS.textMuted, cursor: "default" }}>→ {String(res.label || "").trim()}</span>
-                            )}
+                      <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                        <span
+                          style={{ width: 5, height: 5, borderRadius: "50%", background: sevColor, flexShrink: 0, marginTop: 6 }}
+                          aria-hidden
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <label
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              marginBottom: 10,
+                              cursor: "pointer",
+                              userSelect: "none",
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={!!fixedDone[i]}
+                              onChange={() => {
+                                setFixedDone((prev) => {
+                                  const base =
+                                    prev.length === planFixes.length ? prev : Array.from({ length: planFixes.length }, (_, j) => !!prev[j]);
+                                  const next = [...base];
+                                  next[i] = !next[i];
+                                  if (fp) saveFixProgressArray(fp, next);
+                                  return next;
+                                });
+                              }}
+                              aria-label={t.markFixDoneAria.replace("{n}", String(i + 1))}
+                              style={{
+                                width: 18,
+                                height: 18,
+                                accentColor: RS.indigo,
+                                cursor: "pointer",
+                                flexShrink: 0,
+                              }}
+                            />
+                            <span style={{ fontSize: 12, fontWeight: 500, color: RS.textMuted }}>{t.markFixComplete}</span>
+                          </label>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>
+                            {humanizeUserFacingReason(f.issue || "—", lang)}
                           </div>
-                        ) : null}
+                          {score != null && Number.isFinite(Number(score)) ? (
+                            <>
+                              <div style={{ fontSize: 12, color: RS.green, fontWeight: 600, marginTop: 6, lineHeight: 1.4 }}>
+                                {t.fixScoreImpactApprox.replace("{pts}", String(impPts))}
+                              </div>
+                              <div style={{ fontSize: 12, color: RS.textMuted, marginTop: 4, lineHeight: 1.45 }}>
+                                {formatBlockerTransform(score, impPts, lang)}
+                              </div>
+                            </>
+                          ) : null}
+                          {f.steps && f.steps.length ? (
+                            <>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, marginBottom: 8 }}>
+                                <span
+                                  aria-hidden
+                                  style={{ width: 4, height: 4, borderRadius: "50%", background: sevColor, flexShrink: 0 }}
+                                />
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 500,
+                                    textTransform: "uppercase",
+                                    color: sevColor,
+                                    fontFamily: RS.fontUi,
+                                  }}
+                                >
+                                  {priorityLabel}
+                                </span>
+                              </div>
+                              {(() => {
+                                let prev = scoreBeforeFix;
+                                return f.steps.map((step, si) => {
+                                  const inc = stepIncrements[si] ?? 0;
+                                  const next = Math.min(100, prev + inc);
+                                  const hint =
+                                    scoreNumeric != null
+                                      ? t.projectedStepHint.replace("{from}", String(Math.round(prev))).replace("{to}", String(Math.round(next)))
+                                      : "";
+                                  const line = (
+                                    <div
+                                      key={si}
+                                      style={{
+                                        fontSize: 13,
+                                        color: RS.textSecondary,
+                                        paddingLeft: 13,
+                                        marginTop: si ? 4 : 0,
+                                        lineHeight: 1.5,
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        alignItems: "baseline",
+                                        gap: 8,
+                                      }}
+                                    >
+                                      <span>→ {step}</span>
+                                      {hint ? (
+                                        <span style={{ fontSize: 11, color: RS.textMuted, fontFamily: RS.fontMono }}>{hint}</span>
+                                      ) : null}
+                                    </div>
+                                  );
+                                  prev = next;
+                                  return line;
+                                });
+                              })()}
+                            </>
+                          ) : null}
+                          {scoreNumeric != null && cumulativeProjected[i] != null ? (
+                            <div style={{ fontSize: 11, color: RS.indigo, marginTop: 10, lineHeight: 1.45, fontFamily: RS.fontMono }}>
+                              {t.projectedAfterFixOrder.replace("{score}", String(Math.round(cumulativeProjected[i])))}
+                            </div>
+                          ) : null}
+                          {hasRes ? (
+                            <div style={{ fontSize: 13, paddingLeft: 13, marginTop: 8, lineHeight: 1.45 }}>
+                              {res.url ? (
+                                <a
+                                  href={res.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: RS.indigo, textDecoration: "none", cursor: "pointer" }}
+                                >
+                                  → {String(res.label || "").trim() || res.url}
+                                </a>
+                              ) : (
+                                <span style={{ color: RS.textMuted, cursor: "default" }}>→ {String(res.label || "").trim()}</span>
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </>
           ) : (
             <EmptyGuidance primary={t.emptyPlanFallback} action={t.emptyPlanNext} />
           )}
@@ -1993,6 +2201,16 @@ const translations = {
     priorityOptional: "Optional",
     priorityFixes: "Priority fixes",
     interviewPrepShort: "Interview prep",
+    sanitizeParsingFailed:
+      "Temporary format issue: run Check Fit again or paste a shorter CV and job description.",
+    executionProgress: "Execution",
+    fixesCompletedCount: "{done}/{total} fixes marked done",
+    executionLadder: "Projected alignment if you complete fixes in order",
+    projectedStepHint: "~{from} → ~{to}",
+    projectedAfterFixOrder: "After this fix (and all prior in order): ~{score}",
+    reanalysisScoreHint: "Compared with your previous Check Fit in this browser.",
+    markFixComplete: "Mark this fix done",
+    markFixDoneAria: "Mark fix {n} as done",
   },
   TR: {
     slogan: "AI Career Decision Engine",
@@ -2184,6 +2402,16 @@ const translations = {
     priorityOptional: "İsteğe bağlı",
     priorityFixes: "Öncelikli düzeltmeler",
     interviewPrepShort: "Mülakat hazırlığı",
+    sanitizeParsingFailed:
+      "Geçici biçim sorunu: Uyumu Kontrol Et'i tekrar çalıştırın veya daha kısa CV ve ilan metni yapıştırın.",
+    executionProgress: "İlerleme",
+    fixesCompletedCount: "{done}/{total} düzeltme tamamlandı olarak işaretlendi",
+    executionLadder: "Düzeltmeleri sırayla tamamlarsanız tahmini hizalama",
+    projectedStepHint: "~{from} → ~{to}",
+    projectedAfterFixOrder: "Bu düzeltme (ve öncekiler sırayla) sonrası: ~{score}",
+    reanalysisScoreHint: "Bu tarayıcıdaki önceki Uyumu Kontrol Et ile karşılaştırma.",
+    markFixComplete: "Bu düzeltmeyi tamamlandı işaretle",
+    markFixDoneAria: "{n}. düzeltmeyi tamamlandı olarak işaretle",
   },
 };
 
@@ -5653,6 +5881,9 @@ export function AnalyzerPage() {
           topKeywords={topKeywords}
           interviewPrep={analysisData?.interview_prep ?? []}
           scoreRunProgress={scoreRunProgress}
+          progressFingerprint={
+            alignmentScore != null ? analysisExecutionFingerprint(cvText, jdText, alignmentScore) : ""
+          }
         />
       </motion.div>
     )}
@@ -5660,11 +5891,10 @@ export function AnalyzerPage() {
       <ShareYourResult
         score={alignmentScore}
         verdictLabel={getScoreFinalVerdict(alignmentScore, lang).shareLabel}
-        biggestMistake={
-          engineV2?.Gaps?.biggest_gap ||
-          engineV2?.Gaps?.rejection_reasons?.[0]?.issue ||
-          ""
-        }
+        biggestMistake={humanizeUserFacingReason(
+          String(engineV2?.Gaps?.biggest_gap || engineV2?.Gaps?.rejection_reasons?.[0]?.issue || "").trim(),
+          lang,
+        )}
         lang={lang}
       />
     )}
