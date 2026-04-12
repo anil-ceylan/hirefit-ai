@@ -105,27 +105,49 @@ function rsAlpha(hex, a) {
 function parseActionPlan(raw) {
   try {
     const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    const normResource = (v) => {
-      if (v == null) return null;
-      const s = String(v).trim();
-      if (!s || /^null$/i.test(s)) return null;
-      return s;
-    };
     const normNote = (v) => {
       if (v == null) return null;
       const s = String(v).trim();
       if (!s || /^null$/i.test(s)) return null;
       return s;
     };
+    const normFixResource = (v) => {
+      if (v == null) return null;
+      if (typeof v === "object" && v !== null && !Array.isArray(v)) {
+        const label = String(v.label ?? "").trim();
+        const urlRaw = v.url == null ? "" : String(v.url).trim();
+        const url = !urlRaw || /^null$/i.test(urlRaw) ? null : urlRaw;
+        if (!label && !url) return null;
+        return { label: label || "Resource", url };
+      }
+      const s = String(v).trim();
+      if (!s || /^null$/i.test(s)) return null;
+      return { label: s, url: null };
+    };
+    const normSeverity = (v) => {
+      const s = String(v || "").toLowerCase();
+      if (s === "critical") return "critical";
+      if (s === "major" || s === "high") return "major";
+      if (s === "minor" || s === "low" || s === "medium") return "minor";
+      return "major";
+    };
+    const normFixItem = (f) => {
+      const issue = f && f.issue != null ? String(f.issue).trim() : "";
+      let steps = Array.isArray(f?.steps)
+        ? f.steps.map((x) => String(x ?? "").trim()).filter(Boolean).slice(0, 5)
+        : [];
+      const legacyFix = f && f.fix != null ? String(f.fix).trim() : "";
+      if (!steps.length && legacyFix) steps = [legacyFix];
+      return {
+        issue,
+        severity: normSeverity(f?.severity),
+        steps,
+        resource: normFixResource(f?.resource),
+      };
+    };
     return {
       priority_callout: parsed?.priority_callout?.trim() || null,
-      fixes: Array.isArray(parsed?.fixes)
-        ? parsed.fixes.slice(0, 3).map((f) => ({
-            issue: f && f.issue != null ? String(f.issue).trim() : "",
-            fix: f && f.fix != null ? String(f.fix).trim() : "",
-            resource: normResource(f?.resource),
-          }))
-        : [],
+      fixes: Array.isArray(parsed?.fixes) ? parsed.fixes.slice(0, 3).map(normFixItem) : [],
       interview_note: normNote(parsed?.interview_note),
     };
   } catch {
@@ -1001,7 +1023,8 @@ function CareerEngineCard({
   const best = data.RoleFit?.best_role;
   const locked = data.RoleFit?.locked;
   const actionPlan = parseActionPlan(data.Decision?.action_plan);
-  const previewFix = actionPlan.fixes[0]?.fix?.trim();
+  const planFixes = actionPlan.fixes.filter((f) => f.issue || (f.steps && f.steps.length));
+  const previewStep = (planFixes[0]?.steps?.[0] || "").trim();
   const biggest =
     (data.Gaps?.biggest_gap && String(data.Gaps.biggest_gap).trim()) ||
     (gaps[0]?.issue ? String(gaps[0].issue) : "");
@@ -1015,7 +1038,6 @@ function CareerEngineCard({
   const matchedDisplay = (Array.isArray(matchedSkills) && matchedSkills.length > 0 ? matchedSkills : data.ATS?.matched_skills) || [];
   const missingDisplay = (Array.isArray(missingSkills) && missingSkills.length > 0 ? missingSkills : data.ATS?.missing_keywords) || [];
   const keywordsDisplay = (Array.isArray(topKeywords) && topKeywords.length > 0 ? topKeywords : data.ATS?.top_keywords) || [];
-  const planFixes = actionPlan.fixes.filter((f) => f.issue || f.fix);
   const na = t.notAvailableForAnalysis;
   const unlockLabel = t.unlockProArrow;
   const tabSpecs = [
@@ -1091,28 +1113,32 @@ function CareerEngineCard({
                 </span>
               </div>
             ) : null}
-            {previewFix ? (
+            {planFixes.length ? (
               <div style={{ marginTop: 14, marginLeft: 64, maxWidth: "100%" }}>
                 <div style={{ ...labelStyle, marginBottom: 6 }}>{t.doThisNext}</div>
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 10 }}>
-                  <span style={{ fontSize: 14, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>{previewFix}</span>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("plan")}
-                    style={{
-                      border: "none",
-                      background: "none",
-                      padding: 0,
-                      cursor: "pointer",
-                      fontSize: 13,
-                      fontWeight: 500,
-                      color: RS.indigo,
-                      fontFamily: RS.fontUi,
-                    }}
-                  >
-                    {t.seeFullPlan}
-                  </button>
-                </div>
+                {previewStep ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 10 }}>
+                    <span style={{ fontSize: 14, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>{previewStep}</span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("plan")}
+                      style={{
+                        border: "none",
+                        background: "none",
+                        padding: 0,
+                        cursor: "pointer",
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: RS.indigo,
+                        fontFamily: RS.fontUi,
+                      }}
+                    >
+                      {t.seeFullPlan}
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: RS.textMuted, lineHeight: 1.5, cursor: "default" }}>{t.noDirectFixAvailable}</div>
+                )}
               </div>
             ) : null}
           </div>
@@ -1289,30 +1315,101 @@ function CareerEngineCard({
           ) : null}
           <div style={sectionTitleStyle}>{t.priorityFixes}</div>
           {planFixes.length ? (
-            planFixes.map((f, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: "10px 0",
-                  borderBottom: i < planFixes.length - 1 ? `1px solid ${RS.border}` : "none",
-                }}
-              >
-                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: RS.red, flexShrink: 0, marginTop: 6 }} aria-hidden />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>{f.issue || "—"}</div>
-                    {f.fix ? (
-                      <div style={{ fontSize: 13, color: RS.textSecondary, paddingLeft: 13, marginTop: 4, lineHeight: 1.5 }}>
-                        → {f.fix}
+            planFixes.map((f, i) => {
+              const sev = f.severity === "critical" || f.severity === "major" || f.severity === "minor" ? f.severity : "major";
+              const sevColor = sev === "critical" ? RS.red : sev === "major" ? RS.amber : RS.textMuted;
+              const priorityLabel = sev === "critical" ? t.fixFirst : sev === "major" ? t.priorityImportant : t.priorityOptional;
+              const res = f.resource;
+              const hasRes = res && (String(res.label || "").trim() || res.url);
+              return (
+                <div key={i} style={{ marginBottom: i < planFixes.length - 1 ? 16 : 0 }}>
+                  {i === 0 && sev === "critical" ? (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 500,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                        color: RS.red,
+                        marginBottom: 6,
+                        fontFamily: RS.fontUi,
+                      }}
+                    >
+                      {t.primaryBlocker}
+                    </div>
+                  ) : null}
+                  <div
+                    style={{
+                      padding: "14px 16px",
+                      borderRadius: 8,
+                      background: RS.bgElevated,
+                      border: `1px solid ${RS.borderSubtle}`,
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <span
+                        style={{ width: 5, height: 5, borderRadius: "50%", background: sevColor, flexShrink: 0, marginTop: 6 }}
+                        aria-hidden
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>{f.issue || "—"}</div>
+                        {f.steps && f.steps.length ? (
+                          <>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, marginBottom: 8 }}>
+                              <span
+                                aria-hidden
+                                style={{ width: 4, height: 4, borderRadius: "50%", background: sevColor, flexShrink: 0 }}
+                              />
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 500,
+                                  textTransform: "uppercase",
+                                  color: sevColor,
+                                  fontFamily: RS.fontUi,
+                                }}
+                              >
+                                {priorityLabel}
+                              </span>
+                            </div>
+                            {f.steps.map((step, si) => (
+                              <div
+                                key={si}
+                                style={{
+                                  fontSize: 13,
+                                  color: RS.textSecondary,
+                                  paddingLeft: 13,
+                                  marginTop: si ? 4 : 0,
+                                  lineHeight: 1.5,
+                                }}
+                              >
+                                → {step}
+                              </div>
+                            ))}
+                          </>
+                        ) : null}
+                        {hasRes ? (
+                          <div style={{ fontSize: 13, paddingLeft: 13, marginTop: 8, lineHeight: 1.45 }}>
+                            {res.url ? (
+                              <a
+                                href={res.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ color: RS.indigo, textDecoration: "none", cursor: "pointer" }}
+                              >
+                                → {String(res.label || "").trim() || res.url}
+                              </a>
+                            ) : (
+                              <span style={{ color: RS.textMuted, cursor: "default" }}>→ {String(res.label || "").trim()}</span>
+                            )}
+                          </div>
+                        ) : null}
                       </div>
-                    ) : null}
-                    {f.resource ? (
-                      <div style={{ fontSize: 12, color: RS.indigo, paddingLeft: 13, marginTop: 4, lineHeight: 1.45, cursor: "pointer" }}>→ {f.resource}</div>
-                    ) : null}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div style={{ fontSize: 14, color: RS.textMuted, marginBottom: 16 }}>{na}</div>
           )}
@@ -1793,6 +1890,11 @@ const translations = {
     unlockProArrow: "Unlock with Pro →",
     doThisNext: "Do this next",
     seeFullPlan: "→ See full plan",
+    primaryBlocker: "Primary blocker",
+    fixFirst: "Fix first",
+    priorityImportant: "Important",
+    priorityOptional: "Optional",
+    noDirectFixAvailable: "No direct fix available — see full strategy",
     priorityFixes: "Priority fixes",
     interviewPrepShort: "Interview prep",
   },
@@ -1930,6 +2032,11 @@ const translations = {
     unlockProArrow: "Pro ile aç →",
     doThisNext: "Önce bunu yap",
     seeFullPlan: "→ Tam planı gör",
+    primaryBlocker: "Birincil engel",
+    fixFirst: "Önce bunu düzelt",
+    priorityImportant: "Önemli",
+    priorityOptional: "İsteğe bağlı",
+    noDirectFixAvailable: "Doğrudan düzeltme yok — tam stratejiye bakın",
     priorityFixes: "Öncelikli düzeltmeler",
     interviewPrepShort: "Mülakat hazırlığı",
   },
