@@ -1,4 +1,5 @@
 import "./App.css";
+import { parseActionPlan, enrichActionPlan, pickDoThisNextStep } from "../lib/analyze-v2/actionPlanNormalize.js";
 import supabase from "./supabaseClient";
 import RoadmapPage from "./RoadmapPage.jsx";
 import { TrustSection, ComparisonSection } from "./HireFitSections";
@@ -99,60 +100,6 @@ function rsRgb(hex) {
 
 function rsAlpha(hex, a) {
   return `rgba(${rsRgb(hex)},${a})`;
-}
-
-/** Normalize action_plan from API (same shape as lib/analyze-v2/decisionEngine.parseActionPlan). */
-function parseActionPlan(raw) {
-  try {
-    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
-    const normNote = (v) => {
-      if (v == null) return null;
-      const s = String(v).trim();
-      if (!s || /^null$/i.test(s)) return null;
-      return s;
-    };
-    const normFixResource = (v) => {
-      if (v == null) return null;
-      if (typeof v === "object" && v !== null && !Array.isArray(v)) {
-        const label = String(v.label ?? "").trim();
-        const urlRaw = v.url == null ? "" : String(v.url).trim();
-        const url = !urlRaw || /^null$/i.test(urlRaw) ? null : urlRaw;
-        if (!label && !url) return null;
-        return { label: label || "Resource", url };
-      }
-      const s = String(v).trim();
-      if (!s || /^null$/i.test(s)) return null;
-      return { label: s, url: null };
-    };
-    const normSeverity = (v) => {
-      const s = String(v || "").toLowerCase();
-      if (s === "critical") return "critical";
-      if (s === "major" || s === "high") return "major";
-      if (s === "minor" || s === "low" || s === "medium") return "minor";
-      return "major";
-    };
-    const normFixItem = (f) => {
-      const issue = f && f.issue != null ? String(f.issue).trim() : "";
-      let steps = Array.isArray(f?.steps)
-        ? f.steps.map((x) => String(x ?? "").trim()).filter(Boolean).slice(0, 5)
-        : [];
-      const legacyFix = f && f.fix != null ? String(f.fix).trim() : "";
-      if (!steps.length && legacyFix) steps = [legacyFix];
-      return {
-        issue,
-        severity: normSeverity(f?.severity),
-        steps,
-        resource: normFixResource(f?.resource),
-      };
-    };
-    return {
-      priority_callout: parsed?.priority_callout?.trim() || null,
-      fixes: Array.isArray(parsed?.fixes) ? parsed.fixes.slice(0, 3).map(normFixItem) : [],
-      interview_note: normNote(parsed?.interview_note),
-    };
-  } catch {
-    return { priority_callout: null, fixes: [], interview_note: null };
-  }
 }
 
 /**
@@ -1022,9 +969,14 @@ function CareerEngineCard({
   const roles = data.RoleFit?.role_fit || [];
   const best = data.RoleFit?.best_role;
   const locked = data.RoleFit?.locked;
-  const actionPlan = parseActionPlan(data.Decision?.action_plan);
+  const actionPlan = enrichActionPlan(parseActionPlan(data.Decision?.action_plan), {
+    lang: lang === "TR" ? "tr" : "en",
+    roleFit: data.RoleFit,
+    gaps: data.Gaps,
+    verdict: data.Decision?.final_verdict,
+  });
   const planFixes = actionPlan.fixes.filter((f) => f.issue || (f.steps && f.steps.length));
-  const previewStep = (planFixes[0]?.steps?.[0] || "").trim();
+  const previewStep = pickDoThisNextStep(actionPlan.fixes);
   const biggest =
     (data.Gaps?.biggest_gap && String(data.Gaps.biggest_gap).trim()) ||
     (gaps[0]?.issue ? String(gaps[0].issue) : "");
@@ -1113,32 +1065,28 @@ function CareerEngineCard({
                 </span>
               </div>
             ) : null}
-            {planFixes.length ? (
+            {previewStep ? (
               <div style={{ marginTop: 14, marginLeft: 64, maxWidth: "100%" }}>
                 <div style={{ ...labelStyle, marginBottom: 6 }}>{t.doThisNext}</div>
-                {previewStep ? (
-                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 10 }}>
-                    <span style={{ fontSize: 14, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>{previewStep}</span>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("plan")}
-                      style={{
-                        border: "none",
-                        background: "none",
-                        padding: 0,
-                        cursor: "pointer",
-                        fontSize: 13,
-                        fontWeight: 500,
-                        color: RS.indigo,
-                        fontFamily: RS.fontUi,
-                      }}
-                    >
-                      {t.seeFullPlan}
-                    </button>
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 12, color: RS.textMuted, lineHeight: 1.5, cursor: "default" }}>{t.noDirectFixAvailable}</div>
-                )}
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 10 }}>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>{previewStep}</span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("plan")}
+                    style={{
+                      border: "none",
+                      background: "none",
+                      padding: 0,
+                      cursor: "pointer",
+                      fontSize: 13,
+                      fontWeight: 500,
+                      color: RS.indigo,
+                      fontFamily: RS.fontUi,
+                    }}
+                  >
+                    {t.seeFullPlan}
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>
@@ -1894,7 +1842,6 @@ const translations = {
     fixFirst: "Fix first",
     priorityImportant: "Important",
     priorityOptional: "Optional",
-    noDirectFixAvailable: "No direct fix available — see full strategy",
     priorityFixes: "Priority fixes",
     interviewPrepShort: "Interview prep",
   },
@@ -2036,7 +1983,6 @@ const translations = {
     fixFirst: "Önce bunu düzelt",
     priorityImportant: "Önemli",
     priorityOptional: "İsteğe bağlı",
-    noDirectFixAvailable: "Doğrudan düzeltme yok — tam stratejiye bakın",
     priorityFixes: "Öncelikli düzeltmeler",
     interviewPrepShort: "Mülakat hazırlığı",
   },
