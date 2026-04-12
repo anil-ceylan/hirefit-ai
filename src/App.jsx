@@ -393,24 +393,22 @@ function buildShareResultText({ score, verdictLabel, biggestMistake, lang }) {
   const v = normalizeShareVerdictLabel(verdictLabel, lang);
   const mistake = (biggestMistake && String(biggestMistake).trim()) || (tr ? "Belirtilmedi" : "Not specified");
   return tr
-    ? `HireFit ile CV'mi test ettim.
+    ? `CV'mi HireFit'ten geçirdim.
 
 Skor: ${score}
 Karar: ${v}
-En büyük hata: ${mistake}
+Kritik boşluk: ${mistake}
 
-Acımasızca dürüsttü.
-
-→ Dene: hirefit.ai`
-    : `I just tested my CV with HireFit.
+Başvurmadan önce denemeye değer.
+→ hirefit.ai`
+    : `Just ran my CV through HireFit.
 
 Score: ${score}
 Verdict: ${v}
-Biggest mistake: ${mistake}
+Key gap: ${mistake}
 
-This was brutally honest.
-
-→ Try it: hirefit.ai`;
+Worth trying before you apply.
+→ hirefit.ai`;
 }
 
 function buildLinkedInShareUrl(shareText) {
