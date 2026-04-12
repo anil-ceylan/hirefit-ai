@@ -419,14 +419,39 @@ Use I/you for all narrative JSON fields (recruiter_simulation, fit_summary, reje
     const parsed = extractJSON(rawText);
 
     if (!parsed) {
-      return res.json({ alignment_score: 50, confidence_level: "Medium", rejection_reasons: { high: ["Parsing failed"], medium: [], low: [] } });
+      return res.json({
+        alignment_score: 50,
+        confidence_level: "Medium",
+        fit_summary:
+          "We could not read the model response as structured data. Your inputs were received — try again in a moment, or shorten the CV/JD paste and resend.",
+        strengths: [],
+        improvements: ["Re-run analysis", "Paste a slightly shorter CV if the file is very long", "Confirm the job description is plain text (not only a link)"],
+        rejection_reasons: {
+          high: [
+            "Temporary format issue: retry the analysis. If it repeats, paste the CV and job text directly instead of relying on extraction.",
+          ],
+          medium: [],
+          low: [],
+        },
+      });
     }
 
     return res.json(cleanAITone(parsed));
 
   } catch (err) {
     console.error("💥 SERVER ERROR:", err);
-    return res.status(500).json({ alignment_score: 0, confidence_level: "Low", rejection_reasons: { high: ["Server error"], medium: [], low: [] } });
+    return res.status(500).json({
+      alignment_score: 0,
+      confidence_level: "Low",
+      fit_summary: "Something went wrong on our side. Wait a few seconds and run the analysis again.",
+      strengths: [],
+      improvements: ["Retry Check Fit", "Check your connection", "If it keeps failing, try again later"],
+      rejection_reasons: {
+        high: ["Server hiccup — please retry the analysis."],
+        medium: [],
+        low: [],
+      },
+    });
   }
 });
 
@@ -477,7 +502,11 @@ ${jobDescription}`,
 
   } catch (err) {
     console.error("💥 OPTIMIZE ERROR:", err);
-    return res.status(500).json({ error: "Optimization failed" });
+    return res.status(500).json({
+      error: "optimization_failed",
+      message: "CV optimization did not complete. Check your connection and try again.",
+      recovery: ["Retry Fix My CV", "Confirm CV and JD are both filled in"],
+    });
   }
 });
 
@@ -672,7 +701,12 @@ Apply this voice to summary, biggestMistake, topFixes, recruiterInsight, oneActi
     const gptParsed = extractJSON(gptContent);
 
     if (!gptParsed) {
-      return res.status(500).json({ error: "GPT parsing failed" });
+      return res.status(500).json({
+        error: "decision_parse_failed",
+        message:
+          "We could not parse the decision response. Retry in a moment, or run a new analysis with a shorter CV/JD paste.",
+        recovery: ["Retry the decision request", "Shorten pasted text", "Try again in one minute"],
+      });
     }
 
     // Clean AI tone from output

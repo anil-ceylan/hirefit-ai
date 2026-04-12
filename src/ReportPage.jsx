@@ -756,7 +756,12 @@ export default function ReportPage() {
             <div>
               {matchedSkills.length > 0
                 ? matchedSkills.map((s, i) => <span key={i} className="rp-skill-tag matched">{s}</span>)
-                : <span style={{ color: "#334155", fontSize: 13 }}>None detected</span>}
+                : (
+                  <div style={{ color: "#334155", fontSize: 13, lineHeight: 1.55 }}>
+                    <div>No matched skills were stored for this report.</div>
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>Mirror phrasing from the job description in your CV, then re-run analysis.</div>
+                  </div>
+                )}
             </div>
           </div>
           <div className="rp-card">
@@ -764,7 +769,12 @@ export default function ReportPage() {
             <div>
               {missingSkills.length > 0
                 ? missingSkills.map((s, i) => <span key={i} className="rp-skill-tag missing">{s}</span>)
-                : <span className="rp-skill-tag matched">None — perfect match!</span>}
+                : (
+                  <div style={{ color: "#334155", fontSize: 13, lineHeight: 1.55 }}>
+                    <div>No missing skills flagged — either a strong match or limited JD data.</div>
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>Still skim the job text for tools you use but did not mention.</div>
+                  </div>
+                )}
             </div>
           </div>
           <div className="rp-card">
@@ -772,7 +782,12 @@ export default function ReportPage() {
             <div>
               {topKeywords.length > 0
                 ? topKeywords.map((s, i) => <span key={i} className="rp-skill-tag keyword">{s}</span>)
-                : <span style={{ color: "#334155", fontSize: 13 }}>None detected</span>}
+                : (
+                  <div style={{ color: "#334155", fontSize: 13, lineHeight: 1.55 }}>
+                    <div>No top keywords were stored for this report.</div>
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>Paste the full posting as plain text and run analysis again.</div>
+                  </div>
+                )}
             </div>
           </div>
         </div>

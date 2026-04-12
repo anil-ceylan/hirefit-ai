@@ -102,6 +102,59 @@ function rsAlpha(hex, a) {
   return `rgba(${rsRgb(hex)},${a})`;
 }
 
+/** Guidance plus a concrete next step (empty / weak analysis states). */
+function EmptyGuidance({ primary, action }) {
+  return (
+    <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65 }}>
+      <div>{primary}</div>
+      {action ? (
+        <div style={{ marginTop: 10, fontSize: 13, color: RS.textMuted, fontWeight: 500, lineHeight: 1.55 }}>{action}</div>
+      ) : null}
+    </div>
+  );
+}
+
+const LS_PRIOR_ALIGNMENT_SCORE = "hirefit-prior-alignment-score";
+
+function readPriorAlignmentScore() {
+  try {
+    const raw = localStorage.getItem(LS_PRIOR_ALIGNMENT_SCORE);
+    if (raw == null || raw === "") return NaN;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : NaN;
+  } catch {
+    return NaN;
+  }
+}
+
+function writePriorAlignmentScore(fs) {
+  try {
+    localStorage.setItem(LS_PRIOR_ALIGNMENT_SCORE, String(fs));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Read last stored score, persist new score, return { prior, delta } for UI. */
+function computeScoreRunProgress(newScore) {
+  const fs = Math.round(Number(newScore) || 0);
+  const priorN = readPriorAlignmentScore();
+  writePriorAlignmentScore(fs);
+  return {
+    prior: Number.isFinite(priorN) ? priorN : null,
+    delta: Number.isFinite(priorN) ? fs - priorN : null,
+  };
+}
+
+function formatBlockerTransform(currentScore, impactPts, lang) {
+  const cur = Math.min(100, Math.max(0, Math.round(Number(currentScore) || 0)));
+  const imp = Math.max(1, Math.min(18, Math.round(Number(impactPts) || 0)));
+  const nxt = Math.min(100, cur + imp);
+  return lang === "TR"
+    ? `Bunu düzeltmek skorunuzu ${cur} → ${nxt} (+${imp}) seviyesine taşıyabilir.`
+    : `Fixing this can move your score from ${cur} → ${nxt} (+${imp}).`;
+}
+
 /**
  * Deterministic score lift (5–20) from prioritized gaps / missing signals — not random.
  */
@@ -958,6 +1011,7 @@ function CareerEngineCard({
   missingSkills = [],
   topKeywords = [],
   interviewPrep = [],
+  scoreRunProgress = { prior: null, delta: null },
 }) {
   const [showJobs, setShowJobs] = useState(false);
   const [activeTab, setActiveTab] = useState("recruiter");
@@ -977,6 +1031,8 @@ function CareerEngineCard({
   });
   const planFixes = actionPlan.fixes.filter((f) => f.issue || (f.steps && f.steps.length));
   const previewStep = pickDoThisNextStep(actionPlan.fixes);
+  const highFix = actionPlan.fixes.find((f) => f.priority === "high");
+  const highImpactPts = Math.max(1, Math.min(18, Math.round(Number(highFix?.score_impact) || 0)));
   const biggest =
     (data.Gaps?.biggest_gap && String(data.Gaps.biggest_gap).trim()) ||
     (gaps[0]?.issue ? String(gaps[0].issue) : "");
@@ -990,7 +1046,7 @@ function CareerEngineCard({
   const matchedDisplay = (Array.isArray(matchedSkills) && matchedSkills.length > 0 ? matchedSkills : data.ATS?.matched_skills) || [];
   const missingDisplay = (Array.isArray(missingSkills) && missingSkills.length > 0 ? missingSkills : data.ATS?.missing_keywords) || [];
   const keywordsDisplay = (Array.isArray(topKeywords) && topKeywords.length > 0 ? topKeywords : data.ATS?.top_keywords) || [];
-  const na = t.notAvailableForAnalysis;
+  const gapActionNext = isPro ? t.emptyGapNextPro : t.emptyGapNextFree;
   const unlockLabel = t.unlockProArrow;
   const tabSpecs = [
     { id: "recruiter", label: t.recruiterView },
@@ -1067,7 +1123,8 @@ function CareerEngineCard({
             ) : null}
             {previewStep ? (
               <div style={{ marginTop: 14, marginLeft: 64, maxWidth: "100%" }}>
-                <div style={{ ...labelStyle, marginBottom: 6 }}>{t.doThisNext}</div>
+                <div style={{ ...labelStyle, marginBottom: 4 }}>{t.doThisNext}</div>
+                <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 8, maxWidth: 520, lineHeight: 1.45 }}>{t.doThisNextLeverage}</div>
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 10 }}>
                   <span style={{ fontSize: 14, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>{previewStep}</span>
                   <button
@@ -1087,12 +1144,35 @@ function CareerEngineCard({
                     {t.seeFullPlan}
                   </button>
                 </div>
+                {score != null && Number.isFinite(Number(score)) && highImpactPts ? (
+                  <div style={{ fontSize: 12, color: RS.textMuted, marginTop: 8, lineHeight: 1.45, maxWidth: 520 }}>
+                    {formatBlockerTransform(score, highImpactPts, lang)}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
           <div style={{ textAlign: "right", flexShrink: 0, minWidth: 100 }}>
             <div style={{ ...labelStyle, marginBottom: 6 }}>{t.alignmentScore}</div>
             <div style={{ fontFamily: RS.fontMono, fontSize: 48, fontWeight: 500, color: vc, lineHeight: 1.05 }}>{score ?? "—"}</div>
+            {scoreRunProgress?.delta != null && scoreRunProgress?.prior != null ? (
+              <div
+                style={{
+                  fontSize: 12,
+                  marginTop: 10,
+                  fontWeight: 500,
+                  color: scoreRunProgress.delta >= 0 ? RS.green : RS.red,
+                  fontFamily: RS.fontUi,
+                  lineHeight: 1.35,
+                  maxWidth: 200,
+                  marginLeft: "auto",
+                }}
+              >
+                {t.scoreVsLastRun
+                  .replace("{delta}", scoreRunProgress.delta >= 0 ? `+${scoreRunProgress.delta}` : String(scoreRunProgress.delta))
+                  .replace("{prior}", String(scoreRunProgress.prior))}
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -1201,6 +1281,7 @@ function CareerEngineCard({
           {data.Recruiter?.reasoning ? (
             <>
               <div style={sectionTitleStyle}>{t.whatTheyThink}</div>
+              <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 10, lineHeight: 1.5, maxWidth: 560 }}>{t.recruiterBluntBanner}</div>
               <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65, marginBottom: 14 }}>{data.Recruiter.reasoning}</div>
             </>
           ) : null}
@@ -1211,7 +1292,7 @@ function CareerEngineCard({
               ...(data.Recruiter?.weaknesses || []).slice(0, 12).map((w) => ({ text: w, sentiment: "warning" })),
             ];
             if (!rows.length) {
-              return <div style={{ fontSize: 14, color: RS.textSecondary }}>{na}</div>;
+              return <EmptyGuidance primary={t.emptyRecruiterSignals} action={t.emptyRecruiterNext} />;
             }
             return rows.map((row, i) => (
               <ResultsBulletRow key={i} sentiment={row.sentiment}>
@@ -1230,7 +1311,7 @@ function CareerEngineCard({
           ) : null}
           <div style={sectionTitleStyle}>{t.whyYouFail}</div>
           {gaps.length === 0 ? (
-            <div style={{ fontSize: 14, color: RS.textSecondary }}>{na}</div>
+            <EmptyGuidance primary={t.emptyGapList} action={gapActionNext} />
           ) : !isPro ? (
             <ProBlurGate active onUpgrade={onUpgrade} unlockLabel={unlockLabel}>
               <div style={{ padding: "12px 14px", borderRadius: 8, border: `1px solid ${RS.border}`, background: RS.bgSurface }}>
@@ -1269,6 +1350,7 @@ function CareerEngineCard({
               const priorityLabel = sev === "critical" ? t.fixFirst : sev === "major" ? t.priorityImportant : t.priorityOptional;
               const res = f.resource;
               const hasRes = res && (String(res.label || "").trim() || res.url);
+              const impPts = Math.max(1, Math.min(18, Math.round(Number(f.score_impact) || 0)));
               return (
                 <div key={i} style={{ marginBottom: i < planFixes.length - 1 ? 16 : 0 }}>
                   {i === 0 && sev === "critical" ? (
@@ -1301,6 +1383,16 @@ function CareerEngineCard({
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 13, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>{f.issue || "—"}</div>
+                        {score != null && Number.isFinite(Number(score)) ? (
+                          <>
+                            <div style={{ fontSize: 12, color: RS.green, fontWeight: 600, marginTop: 6, lineHeight: 1.4 }}>
+                              {t.fixScoreImpactApprox.replace("{pts}", String(impPts))}
+                            </div>
+                            <div style={{ fontSize: 12, color: RS.textMuted, marginTop: 4, lineHeight: 1.45 }}>
+                              {formatBlockerTransform(score, impPts, lang)}
+                            </div>
+                          </>
+                        ) : null}
                         {f.steps && f.steps.length ? (
                           <>
                             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, marginBottom: 8 }}>
@@ -1359,7 +1451,7 @@ function CareerEngineCard({
               );
             })
           ) : (
-            <div style={{ fontSize: 14, color: RS.textMuted, marginBottom: 16 }}>{na}</div>
+            <EmptyGuidance primary={t.emptyPlanFallback} action={t.emptyPlanNext} />
           )}
           {actionPlan.interview_note ? (
             <div style={{ marginTop: 20 }}>
@@ -1385,6 +1477,11 @@ function CareerEngineCard({
                   {q.personal_angle ? <div style={{ fontSize: 13, color: RS.textSecondary, marginLeft: 13, marginTop: 4 }}>{q.personal_angle}</div> : null}
                 </div>
               ))}
+            </div>
+          ) : isPro ? (
+            <div style={{ marginTop: 20 }}>
+              <div style={sectionTitleStyle}>{lang === "TR" ? "Mülakat soruları" : "Interview questions"}</div>
+              <EmptyGuidance primary={t.interviewEmptyGuidance} action={t.interviewEmptyNext} />
             </div>
           ) : null}
         </div>
@@ -1436,7 +1533,7 @@ function CareerEngineCard({
                   </span>
                 ))
               ) : (
-                <div style={{ fontSize: 14, color: RS.textSecondary }}>{na}</div>
+                <EmptyGuidance primary={t.emptySkillsMissing} action={t.emptySkillsMissingNext} />
               )}
             </div>
           )}
@@ -1462,7 +1559,7 @@ function CareerEngineCard({
                 </span>
               ))
             ) : (
-              <div style={{ fontSize: 14, color: RS.textSecondary }}>{na}</div>
+              <EmptyGuidance primary={t.emptySkillsMatched} action={t.emptySkillsMatchedNext} />
             )}
           </div>
           <div style={{ fontSize: 12, fontWeight: 500, color: RS.textMuted, marginBottom: 8 }}>{lang === "TR" ? "Öne çıkan anahtar kelimeler" : "Top keywords"}</div>
@@ -1487,7 +1584,7 @@ function CareerEngineCard({
                 </span>
               ))
             ) : (
-              <div style={{ fontSize: 14, color: RS.textSecondary }}>{na}</div>
+              <EmptyGuidance primary={t.emptyKeywordsNone} action={t.emptyKeywordsNext} />
             )}
           </div>
         </div>
@@ -1547,7 +1644,7 @@ function CareerEngineCard({
                 {unlockLabel}
               </button>
             </div>
-          ) : (
+          ) : roles.length ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 1, background: RS.border }}>
               {roles.map((r, i) => {
                 const isBest = best && r.role === best;
@@ -1587,6 +1684,8 @@ function CareerEngineCard({
                 );
               })}
             </div>
+          ) : (
+            <EmptyGuidance primary={t.emptyMarketRoles} action={t.emptyMarketRolesNext} />
           )}
           <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
             <button
@@ -1791,8 +1890,52 @@ const translations = {
     proFeatureInterview: "Role-specific interview prep — included in Pro.",
     rolesEmptyPro: "No alternative roles surfaced for this CV.",
     rolesEmptyGeneric: "No cross-role matches in this report.",
+    rolesEmptyGuidance: "We did not get a role matrix for this report yet.",
+    rolesEmptyNext: "Upgrade to Pro for cross-role suggestions, or add clearer role titles to your CV and run Check Fit again.",
     interviewEmpty: "No interview prompts in this report.",
+    interviewEmptyGuidance: "No scripted interview prompts were attached to this run.",
+    interviewEmptyNext: "Use the Action plan steps above, then rehearse one answer with a metric from your CV.",
     confidenceNA: "N/A",
+    confidenceUnavailableLabel: "Not scored this run",
+    confidenceUnavailableNext: "Run Check Fit again after both CV and job description finish loading.",
+    decisionUnavailable: "Verdict pending",
+    decisionUnavailableNext: "Paste CV and job text, then run Check Fit to see your apply / risk / pass signal.",
+    analysisFailedTitle: "We couldn't complete the analysis.",
+    analysisFailedRecovery: "Check your connection, confirm both CV and job description are pasted (not empty), then press Check Fit again. If you use a VPN, try briefly turning it off.",
+    cvOptimizeFailedTitle: "CV optimization didn't finish.",
+    cvOptimizeFailedRecovery: "Wait a few seconds and try Fix My CV again. Both CV and JD need enough text for a useful rewrite.",
+    roadmapFailedTitle: "Learning roadmap couldn't be generated.",
+    roadmapFailedRecovery: "Run Check Fit first so we can read missing skills, then open Learning roadmap again.",
+    roadmapNeedsSkillsTitle: "We need missing-skill signals from an analysis first.",
+    roadmapNeedsSkillsRecovery: "Run Check Fit on this CV and job, then open Learning roadmap again.",
+    pdfReadFailedTitle: "We could not read that PDF.",
+    pdfReadFailedRecovery: "Try a smaller file, export PDF as text from Word, or paste the CV text directly.",
+    fileReadFailedTitle: "That file could not be read.",
+    fileReadFailedRecovery: "Use a .txt export or paste plain text into the CV or JD box.",
+    extractionRecovery: "Paste the job description text manually — full posting text works best.",
+    emptyRecruiterSignals: "No recruiter-style strength or risk bullets were returned for this run.",
+    emptyRecruiterNext: "Paste a fuller CV (roles, tools, outcomes) and run Check Fit again.",
+    emptyGapList: "No gap rows are visible in this view.",
+    emptyGapNextFree: "Upgrade to Pro for the full gap list, or paste a longer job description and re-run.",
+    emptyGapNextPro: "If you just edited your CV, run Check Fit again to refresh gaps.",
+    emptyPlanFallback: "No structured fixes were listed in this view.",
+    emptyPlanNext: "Scroll to “What to do before applying” above, or run a new analysis.",
+    emptySkillsMissing: "No missing keyword chips were extracted.",
+    emptySkillsMissingNext: "Paste the complete job description and mirror its hard-skill terms in your CV.",
+    emptySkillsMatched: "No matched skills were highlighted.",
+    emptySkillsMatchedNext: "Add the tools and methods from the posting where you truly have experience, then re-analyze.",
+    emptyKeywordsNone: "No top keyword chips yet.",
+    emptyKeywordsNext: "Use plain-text JD (not only a link) and re-run Check Fit.",
+    emptyMarketRoles: "No role fit scores to display here.",
+    emptyMarketRolesNext: "Pro unlocks the full role matrix; on Free, focus on the Action plan and Skills tabs first.",
+    ciEmptyOverview: "No company overview text in this bundle.",
+    ciEmptyOverviewNext: "Try company analysis again later, or continue with your CV vs JD Action plan.",
+    ciEmptyCareer: "No career upside bullets yet.",
+    ciEmptyCareerNext: "Expand the job posting or add a company name if you have one.",
+    ciEmptySector: "No sector positioning blurb yet.",
+    ciEmptySectorNext: "Paste a richer JD or run analysis again.",
+    ciEmptyCvTrends: "No sector trend comparison yet.",
+    ciEmptyCvTrendsNext: "Complete a fresh analysis or open the Skills tab to tune keywords.",
     companyIntelTitle: "Company Intelligence",
     companyIntelSectorTitle: "Sector analysis",
     ciCompanyStructure: "Company overview",
@@ -1831,12 +1974,18 @@ const translations = {
     simulatedRecruiterPatterns: "Based on simulated recruiter patterns",
     atsStyleAnalysis: "ATS-style analysis",
     sectorLens: "Sector lens: ",
-    notAvailableForAnalysis: "Not available for this analysis",
+    notAvailableForAnalysis: "Limited data for this section — see the suggested next step below.",
+    emptyNoneDetectedSkills: "No ATS keyword hits were listed for this paste.",
+    emptyNoneDetectedSkillsNext: "Paste the full posting and ensure your CV mentions tools and outcomes the JD asks for.",
     biggestBlockerLead: "Biggest blocker: ",
     missingFromCv: "Missing from your CV",
     detectedInCv: "Detected in your CV",
     unlockProArrow: "Unlock with Pro →",
     doThisNext: "Do this next",
+    doThisNextLeverage: "Highest-leverage move: ship proof recruiters can verify — numbers, a link, a cert, or a scoped project — not vague self-improvement.",
+    fixScoreImpactApprox: "Fixing this can increase your score by about +{pts} points.",
+    scoreVsLastRun: "vs last analysis: {delta} (was {prior})",
+    recruiterBluntBanner: "Specific screen-out read — not pep talk. Weaknesses name the JD vs CV gap.",
     seeFullPlan: "→ See full plan",
     primaryBlocker: "Primary blocker",
     fixFirst: "Fix first",
@@ -1932,8 +2081,52 @@ const translations = {
     proFeatureInterview: "Role özel mülakat soruları — Pro'da.",
     rolesEmptyPro: "Bu CV için ek rol önerisi çıkmadı.",
     rolesEmptyGeneric: "Bu raporda çapraz rol eşleşmesi yok.",
+    rolesEmptyGuidance: "Bu rapor için henüz rol matrisi üretilmedi.",
+    rolesEmptyNext: "Çapraz rol önerileri için Pro'ya geçin veya CV'ye net rol başlıkları ekleyip Uyumu Kontrol Et'i yeniden çalıştırın.",
     interviewEmpty: "Bu raporda mülakat sorusu yok.",
+    interviewEmptyGuidance: "Bu çalıştırmaya bağlı mülakat sorusu eklenmedi.",
+    interviewEmptyNext: "Yukarıdaki aksiyon planı adımlarını kullanın; ardından CV'nizden bir metrikle tek bir cevap prova edin.",
     confidenceNA: "Yok",
+    confidenceUnavailableLabel: "Bu turda skorlanmadı",
+    confidenceUnavailableNext: "CV ve ilan metni tam yüklendikten sonra Uyumu Kontrol Et'i tekrar çalıştırın.",
+    decisionUnavailable: "Karar bekleniyor",
+    decisionUnavailableNext: "CV ve iş ilanını yapıştırıp Uyumu Kontrol Et ile başvuru / risk sinyalini görün.",
+    analysisFailedTitle: "Analizi tamamlayamadık.",
+    analysisFailedRecovery: "Bağlantınızı kontrol edin; CV ve iş ilanının yapıştırıldığından emin olun, ardından Uyumu Kontrol Et'e basın. VPN kullanıyorsanız kısa süre kapatıp deneyin.",
+    cvOptimizeFailedTitle: "CV optimizasyonu tamamlanmadı.",
+    cvOptimizeFailedRecovery: "Birkaç saniye bekleyip CV'mi düzelt'i yeniden deneyin. Her iki alanda da yeterli metin olmalı.",
+    roadmapFailedTitle: "Öğrenme yol haritası oluşturulamadı.",
+    roadmapFailedRecovery: "Önce Uyumu Kontrol Et çalıştırıp eksik becerileri tespit edin, sonra yol haritasını tekrar açın.",
+    roadmapNeedsSkillsTitle: "Önce analizden eksik beceri sinyali gerekiyor.",
+    roadmapNeedsSkillsRecovery: "Bu CV ve ilan için Uyumu Kontrol Et çalıştırın, ardından öğrenme yol haritasını açın.",
+    pdfReadFailedTitle: "PDF okunamadı.",
+    pdfReadFailedRecovery: "Daha küçük dosya deneyin, Word'den metin olarak dışa aktarın veya CV'yi doğrudan yapıştırın.",
+    fileReadFailedTitle: "Dosya okunamadı.",
+    fileReadFailedRecovery: "CV veya ilan için .txt kullanın veya düz metin yapıştırın.",
+    extractionRecovery: "İş ilanı metnini elle yapıştırın — tam metin en doğru sonucu verir.",
+    emptyRecruiterSignals: "Bu tur için recruiter tarzı güçlü / risk maddesi dönmedi.",
+    emptyRecruiterNext: "Daha dolu bir CV (rol, araç, sonuç) yapıştırıp Uyumu Kontrol Et'i yeniden çalıştırın.",
+    emptyGapList: "Bu görünümde boşluk satırı yok.",
+    emptyGapNextFree: "Tam liste için Pro'ya geçin veya daha uzun ilan metni yapıştırıp yeniden analiz edin.",
+    emptyGapNextPro: "CV'yi güncellediyseniz boşlukları yenilemek için Uyumu Kontrol Et'i tekrar çalıştırın.",
+    emptyPlanFallback: "Bu görünümde yapılandırılmış düzeltme listelenmedi.",
+    emptyPlanNext: "Yukarıdaki “Başvurmadan önce yapılacaklar”a bakın veya yeni analiz çalıştırın.",
+    emptySkillsMissing: "Eksik anahtar kelime etiketi çıkarılmadı.",
+    emptySkillsMissingNext: "Tam iş ilanını yapıştırın; istenen araç ve metodları CV'de geçirin.",
+    emptySkillsMatched: "Eşleşen beceri vurgusu yok.",
+    emptySkillsMatchedNext: "Deneyiminiz olan araçları ilandaki dil ile ekleyip yeniden analiz edin.",
+    emptyKeywordsNone: "Öne çıkan anahtar kelime etiketi yok.",
+    emptyKeywordsNext: "İlanı düz metin olarak yapıştırın (yalnızca link değil) ve Uyumu Kontrol Et'i yeniden çalıştırın.",
+    emptyMarketRoles: "Burada gösterilecek rol uyumu skoru yok.",
+    emptyMarketRolesNext: "Tam matris Pro'da; Ücretsiz planda önce Aksiyon planı ve Beceriler sekmesine odaklanın.",
+    ciEmptyOverview: "Bu pakette şirket özeti metni yok.",
+    ciEmptyOverviewNext: "Şirket analizini sonra tekrar deneyin veya CV–ilan aksiyon planıyla devam edin.",
+    ciEmptyCareer: "Kariyer fırsatı maddesi henüz yok.",
+    ciEmptyCareerNext: "İlanı genişletin veya bildiğiniz şirket adını ekleyin.",
+    ciEmptySector: "Sektör konumu özeti henüz yok.",
+    ciEmptySectorNext: "Daha zengin ilan yapıştırın veya analizi yeniden çalıştırın.",
+    ciEmptyCvTrends: "Sektör trend karşılaştırması henüz yok.",
+    ciEmptyCvTrendsNext: "Yeni analiz yapın veya anahtar kelimeler için Beceriler sekmesini kullanın.",
     companyIntelTitle: "Şirket Analizi",
     companyIntelSectorTitle: "Sektör analizi",
     ciCompanyStructure: "Şirket genel yapısı",
@@ -1972,12 +2165,18 @@ const translations = {
     simulatedRecruiterPatterns: "Simüle recruiter paternlerine dayalı",
     atsStyleAnalysis: "ATS-stili analiz",
     sectorLens: "Sektör analizi: ",
-    notAvailableForAnalysis: "Bu analiz için kullanılamıyor",
+    notAvailableForAnalysis: "Bu bölüm için veri sınırlı — aşağıdaki sonraki adıma bakın.",
+    emptyNoneDetectedSkills: "Bu yapıştırma için ATS anahtar kelime eşleşmesi listelenmedi.",
+    emptyNoneDetectedSkillsNext: "Tam ilanı yapıştırın; CV'nizde ilanın istediği araç ve sonuçları geçirin.",
     biggestBlockerLead: "En büyük engel: ",
     missingFromCv: "CV'nizde eksik",
     detectedInCv: "CV'nizde tespit edilen",
     unlockProArrow: "Pro ile aç →",
     doThisNext: "Önce bunu yap",
+    doThisNextLeverage: "En yüksek kaldıraçlı hamle: recruiter’ın doğrulayabileceği kanıt — rakam, link, sertifika veya kapsamlı küçük proje — belirsiz “kendini geliştir” değil.",
+    fixScoreImpactApprox: "Bunu düzeltmek skorunuza yaklaşık +{pts} puan ekleyebilir.",
+    scoreVsLastRun: "Son analize göre: {delta} (önceki: {prior})",
+    recruiterBluntBanner: "Net eleme okuması — motivasyon değil. Zayıflıklar ilan–CV uyumsuzluğunu adlandırır.",
     seeFullPlan: "→ Tam planı gör",
     primaryBlocker: "Birincil engel",
     fixFirst: "Önce bunu düzelt",
@@ -2155,7 +2354,6 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
   const vc = scoreFv?.verdictColor || RS.textMuted;
   const confTier = getConfidenceTierLabel(data.confidence, lang);
   const rej = alignmentScore != null && Number.isFinite(Number(alignmentScore)) ? getRejectionRiskFromAlignmentScore(alignmentScore, lang) : null;
-  const na = t.notAvailableForAnalysis;
   const dLbl = { fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, fontFamily: RS.fontUi };
 
   return (
@@ -2206,7 +2404,14 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, background: RS.border, borderBottom: `1px solid ${RS.border}` }}>
             <div style={{ background: RS.bgSurface, padding: "16px 32px" }}>
               <div style={{ ...dLbl, marginBottom: 8 }}>{lang === "TR" ? "Güven seviyesi" : "Confidence level"}</div>
-              <div style={{ fontSize: 15, fontWeight: 500, color: confTier?.color || RS.textSecondary }}>{confTier?.label || na}</div>
+              <div style={{ fontSize: 15, fontWeight: 500, color: confTier?.color || RS.textSecondary }}>
+                {confTier?.label || (
+                  <div>
+                    <div>{t.confidenceUnavailableLabel}</div>
+                    <div style={{ marginTop: 6, fontSize: 13, fontWeight: 500, color: RS.textMuted }}>{t.confidenceUnavailableNext}</div>
+                  </div>
+                )}
+              </div>
             </div>
             <div style={{ background: RS.bgSurface, padding: "16px 32px", textAlign: "right" }}>
               <div style={{ ...dLbl, marginBottom: 8 }}>{t.rejectionRisk}</div>
@@ -2221,7 +2426,14 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
       ) : (
         <div style={{ padding: "24px 32px", background: RS.bgSurface, borderBottom: `1px solid ${RS.border}` }}>
           <div style={{ ...dLbl, marginBottom: 6 }}>{lang === "TR" ? "Karar" : "Decision"}</div>
-          <div style={{ fontSize: 22, fontWeight: 600, color: RS.textPrimary }}>{displayDecision || na}</div>
+          <div style={{ fontSize: 22, fontWeight: 600, color: RS.textPrimary }}>
+            {displayDecision || (
+              <div>
+                <div>{t.decisionUnavailable}</div>
+                <div style={{ marginTop: 8, fontSize: 14, fontWeight: 500, color: RS.textMuted }}>{t.decisionUnavailableNext}</div>
+              </div>
+            )}
+          </div>
           {confTier ? <div style={{ marginTop: 12, fontSize: 15, fontWeight: 500, color: confTier.color }}>{confTier.label}</div> : null}
         </div>
       )}
@@ -2365,7 +2577,6 @@ function CompanyIntelligenceSection({ intel, lang, t, isPro, onOpenRoadmap, onUp
   if (!hasBody) return null;
 
   const hasCompanyName = Boolean(ex.company_name && String(ex.company_name).trim());
-  const na = t.notAvailableForAnalysis;
   const subCard = {
     background: RS.bgElevated,
     borderRadius: 8,
@@ -2399,7 +2610,9 @@ function CompanyIntelligenceSection({ intel, lang, t, isPro, onOpenRoadmap, onUp
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div style={subCard}>
           <div style={subTitle}>{t.ciCompanyStructure}</div>
-          <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65 }}>{overview || na}</div>
+          <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65 }}>
+            {overview || <EmptyGuidance primary={t.ciEmptyOverview} action={t.ciEmptyOverviewNext} />}
+          </div>
         </div>
         <div style={subCard}>
           <div style={subTitle}>{t.ciCareerOpportunities}</div>
@@ -2412,12 +2625,14 @@ function CompanyIntelligenceSection({ intel, lang, t, isPro, onOpenRoadmap, onUp
               ))}
             </ul>
           ) : (
-            <div style={{ fontSize: 14, color: RS.textSecondary }}>{na}</div>
+            <EmptyGuidance primary={t.ciEmptyCareer} action={t.ciEmptyCareerNext} />
           )}
         </div>
         <div style={subCard}>
           <div style={subTitle}>{t.ciSectorPosition}</div>
-          <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65 }}>{sectorPos || na}</div>
+          <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65 }}>
+            {sectorPos || <EmptyGuidance primary={t.ciEmptySector} action={t.ciEmptySectorNext} />}
+          </div>
         </div>
         <div style={subCard}>
           <div style={subTitle}>{t.ciCvVsTrends}</div>
@@ -2458,7 +2673,9 @@ function CompanyIntelligenceSection({ intel, lang, t, isPro, onOpenRoadmap, onUp
               </span>
             ))}
           </div>
-          {!cvNarrative && !missingTrend.length && !matchedTrend.length ? <div style={{ fontSize: 14, color: RS.textSecondary }}>{na}</div> : null}
+          {!cvNarrative && !missingTrend.length && !matchedTrend.length ? (
+            <EmptyGuidance primary={t.ciEmptyCvTrends} action={t.ciEmptyCvTrendsNext} />
+          ) : null}
         </div>
       </div>
       <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
@@ -2865,7 +3082,7 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
                 );
               })
             ) : (
-              <div style={{ fontSize: 13, color: "#6a6a6a", lineHeight: 1.5 }}>{isPro ? t.rolesEmptyPro : t.rolesEmptyGeneric}</div>
+              <EmptyGuidance primary={isPro ? t.rolesEmptyPro : t.rolesEmptyGeneric} action={t.rolesEmptyNext} />
             )}
           </div>
         </div>
@@ -2937,7 +3154,14 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
             <div key={title} style={{ border: "1px solid #1c1c1c", borderRadius: 16, padding: 18, background: "#0c0c0c" }}>
               <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: titleColor, marginBottom: 12 }}>{title}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {skills.length ? skills.map((s) => <span key={s} style={{ padding: "4px 10px", borderRadius: 999, background: bg, border: `1px solid ${border}`, color, fontSize: 11, fontWeight: 600 }}>{s}</span>) : <span style={{ color: "#5a5a5a", fontSize: 12 }}>{lang === "TR" ? "Tespit edilemedi" : "None detected"}</span>}
+                {skills.length ? (
+                  skills.map((s) => <span key={s} style={{ padding: "4px 10px", borderRadius: 999, background: bg, border: `1px solid ${border}`, color, fontSize: 11, fontWeight: 600 }}>{s}</span>)
+                ) : (
+                  <div style={{ fontSize: 12, lineHeight: 1.55 }}>
+                    <div style={{ color: "#94a3b8" }}>{t.emptyNoneDetectedSkills}</div>
+                    <div style={{ color: "#5a5a5a", marginTop: 6, fontWeight: 600 }}>{t.emptyNoneDetectedSkillsNext}</div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -3955,6 +4179,8 @@ function HireFitLayout() {
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [error, setError] = useState("");
   const [alignmentScore, setAlignmentScore] = useState(null);
+  /** vs last completed alignment score (localStorage-backed). */
+  const [scoreRunProgress, setScoreRunProgress] = useState({ prior: null, delta: null });
   const [roleType, setRoleType] = useState("");
   const [seniority, setSeniority] = useState("");
   const [matchedSkills, setMatchedSkills] = useState([]);
@@ -4219,7 +4445,13 @@ function HireFitLayout() {
 
       if (!extracted) throw lastErr || new Error("Extraction failed");
       setJdText(extracted);
-    } catch { setError(lang === "TR" ? "İş ilanı çıkarılamadı. Lütfen manuel yapıştırın." : "Could not extract job description. Please paste it manually."); }
+    } catch {
+      setError(
+        lang === "TR"
+          ? `İş ilanı çıkarılamadı.\n\n${t.extractionRecovery}`
+          : `Could not extract the job description.\n\n${t.extractionRecovery}`
+      );
+    }
     finally { setExtractingJob(false); }
   };
 
@@ -4288,6 +4520,7 @@ const msgInterval = setInterval(() => {
         setLastDetectedSector(v2.Context?.sector || v2.detected_sector || "");
         const fs = Number(v2["Final Alignment Score"]) || 0;
         setAlignmentScore(fs);
+        setScoreRunProgress(computeScoreRunProgress(fs));
         const modelRole =
           !v2.RoleFit?.locked && v2.RoleFit?.best_role
             ? v2.RoleFit.best_role
@@ -4376,7 +4609,9 @@ const msgInterval = setInterval(() => {
         });
         const data = await res.json();
         setEngineV2(null);
+        const legacyScore = Number(data.alignment_score) || 0;
         setAlignmentScore(data.alignment_score ?? null);
+        setScoreRunProgress(computeScoreRunProgress(legacyScore));
         const legacySavedTitle = resolveSavedAnalysisRole(jdDerivedTitle, data.role_type, lang);
         setRoleType(legacySavedTitle);
         setSeniority(data.seniority ?? "");
@@ -4406,7 +4641,7 @@ const msgInterval = setInterval(() => {
         creditConsumed = true;
       } catch (err) {
         console.error(err);
-        setError(lang === "TR" ? "Analiz başarısız." : "Analysis failed. Check your API key or network.");
+        setError(`${t.analysisFailedTitle}\n\n${t.analysisFailedRecovery}`);
       }
     }
 
@@ -4471,9 +4706,22 @@ const msgInterval = setInterval(() => {
     try {
       const res = await fetch(`${HF_API_BASE}/optimize`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang }) });
       const data = await res.json();
-      setOptimizedCv(data.optimizedCv || "");
+      if (!res.ok) {
+        const msg = data?.message || data?.error || t.cvOptimizeFailedTitle;
+        const rec = Array.isArray(data?.recovery) ? data.recovery.join(" · ") : t.cvOptimizeFailedRecovery;
+        setError(`${msg}\n\n${rec}`);
+        return;
+      }
+      const out = String(data.optimizedCv || "").trim();
+      if (!out) {
+        setError(`${t.cvOptimizeFailedTitle}\n\n${t.cvOptimizeFailedRecovery}`);
+        return;
+      }
+      setOptimizedCv(out);
       setShowSharePrompt(true);
-    } catch { setError(lang === "TR" ? "CV optimizasyonu başarısız." : "CV optimization failed."); }
+    } catch {
+      setError(`${t.cvOptimizeFailedTitle}\n\n${t.cvOptimizeFailedRecovery}`);
+    }
     finally { setOptimizing(false); }
   };
 
@@ -4490,13 +4738,18 @@ const msgInterval = setInterval(() => {
   };
 
   const generateLearningPlan = async () => {
-    if (!missingSkills.length) { setError(lang === "TR" ? "Henüz eksik beceri tespit edilmedi." : "No missing skills detected yet."); return; }
+    if (!missingSkills.length) {
+      setError(`${t.roadmapNeedsSkillsTitle}\n\n${t.roadmapNeedsSkillsRecovery}`);
+      return;
+    }
     setRoadmapLoading(true); setError(""); setLearningPlan("");
     try {
       const res = await fetch(`${HF_API_BASE}/roadmap`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ missingSkills, roleType, seniority }) });
       const data = await res.json();
       setLearningPlan(data.roadmap || "");
-    } catch { setError(lang === "TR" ? "Öğrenme yol haritası oluşturulamadı." : "Failed to generate learning roadmap."); }
+    } catch {
+      setError(`${t.roadmapFailedTitle}\n\n${t.roadmapFailedRecovery}`);
+    }
     finally { setRoadmapLoading(false); }
   };
 
@@ -4524,7 +4777,7 @@ const msgInterval = setInterval(() => {
       }
       setCvText(fullText.trim());
     } catch {
-      setError(lang === "TR" ? "PDF okunamadı." : "Failed to read PDF.");
+      setError(`${t.pdfReadFailedTitle}\n\n${t.pdfReadFailedRecovery}`);
     } finally {
       setUploadingPdf(false);
     }
@@ -4547,7 +4800,7 @@ const msgInterval = setInterval(() => {
       const txt = await file.text();
       setJdText(txt.trim());
     } catch {
-      setError(lang === "TR" ? "Dosya okunamadı." : "Could not read file.");
+      setError(`${t.fileReadFailedTitle}\n\n${t.fileReadFailedRecovery}`);
     }
   };
 
@@ -5300,8 +5553,23 @@ export function AnalyzerPage() {
 
     {/* ERROR */}
     {error && (
-      <div style={{ display: "flex", gap: 10, padding: "14px 16px", borderRadius: 12, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)", color: "#fca5a5", fontSize: 14, marginBottom: 16 }}>
-        <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />{error}
+      <div
+        style={{
+          display: "flex",
+          gap: 10,
+          padding: "14px 16px",
+          borderRadius: 12,
+          background: "rgba(239,68,68,0.06)",
+          border: "1px solid rgba(239,68,68,0.15)",
+          color: "#fca5a5",
+          fontSize: 14,
+          marginBottom: 16,
+          whiteSpace: "pre-line",
+          lineHeight: 1.55,
+        }}
+      >
+        <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+        <span>{error}</span>
       </div>
     )}
 
@@ -5369,7 +5637,7 @@ export function AnalyzerPage() {
       </div>
     )}
     <AnimatePresence mode="wait">
-    {engineV2 && lang !== "TR" && (
+    {engineV2 && (
       <motion.div key="engineV2" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.28 }}>
         <CareerEngineCard
           data={engineV2}
@@ -5384,6 +5652,7 @@ export function AnalyzerPage() {
           missingSkills={missingSkills}
           topKeywords={topKeywords}
           interviewPrep={analysisData?.interview_prep ?? []}
+          scoreRunProgress={scoreRunProgress}
         />
       </motion.div>
     )}
