@@ -72,21 +72,22 @@ const SHARE_RESULT_UI = {
   TR: { title: "Sonucunu paylaş", copy: "Metni kopyala", linkedIn: "LinkedIn'de paylaş", copied: "Kopyalandı!" },
 };
 
-/** HireFit results surface — colors from design system only (see RS usages in results UI). */
+/** HireFit results surface — semantic colors + premium contrast. */
 const RS = {
-  bgBase: "#0f1117",
-  bgSurface: "#161922",
-  bgElevated: "#1e2330",
-  border: "#222630",
-  borderSubtle: "#2a3040",
-  textPrimary: "#f1f5f9",
+  pageGradient: "linear-gradient(165deg, #020617 0%, #0f172a 42%, #0c1222 100%)",
+  bgBase: "#0b1220",
+  bgSurface: "#111827",
+  bgElevated: "#1e293b",
+  border: "rgba(255,255,255,0.1)",
+  borderSubtle: "rgba(255,255,255,0.08)",
+  textPrimary: "#f8fafc",
   textSecondary: "#94a3b8",
-  textMuted: "#4b5563",
-  green: "#4ade80",
-  amber: "#fbbf24",
-  red: "#f87171",
-  redDim: "#fca5a5",
-  indigo: "#6366f1",
+  textMuted: "#64748b",
+  green: "#22c55e",
+  amber: "#f59e0b",
+  red: "#ff4d4f",
+  redDim: "#fda4a6",
+  indigo: "#818cf8",
   fontUi: "'DM Sans', sans-serif",
   fontMono: "'DM Mono', ui-monospace, monospace",
 };
@@ -105,10 +106,10 @@ function rsAlpha(hex, a) {
 /** Guidance plus a concrete next step (empty / weak analysis states). */
 function EmptyGuidance({ primary, action }) {
   return (
-    <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65 }}>
+    <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.75, fontWeight: 500 }}>
       <div>{primary}</div>
       {action ? (
-        <div style={{ marginTop: 10, fontSize: 13, color: RS.textMuted, fontWeight: 500, lineHeight: 1.55 }}>{action}</div>
+        <div style={{ marginTop: 12, fontSize: 13, color: RS.textMuted, fontWeight: 500, lineHeight: 1.65 }}>{action}</div>
       ) : null}
     </div>
   );
@@ -493,6 +494,7 @@ function isUiTurkish(lang) {
 
 function getScoreFinalVerdict(score, lang) {
   const tr = isUiTurkish(lang);
+  const tk = translations[tr ? "TR" : "EN"];
   const s = Number(score);
   if (Number.isNaN(s)) {
     return {
@@ -512,60 +514,48 @@ function getScoreFinalVerdict(score, lang) {
   if (s < 60) {
     return {
       icon: "✕",
-      verdictIcon: "✕",
+      verdictIcon: "🚫",
       verdictColor: RS.red,
-      title: tr ? "Başvurma" : "Application not recommended",
-      explanation:
-        tr
-          ? "Kritik gereksinimleri karşılamıyorsun. Şimdi başvurursan büyük ihtimalle elenirsin — önce boşlukları kapat."
-          : "You are missing critical requirements. Applying now will likely lead to rejection.",
-      shareLabel: tr ? "Başvurma" : "Application not recommended",
-      border: rsAlpha(RS.red, 0.45),
-      bg: rsAlpha(RS.red, 0.12),
+      title: tk.verdictBadTitle,
+      explanation: tk.verdictBadSub,
+      shareLabel: tk.verdictBadTitle,
+      border: rsAlpha(RS.red, 0.5),
+      bg: rsAlpha(RS.red, 0.14),
     };
   }
   if (s < 75) {
     return {
       icon: "⚠",
-      verdictIcon: "⚠",
+      verdictIcon: "⚠️",
       verdictColor: RS.amber,
-      title: tr ? "Riskli başvuru" : "Risky apply",
-      explanation:
-        tr
-          ? "İlk elemede çoğu recruiter seni saniyeler içinde eleyecek. Kanıt ve anahtar kelimeleri güçlendirmeden gönderme."
-          : "You are not competitive on the first screen yet — most recruiters will bin this CV unless you fix the gaps first.",
-      shareLabel: tr ? "Riskli başvuru" : "Risky apply",
-      border: rsAlpha(RS.amber, 0.45),
-      bg: rsAlpha(RS.amber, 0.1),
+      title: tk.verdictRiskyTitle,
+      explanation: tk.verdictRiskySub,
+      shareLabel: tk.verdictRiskyTitle,
+      border: rsAlpha(RS.amber, 0.5),
+      bg: rsAlpha(RS.amber, 0.12),
     };
   }
   if (s < 85) {
     return {
       icon: "✓",
-      verdictIcon: "✓",
+      verdictIcon: "⚡",
       verdictColor: RS.green,
-      title: tr ? "Düzeltmelerle başvur" : "Apply with fixes",
-      explanation:
-        tr
-          ? "Yakınsın ama henüz ikna edici değil. Birkaç net düzeltme — ölçülebilir etki ve ilan dili — sonra başvur."
-          : "You are close but not sharp enough to win the pile. Fix the highest-impact gaps, then apply.",
-      shareLabel: tr ? "Düzeltmelerle başvur" : "Apply with fixes",
+      title: tk.verdictCloseTitle,
+      explanation: tk.verdictCloseSub,
+      shareLabel: tk.verdictCloseTitle,
       border: rsAlpha(RS.green, 0.45),
       bg: rsAlpha(RS.green, 0.1),
     };
   }
   return {
     icon: "✓",
-    verdictIcon: "✓",
+    verdictIcon: "✅",
     verdictColor: RS.green,
-    title: tr ? "Güçlü başvuru" : "Strong apply",
-    explanation:
-      tr
-        ? "Bu ilan için güçlü aday sinyali veriyorsun. Son bir sıkılaştırma ile gönder."
-        : "Strong candidate signal for this role — tighten the CV once more and send it.",
-    shareLabel: tr ? "Güçlü başvuru" : "Strong apply",
-    border: rsAlpha(RS.green, 0.45),
-    bg: rsAlpha(RS.green, 0.12),
+    title: tk.verdictStrongTitle,
+    explanation: tk.verdictStrongSub,
+    shareLabel: tk.verdictStrongTitle,
+    border: rsAlpha(RS.green, 0.5),
+    bg: rsAlpha(RS.green, 0.14),
   };
 }
 
@@ -591,6 +581,9 @@ function normalizeShareVerdictLabel(verdictLabel, lang) {
   const s = String(verdictLabel || "").trim();
   if (!s) return s;
   if (/application\s+not\s+recommended/i.test(s)) return "Başvurma";
+  if (/you will likely get rejected/i.test(s)) return "🚫 Büyük ihtimalle elenirsin";
+  if (/strong match/i.test(s)) return "✅ Güçlü eşleşme";
+  if (/competitive.*tighten/i.test(s) || /tighten proof/i.test(s)) return "⚡ Rekabetçi — kanıtı sıkılaştır";
   if (/^do\s*not\s*apply$/i.test(s)) return "Başvurma";
   if (/risky\s*apply/i.test(s)) return "Riskli başvuru";
   if (/apply\s+with\s+(fixes|risk)/i.test(s)) return s.toLowerCase().includes("risk") ? "Riskli başvuru" : "Düzeltmelerle başvur";
@@ -1117,6 +1110,7 @@ function CareerEngineCard({
 }) {
   const [showJobs, setShowJobs] = useState(false);
   const [activeTab, setActiveTab] = useState("recruiter");
+  const [uxToast, setUxToast] = useState(null);
   const [execState, setExecState] = useState(() => ({
     completed: [],
     fixProofs: [],
@@ -1195,6 +1189,12 @@ function CareerEngineCard({
     return Math.round(acc);
   }, [scoreNumeric, planFixesMemo, execState.completed]);
 
+  useEffect(() => {
+    if (!uxToast) return undefined;
+    const id = window.setTimeout(() => setUxToast(null), 4200);
+    return () => window.clearTimeout(id);
+  }, [uxToast]);
+
   if (!data) return null;
 
   const t = translations[lang];
@@ -1233,49 +1233,71 @@ function CareerEngineCard({
     { id: "market", label: t.marketInsights },
   ];
 
-  const labelStyle = { fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, fontFamily: RS.fontUi };
-  const sectionTitleStyle = { fontSize: 12, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: RS.textMuted, marginBottom: 12, fontFamily: RS.fontUi };
+  const labelStyle = {
+    fontSize: 10,
+    fontWeight: 700,
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
+    color: RS.textMuted,
+    fontFamily: RS.fontUi,
+  };
+  const sectionTitleStyle = {
+    fontSize: 14,
+    fontWeight: 800,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    color: RS.textSecondary,
+    marginBottom: 14,
+    fontFamily: RS.fontUi,
+  };
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      whileHover={{ y: -3, boxShadow: `0 28px 90px rgba(0,0,0,0.5), 0 0 0 1px ${rsAlpha(RS.indigo, 0.12)}` }}
       style={{
-        marginBottom: 20,
-        borderRadius: 12,
+        marginBottom: 28,
+        borderRadius: 20,
         overflow: "hidden",
         border: `1px solid ${RS.border}`,
-        background: RS.bgBase,
+        background: RS.pageGradient,
         fontFamily: RS.fontUi,
-        boxShadow: `0 24px 64px ${rsAlpha(RS.bgBase, 0.45)}`,
+        boxShadow: `0 24px 80px rgba(0,0,0,0.45), 0 0 0 1px ${rsAlpha(RS.indigo, 0.06)}`,
+        transition: "box-shadow 0.22s ease, transform 0.22s ease",
       }}
     >
-      <div style={{ padding: "24px 32px", background: RS.bgSurface, borderBottom: `1px solid ${RS.border}` }}>
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
-          <div style={{ flex: "1 1 260px", minWidth: 0 }}>
-            <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+      <div style={{ padding: "28px 32px", background: rsAlpha(RS.bgSurface, 0.92), borderBottom: `1px solid ${RS.border}` }}>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 28 }}>
+          <div style={{ flex: "1 1 280px", minWidth: 0 }}>
+            <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
               <div
                 style={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: 12,
+                  width: 56,
+                  height: 56,
+                  borderRadius: 16,
                   display: "grid",
                   placeItems: "center",
                   flexShrink: 0,
-                  fontSize: 22,
-                  fontWeight: 500,
+                  fontSize: 28,
+                  fontWeight: 800,
                   color: vc,
-                  background: rsAlpha(vc, 0.12),
-                  border: `1px solid ${rsAlpha(vc, 0.25)}`,
+                  background: rsAlpha(vc, 0.14),
+                  border: `1px solid ${rsAlpha(vc, 0.35)}`,
                   fontFamily: RS.fontUi,
+                  boxShadow: `0 0 28px ${rsAlpha(vc, 0.2)}`,
                 }}
               >
                 {fv.verdictIcon || fv.icon}
               </div>
               <div style={{ minWidth: 0, paddingTop: 2 }}>
-                <div style={{ ...labelStyle, marginBottom: 6 }}>{t.finalVerdict}</div>
-                <div style={{ fontSize: 26, fontWeight: 600, color: vc, lineHeight: 1.2 }}>{fv.title}</div>
+                <div style={{ ...labelStyle, marginBottom: 8 }}>{t.finalVerdict}</div>
+                <div style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 900, color: vc, lineHeight: 1.12, letterSpacing: "-0.02em" }}>{fv.title}</div>
+                <p style={{ margin: "12px 0 0", fontSize: 15, fontWeight: 500, lineHeight: 1.65, color: RS.textSecondary, maxWidth: 560 }}>{fv.explanation}</p>
               </div>
             </div>
-            <p style={{ margin: "14px 0 0", paddingLeft: 64, fontSize: 14, fontWeight: 400, lineHeight: 1.65, color: RS.textSecondary }}>{oneLineSummary}</p>
+            <p style={{ margin: "16px 0 0", paddingLeft: 74, fontSize: 14, fontWeight: 400, lineHeight: 1.75, color: RS.textMuted }}>{oneLineSummary}</p>
             {biggest ? (
               <div
                 style={{
@@ -1284,7 +1306,7 @@ function CareerEngineCard({
                   gap: 10,
                   maxWidth: "100%",
                   marginTop: 12,
-                  marginLeft: 64,
+                  marginLeft: 74,
                   padding: "12px 14px",
                   borderRadius: 10,
                   border: `1px solid ${rsAlpha(RS.red, 0.18)}`,
@@ -1299,26 +1321,37 @@ function CareerEngineCard({
               </div>
             ) : null}
             {previewStep ? (
-              <div style={{ marginTop: 14, marginLeft: 64, maxWidth: "100%" }}>
+              <div style={{ marginTop: 14, marginLeft: 74, maxWidth: "100%" }}>
                 <div style={{ ...labelStyle, marginBottom: 4 }}>{t.doThisNext}</div>
                 <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 8, maxWidth: 520, lineHeight: 1.45 }}>{t.doThisNextLeverage}</div>
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 10 }}>
-                  <span style={{ fontSize: 14, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5 }}>{previewStep}</span>
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontSize: 15, fontWeight: 600, color: RS.textPrimary, lineHeight: 1.55 }}>{previewStep}</span>
                   <button
                     type="button"
                     onClick={() => setActiveTab("plan")}
                     style={{
                       border: "none",
-                      background: "none",
-                      padding: 0,
+                      borderRadius: 12,
+                      padding: "10px 16px",
                       cursor: "pointer",
                       fontSize: 13,
-                      fontWeight: 500,
-                      color: RS.indigo,
+                      fontWeight: 800,
+                      color: "#0f172a",
                       fontFamily: RS.fontUi,
+                      background: `linear-gradient(135deg, ${RS.indigo}, #a855f7)`,
+                      boxShadow: `0 4px 20px ${rsAlpha(RS.indigo, 0.35)}`,
+                      transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-1px)";
+                      e.currentTarget.style.boxShadow = `0 8px 28px ${rsAlpha(RS.indigo, 0.45)}`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "none";
+                      e.currentTarget.style.boxShadow = `0 4px 20px ${rsAlpha(RS.indigo, 0.35)}`;
                     }}
                   >
-                    {t.seeFullPlan}
+                    {t.startFixingNow}
                   </button>
                 </div>
                 {score != null && Number.isFinite(Number(score)) && highImpactPts ? (
@@ -1329,9 +1362,21 @@ function CareerEngineCard({
               </div>
             ) : null}
           </div>
-          <div style={{ textAlign: "right", flexShrink: 0, minWidth: 100 }}>
-            <div style={{ ...labelStyle, marginBottom: 6 }}>{t.alignmentScore}</div>
-            <div style={{ fontFamily: RS.fontMono, fontSize: 48, fontWeight: 500, color: vc, lineHeight: 1.05 }}>{score ?? "—"}</div>
+          <div style={{ textAlign: "right", flexShrink: 0, minWidth: 120 }}>
+            <div style={{ ...labelStyle, marginBottom: 8, opacity: 0.95 }}>{t.alignmentScore}</div>
+            <div
+              style={{
+                fontFamily: RS.fontMono,
+                fontSize: "clamp(52px, 7vw, 72px)",
+                fontWeight: 900,
+                color: vc,
+                lineHeight: 0.95,
+                letterSpacing: "-0.03em",
+                textShadow: `0 0 48px ${rsAlpha(vc, 0.35)}, 0 0 80px ${rsAlpha(vc, 0.12)}`,
+              }}
+            >
+              {score ?? "—"}
+            </div>
             {scoreRunProgress?.delta != null && scoreRunProgress?.prior != null ? (
               <div
                 style={{
@@ -1357,7 +1402,7 @@ function CareerEngineCard({
         </div>
       </div>
 
-      <div style={{ padding: "14px 32px", borderBottom: `1px solid ${RS.border}`, background: RS.bgBase }}>
+      <div style={{ padding: "18px 32px", borderBottom: `1px solid ${RS.border}`, background: rsAlpha(RS.bgSurface, 0.55) }}>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
           {data.Context?.sector ? (
             <div
@@ -1426,11 +1471,12 @@ function CareerEngineCard({
           position: "sticky",
           top: 0,
           zIndex: 6,
-          background: RS.bgBase,
+          background: rsAlpha(RS.bgSurface, 0.92),
+          backdropFilter: "blur(10px)",
           borderBottom: `1px solid ${RS.border}`,
         }}
       >
-        <div style={{ display: "flex", overflowX: "auto", gap: 4, padding: "0 32px", WebkitOverflowScrolling: "touch" }}>
+        <div style={{ display: "flex", overflowX: "auto", gap: 6, padding: "4px 32px 0", WebkitOverflowScrolling: "touch" }}>
           {tabSpecs.map((tab) => (
             <button
               key={tab.id}
@@ -1438,16 +1484,17 @@ function CareerEngineCard({
               onClick={() => setActiveTab(tab.id)}
               style={{
                 flex: "1 0 auto",
-                padding: "12px 14px",
+                padding: "14px 16px",
                 border: "none",
-                borderBottom: activeTab === tab.id ? `2px solid ${RS.indigo}` : "2px solid transparent",
+                borderBottom: activeTab === tab.id ? `3px solid ${RS.indigo}` : "3px solid transparent",
                 background: "transparent",
                 cursor: "pointer",
                 fontSize: 13,
-                fontWeight: 500,
+                fontWeight: activeTab === tab.id ? 800 : 600,
                 color: activeTab === tab.id ? RS.textPrimary : RS.textMuted,
                 fontFamily: RS.fontUi,
                 whiteSpace: "nowrap",
+                transition: "color 0.2s ease, border-color 0.2s ease",
               }}
             >
               {tab.label}
@@ -1456,7 +1503,7 @@ function CareerEngineCard({
         </div>
       </div>
 
-      <div style={{ padding: "24px 32px", background: RS.bgBase, minHeight: 180 }}>
+      <div style={{ padding: "28px 36px", background: "transparent", minHeight: 200 }}>
         <div style={{ display: activeTab === "recruiter" ? "block" : "none" }}>
           {data.Recruiter?.reasoning ? (
             <>
@@ -1524,6 +1571,27 @@ function CareerEngineCard({
         </div>
 
         <div style={{ display: activeTab === "plan" ? "block" : "none" }}>
+          {uxToast ? (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              style={{
+                marginBottom: 18,
+                padding: "16px 18px",
+                borderRadius: 14,
+                border: `1px solid ${rsAlpha(RS.green, 0.35)}`,
+                background: rsAlpha(RS.green, 0.1),
+                boxShadow: `0 8px 32px ${rsAlpha(RS.green, 0.12)}`,
+              }}
+            >
+              <div style={{ fontWeight: 900, fontSize: 15, color: RS.green, letterSpacing: "-0.01em" }}>{t.proofAddedToast}</div>
+              <div style={{ fontSize: 13, color: RS.textSecondary, marginTop: 6, lineHeight: 1.55, fontWeight: 500 }}>{t.proofTrustToast}</div>
+              <div style={{ fontSize: 14, fontFamily: RS.fontMono, fontWeight: 800, color: RS.green, marginTop: 8 }}>
+                {t.proofImpactToast.replace("{pts}", String(uxToast.pts))}
+              </div>
+            </motion.div>
+          ) : null}
           {actionPlan.priority_callout ? (
             <div style={{ marginBottom: 16, padding: "14px 16px", borderRadius: 8, background: RS.bgElevated, border: `1px solid ${RS.borderSubtle}` }}>
               <div style={{ ...labelStyle, marginBottom: 8 }}>{t.whatToDoNext}</div>
@@ -1576,7 +1644,7 @@ function CareerEngineCard({
                 const scoreBeforeFix = i === 0 ? (scoreNumeric ?? 0) : cumulativeProjected[i - 1];
                 const stepIncrements = f.steps?.length ? splitImpactAcrossSteps(impPts, f.steps.length) : [];
                 return (
-                  <div key={i} style={{ marginBottom: i < planFixes.length - 1 ? 16 : 0 }}>
+                  <div key={i} id={`hf-fix-${i}`} style={{ marginBottom: i < planFixes.length - 1 ? 24 : 0 }}>
                     {i === 0 && sev === "critical" ? (
                       <div
                         style={{
@@ -1594,10 +1662,12 @@ function CareerEngineCard({
                     ) : null}
                     <div
                       style={{
-                        padding: "14px 16px",
-                        borderRadius: 8,
+                        padding: "20px 20px",
+                        borderRadius: 16,
                         background: RS.bgElevated,
                         border: `1px solid ${RS.borderSubtle}`,
+                        boxShadow: `0 12px 40px rgba(0,0,0,0.2)`,
+                        transition: "border-color 0.2s ease, box-shadow 0.2s ease",
                       }}
                     >
                       <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
@@ -1644,6 +1714,7 @@ function CareerEngineCard({
                                     if (fp) saveExecutionPlanState(fp, next);
                                     return next;
                                   });
+                                  window.setTimeout(() => setUxToast({ pts: impPts }), 0);
                                 } else {
                                   setExecState((prev) => {
                                     const completed = Array.from({ length: n }, (_, j) => !!prev.completed[j]);
@@ -1705,13 +1776,27 @@ function CareerEngineCard({
                           ) : null}
                           {score != null && Number.isFinite(Number(score)) ? (
                             <>
-                              <div style={{ fontSize: 12, color: RS.green, fontWeight: 600, marginTop: 6, lineHeight: 1.4 }}>
-                                {t.fixScoreImpactApprox.replace("{pts}", String(impPts))}
+                              <div style={{ fontSize: 13, color: RS.green, fontWeight: 800, marginTop: 8, lineHeight: 1.45, fontFamily: RS.fontMono }}>
+                                {t.fixPointsIfDone.replace("{pts}", String(impPts))}
                               </div>
-                              <div style={{ fontSize: 12, color: RS.textMuted, marginTop: 4, lineHeight: 1.45 }}>
+                              <div style={{ fontSize: 13, color: RS.textMuted, marginTop: 6, lineHeight: 1.6, fontWeight: 500 }}>
                                 {formatBlockerTransform(score, impPts, lang)}
                               </div>
                             </>
+                          ) : null}
+                          {execState.completed[i] ? (
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 900,
+                                color: RS.green,
+                                marginTop: 10,
+                                fontFamily: RS.fontUi,
+                                letterSpacing: "-0.01em",
+                              }}
+                            >
+                              {t.fixProgressApplied.replace("{pts}", String(impPts))}
+                            </div>
                           ) : null}
                           {f.steps && f.steps.length ? (
                             <>
@@ -1771,6 +1856,11 @@ function CareerEngineCard({
                                           type="text"
                                           value={stepVal}
                                           placeholder={t.proofPasteLinkPlaceholder}
+                                          onBlur={(ev) => {
+                                            const v = String(ev.target.value || "").trim();
+                                            if (v.length < 8 || !inc) return;
+                                            setUxToast({ pts: inc });
+                                          }}
                                           onChange={(ev) => {
                                             const v = ev.target.value;
                                             setExecState((prev) => {
@@ -1839,6 +1929,7 @@ function CareerEngineCard({
                                                     if (fp) saveExecutionPlanState(fp, next);
                                                     return next;
                                                   });
+                                                  window.setTimeout(() => setUxToast({ pts: inc || 1 }), 0);
                                                 });
                                               } else {
                                                 setExecState((prev) => {
@@ -1855,6 +1946,7 @@ function CareerEngineCard({
                                                   if (fp) saveExecutionPlanState(fp, next);
                                                   return next;
                                                 });
+                                                window.setTimeout(() => setUxToast({ pts: inc || 1 }), 0);
                                               }
                                             }}
                                           />
@@ -1874,6 +1966,43 @@ function CareerEngineCard({
                               {t.projectedAfterFixOrder.replace("{score}", String(Math.round(cumulativeProjected[i])))}
                             </div>
                           ) : null}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTab("plan");
+                              window.requestAnimationFrame(() => {
+                                document.getElementById(`hf-fix-${i}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                              });
+                            }}
+                            style={{
+                              marginTop: 14,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: 8,
+                              padding: "12px 20px",
+                              borderRadius: 12,
+                              border: "none",
+                              cursor: "pointer",
+                              fontWeight: 900,
+                              fontSize: 13,
+                              fontFamily: RS.fontUi,
+                              color: "#0f172a",
+                              background: `linear-gradient(135deg, ${RS.indigo}, #a855f7)`,
+                              boxShadow: `0 6px 24px ${rsAlpha(RS.indigo, 0.35)}`,
+                              transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = "translateY(-2px)";
+                              e.currentTarget.style.boxShadow = `0 10px 32px ${rsAlpha(RS.indigo, 0.45)}`;
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = "none";
+                              e.currentTarget.style.boxShadow = `0 6px 24px ${rsAlpha(RS.indigo, 0.35)}`;
+                            }}
+                          >
+                            {t.startThisStep}
+                          </button>
                           {hasRes ? (
                             <div style={{ fontSize: 13, paddingLeft: 13, marginTop: 8, lineHeight: 1.45 }}>
                               {res.url ? (
@@ -2233,7 +2362,7 @@ function CareerEngineCard({
         </div>
       </div>
 
-      <div style={{ padding: "0 32px 24px", background: RS.bgBase }}>
+      <div style={{ padding: "0 32px 28px", background: "transparent" }}>
         <button
           type="button"
           onClick={() => {
@@ -2246,13 +2375,13 @@ function CareerEngineCard({
           disabled={optimizing && isPro}
           style={{
             width: "100%",
-            padding: "14px 20px",
-            borderRadius: 12,
-            border: `1px solid ${rsAlpha(RS.indigo, 0.4)}`,
-            background: rsAlpha(RS.indigo, 0.12),
-            color: RS.indigo,
-            fontSize: 15,
-            fontWeight: 500,
+            padding: "16px 22px",
+            borderRadius: 14,
+            border: "none",
+            background: `linear-gradient(135deg, ${RS.indigo}, #a855f7)`,
+            color: "#0f172a",
+            fontSize: 16,
+            fontWeight: 900,
             cursor: optimizing && isPro ? "wait" : "pointer",
             fontFamily: RS.fontUi,
             display: "flex",
@@ -2260,19 +2389,24 @@ function CareerEngineCard({
             justifyContent: "center",
             gap: 10,
             opacity: optimizing && isPro ? 0.75 : 1,
+            boxShadow: `0 8px 32px ${rsAlpha(RS.indigo, 0.4)}`,
+            transition: "transform 0.2s ease, box-shadow 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            if (e.currentTarget.disabled) return;
+            e.currentTarget.style.transform = "translateY(-2px)";
+            e.currentTarget.style.boxShadow = `0 12px 40px ${rsAlpha(RS.indigo, 0.5)}`;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "none";
+            e.currentTarget.style.boxShadow = `0 8px 32px ${rsAlpha(RS.indigo, 0.4)}`;
           }}
         >
           {optimizing && isPro ? <Loader2 size={18} style={{ animation: "spin 0.8s linear infinite" }} /> : <Wand2 size={18} />}
-          {!isPro
-            ? lang === "TR"
-              ? "Fix My CV — Pro ile aç"
-              : "Fix My CV — unlock with Pro"
-            : lang === "TR"
-              ? "Fix My CV"
-              : "Fix My CV"}
+          {!isPro ? t.fixMyCvUnlock : t.fixMyCvRun}
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -2287,7 +2421,7 @@ const translations = {
     analyzeBtn: "Analyze My CV Free",
     viewDashboard: "View Dashboard",
     checkFit: "Check My Fit",
-    optimizeCV: "👉 Fix My CV",
+    optimizeCV: "👉 Take action on your CV",
     learningRoadmap: "Learning Roadmap",
     pasteCv: "Paste your CV text here...",
     pasteJd: "Paste the job description here...",
@@ -2340,7 +2474,7 @@ const translations = {
     product: "Product",
     recentAnalyses: "Recent Analyses",
     allSystemsOp: "All systems operational",
-    applyFix: "Apply Fix",
+    applyFix: "Take action →",
     applying: "Applying...",
     fixApplied: "Fix Applied ✓",
     copyFix: "Copy",
@@ -2423,8 +2557,8 @@ const translations = {
     detectedSectorLabel: "Detected sector",
     sectorOverrideHint: "Override (optional)",
     orPasteLinkHint: "or paste a job URL below",
-    finalVerdict: "FINAL VERDICT",
-    alignmentScore: "ALIGNMENT SCORE",
+    finalVerdict: "Verdict",
+    alignmentScore: "Alignment score",
     rejectionRisk: "Rejection Risk",
     confidenceLabel: "Confidence",
     recruiterView: "Recruiter view",
@@ -2456,11 +2590,11 @@ const translations = {
     detectedInCv: "Detected in your CV",
     unlockProArrow: "Unlock with Pro →",
     doThisNext: "Do this next",
-    doThisNextLeverage: "Highest-leverage move: ship proof recruiters can verify — numbers, a link, a cert, or a scoped project — not vague self-improvement.",
+    doThisNextLeverage: "Ship proof a recruiter can verify in 10 seconds: numbers, a link, a cert, a repo — not vibes.",
     fixScoreImpactApprox: "Fixing this can increase your score by about +{pts} points.",
     scoreVsLastRun: "vs last analysis: {delta} (was {prior})",
-    recruiterBluntBanner: "Specific screen-out read — not pep talk. Weaknesses name the JD vs CV gap.",
-    seeFullPlan: "→ See full plan",
+    recruiterBluntBanner: "Cold read: where they stop reading. No pep talk — just the gap.",
+    seeFullPlan: "Start fixing this now →",
     primaryBlocker: "Primary blocker",
     fixFirst: "Fix first",
     priorityImportant: "Important",
@@ -2489,6 +2623,25 @@ const translations = {
     reanalysisScoreHint: "Compared with your previous Check Fit in this browser.",
     markFixComplete: "Mark this fix done",
     markFixDoneAria: "Mark fix {n} as done",
+    verdictBadTitle: "🚫 You will likely get rejected",
+    verdictBadSub:
+      "This is not about your potential — it's a mismatch with what this role filters for.",
+    verdictRiskyTitle: "⚠️ Risky apply",
+    verdictRiskySub: "You're close — but missing key signals recruiters scan for in the first pass.",
+    verdictCloseTitle: "⚡ Competitive — tighten proof",
+    verdictCloseSub: "You can fight for this pile. Ship one sharp proof line per gap, then send.",
+    verdictStrongTitle: "✅ Strong match",
+    verdictStrongSub: "You have a real shot at passing initial screening.",
+    startFixingNow: "Start fixing this now →",
+    takeActionBtn: "Take action →",
+    startThisStep: "Start this step →",
+    fixPointsIfDone: "🔥 +{pts} points if completed",
+    fixProgressApplied: "✅ Progress applied: +{pts}",
+    proofAddedToast: "Proof added",
+    proofTrustToast: "Recruiter trust signal captured",
+    proofImpactToast: "+{pts} impact applied to your progress score",
+    fixMyCvRun: "Take action on your CV →",
+    fixMyCvUnlock: "Take action — unlock with Pro →",
   },
   TR: {
     slogan: "AI Career Decision Engine",
@@ -2500,7 +2653,7 @@ const translations = {
     analyzeBtn: "CV'mi Ücretsiz Analiz Et",
     viewDashboard: "Paneli Görüntüle",
     checkFit: "Uyumu Kontrol Et",
-    optimizeCV: "👉 CV'mi düzelt",
+    optimizeCV: "👉 CV'de harekete geç",
     learningRoadmap: "Öğrenme Yol Haritası",
     pasteCv: "CV metninizi buraya yapıştırın...",
     pasteJd: "İş ilanını buraya yapıştırın...",
@@ -2553,7 +2706,7 @@ const translations = {
     product: "Ürün",
     recentAnalyses: "Son Analizler",
     allSystemsOp: "Tüm sistemler çalışıyor",
-    applyFix: "Düzeltmeyi Uygula",
+    applyFix: "Harekete geç →",
     applying: "Uygulanıyor...",
     fixApplied: "Uygulandı ✓",
     copyFix: "Kopyala",
@@ -2636,8 +2789,8 @@ const translations = {
     detectedSectorLabel: "Algılanan sektör",
     sectorOverrideHint: "Manuel düzeltme (isteğe bağlı)",
     orPasteLinkHint: "veya iş ilanı linkini yapıştırın",
-    finalVerdict: "FINAL KARAR",
-    alignmentScore: "HİZALAMA SKORU",
+    finalVerdict: "Karar",
+    alignmentScore: "Uyum skoru",
     rejectionRisk: "Elenme Riski",
     confidenceLabel: "Güven",
     recruiterView: "Recruiter Görüşü",
@@ -2669,11 +2822,11 @@ const translations = {
     detectedInCv: "CV'nizde tespit edilen",
     unlockProArrow: "Pro ile aç →",
     doThisNext: "Önce bunu yap",
-    doThisNextLeverage: "En yüksek kaldıraçlı hamle: recruiter’ın doğrulayabileceği kanıt — rakam, link, sertifika veya kapsamlı küçük proje — belirsiz “kendini geliştir” değil.",
+    doThisNextLeverage: "Recruiter 10 saniyede doğrulayacağı kanıt: rakam, link, sertifika, repo — vibe değil.",
     fixScoreImpactApprox: "Bunu düzeltmek skorunuza yaklaşık +{pts} puan ekleyebilir.",
     scoreVsLastRun: "Son analize göre: {delta} (önceki: {prior})",
-    recruiterBluntBanner: "Net eleme okuması — motivasyon değil. Zayıflıklar ilan–CV uyumsuzluğunu adlandırır.",
-    seeFullPlan: "→ Tam planı gör",
+    recruiterBluntBanner: "Soğuk okuma: nerede okumayı keser. Motivasyon değil — boşluk.",
+    seeFullPlan: "Şimdi düzeltmeye başla →",
     primaryBlocker: "Birincil engel",
     fixFirst: "Önce bunu düzelt",
     priorityImportant: "Önemli",
@@ -2702,11 +2855,30 @@ const translations = {
     reanalysisScoreHint: "Bu tarayıcıdaki önceki Uyumu Kontrol Et ile karşılaştırma.",
     markFixComplete: "Bu düzeltmeyi tamamlandı işaretle",
     markFixDoneAria: "{n}. düzeltmeyi tamamlandı olarak işaretle",
+    verdictBadTitle: "🚫 Büyük ihtimalle elenirsin",
+    verdictBadSub:
+      "Bu senin potansiyelin değil — bu rolün filtresiyle uyum eksikliği.",
+    verdictRiskyTitle: "⚠️ Riskli başvuru",
+    verdictRiskySub: "Yakınsın — ama recruiter'ın ilk turda aradığı kritik sinyaller eksik.",
+    verdictCloseTitle: "⚡ Rekabetçi — kanıtı sıkılaştır",
+    verdictCloseSub: "Bu yığında savaşabilirsin. Her boşluk için tek net kanıt satırı, sonra gönder.",
+    verdictStrongTitle: "✅ Güçlü eşleşme",
+    verdictStrongSub: "İlk elemeden geçme şansın gerçek.",
+    startFixingNow: "Şimdi düzeltmeye başla →",
+    takeActionBtn: "Harekete geç →",
+    startThisStep: "Bu adımla başla →",
+    fixPointsIfDone: "🔥 Tamamlarsan +{pts} puan",
+    fixProgressApplied: "✅ İlerleme işlendi: +{pts}",
+    proofAddedToast: "Kanıt eklendi",
+    proofTrustToast: "Recruiter güven sinyali kaydedildi",
+    proofImpactToast: "İlerleme skoruna +{pts} etki uygulandı",
+    fixMyCvRun: "CV'de harekete geç →",
+    fixMyCvUnlock: "Harekete geç — Pro ile aç →",
   },
 };
 
 const T = {
-  bg: "#060910",
+  bg: "#020617",
   bgCard: "rgba(255,255,255,0.03)",
   bgCardHover: "rgba(255,255,255,0.06)",
   border: "rgba(255,255,255,0.08)",
@@ -2722,13 +2894,13 @@ const T = {
 const globalStyles = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: ${T.bg}; font-family: 'DM Sans', sans-serif; color: ${T.text}; -webkit-font-smoothing: antialiased; }
+  body { background: linear-gradient(165deg, #020617 0%, #0f172a 45%, #0a0f1c 100%); background-attachment: fixed; font-family: 'DM Sans', sans-serif; color: ${T.text}; -webkit-font-smoothing: antialiased; }
   .hf-btn-primary { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; background: ${T.blue}; border: none; border-radius: 10px; cursor: pointer; color: white; font-weight: 600; font-size: 15px; font-family: 'DM Sans', sans-serif; transition: all 0.2s ease; }
   .hf-btn-primary:hover { background: #2563eb; box-shadow: 0 0 30px ${T.blueGlow}; transform: translateY(-1px); }
   .hf-btn-ghost { display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; background: transparent; border: 1px solid ${T.border}; border-radius: 10px; cursor: pointer; color: ${T.textSub}; font-weight: 500; font-size: 14px; font-family: 'DM Sans', sans-serif; transition: all 0.2s ease; }
   .hf-btn-ghost:hover { border-color: rgba(255,255,255,0.2); color: white; background: rgba(255,255,255,0.04); }
-  .hf-card { background: ${T.bgCard}; border: 1px solid ${T.border}; border-radius: 16px; transition: all 0.25s ease; }
-  .hf-card:hover { background: ${T.bgCardHover}; border-color: rgba(255,255,255,0.12); }
+  .hf-card { background: rgba(17,24,39,0.72); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, background 0.22s ease; box-shadow: 0 18px 50px rgba(0,0,0,0.35); }
+  .hf-card:hover { background: rgba(30,41,59,0.85); border-color: rgba(255,255,255,0.14); transform: translateY(-3px); box-shadow: 0 24px 60px rgba(0,0,0,0.45); }
   .hf-feature-card { background: ${T.bgCard}; border: 1px solid ${T.border}; border-radius: 20px; padding: 32px; transition: all 0.3s ease; position: relative; overflow: hidden; }
   .hf-feature-card:hover { background: ${T.bgCardHover}; border-color: rgba(59,130,246,0.2); transform: translateY(-4px); box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px ${T.blueGlow}; }
   .hf-input { width: 100%; padding: 13px 16px; border-radius: 10px; border: 1px solid ${T.border}; background: rgba(255,255,255,0.03); color: white; outline: none; font-family: 'DM Sans', sans-serif; font-size: 14px; transition: border-color 0.2s; }
@@ -2752,7 +2924,16 @@ const globalStyles = `
 `;
 
 const styles = {
-  page: { minHeight: "100vh", width: "100%", maxWidth: "none", margin: 0, overflowX: "hidden", background: T.bg, color: T.text, fontFamily: "'DM Sans', sans-serif" },
+  page: {
+    minHeight: "100vh",
+    width: "100%",
+    maxWidth: "none",
+    margin: 0,
+    overflowX: "hidden",
+    background: "linear-gradient(165deg, #020617 0%, #0f172a 50%, #0c1222 100%)",
+    color: T.text,
+    fontFamily: "'DM Sans', sans-serif",
+  },
   container: { maxWidth: "1500px", margin: "0 auto", padding: "0 24px", width: "100%" },
 };
 
@@ -2875,47 +3056,65 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
   const dLbl = { fontSize: 11, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, fontFamily: RS.fontUi };
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      whileHover={{ y: -2 }}
       style={{
         border: `1px solid ${RS.border}`,
-        borderRadius: 12,
-        background: RS.bgBase,
-        marginBottom: 16,
+        borderRadius: 20,
+        background: RS.pageGradient,
+        marginBottom: 24,
         overflow: "hidden",
         fontFamily: RS.fontUi,
+        boxShadow: `0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px ${rsAlpha(RS.indigo, 0.06)}`,
       }}
     >
       {scoreFv ? (
         <>
-          <div style={{ padding: "24px 32px", background: RS.bgSurface, borderBottom: `1px solid ${RS.border}` }}>
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 24, alignItems: "flex-start" }}>
-              <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flex: "1 1 220px", minWidth: 0 }}>
+          <div style={{ padding: "28px 32px", background: rsAlpha(RS.bgSurface, 0.92), borderBottom: `1px solid ${RS.border}` }}>
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 28, alignItems: "flex-start" }}>
+              <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flex: "1 1 240px", minWidth: 0 }}>
                 <div
                   style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: 12,
+                    width: 56,
+                    height: 56,
+                    borderRadius: 16,
                     display: "grid",
                     placeItems: "center",
                     flexShrink: 0,
-                    fontSize: 22,
-                    fontWeight: 500,
+                    fontSize: 28,
+                    fontWeight: 800,
                     color: vc,
-                    background: rsAlpha(vc, 0.12),
-                    border: `1px solid ${rsAlpha(vc, 0.25)}`,
+                    background: rsAlpha(vc, 0.14),
+                    border: `1px solid ${rsAlpha(vc, 0.35)}`,
+                    boxShadow: `0 0 24px ${rsAlpha(vc, 0.18)}`,
                   }}
                 >
                   {scoreFv.verdictIcon || scoreFv.icon}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ ...dLbl, marginBottom: 6 }}>{t.finalVerdict}</div>
-                  <div style={{ fontSize: 26, fontWeight: 600, color: vc, lineHeight: 1.2 }}>{scoreFv.title}</div>
-                  <p style={{ margin: "12px 0 0", fontSize: 14, lineHeight: 1.65, color: RS.textSecondary, fontWeight: 400 }}>{scoreFv.explanation}</p>
+                  <div style={{ ...dLbl, marginBottom: 8 }}>{t.finalVerdict}</div>
+                  <div style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 900, color: vc, lineHeight: 1.1, letterSpacing: "-0.02em" }}>{scoreFv.title}</div>
+                  <p style={{ margin: "12px 0 0", fontSize: 15, lineHeight: 1.7, color: RS.textSecondary, fontWeight: 500 }}>{scoreFv.explanation}</p>
                 </div>
               </div>
-              <div style={{ textAlign: "right", flexShrink: 0 }}>
-                <div style={{ ...dLbl, marginBottom: 6 }}>{t.alignmentScore}</div>
-                <div style={{ fontFamily: RS.fontMono, fontSize: 48, fontWeight: 500, color: vc, lineHeight: 1.05 }}>{alignmentScore}</div>
+              <div style={{ textAlign: "right", flexShrink: 0, minWidth: 110 }}>
+                <div style={{ ...dLbl, marginBottom: 8 }}>{t.alignmentScore}</div>
+                <div
+                  style={{
+                    fontFamily: RS.fontMono,
+                    fontSize: "clamp(48px, 6vw, 64px)",
+                    fontWeight: 900,
+                    color: vc,
+                    lineHeight: 0.95,
+                    letterSpacing: "-0.03em",
+                    textShadow: `0 0 40px ${rsAlpha(vc, 0.32)}`,
+                  }}
+                >
+                  {alignmentScore}
+                </div>
               </div>
             </div>
           </div>
@@ -2969,7 +3168,7 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
           <div style={{ fontSize: 15, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.45 }}>{data.oneAction}</div>
         </div>
       ) : null}
-    </div>
+    </motion.div>
   );
 
 }
