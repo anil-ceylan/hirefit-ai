@@ -435,55 +435,55 @@ function ImpactProjectionPanel({ projection, lang }) {
   return (
     <div
       style={{
-        marginTop: 14,
-        padding: "18px 20px",
-        borderRadius: 16,
-        border: "1px solid rgba(52,211,153,0.35)",
-        background: "linear-gradient(135deg, rgba(16,185,129,0.14), rgba(59,130,246,0.08), rgba(212,175,55,0.06))",
-        boxShadow: "0 0 32px rgba(52,211,153,0.12)",
+        marginTop: 18,
+        padding: "22px 22px",
+        borderRadius: 18,
+        border: "1px solid rgba(52,211,153,0.4)",
+        background: "linear-gradient(135deg, rgba(16,185,129,0.18), rgba(59,130,246,0.1), rgba(212,175,55,0.08))",
+        boxShadow: "0 0 40px rgba(52,211,153,0.16)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <TrendingUp size={18} color="#34d399" />
-        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.14em", color: "#6ee7b7" }}>
-          {t.impactProjection}
-        </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        <TrendingUp size={20} color="#34d399" />
+        <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.16em", color: "#6ee7b7" }}>{t.impactProjection}</div>
       </div>
-      <div style={{ fontSize: 11, fontWeight: 800, color: "#a7f3d0", letterSpacing: "0.06em", marginBottom: 8 }}>
-        {t.nowAfter}
+      <div style={{ fontSize: 15, fontWeight: 900, color: "#fef08a", marginBottom: 8, letterSpacing: "-0.01em" }}>
+        {t.impactFixUnlock.replace("{pts}", String(delta))}
       </div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: "#cbd5e1", marginBottom: 14, lineHeight: 1.5 }}>{t.impactMovesCloser.replace("{pts}", String(delta))}</div>
+      <div style={{ fontSize: 10, fontWeight: 800, color: "#a7f3d0", letterSpacing: "0.08em", marginBottom: 10 }}>{t.nowAfter}</div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap", marginBottom: 12 }}>
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            {t.currentScore}
-          </div>
-          <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 34, fontWeight: 800, color: "#fca5a5" }}>{current}</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" }}>{t.currentScore}</div>
+          <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 38, fontWeight: 800, color: "#fca5a5" }}>{current}</div>
         </div>
-        <div style={{ fontSize: 26, color: "#64748b", fontWeight: 300, padding: "0 4px" }}>→</div>
+        <motion.div
+          animate={{ x: [0, 6, 0], opacity: [0.7, 1, 0.7] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+          style={{ fontSize: 28, color: "#94a3b8", fontWeight: 300, padding: "0 6px" }}
+        >
+          →
+        </motion.div>
         <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" }}>
-            {t.projectedScore}
-          </div>
-          <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 34, fontWeight: 800, color: "#6ee7b7" }}>{projected}</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" }}>{t.projectedScore}</div>
+          <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 38, fontWeight: 800, color: "#6ee7b7" }}>{projected}</div>
         </div>
         <div
           style={{
-            padding: "10px 18px",
+            padding: "12px 20px",
             borderRadius: 999,
             background: "linear-gradient(90deg, #d4af37, #f0d060)",
             color: "#0a0a0a",
             fontWeight: 900,
-            fontSize: 16,
-            boxShadow: "0 4px 20px rgba(212,175,55,0.35)",
+            fontSize: 17,
+            boxShadow: "0 4px 24px rgba(212,175,55,0.45)",
           }}
         >
           +{delta}
         </div>
       </div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
-        {t.scoreIncrease}
-      </div>
-      <p style={{ margin: 0, fontSize: 14, color: "#e2e8f0", lineHeight: 1.6, fontWeight: 600 }}>{narrative}</p>
+      <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>{t.scoreIncrease}</div>
+      <p style={{ margin: 0, fontSize: 14, color: "#e2e8f0", lineHeight: 1.65, fontWeight: 600 }}>{narrative}</p>
     </div>
   );
 }
@@ -592,6 +592,39 @@ function normalizeShareVerdictLabel(verdictLabel, lang) {
   return s;
 }
 
+function scoreHeroLines(scoreRounded, lang) {
+  const tk = translations[isUiTurkish(lang) ? "TR" : "EN"];
+  if (!Number.isFinite(scoreRounded)) return null;
+  if (scoreRounded < 60) {
+    return { big: tk.heroStopBig, line1: tk.heroStopLine1, line2: tk.heroStopLine2 };
+  }
+  if (scoreRounded < 75) {
+    return { big: tk.heroRiskBig, line1: tk.heroRiskLine1, line2: tk.heroRiskLine2 };
+  }
+  if (scoreRounded < 85) {
+    return { big: tk.heroCloseBig, line1: tk.heroCloseLine1, line2: tk.heroCloseLine2 };
+  }
+  return { big: tk.heroStrongBig, line1: tk.heroStrongLine1, line2: tk.heroStrongLine2 };
+}
+
+function scoreInsightBlock(scoreRounded, lang) {
+  const tk = translations[isUiTurkish(lang) ? "TR" : "EN"];
+  if (!Number.isFinite(scoreRounded)) return { main: "", bench: "" };
+  if (scoreRounded < 60) return { main: tk.scoreInsightLow, bench: tk.scoreInsightBench };
+  if (scoreRounded < 75) return { main: tk.scoreInsightMid, bench: tk.scoreInsightBench };
+  return { main: tk.scoreInsightHigh, bench: tk.scoreInsightBench };
+}
+
+function stepCtaFromText(step, lang) {
+  const tk = translations[isUiTurkish(lang) ? "TR" : "EN"];
+  const s = String(step || "");
+  const url = s.match(/https?:\/\/[^\s)\]}>]+/i)?.[0] || null;
+  if (url) return { label: tk.stepCtaOpenLink, href: url };
+  if (/github/i.test(s)) return { label: tk.stepCtaGithub, href: null };
+  if (/apply|annotation|başvur|işe|job/i.test(s)) return { label: tk.stepCtaApply, href: null };
+  return { label: tk.startThisStep, href: null };
+}
+
 function ResultsBulletRow({ sentiment, children }) {
   const dot =
     sentiment === "positive"
@@ -602,7 +635,7 @@ function ResultsBulletRow({ sentiment, children }) {
           ? RS.red
           : RS.indigo;
   return (
-    <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 10 }}>
+    <div style={{ display: "flex", gap: 8, alignItems: "flex-start", marginBottom: 14 }}>
       <span style={{ width: 5, height: 5, borderRadius: "50%", background: dot, flexShrink: 0, marginTop: 8 }} />
       <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.6, fontFamily: RS.fontUi }}>{children}</div>
     </div>
@@ -1225,6 +1258,39 @@ function CareerEngineCard({
   const keywordsDisplay = (Array.isArray(topKeywords) && topKeywords.length > 0 ? topKeywords : data.ATS?.top_keywords) || [];
   const gapActionNext = isPro ? t.emptyGapNextPro : t.emptyGapNextFree;
   const unlockLabel = t.unlockProArrow;
+  const scoreRounded =
+    score != null && Number.isFinite(Number(score)) ? Math.round(Number(score)) : NaN;
+  const hero = Number.isFinite(scoreRounded) ? scoreHeroLines(scoreRounded, lang) : null;
+  const scoreInsights = Number.isFinite(scoreRounded)
+    ? scoreInsightBlock(scoreRounded, lang)
+    : { main: "", bench: "" };
+  const ptsGainedProg =
+    scoreNumeric != null && dynamicProgressScore != null ? Math.max(0, dynamicProgressScore - scoreNumeric) : 0;
+  const completedFixCount = execState.completed.filter(Boolean).length;
+  const firstOpenFixIdx = execState.completed.findIndex((c) => !c);
+  const nextActionText =
+    firstOpenFixIdx >= 0
+      ? (() => {
+          const fx = planFixes[firstOpenFixIdx];
+          const st = fx?.steps?.[0];
+          if (st && String(st).trim()) return String(st).trim();
+          if (fx?.issue) return humanizeUserFacingReason(String(fx.issue), lang);
+          return lang === "TR" ? "Aksiyon planına git" : "Open your action plan";
+        })()
+      : lang === "TR"
+        ? "Check Fit'i tekrar çalıştır — kazanımları kilitle"
+        : "Run Check Fit again to lock in gains";
+  const progressFillTo70 = (() => {
+    const cur = dynamicProgressScore ?? scoreNumeric;
+    if (cur == null || !Number.isFinite(Number(cur))) return 0;
+    return Math.min(100, Math.round((Number(cur) / 70) * 100));
+  })();
+  const gapTo70Steps = (() => {
+    const cur = dynamicProgressScore ?? scoreNumeric;
+    if (cur == null || !Number.isFinite(Number(cur))) return 0;
+    if (Number(cur) >= 70) return 0;
+    return Math.max(1, Math.ceil((70 - Number(cur)) / 5));
+  })();
   const tabSpecs = [
     { id: "recruiter", label: t.recruiterView },
     { id: "deep", label: t.deepAnalysis },
@@ -1242,12 +1308,12 @@ function CareerEngineCard({
     fontFamily: RS.fontUi,
   };
   const sectionTitleStyle = {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 800,
     letterSpacing: "0.06em",
     textTransform: "uppercase",
     color: RS.textSecondary,
-    marginBottom: 14,
+    marginBottom: 18,
     fontFamily: RS.fontUi,
   };
 
@@ -1268,7 +1334,7 @@ function CareerEngineCard({
         transition: "box-shadow 0.22s ease, transform 0.22s ease",
       }}
     >
-      <div style={{ padding: "28px 32px", background: rsAlpha(RS.bgSurface, 0.92), borderBottom: `1px solid ${RS.border}` }}>
+      <div style={{ padding: "36px 36px 32px", background: rsAlpha(RS.bgSurface, 0.92), borderBottom: `1px solid ${RS.border}` }}>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 28 }}>
           <div style={{ flex: "1 1 280px", minWidth: 0 }}>
             <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
@@ -1292,12 +1358,37 @@ function CareerEngineCard({
                 {fv.verdictIcon || fv.icon}
               </div>
               <div style={{ minWidth: 0, paddingTop: 2 }}>
-                <div style={{ ...labelStyle, marginBottom: 8 }}>{t.finalVerdict}</div>
-                <div style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 900, color: vc, lineHeight: 1.12, letterSpacing: "-0.02em" }}>{fv.title}</div>
-                <p style={{ margin: "12px 0 0", fontSize: 15, fontWeight: 500, lineHeight: 1.65, color: RS.textSecondary, maxWidth: 560 }}>{fv.explanation}</p>
+                <div style={{ ...labelStyle, marginBottom: 10 }}>{t.finalVerdict}</div>
+                {hero ? (
+                  <>
+                    <div
+                      style={{
+                        fontSize: "clamp(38px, 5.5vw, 56px)",
+                        fontWeight: 900,
+                        color: vc,
+                        lineHeight: 1.05,
+                        letterSpacing: "-0.03em",
+                      }}
+                    >
+                      {hero.big}
+                    </div>
+                    <p style={{ margin: "16px 0 0", fontSize: 18, fontWeight: 700, color: RS.textPrimary, lineHeight: 1.55, maxWidth: 560 }}>
+                      {hero.line1}
+                    </p>
+                    <p style={{ margin: "12px 0 0", fontSize: 16, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.65, maxWidth: 560 }}>
+                      {hero.line2}
+                    </p>
+                    <p style={{ margin: "14px 0 0", fontSize: 14, fontWeight: 500, lineHeight: 1.65, color: RS.textMuted, maxWidth: 560 }}>{fv.explanation}</p>
+                  </>
+                ) : (
+                  <>
+                    <div style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 900, color: vc, lineHeight: 1.12, letterSpacing: "-0.02em" }}>{fv.title}</div>
+                    <p style={{ margin: "12px 0 0", fontSize: 15, fontWeight: 500, lineHeight: 1.65, color: RS.textSecondary, maxWidth: 560 }}>{fv.explanation}</p>
+                  </>
+                )}
               </div>
             </div>
-            <p style={{ margin: "16px 0 0", paddingLeft: 74, fontSize: 14, fontWeight: 400, lineHeight: 1.75, color: RS.textMuted }}>{oneLineSummary}</p>
+            <p style={{ margin: "18px 0 0", paddingLeft: 74, fontSize: 14, fontWeight: 400, lineHeight: 1.75, color: RS.textMuted }}>{oneLineSummary}</p>
             {biggest ? (
               <div
                 style={{
@@ -1362,21 +1453,55 @@ function CareerEngineCard({
               </div>
             ) : null}
           </div>
-          <div style={{ textAlign: "right", flexShrink: 0, minWidth: 120 }}>
+          <div style={{ textAlign: "right", flexShrink: 0, minWidth: 140 }}>
             <div style={{ ...labelStyle, marginBottom: 8, opacity: 0.95 }}>{t.alignmentScore}</div>
-            <div
+            <motion.div
+              animate={{ scale: [1, 1.02, 1] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
               style={{
                 fontFamily: RS.fontMono,
-                fontSize: "clamp(52px, 7vw, 72px)",
+                fontSize: "clamp(56px, 7.5vw, 80px)",
                 fontWeight: 900,
                 color: vc,
                 lineHeight: 0.95,
                 letterSpacing: "-0.03em",
-                textShadow: `0 0 48px ${rsAlpha(vc, 0.35)}, 0 0 80px ${rsAlpha(vc, 0.12)}`,
+                textShadow: `0 0 56px ${rsAlpha(vc, 0.45)}, 0 0 100px ${rsAlpha(vc, 0.18)}`,
               }}
             >
               {score ?? "—"}
-            </div>
+            </motion.div>
+            {scoreInsights.main ? (
+              <div
+                style={{
+                  marginTop: 12,
+                  marginLeft: "auto",
+                  maxWidth: 260,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  lineHeight: 1.5,
+                  color: RS.textSecondary,
+                  textAlign: "right",
+                }}
+              >
+                {scoreInsights.main}
+              </div>
+            ) : null}
+            {scoreInsights.bench ? (
+              <div
+                style={{
+                  marginTop: 8,
+                  marginLeft: "auto",
+                  maxWidth: 260,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  lineHeight: 1.45,
+                  color: RS.textMuted,
+                  textAlign: "right",
+                }}
+              >
+                {scoreInsights.bench}
+              </div>
+            ) : null}
             {scoreRunProgress?.delta != null && scoreRunProgress?.prior != null ? (
               <div
                 style={{
@@ -1468,6 +1593,58 @@ function CareerEngineCard({
 
       <div
         style={{
+          padding: "22px 32px 26px",
+          borderBottom: `1px solid ${RS.border}`,
+          background: `linear-gradient(180deg, ${rsAlpha(RS.indigo, 0.06)} 0%, ${rsAlpha(RS.bgSurface, 0.85)} 100%)`,
+        }}
+      >
+        <div style={{ ...sectionTitleStyle, marginBottom: 12 }}>{t.yourProgressTitle}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 8, fontFamily: RS.fontMono }}>
+          {t.yourProgressPoints.replace("{pts}", String(ptsGainedProg))}
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.55, marginBottom: 10, maxWidth: 640 }}>
+          {t.yourProgressNext.replace("{action}", nextActionText)}
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: RS.textMuted, marginBottom: 8, letterSpacing: "0.04em" }}>
+          {t.fixesCompletedCount.replace("{done}", String(completedFixCount)).replace("{total}", String(planFixes.length || 0))}
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: RS.textMuted, marginBottom: 6, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+          {t.yourProgressBarLabel}
+        </div>
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 480,
+            height: 10,
+            borderRadius: 999,
+            background: rsAlpha(RS.textMuted, 0.2),
+            overflow: "hidden",
+            border: `1px solid ${RS.borderSubtle}`,
+          }}
+        >
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${progressFillTo70}%` }}
+            transition={{ duration: 0.7, ease: "easeOut" }}
+            style={{
+              height: "100%",
+              borderRadius: 999,
+              background: `linear-gradient(90deg, ${RS.indigo}, ${RS.green})`,
+              boxShadow: `0 0 20px ${rsAlpha(RS.green, 0.35)}`,
+            }}
+          />
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: RS.amber, marginTop: 12, lineHeight: 1.45, maxWidth: 560 }}>
+          {(dynamicProgressScore ?? scoreNumeric) != null && Number(dynamicProgressScore ?? scoreNumeric) >= 70
+            ? t.yourProgressAllDone
+            : gapTo70Steps > 0
+              ? t.yourProgressNudge.replace("{n}", String(gapTo70Steps))
+              : null}
+        </div>
+      </div>
+
+      <div
+        style={{
           position: "sticky",
           top: 0,
           zIndex: 6,
@@ -1503,8 +1680,26 @@ function CareerEngineCard({
         </div>
       </div>
 
-      <div style={{ padding: "28px 36px", background: "transparent", minHeight: 200 }}>
+      <div style={{ padding: "32px 40px 36px", background: "transparent", minHeight: 200 }}>
         <div style={{ display: activeTab === "recruiter" ? "block" : "none" }}>
+          <div
+            style={{
+              marginBottom: 22,
+              padding: "18px 20px",
+              borderRadius: 16,
+              border: `1px solid ${rsAlpha(RS.red, 0.22)}`,
+              background: `linear-gradient(135deg, ${rsAlpha(RS.red, 0.1)}, ${rsAlpha(RS.amber, 0.06)})`,
+              boxShadow: `0 12px 40px ${rsAlpha(RS.red, 0.08)}`,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 900, color: RS.red, letterSpacing: "0.04em", marginBottom: 10 }}>{t.recruiterRealLead}</div>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: RS.textPrimary, lineHeight: 1.6, marginBottom: 12 }}>{t.recruiterRealIntro}</p>
+            <div style={{ fontSize: 14, fontWeight: 600, color: RS.textSecondary, lineHeight: 1.75 }}>
+              <div>{t.recruiterLensLine1}</div>
+              <div>{t.recruiterLensLine2}</div>
+              <div>{t.recruiterLensLine3}</div>
+            </div>
+          </div>
           {data.Recruiter?.reasoning ? (
             <>
               <div style={sectionTitleStyle}>{t.whatTheyThink}</div>
@@ -1590,6 +1785,7 @@ function CareerEngineCard({
               <div style={{ fontSize: 14, fontFamily: RS.fontMono, fontWeight: 800, color: RS.green, marginTop: 8 }}>
                 {t.proofImpactToast.replace("{pts}", String(uxToast.pts))}
               </div>
+              <div style={{ fontSize: 12, fontWeight: 900, color: RS.amber, marginTop: 8, letterSpacing: "0.04em" }}>{t.impactUnlockedLine}</div>
             </motion.div>
           ) : null}
           {actionPlan.priority_callout ? (
@@ -1785,18 +1981,25 @@ function CareerEngineCard({
                             </>
                           ) : null}
                           {execState.completed[i] ? (
-                            <div
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.96 }}
+                              animate={{ opacity: 1, scale: 1 }}
                               style={{
-                                fontSize: 13,
-                                fontWeight: 900,
-                                color: RS.green,
                                 marginTop: 10,
-                                fontFamily: RS.fontUi,
-                                letterSpacing: "-0.01em",
+                                padding: "12px 14px",
+                                borderRadius: 12,
+                                border: `1px solid ${rsAlpha(RS.green, 0.35)}`,
+                                background: rsAlpha(RS.green, 0.08),
+                                boxShadow: `0 0 24px ${rsAlpha(RS.green, 0.25)}`,
                               }}
                             >
-                              {t.fixProgressApplied.replace("{pts}", String(impPts))}
-                            </div>
+                              <div style={{ fontSize: 13, fontWeight: 900, color: RS.green, fontFamily: RS.fontUi, letterSpacing: "-0.01em" }}>
+                                {t.fixProgressApplied.replace("{pts}", String(impPts))}
+                              </div>
+                              <div style={{ fontSize: 12, fontWeight: 800, color: RS.amber, marginTop: 6, letterSpacing: "0.02em" }}>
+                                {t.impactUnlockedLine}
+                              </div>
+                            </motion.div>
                           ) : null}
                           {f.steps && f.steps.length ? (
                             <>
@@ -1828,7 +2031,7 @@ function CareerEngineCard({
                                       : "";
                                   const stepVal = String(execState.stepProofs[i]?.[si] ?? "");
                                   const line = (
-                                    <div key={si} style={{ marginTop: si ? 10 : 0, paddingLeft: 13 }}>
+                                    <div key={si} id={`hf-step-${i}-${si}`} style={{ marginTop: si ? 10 : 0, paddingLeft: 13 }}>
                                       <div
                                         style={{
                                           fontSize: 13,
@@ -1953,6 +2156,44 @@ function CareerEngineCard({
                                           <span>{t.proofUploadFile}</span>
                                         </label>
                                       </div>
+                                      {(() => {
+                                        const cta = stepCtaFromText(step, lang);
+                                        const ctaStyle = {
+                                          marginTop: 12,
+                                          display: "inline-flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
+                                          padding: "8px 14px",
+                                          borderRadius: 10,
+                                          fontSize: 12,
+                                          fontWeight: 800,
+                                          fontFamily: RS.fontUi,
+                                          cursor: "pointer",
+                                          textDecoration: "none",
+                                          border: `1px solid ${rsAlpha(RS.indigo, 0.4)}`,
+                                          background: `linear-gradient(135deg, ${rsAlpha(RS.indigo, 0.22)}, ${rsAlpha(RS.indigo, 0.06)})`,
+                                          color: RS.textPrimary,
+                                          boxShadow: `0 4px 16px ${rsAlpha(RS.indigo, 0.15)}`,
+                                        };
+                                        return cta.href ? (
+                                          <a href={cta.href} target="_blank" rel="noopener noreferrer" style={ctaStyle}>
+                                            {cta.label}
+                                          </a>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            style={ctaStyle}
+                                            onClick={() => {
+                                              setActiveTab("plan");
+                                              window.requestAnimationFrame(() => {
+                                                document.getElementById(`hf-step-${i}-${si}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                                              });
+                                            }}
+                                          >
+                                            {cta.label}
+                                          </button>
+                                        );
+                                      })()}
                                     </div>
                                   );
                                   prev = next;
@@ -2642,6 +2883,40 @@ const translations = {
     proofImpactToast: "+{pts} impact applied to your progress score",
     fixMyCvRun: "Take action on your CV →",
     fixMyCvUnlock: "Take action — unlock with Pro →",
+    heroStopBig: "🚫 Stop.",
+    heroStopLine1: "If you apply to this role right now — you will get rejected.",
+    heroStopLine2: "Not because you're not good. Because you're playing the wrong game.",
+    heroRiskBig: "⚠️ Not safe yet.",
+    heroRiskLine1: "You're in the danger zone for first-pass screening.",
+    heroRiskLine2: "One sharp proof block per gap — then you're back in the fight.",
+    heroCloseBig: "⚡ In range.",
+    heroCloseLine1: "You're close to where hiring managers start saying yes more often.",
+    heroCloseLine2: "Tighten receipts: metrics, tools, outcomes — then hit send.",
+    heroStrongBig: "✅ Green light.",
+    heroStrongLine1: "You're in interview range for this posting.",
+    heroStrongLine2: "Polish noise, keep proof loud — don't talk yourself down.",
+    scoreInsightLow: "This is below the usual hiring bar for this posting.",
+    scoreInsightMid: "You're close — but not default-hire competitive yet.",
+    scoreInsightHigh: "You're in interview range.",
+    scoreInsightBench: "Most successful candidates here score above 70.",
+    yourProgressTitle: "Your progress",
+    yourProgressPoints: "You've gained +{pts} points so far",
+    yourProgressNext: "Next best move: {action}",
+    yourProgressBarLabel: "Path to interview range (70)",
+    yourProgressNudge: "Complete {n} more high-impact step(s) to cross 70.",
+    yourProgressAllDone: "You're past the 70 benchmark — keep shipping proof.",
+    recruiterRealLead: "Here's the real issue:",
+    recruiterRealIntro:
+      "Your CV doesn't scream what you actually built or shipped. From a recruiter's scan:",
+    recruiterLensLine1: "→ No proof of impact",
+    recruiterLensLine2: "→ No measurable outcomes",
+    recruiterLensLine3: "→ No obvious tools stack",
+    impactFixUnlock: "🔥 Fix this → unlock +{pts} points",
+    impactMovesCloser: "+{pts} moves you closer to interview range.",
+    stepCtaOpenLink: "Open link →",
+    stepCtaGithub: "Open GitHub guide →",
+    stepCtaApply: "Apply / pursue this →",
+    impactUnlockedLine: "Impact unlocked",
   },
   TR: {
     slogan: "AI Career Decision Engine",
@@ -2874,6 +3149,39 @@ const translations = {
     proofImpactToast: "İlerleme skoruna +{pts} etki uygulandı",
     fixMyCvRun: "CV'de harekete geç →",
     fixMyCvUnlock: "Harekete geç — Pro ile aç →",
+    heroStopBig: "🚫 Dur.",
+    heroStopLine1: "Şu an bu role başvurursan — büyük ihtimalle elenirsin.",
+    heroStopLine2: "Yeteneksiz olduğun için değil. Yanlış masada oynadığın için.",
+    heroRiskBig: "⚠️ Henüz güvenli değil.",
+    heroRiskLine1: "İlk tur eleme bölgesindesin.",
+    heroRiskLine2: "Her boşluk için tek net kanıt bloğu — sonra tekrar oyundasın.",
+    heroCloseBig: "⚡ Aralıktasın.",
+    heroCloseLine1: "İşe alımın daha sık evet dediği skora yakınsın.",
+    heroCloseLine2: "Kanıtı sıkılaştır: metrik, araç, sonuç — sonra gönder.",
+    heroStrongBig: "✅ Yeşil.",
+    heroStrongLine1: "Bu ilan için mülakat aralığındasın.",
+    heroStrongLine2: "Gürültüyü kes, kanıtı yükselt — kendini küçültme.",
+    scoreInsightLow: "Bu ilan için tipik işe alım barının altında.",
+    scoreInsightMid: "Yakınsın — ama henüz varsayılan aday seviyesinde değilsin.",
+    scoreInsightHigh: "Mülakat aralığındasın.",
+    scoreInsightBench: "Burada çoğu güçlü aday 70 üstü skorlar.",
+    yourProgressTitle: "İlerlemen",
+    yourProgressPoints: "Şu ana +{pts} puan kazandın",
+    yourProgressNext: "Sıradaki en iyi hamle: {action}",
+    yourProgressBarLabel: "Mülakat bandına yol (70)",
+    yourProgressNudge: "70'i geçmek için {n} yüksek etkili adım daha.",
+    yourProgressAllDone: "70 barını geçtin — kanıt göndermeye devam.",
+    recruiterRealLead: "Asıl mesele şu:",
+    recruiterRealIntro: "CV'n ne inşa ettiğini veya teslim ettiğini bağırmıyor. Recruiter taramasında:",
+    recruiterLensLine1: "→ Etki kanıtı yok",
+    recruiterLensLine2: "→ Ölçülebilir sonuç yok",
+    recruiterLensLine3: "→ Araç yığını net değil",
+    impactFixUnlock: "🔥 Bunu düzelt → +{pts} puan aç",
+    impactMovesCloser: "+{pts} seni mülakat bandına yaklaştırır.",
+    stepCtaOpenLink: "Linki aç →",
+    stepCtaGithub: "GitHub rehberi →",
+    stepCtaApply: "Başvur / takip et →",
+    impactUnlockedLine: "Etki açıldı",
   },
 };
 
