@@ -622,7 +622,7 @@ function stepCtaFromText(step, lang) {
   if (url) return { label: tk.stepCtaOpenLink, href: url };
   if (/github/i.test(s)) return { label: tk.stepCtaGithub, href: null };
   if (/apply|annotation|başvur|işe|job/i.test(s)) return { label: tk.stepCtaApply, href: null };
-  return { label: tk.startThisStep, href: null };
+  return { label: lang === "TR" ? "Start mission →" : "Start mission →", href: null };
 }
 
 function ResultsBulletRow({ sentiment, children }) {
@@ -1649,6 +1649,8 @@ function CareerEngineCard({
           padding: "22px 32px 26px",
           borderBottom: `1px solid ${RS.border}`,
           background: `linear-gradient(180deg, ${rsAlpha(RS.indigo, 0.06)} 0%, ${rsAlpha(RS.bgSurface, 0.85)} 100%)`,
+          boxShadow: scoreDeltaFloat ? `inset 0 0 34px ${rsAlpha(RS.green, 0.18)}` : "none",
+          transition: "box-shadow 0.45s ease",
         }}
       >
         <div style={{ ...sectionTitleStyle, marginBottom: 12 }}>{t.yourProgressTitle}</div>
@@ -1910,6 +1912,35 @@ function CareerEngineCard({
                   ) : null}
                 </div>
               ) : null}
+              {planFixes.length > 1 ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+                  {planFixes.map((_, idx) => {
+                    const done = !!completedSteps[idx];
+                    const active = idx === activeStepIndex && !done;
+                    return (
+                      <div key={`fix-line-${idx}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span
+                          style={{
+                            width: 20,
+                            height: 20,
+                            borderRadius: "50%",
+                            display: "grid",
+                            placeItems: "center",
+                            fontSize: 10,
+                            fontWeight: 900,
+                            color: done ? "#052e16" : active ? "#e0e7ff" : RS.textMuted,
+                            background: done ? RS.green : active ? RS.indigo : rsAlpha(RS.textMuted, 0.22),
+                            boxShadow: active ? `0 0 16px ${rsAlpha(RS.indigo, 0.45)}` : "none",
+                          }}
+                        >
+                          {idx + 1}
+                        </span>
+                        {idx < planFixes.length - 1 ? <span style={{ color: RS.textMuted, fontSize: 12 }}>→</span> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : null}
               {planFixes.map((f, i) => {
                 const sev = f.severity === "critical" || f.severity === "major" || f.severity === "minor" ? f.severity : "major";
                 const sevColor = sev === "critical" ? RS.red : sev === "major" ? RS.amber : RS.textMuted;
@@ -2039,7 +2070,11 @@ function CareerEngineCard({
                                   });
                                   setSuccessFlashFixIdx(i);
                                   window.setTimeout(() => setSuccessFlashFixIdx(-1), 750);
-                                  setScoreDeltaFloat(`+${impPts} points unlocked 🚀`);
+                                  setScoreDeltaFloat(
+                                    lang === "TR"
+                                      ? `+${impPts} puan — mülakat aralığına daha yakınsın`
+                                      : `+${impPts} points — you're now closer to interview range`
+                                  );
                                   window.setTimeout(() => setUxToast({ pts: impPts }), 0);
                                   window.setTimeout(() => {
                                     if (nextActive >= 0 && nextActive !== i) {
@@ -2149,9 +2184,17 @@ function CareerEngineCard({
                           ) : null}
                           {isCompletedFix ? (
                             <div style={{ fontSize: 12, color: RS.textSecondary, marginTop: 8, lineHeight: 1.45 }}>
-                              {lang === "TR"
-                                ? `+${impPts} → Recruiter artık etki kanıtını görüyor. ${planFixes[i + 1] ? `Sonraki adım: +${Math.max(1, Math.min(18, Math.round(Number(planFixes[i + 1]?.score_impact) || 0)))} domain credibility.` : ""}`
-                                : `+${impPts} → Recruiter now sees proof of impact. ${planFixes[i + 1] ? `Next step unlocks: +${Math.max(1, Math.min(18, Math.round(Number(planFixes[i + 1]?.score_impact) || 0)))} domain credibility.` : ""}`}
+                              <div style={{ fontSize: 11, fontWeight: 800, color: RS.green, marginBottom: 6 }}>
+                                {lang === "TR" ? "Ne değişti:" : "What changed:"}
+                              </div>
+                              <div>{lang === "TR" ? "✔ eylem kanıtı görünür oldu" : "✔ proof of action is now visible"}</div>
+                              <div>{lang === "TR" ? "✔ rol hizalaması güçlendi" : "✔ role alignment is stronger"}</div>
+                              <div>{lang === "TR" ? "✔ niyet sinyali netleşti" : "✔ intent signal is clearer"}</div>
+                              <div style={{ marginTop: 6 }}>
+                                {lang === "TR"
+                                  ? `+${impPts} etki açıldı. ${planFixes[i + 1] ? `Sonraki adım: +${Math.max(1, Math.min(18, Math.round(Number(planFixes[i + 1]?.score_impact) || 0)))} domain credibility.` : ""}`
+                                  : `+${impPts} impact unlocked. ${planFixes[i + 1] ? `Next step unlocks: +${Math.max(1, Math.min(18, Math.round(Number(planFixes[i + 1]?.score_impact) || 0)))} domain credibility.` : ""}`}
+                              </div>
                             </div>
                           ) : null}
                           {f.steps && f.steps.length ? (
@@ -3028,16 +3071,16 @@ const translations = {
     markFixDoneAria: "Mark fix {n} as done",
     verdictBadTitle: "🚫 You will likely get rejected",
     verdictBadSub:
-      "This is not about your potential — it's a mismatch with what this role filters for.",
+      "Reality check: this role still filters you out today. Recovery path: close the next 2 signal gaps and rerun.",
     verdictRiskyTitle: "⚠️ Risky apply",
-    verdictRiskySub: "You're close — but missing key signals recruiters scan for in the first pass.",
+    verdictRiskySub: "Reality check: still risky on first-pass scan. Recovery path: ship 1-2 proof lines and re-enter range.",
     verdictCloseTitle: "⚡ Competitive — tighten proof",
-    verdictCloseSub: "You can fight for this pile. Ship one sharp proof line per gap, then send.",
+    verdictCloseSub: "Reality check: you're close, not done. Recovery path: tighten proof, then apply with leverage.",
     verdictStrongTitle: "✅ Strong match",
-    verdictStrongSub: "You have a real shot at passing initial screening.",
-    startFixingNow: "Start fixing this now →",
+    verdictStrongSub: "Reality check: this is interview range. Recovery path: keep proof sharp and momentum high.",
+    startFixingNow: "Fix your positioning →",
     takeActionBtn: "Take action →",
-    startThisStep: "Start this step →",
+    startThisStep: "Start mission →",
     fixPointsIfDone: "🔥 +{pts} points if completed",
     fixProgressApplied: "✅ Progress applied: +{pts}",
     proofAddedToast: "Proof added",
@@ -3045,18 +3088,18 @@ const translations = {
     proofImpactToast: "+{pts} impact applied to your progress score",
     fixMyCvRun: "Take action on your CV →",
     fixMyCvUnlock: "Take action — unlock with Pro →",
-    heroStopBig: "🚫 Stop.",
-    heroStopLine1: "If you apply to this role right now — you will get rejected.",
-    heroStopLine2: "Not because you're not good. Because you're playing the wrong game.",
-    heroRiskBig: "⚠️ Not safe yet.",
-    heroRiskLine1: "You're in the danger zone for first-pass screening.",
-    heroRiskLine2: "One sharp proof block per gap — then you're back in the fight.",
-    heroCloseBig: "⚡ In range.",
-    heroCloseLine1: "You're close to where hiring managers start saying yes more often.",
-    heroCloseLine2: "Tighten receipts: metrics, tools, outcomes — then hit send.",
-    heroStrongBig: "✅ Green light.",
-    heroStrongLine1: "You're in interview range for this posting.",
-    heroStrongLine2: "Polish noise, keep proof loud — don't talk yourself down.",
+    heroStopBig: "Stop.",
+    heroStopLine1: "If you apply right now → high chance of rejection.",
+    heroStopLine2: "But you're closer than it looks. Fix 2 key gaps to push into interview range.",
+    heroRiskBig: "Not safe yet.",
+    heroRiskLine1: "Reality check: still risky for first-pass screening.",
+    heroRiskLine2: "Recovery path: close the next 1-2 gaps and you'll be back in the fight.",
+    heroCloseBig: "You're close.",
+    heroCloseLine1: "Reality check: competitive, but not finished.",
+    heroCloseLine2: "Recovery path: tighten metrics + tools proof, then send.",
+    heroStrongBig: "Green light.",
+    heroStrongLine1: "Reality check: you're in interview range for this posting.",
+    heroStrongLine2: "Recovery path: keep proof loud and apply with confidence.",
     scoreInsightLow: "This is below the usual hiring bar for this posting.",
     scoreInsightMid: "You're close — but not default-hire competitive yet.",
     scoreInsightHigh: "You're in interview range.",
@@ -3073,11 +3116,11 @@ const translations = {
     recruiterLensLine1: "→ No proof of impact",
     recruiterLensLine2: "→ No measurable outcomes",
     recruiterLensLine3: "→ No obvious tools stack",
-    impactFixUnlock: "🔥 Fix this → unlock +{pts} points",
+    impactFixUnlock: "🔥 Fix your positioning → unlock +{pts} points",
     impactMovesCloser: "+{pts} moves you closer to interview range.",
     stepCtaOpenLink: "Open link →",
     stepCtaGithub: "Open GitHub guide →",
-    stepCtaApply: "Apply / pursue this →",
+    stepCtaApply: "Enter target zone →",
     impactUnlockedLine: "Impact unlocked",
   },
   TR: {
@@ -3301,9 +3344,9 @@ const translations = {
     verdictCloseSub: "Bu yığında savaşabilirsin. Her boşluk için tek net kanıt satırı, sonra gönder.",
     verdictStrongTitle: "✅ Güçlü eşleşme",
     verdictStrongSub: "İlk elemeden geçme şansın gerçek.",
-    startFixingNow: "Şimdi düzeltmeye başla →",
+    startFixingNow: "Konumlanmanı düzelt →",
     takeActionBtn: "Harekete geç →",
-    startThisStep: "Bu adımla başla →",
+    startThisStep: "Misyona başla →",
     fixPointsIfDone: "🔥 Tamamlarsan +{pts} puan",
     fixProgressApplied: "✅ İlerleme işlendi: +{pts}",
     proofAddedToast: "Kanıt eklendi",
@@ -3311,18 +3354,18 @@ const translations = {
     proofImpactToast: "İlerleme skoruna +{pts} etki uygulandı",
     fixMyCvRun: "CV'de harekete geç →",
     fixMyCvUnlock: "Harekete geç — Pro ile aç →",
-    heroStopBig: "🚫 Dur.",
-    heroStopLine1: "Şu an bu role başvurursan — büyük ihtimalle elenirsin.",
-    heroStopLine2: "Yeteneksiz olduğun için değil. Yanlış masada oynadığın için.",
-    heroRiskBig: "⚠️ Henüz güvenli değil.",
-    heroRiskLine1: "İlk tur eleme bölgesindesin.",
-    heroRiskLine2: "Her boşluk için tek net kanıt bloğu — sonra tekrar oyundasın.",
-    heroCloseBig: "⚡ Aralıktasın.",
-    heroCloseLine1: "İşe alımın daha sık evet dediği skora yakınsın.",
-    heroCloseLine2: "Kanıtı sıkılaştır: metrik, araç, sonuç — sonra gönder.",
-    heroStrongBig: "✅ Yeşil.",
-    heroStrongLine1: "Bu ilan için mülakat aralığındasın.",
-    heroStrongLine2: "Gürültüyü kes, kanıtı yükselt — kendini küçültme.",
+    heroStopBig: "Dur.",
+    heroStopLine1: "Şu an başvurursan → elenme ihtimali yüksek.",
+    heroStopLine2: "Ama sandığından yakınsın. 2 kritik boşluğu kapat, mülakat bandına çık.",
+    heroRiskBig: "Henüz güvenli değil.",
+    heroRiskLine1: "Gerçeklik kontrolü: ilk tur için hâlâ riskli.",
+    heroRiskLine2: "Toparlanma yolu: sonraki 1-2 boşluğu kapat, tekrar aralığa gir.",
+    heroCloseBig: "Yakınsın.",
+    heroCloseLine1: "Gerçeklik kontrolü: rekabetçisin ama bitmedi.",
+    heroCloseLine2: "Toparlanma yolu: metrik + araç kanıtını sıkılaştır, sonra gönder.",
+    heroStrongBig: "Yeşil ışık.",
+    heroStrongLine1: "Gerçeklik kontrolü: bu ilan için mülakat aralığındasın.",
+    heroStrongLine2: "Toparlanma yolu: kanıtı güçlü tut ve özgüvenle başvur.",
     scoreInsightLow: "Bu ilan için tipik işe alım barının altında.",
     scoreInsightMid: "Yakınsın — ama henüz varsayılan aday seviyesinde değilsin.",
     scoreInsightHigh: "Mülakat aralığındasın.",
@@ -3338,11 +3381,11 @@ const translations = {
     recruiterLensLine1: "→ Etki kanıtı yok",
     recruiterLensLine2: "→ Ölçülebilir sonuç yok",
     recruiterLensLine3: "→ Araç yığını net değil",
-    impactFixUnlock: "🔥 Bunu düzelt → +{pts} puan aç",
+    impactFixUnlock: "🔥 Konumlanmanı düzelt → +{pts} puan aç",
     impactMovesCloser: "+{pts} seni mülakat bandına yaklaştırır.",
     stepCtaOpenLink: "Linki aç →",
     stepCtaGithub: "GitHub rehberi →",
-    stepCtaApply: "Başvur / takip et →",
+    stepCtaApply: "Hedef bölgeye gir →",
     impactUnlockedLine: "Etki açıldı",
   },
 };
