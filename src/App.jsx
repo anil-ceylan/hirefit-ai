@@ -4433,62 +4433,6 @@ function HireFitLayout() {
     };
   }, [analysisData]);
 
-  const previewData = useMemo(() => {
-    if (engineV2) return engineV2;
-    if (!analysisData && !decisionData) return null;
-    const legacyReasons = analysisData?.rejection_reasons || {};
-    const toRows = (arr, impact) =>
-      (Array.isArray(arr) ? arr : []).map((issue) => ({
-        issue: String(issue || "").trim(),
-        impact,
-      }));
-    const reasonRows = [
-      ...toRows(legacyReasons.high, "high"),
-      ...toRows(legacyReasons.medium, "medium"),
-      ...toRows(legacyReasons.low, "low"),
-    ].filter((x) => x.issue);
-    const roleRows = Array.isArray(analysisData?.role_matches)
-      ? analysisData.role_matches.map((r) => ({
-          role: r.role,
-          score: Number(r.match_score) || 0,
-        }))
-      : [];
-    const scoreFromData =
-      alignmentScore != null
-        ? Number(alignmentScore)
-        : Number(analysisData?.alignment_score ?? NaN);
-    const fixes = Array.isArray(analysisData?.improvements)
-      ? analysisData.improvements
-      : Array.isArray(decisionData?.fixes)
-        ? decisionData.fixes
-        : [];
-    return {
-      "Final Alignment Score": Number.isFinite(scoreFromData) ? scoreFromData : null,
-      Recruiter: {
-        reasoning: String(decisionData?.summary || analysisData?.fit_summary || "").trim(),
-        strengths: Array.isArray(analysisData?.strengths) ? analysisData.strengths : [],
-        weaknesses: [],
-      },
-      Gaps: {
-        rejection_reasons: reasonRows,
-        biggest_gap: reasonRows[0]?.issue || "",
-      },
-      Decision: {
-        reasoning: String(decisionData?.summary || analysisData?.fit_summary || "").trim(),
-        action_plan: fixes.map((f) => String(f || "").trim()).filter(Boolean).join("\n"),
-        what_to_fix_first: fixes,
-      },
-      ATS: {
-        ats_score: analysisData?.score_breakdown?.experience_depth ?? null,
-        keyword_match: analysisData?.score_breakdown?.keyword_match ?? null,
-      },
-      RoleFit: {
-        best_role: String(analysisData?.role_type || roleRows[0]?.role || "").trim(),
-        role_fit: roleRows,
-      },
-    };
-  }, [engineV2, analysisData, decisionData, alignmentScore]);
-
   const handleSharePrompt = () => {
     if (alignmentScore == null) return;
     setShowSharePrompt(true);
@@ -5492,6 +5436,61 @@ export function AnalyzerPage() {
     downloadText, reanalyzeAfterFix, roadmapLoading, generateLearningPlan, decisionImpactContext,
     reanalysisResult, history, clearHistory, loadHistoryItem, scoreRunProgress,
   } = useOutletContext();
+  const previewData = useMemo(() => {
+    if (engineV2) return engineV2;
+    if (!analysisData && !decisionData) return null;
+    const legacyReasons = analysisData?.rejection_reasons || {};
+    const toRows = (arr, impact) =>
+      (Array.isArray(arr) ? arr : []).map((issue) => ({
+        issue: String(issue || "").trim(),
+        impact,
+      }));
+    const reasonRows = [
+      ...toRows(legacyReasons.high, "high"),
+      ...toRows(legacyReasons.medium, "medium"),
+      ...toRows(legacyReasons.low, "low"),
+    ].filter((x) => x.issue);
+    const roleRows = Array.isArray(analysisData?.role_matches)
+      ? analysisData.role_matches.map((r) => ({
+          role: r.role,
+          score: Number(r.match_score) || 0,
+        }))
+      : [];
+    const scoreFromData =
+      alignmentScore != null
+        ? Number(alignmentScore)
+        : Number(analysisData?.alignment_score ?? NaN);
+    const fixes = Array.isArray(analysisData?.improvements)
+      ? analysisData.improvements
+      : Array.isArray(decisionData?.fixes)
+        ? decisionData.fixes
+        : [];
+    return {
+      "Final Alignment Score": Number.isFinite(scoreFromData) ? scoreFromData : null,
+      Recruiter: {
+        reasoning: String(decisionData?.summary || analysisData?.fit_summary || "").trim(),
+        strengths: Array.isArray(analysisData?.strengths) ? analysisData.strengths : [],
+        weaknesses: [],
+      },
+      Gaps: {
+        rejection_reasons: reasonRows,
+        biggest_gap: reasonRows[0]?.issue || "",
+      },
+      Decision: {
+        reasoning: String(decisionData?.summary || analysisData?.fit_summary || "").trim(),
+        action_plan: fixes.map((f) => String(f || "").trim()).filter(Boolean).join("\n"),
+        what_to_fix_first: fixes,
+      },
+      ATS: {
+        ats_score: analysisData?.score_breakdown?.experience_depth ?? null,
+        keyword_match: analysisData?.score_breakdown?.keyword_match ?? null,
+      },
+      RoleFit: {
+        best_role: String(analysisData?.role_type || roleRows[0]?.role || "").trim(),
+        role_fit: roleRows,
+      },
+    };
+  }, [engineV2, analysisData, decisionData, alignmentScore]);
   return (
   <div className="hf-analyzer-page" style={{ maxWidth: 1320, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
 
