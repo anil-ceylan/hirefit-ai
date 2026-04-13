@@ -1149,6 +1149,8 @@ function CareerEngineCard({
   const [animatedProgressScore, setAnimatedProgressScore] = useState(null);
   const [scoreDeltaFloat, setScoreDeltaFloat] = useState(null);
   const [successFlashFixIdx, setSuccessFlashFixIdx] = useState(-1);
+  const [stepPopup, setStepPopup] = useState(null);
+  const [todayCompletedCount, setTodayCompletedCount] = useState(0);
   const [execState, setExecState] = useState(() => ({
     completed: [],
     fixProofs: [],
@@ -1281,6 +1283,30 @@ function CareerEngineCard({
     return () => window.clearTimeout(id);
   }, [scoreDeltaFloat]);
 
+  useEffect(() => {
+    if (!stepPopup) return undefined;
+    const id = window.setTimeout(() => setStepPopup(null), 1700);
+    return () => window.clearTimeout(id);
+  }, [stepPopup]);
+
+  const todayYmd = new Date().toISOString().slice(0, 10);
+  const todayProgressKey = `hirefit-today-progress-${fp || "anon"}`;
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(todayProgressKey);
+      if (!raw) {
+        setTodayCompletedCount(0);
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      if (parsed?.date === todayYmd) setTodayCompletedCount(Math.max(0, Number(parsed.count) || 0));
+      else setTodayCompletedCount(0);
+    } catch {
+      setTodayCompletedCount(0);
+    }
+  }, [todayProgressKey, todayYmd]);
+
   if (!data) return null;
 
   const t = translations[lang];
@@ -1343,6 +1369,26 @@ function CareerEngineCard({
     if (cur == null || !Number.isFinite(Number(cur))) return 0;
     if (Number(cur) >= 70) return 0;
     return Math.max(1, Math.ceil((70 - Number(cur)) / 5));
+  })();
+  const strongCandidateGap = (() => {
+    const current = dynamicProgressScore ?? scoreNumeric;
+    if (current == null || Number(current) >= 82) return 0;
+    return Math.max(0, 82 - Number(current));
+  })();
+  const stepsToStrongCandidate = (() => {
+    if (!strongCandidateGap) return 0;
+    const remaining = planFixes
+      .map((f, idx) => ({ pts: Math.max(1, Math.min(18, Math.round(Number(f?.score_impact) || 0))), done: !!execState.completed[idx] }))
+      .filter((x) => !x.done)
+      .map((x) => x.pts);
+    let acc = 0;
+    let steps = 0;
+    for (const pts of remaining) {
+      acc += pts;
+      steps += 1;
+      if (acc >= strongCandidateGap) return steps;
+    }
+    return remaining.length;
   })();
   const tabSpecs = [
     { id: "recruiter", label: t.recruiterView },
@@ -1472,7 +1518,13 @@ function CareerEngineCard({
                   <span style={{ fontSize: 15, fontWeight: 600, color: RS.textPrimary, lineHeight: 1.55 }}>{previewStep}</span>
                   <button
                     type="button"
-                    onClick={() => setActiveTab("plan")}
+                    onClick={() => {
+                      setActiveTab("plan");
+                      setStepPopup({
+                        kind: "start",
+                        text: lang === "TR" ? "Misyon başlatıldı" : "Mission started",
+                      });
+                    }}
                     style={{
                       border: "none",
                       borderRadius: 12,
@@ -1707,6 +1759,13 @@ function CareerEngineCard({
               ? "Mülakat aralığına ulaşmak için 1 yüksek etkili adım daha tamamla."
               : "Complete 1 more high-impact step to reach interview range.")}
         </div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: RS.textSecondary, marginTop: 6, lineHeight: 1.45, maxWidth: 560 }}>
+          {stepsToStrongCandidate > 0
+            ? (lang === "TR"
+              ? `Güçlü aday statüsünü açmak için ${stepsToStrongCandidate} adım kaldı.`
+              : `${stepsToStrongCandidate} more step${stepsToStrongCandidate > 1 ? "s" : ""} to unlock strong candidate status.`)
+            : (lang === "TR" ? "Güçlü aday statüsü aktif — ivmeyi koru." : "Strong candidate status unlocked — keep momentum.")}
+        </div>
       </div>
 
       <div
@@ -1832,6 +1891,26 @@ function CareerEngineCard({
         </div>
 
         <div style={{ display: activeTab === "plan" ? "block" : "none" }}>
+          {stepPopup ? (
+            <motion.div
+              initial={{ opacity: 0, y: 10, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0 }}
+              style={{
+                marginBottom: 14,
+                padding: "12px 14px",
+                borderRadius: 12,
+                border: `1px solid ${rsAlpha(RS.indigo, 0.35)}`,
+                background: `linear-gradient(135deg, ${rsAlpha(RS.indigo, 0.18)}, ${rsAlpha(RS.green, 0.1)})`,
+                boxShadow: `0 0 24px ${rsAlpha(RS.indigo, 0.22)}`,
+                fontSize: 13,
+                fontWeight: 800,
+                color: RS.textPrimary,
+              }}
+            >
+              {stepPopup.text}
+            </motion.div>
+          ) : null}
           {uxToast ? (
             <motion.div
               initial={{ opacity: 0, y: 6 }}
@@ -1854,6 +1933,23 @@ function CareerEngineCard({
               <div style={{ fontSize: 12, fontWeight: 900, color: RS.amber, marginTop: 8, letterSpacing: "0.04em" }}>{t.impactUnlockedLine}</div>
             </motion.div>
           ) : null}
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "14px 16px",
+              borderRadius: 12,
+              border: `1px solid ${rsAlpha(RS.indigo, 0.28)}`,
+              background: `linear-gradient(135deg, ${rsAlpha(RS.indigo, 0.12)}, ${rsAlpha(RS.bgElevated, 0.9)})`,
+              boxShadow: `0 0 24px ${rsAlpha(RS.indigo, 0.15)}`,
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.08em", color: RS.indigo, marginBottom: 6 }}>
+              {lang === "TR" ? "BUGÜNÜN İLERLEMESİ" : "TODAY'S PROGRESS"}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, fontFamily: RS.fontMono }}>
+              {lang === "TR" ? `Bugün tamamlanan adımlar: ${todayCompletedCount}/3` : `Steps completed today: ${todayCompletedCount}/3`}
+            </div>
+          </div>
           {actionPlan.priority_callout ? (
             <div style={{ marginBottom: 16, padding: "14px 16px", borderRadius: 8, background: RS.bgElevated, border: `1px solid ${RS.borderSubtle}` }}>
               <div style={{ ...labelStyle, marginBottom: 8 }}>{t.whatToDoNext}</div>
@@ -2075,6 +2171,19 @@ function CareerEngineCard({
                                       ? `+${impPts} puan — mülakat aralığına daha yakınsın`
                                       : `+${impPts} points — you're now closer to interview range`
                                   );
+                                  setStepPopup({
+                                    kind: "complete",
+                                    text: lang === "TR" ? `Adım tamamlandı: +${impPts} puan` : `Step completed: +${impPts} points`,
+                                  });
+                                  setTodayCompletedCount((prev) => {
+                                    const next = Math.min(3, prev + 1);
+                                    try {
+                                      localStorage.setItem(todayProgressKey, JSON.stringify({ date: todayYmd, count: next }));
+                                    } catch {
+                                      // ignore
+                                    }
+                                    return next;
+                                  });
                                   window.setTimeout(() => setUxToast({ pts: impPts }), 0);
                                   window.setTimeout(() => {
                                     if (nextActive >= 0 && nextActive !== i) {
@@ -2184,12 +2293,50 @@ function CareerEngineCard({
                           ) : null}
                           {isCompletedFix ? (
                             <div style={{ fontSize: 12, color: RS.textSecondary, marginTop: 8, lineHeight: 1.45 }}>
+                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+                                <div style={{ padding: "10px 11px", borderRadius: 10, border: `1px solid ${rsAlpha(RS.red, 0.22)}`, background: rsAlpha(RS.red, 0.08) }}>
+                                  <div style={{ fontSize: 10, fontWeight: 800, color: RS.red, marginBottom: 4 }}>{lang === "TR" ? "Before" : "Before"}</div>
+                                  <div style={{ fontSize: 11, lineHeight: 1.45, color: RS.textSecondary }}>
+                                    <div>{lang === "TR" ? "• Net konumlanma yok" : "• No clear positioning"}</div>
+                                    <div>{lang === "TR" ? "• Elenme riski yüksek" : "• High rejection risk"}</div>
+                                  </div>
+                                </div>
+                                <div style={{ padding: "10px 11px", borderRadius: 10, border: `1px solid ${rsAlpha(RS.green, 0.28)}`, background: rsAlpha(RS.green, 0.1) }}>
+                                  <div style={{ fontSize: 10, fontWeight: 800, color: RS.green, marginBottom: 4 }}>{lang === "TR" ? "After" : "After"}</div>
+                                  <div style={{ fontSize: 11, lineHeight: 1.45, color: RS.textSecondary }}>
+                                    <div>{lang === "TR" ? "• Rol hizalaması netleşti" : "• Clear role alignment"}</div>
+                                    <div>{lang === "TR" ? "• Recruiter okunabilir sinyal" : "• Recruiter-readable signal"}</div>
+                                  </div>
+                                </div>
+                              </div>
                               <div style={{ fontSize: 11, fontWeight: 800, color: RS.green, marginBottom: 6 }}>
                                 {lang === "TR" ? "Ne değişti:" : "What changed:"}
                               </div>
                               <div>{lang === "TR" ? "✔ eylem kanıtı görünür oldu" : "✔ proof of action is now visible"}</div>
                               <div>{lang === "TR" ? "✔ rol hizalaması güçlendi" : "✔ role alignment is stronger"}</div>
                               <div>{lang === "TR" ? "✔ niyet sinyali netleşti" : "✔ intent signal is clearer"}</div>
+                              <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
+                                {[
+                                  lang === "TR" ? "Positioning Fixed" : "Positioning Fixed",
+                                  lang === "TR" ? "Proof Added" : "Proof Added",
+                                  lang === "TR" ? "Signal Strength Increased" : "Signal Strength Increased",
+                                ].map((badge) => (
+                                  <span
+                                    key={`${i}-${badge}`}
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 800,
+                                      color: RS.green,
+                                      border: `1px solid ${rsAlpha(RS.green, 0.35)}`,
+                                      background: rsAlpha(RS.green, 0.1),
+                                      borderRadius: 999,
+                                      padding: "4px 8px",
+                                    }}
+                                  >
+                                    {badge}
+                                  </span>
+                                ))}
+                              </div>
                               <div style={{ marginTop: 6 }}>
                                 {lang === "TR"
                                   ? `+${impPts} etki açıldı. ${planFixes[i + 1] ? `Sonraki adım: +${Math.max(1, Math.min(18, Math.round(Number(planFixes[i + 1]?.score_impact) || 0)))} domain credibility.` : ""}`
@@ -2413,6 +2560,10 @@ function CareerEngineCard({
                             disabled={isLockedFix}
                             onClick={() => {
                               setActiveTab("plan");
+                              setStepPopup({
+                                kind: "start",
+                                text: lang === "TR" ? "Misyon başlatıldı" : "Mission started",
+                              });
                               window.requestAnimationFrame(() => {
                                 document.getElementById(`hf-fix-${i}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
                               });
