@@ -1144,6 +1144,11 @@ function CareerEngineCard({
   const [showJobs, setShowJobs] = useState(false);
   const [activeTab, setActiveTab] = useState("recruiter");
   const [uxToast, setUxToast] = useState(null);
+  const [completedSteps, setCompletedSteps] = useState([]);
+  const [activeStepIndex, setActiveStepIndex] = useState(0);
+  const [animatedProgressScore, setAnimatedProgressScore] = useState(null);
+  const [scoreDeltaFloat, setScoreDeltaFloat] = useState(null);
+  const [successFlashFixIdx, setSuccessFlashFixIdx] = useState(-1);
   const [execState, setExecState] = useState(() => ({
     completed: [],
     fixProofs: [],
@@ -1223,10 +1228,58 @@ function CareerEngineCard({
   }, [scoreNumeric, planFixesMemo, execState.completed]);
 
   useEffect(() => {
+    setCompletedSteps(Array.isArray(execState.completed) ? execState.completed.map(Boolean) : []);
+  }, [execState.completed]);
+
+  useEffect(() => {
+    if (!completedSteps.length) {
+      setActiveStepIndex(0);
+      return;
+    }
+    const firstOpen = completedSteps.findIndex((c) => !c);
+    setActiveStepIndex(firstOpen === -1 ? Math.max(0, completedSteps.length - 1) : firstOpen);
+  }, [completedSteps]);
+
+  useEffect(() => {
+    const target = dynamicProgressScore ?? scoreNumeric;
+    if (target == null || !Number.isFinite(Number(target))) {
+      setAnimatedProgressScore(null);
+      return undefined;
+    }
+    const from = animatedProgressScore == null || !Number.isFinite(Number(animatedProgressScore))
+      ? Number(target)
+      : Number(animatedProgressScore);
+    if (Math.round(from) === Math.round(Number(target))) {
+      setAnimatedProgressScore(Math.round(Number(target)));
+      return undefined;
+    }
+    let raf = 0;
+    const t0 = performance.now();
+    const dur = 520;
+    const tick = (now) => {
+      const u = Math.min(1, (now - t0) / dur);
+      const ease = 1 - (1 - u) ** 2;
+      const v = Math.round(from + (Number(target) - from) * ease);
+      setAnimatedProgressScore(v);
+      if (u < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [dynamicProgressScore, scoreNumeric]);
+
+  useEffect(() => {
     if (!uxToast) return undefined;
     const id = window.setTimeout(() => setUxToast(null), 4200);
     return () => window.clearTimeout(id);
   }, [uxToast]);
+
+  useEffect(() => {
+    if (!scoreDeltaFloat) return undefined;
+    const id = window.setTimeout(() => setScoreDeltaFloat(null), 1600);
+    return () => window.clearTimeout(id);
+  }, [scoreDeltaFloat]);
 
   if (!data) return null;
 
@@ -1615,7 +1668,7 @@ function CareerEngineCard({
           style={{
             width: "100%",
             maxWidth: 480,
-            height: 10,
+            height: 12,
             borderRadius: 999,
             background: rsAlpha(RS.textMuted, 0.2),
             overflow: "hidden",
@@ -1629,17 +1682,28 @@ function CareerEngineCard({
             style={{
               height: "100%",
               borderRadius: 999,
-              background: `linear-gradient(90deg, ${RS.indigo}, ${RS.green})`,
-              boxShadow: `0 0 20px ${rsAlpha(RS.green, 0.35)}`,
+              background: `linear-gradient(90deg, ${RS.indigo}, ${RS.green}, #22c55e)`,
+              boxShadow: `0 0 24px ${rsAlpha(RS.green, 0.38)}`,
             }}
           />
         </div>
-        <div style={{ fontSize: 12, fontWeight: 600, color: RS.amber, marginTop: 12, lineHeight: 1.45, maxWidth: 560 }}>
+        <div style={{ marginTop: 8, fontSize: 11, color: RS.textMuted, fontWeight: 700, fontFamily: RS.fontMono }}>
+          {(animatedProgressScore ?? (dynamicProgressScore ?? scoreNumeric) ?? 0)} → 70 → 82 → 90
+        </div>
+        <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: RS.amber, padding: "5px 10px", borderRadius: 999, border: `1px solid ${rsAlpha(RS.amber, 0.35)}`, background: rsAlpha(RS.amber, 0.12) }}>
+            {lang === "TR" ? "Mülakat Eşiği: 70" : "Interview Threshold: 70"}
+          </span>
+          <span style={{ fontSize: 10, fontWeight: 700, color: RS.green, padding: "5px 10px", borderRadius: 999, border: `1px solid ${rsAlpha(RS.green, 0.35)}`, background: rsAlpha(RS.green, 0.12) }}>
+            {lang === "TR" ? "Güçlü Aday: 82+" : "Strong Candidate: 82+"}
+          </span>
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 700, color: RS.amber, marginTop: 12, lineHeight: 1.45, maxWidth: 560 }}>
           {(dynamicProgressScore ?? scoreNumeric) != null && Number(dynamicProgressScore ?? scoreNumeric) >= 70
-            ? t.yourProgressAllDone
-            : gapTo70Steps > 0
-              ? t.yourProgressNudge.replace("{n}", String(gapTo70Steps))
-              : null}
+            ? (lang === "TR" ? "Artık mülakat bölgesindesin — itmeye devam et." : "You're now in the interview zone — keep pushing.")
+            : (lang === "TR"
+              ? "Mülakat aralığına ulaşmak için 1 yüksek etkili adım daha tamamla."
+              : "Complete 1 more high-impact step to reach interview range.")}
         </div>
       </div>
 
@@ -1821,13 +1885,29 @@ function CareerEngineCard({
                 </div>
               ) : null}
               {scoreNumeric != null && dynamicProgressScore != null ? (
-                <div style={{ fontSize: 12, fontWeight: 600, color: RS.green, marginBottom: 14, fontFamily: RS.fontMono }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: RS.green, marginBottom: 14, fontFamily: RS.fontMono, position: "relative" }}>
                   {t.progressScoreLive
-                    .replace("{score}", String(dynamicProgressScore))
+                    .replace("{score}", String(animatedProgressScore ?? dynamicProgressScore))
                     .replace(
                       "{delta}",
                       dynamicProgressScore > scoreNumeric ? `+${dynamicProgressScore - scoreNumeric}` : "0",
                     )}
+                  {scoreDeltaFloat ? (
+                    <motion.span
+                      initial={{ opacity: 0, y: 8, scale: 0.92 }}
+                      animate={{ opacity: 1, y: -12, scale: 1 }}
+                      style={{
+                        position: "absolute",
+                        right: 0,
+                        top: -4,
+                        color: RS.green,
+                        fontWeight: 900,
+                        textShadow: `0 0 14px ${rsAlpha(RS.green, 0.5)}`,
+                      }}
+                    >
+                      {scoreDeltaFloat}
+                    </motion.span>
+                  ) : null}
                 </div>
               ) : null}
               {planFixes.map((f, i) => {
@@ -1837,10 +1917,23 @@ function CareerEngineCard({
                 const res = f.resource;
                 const hasRes = res && (String(res.label || "").trim() || res.url);
                 const impPts = Math.max(1, Math.min(18, Math.round(Number(f.score_impact) || 0)));
+                const isCompletedFix = !!completedSteps[i];
+                const isActiveFix = !isCompletedFix && i === activeStepIndex;
+                const isLockedFix = !isCompletedFix && i !== activeStepIndex;
                 const scoreBeforeFix = i === 0 ? (scoreNumeric ?? 0) : cumulativeProjected[i - 1];
                 const stepIncrements = f.steps?.length ? splitImpactAcrossSteps(impPts, f.steps.length) : [];
                 return (
-                  <div key={i} id={`hf-fix-${i}`} style={{ marginBottom: i < planFixes.length - 1 ? 24 : 0 }}>
+                  <motion.div
+                    key={i}
+                    id={`hf-fix-${i}`}
+                    layout
+                    animate={{
+                      opacity: isLockedFix ? 0.5 : 1,
+                      scale: isActiveFix ? 1.02 : 1,
+                    }}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    style={{ marginBottom: i < planFixes.length - 1 ? 24 : 0 }}
+                  >
                     {i === 0 && sev === "critical" ? (
                       <div
                         style={{
@@ -1856,16 +1949,46 @@ function CareerEngineCard({
                         {t.primaryBlocker}
                       </div>
                     ) : null}
+                    {isActiveFix ? (
+                      <div style={{ marginBottom: 8, fontSize: 10, fontWeight: 900, letterSpacing: "0.08em", color: RS.indigo }}>
+                        {lang === "TR" ? "YOU ARE HERE →" : "YOU ARE HERE →"}
+                      </div>
+                    ) : null}
                     <div
                       style={{
                         padding: "20px 20px",
                         borderRadius: 16,
-                        background: RS.bgElevated,
-                        border: `1px solid ${RS.borderSubtle}`,
-                        boxShadow: `0 12px 40px rgba(0,0,0,0.2)`,
-                        transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                        background: isActiveFix
+                          ? `linear-gradient(135deg, ${rsAlpha(RS.indigo, 0.16)}, ${rsAlpha(RS.bgElevated, 0.96)})`
+                          : RS.bgElevated,
+                        border: isCompletedFix
+                          ? `1px solid ${rsAlpha(RS.green, 0.4)}`
+                          : isActiveFix
+                            ? `1px solid ${rsAlpha(RS.indigo, 0.55)}`
+                            : `1px solid ${RS.borderSubtle}`,
+                        boxShadow: isCompletedFix
+                          ? `0 0 26px ${rsAlpha(RS.green, 0.24)}`
+                          : isActiveFix
+                            ? `0 0 30px ${rsAlpha(RS.indigo, 0.28)}`
+                            : `0 12px 40px rgba(0,0,0,0.2)`,
+                        transition: "border-color 0.35s ease, box-shadow 0.35s ease, transform 0.35s ease",
+                        position: "relative",
                       }}
                     >
+                      {successFlashFixIdx === i ? (
+                        <motion.div
+                          initial={{ opacity: 0.45 }}
+                          animate={{ opacity: 0 }}
+                          transition={{ duration: 0.7, ease: "easeOut" }}
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            borderRadius: 16,
+                            background: `radial-gradient(circle at 20% 20%, ${rsAlpha(RS.green, 0.2)}, transparent 70%)`,
+                            pointerEvents: "none",
+                          }}
+                        />
+                      ) : null}
                       <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
                         <span
                           style={{ width: 5, height: 5, borderRadius: "50%", background: sevColor, flexShrink: 0, marginTop: 6 }}
@@ -1884,10 +2007,13 @@ function CareerEngineCard({
                           >
                             <input
                               type="checkbox"
-                              checked={!!execState.completed[i]}
+                              checked={!!isCompletedFix}
+                              disabled={isLockedFix}
                               onChange={(e) => {
                                 const want = e.target.checked;
                                 const n = planFixes.length;
+                                if (isLockedFix && want) return;
+                                let nextActive = -1;
                                 if (want) {
                                   const existing = String(execState.fixProofs[i] || "");
                                   const proof = window.prompt(t.proofPromptWhenDone, existing);
@@ -1900,6 +2026,7 @@ function CareerEngineCard({
                                   setExecState((prev) => {
                                     const completed = Array.from({ length: n }, (_, j) => !!prev.completed[j]);
                                     completed[i] = true;
+                                    nextActive = completed.findIndex((c) => !c);
                                     const fixProofs = Array.from({ length: n }, (_, j) => String(prev.fixProofs[j] ?? ""));
                                     fixProofs[i] = trimmed;
                                     const stepProofs =
@@ -1910,7 +2037,15 @@ function CareerEngineCard({
                                     if (fp) saveExecutionPlanState(fp, next);
                                     return next;
                                   });
+                                  setSuccessFlashFixIdx(i);
+                                  window.setTimeout(() => setSuccessFlashFixIdx(-1), 750);
+                                  setScoreDeltaFloat(`+${impPts} points unlocked 🚀`);
                                   window.setTimeout(() => setUxToast({ pts: impPts }), 0);
+                                  window.setTimeout(() => {
+                                    if (nextActive >= 0 && nextActive !== i) {
+                                      document.getElementById(`hf-fix-${nextActive}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+                                    }
+                                  }, 220);
                                 } else {
                                   setExecState((prev) => {
                                     const completed = Array.from({ length: n }, (_, j) => !!prev.completed[j]);
@@ -1931,11 +2066,15 @@ function CareerEngineCard({
                                 width: 18,
                                 height: 18,
                                 accentColor: RS.indigo,
-                                cursor: "pointer",
+                                cursor: isLockedFix ? "not-allowed" : "pointer",
                                 flexShrink: 0,
                               }}
                             />
-                            <span style={{ fontSize: 12, fontWeight: 500, color: RS.textMuted }}>{t.markFixComplete}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: RS.textMuted }}>
+                              {isCompletedFix
+                                ? (lang === "TR" ? "Seviye tamamlandı" : "Level completed")
+                                : (lang === "TR" ? "Complete step →" : "Complete step →")}
+                            </span>
                           </label>
                           <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
                             <div style={{ fontSize: 13, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5, flex: "1 1 160px", minWidth: 0 }}>
@@ -2001,6 +2140,20 @@ function CareerEngineCard({
                               </div>
                             </motion.div>
                           ) : null}
+                          {isActiveFix ? (
+                            <div style={{ fontSize: 11, color: RS.amber, marginTop: 10, lineHeight: 1.45, fontWeight: 700 }}>
+                              {lang === "TR"
+                                ? "Adayların çoğu burada durur — bunu bitirmek seni öne geçirir. Recruiterlar 6 saniyede tarar; bu adım tam bunu düzeltir."
+                                : "Most candidates stop here — finishing this puts you ahead. Recruiters typically scan in 6 seconds — this step fixes that."}
+                            </div>
+                          ) : null}
+                          {isCompletedFix ? (
+                            <div style={{ fontSize: 12, color: RS.textSecondary, marginTop: 8, lineHeight: 1.45 }}>
+                              {lang === "TR"
+                                ? `+${impPts} → Recruiter artık etki kanıtını görüyor. ${planFixes[i + 1] ? `Sonraki adım: +${Math.max(1, Math.min(18, Math.round(Number(planFixes[i + 1]?.score_impact) || 0)))} domain credibility.` : ""}`
+                                : `+${impPts} → Recruiter now sees proof of impact. ${planFixes[i + 1] ? `Next step unlocks: +${Math.max(1, Math.min(18, Math.round(Number(planFixes[i + 1]?.score_impact) || 0)))} domain credibility.` : ""}`}
+                            </div>
+                          ) : null}
                           {f.steps && f.steps.length ? (
                             <>
                               <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, marginBottom: 8 }}>
@@ -2058,6 +2211,7 @@ function CareerEngineCard({
                                         <input
                                           type="text"
                                           value={stepVal}
+                                          disabled={isLockedFix}
                                           placeholder={t.proofPasteLinkPlaceholder}
                                           onBlur={(ev) => {
                                             const v = String(ev.target.value || "").trim();
@@ -2093,6 +2247,7 @@ function CareerEngineCard({
                                             color: RS.textSecondary,
                                             fontSize: 12,
                                             fontFamily: RS.fontUi,
+                                            opacity: isLockedFix ? 0.65 : 1,
                                           }}
                                         />
                                         <label
@@ -2103,12 +2258,14 @@ function CareerEngineCard({
                                             marginTop: 6,
                                             fontSize: 11,
                                             color: RS.textMuted,
-                                            cursor: "pointer",
+                                            cursor: isLockedFix ? "not-allowed" : "pointer",
+                                            opacity: isLockedFix ? 0.65 : 1,
                                           }}
                                         >
                                           <input
                                             type="file"
                                             accept=".txt,.pdf,image/*"
+                                            disabled={isLockedFix}
                                             style={{ fontSize: 11, maxWidth: 220 }}
                                             onChange={(ev) => {
                                               const file = ev.target.files?.[0];
@@ -2183,6 +2340,7 @@ function CareerEngineCard({
                                           <button
                                             type="button"
                                             style={ctaStyle}
+                                            disabled={isLockedFix}
                                             onClick={() => {
                                               setActiveTab("plan");
                                               window.requestAnimationFrame(() => {
@@ -2209,6 +2367,7 @@ function CareerEngineCard({
                           ) : null}
                           <button
                             type="button"
+                            disabled={isLockedFix}
                             onClick={() => {
                               setActiveTab("plan");
                               window.requestAnimationFrame(() => {
@@ -2224,25 +2383,28 @@ function CareerEngineCard({
                               padding: "12px 20px",
                               borderRadius: 12,
                               border: "none",
-                              cursor: "pointer",
+                              cursor: isLockedFix ? "not-allowed" : "pointer",
                               fontWeight: 900,
                               fontSize: 13,
                               fontFamily: RS.fontUi,
                               color: "#0f172a",
-                              background: `linear-gradient(135deg, ${RS.indigo}, #a855f7)`,
-                              boxShadow: `0 6px 24px ${rsAlpha(RS.indigo, 0.35)}`,
+                              background: isLockedFix ? rsAlpha(RS.textMuted, 0.4) : `linear-gradient(135deg, ${RS.indigo}, #a855f7)`,
+                              boxShadow: isLockedFix ? "none" : `0 6px 24px ${rsAlpha(RS.indigo, 0.35)}`,
                               transition: "transform 0.2s ease, box-shadow 0.2s ease",
                             }}
                             onMouseEnter={(e) => {
+                              if (isLockedFix) return;
                               e.currentTarget.style.transform = "translateY(-2px)";
                               e.currentTarget.style.boxShadow = `0 10px 32px ${rsAlpha(RS.indigo, 0.45)}`;
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.transform = "none";
-                              e.currentTarget.style.boxShadow = `0 6px 24px ${rsAlpha(RS.indigo, 0.35)}`;
+                              e.currentTarget.style.boxShadow = isLockedFix ? "none" : `0 6px 24px ${rsAlpha(RS.indigo, 0.35)}`;
                             }}
                           >
-                            {t.startThisStep}
+                            {isLockedFix
+                              ? (lang === "TR" ? "Unlock next level →" : "Unlock next level →")
+                              : (lang === "TR" ? "Start mission →" : "Start mission →")}
                           </button>
                           {hasRes ? (
                             <div style={{ fontSize: 13, paddingLeft: 13, marginTop: 8, lineHeight: 1.45 }}>
@@ -2263,7 +2425,7 @@ function CareerEngineCard({
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
               {betterRoleAlternatives.length ? (
