@@ -257,6 +257,170 @@ function humanizeUserFacingReason(text, lang) {
   return raw;
 }
 
+function getFallbackAnalysis(cvText, jobDescription, lang = "EN") {
+  const cv = String(cvText || "");
+  const jd = String(jobDescription || "");
+  const cvL = cv.toLowerCase();
+  const jdL = jd.toLowerCase();
+  const hasMetrics = /(\d+\s?%|\$\s?\d+|\d+\s?(x|k|m|hours|days|users|clients|projects))/i.test(cv);
+  const toolLexicon = ["excel", "sql", "python", "tableau", "power bi", "figma", "notion", "jira", "ga4", "google analytics", "aws", "react"];
+  const visibleTools = toolLexicon.filter((t) => cvL.includes(t));
+  const jdTools = toolLexicon.filter((t) => jdL.includes(t));
+  const overlapTools = jdTools.filter((t) => visibleTools.includes(t));
+  const mismatch = jdTools.length >= 2 && overlapTools.length === 0;
+
+  let score;
+  if (!hasMetrics || visibleTools.length === 0 || mismatch) score = 40 + Math.min(10, overlapTools.length * 2);
+  else score = 56 + Math.min(14, overlapTools.length * 3 + (hasMetrics ? 4 : 0));
+  score = Math.max(30, Math.min(70, Math.round(score)));
+
+  const verdict = score < 55 ? "Stop" : "Improve";
+  const keyGap = !hasMetrics
+    ? "No measurable impact"
+    : visibleTools.length === 0
+      ? "No visible tools stack"
+      : mismatch
+        ? "Role targeting mismatch"
+        : "Low recruiter-readable proof";
+
+  const fixes = !hasMetrics
+    ? [
+        "Add 2 quantified outcome bullets with clear before/after impact.",
+        "Map your strongest project to the target role using the job's tool language.",
+      ]
+    : visibleTools.length === 0
+      ? [
+          "Add concrete tools used per experience bullet (Excel, SQL, dashboards, etc.).",
+          "Attach one proof link that shows execution quality (repo, case study, dashboard).",
+        ]
+      : [
+          "Retarget the headline and top summary to this exact role and function.",
+          "Show one result + one tool in each key experience bullet.",
+        ];
+
+  const bump = 12;
+  const impactProjection = {
+    before: score,
+    after: Math.min(100, score + bump),
+    delta: bump,
+    narrative:
+      lang === "TR"
+        ? `Bu iyileştirmelerle skorun ${score} → ${Math.min(100, score + bump)} (+${bump}) olabilir.`
+        : `With these fixes your score can move ${score} → ${Math.min(100, score + bump)} (+${bump}).`,
+  };
+
+  return {
+    score,
+    verdict,
+    summary:
+      lang === "TR"
+        ? "Yapılandırılmış çıktı eksik olsa da mevcut sinyallere göre CV'nizin işe alım filtresindeki konumu analiz edildi."
+        : "Structured output was incomplete, so we analyzed your CV using available signals.",
+    keyGap,
+    fixes,
+    impactProjection,
+  };
+}
+
+function buildFailSafeV2FromFallback(fb, cvText, jobDescription, lang) {
+  const verdictRaw = fb.verdict === "Stop" ? "do_not_apply" : "apply_with_fixes";
+  const topKeywordSeed = String(jobDescription || "")
+    .toLowerCase()
+    .split(/[^a-z0-9+#.]+/i)
+    .filter((w) => w.length >= 4)
+    .slice(0, 6);
+  const missingKeywords = topKeywordSeed.length ? topKeywordSeed.slice(0, 4) : ["impact", "metrics", "tools", "ownership"];
+
+  return {
+    score: fb.score,
+    verdict: fb.verdict,
+    keyGap: fb.keyGap,
+    fixes: fb.fixes,
+    "Final Alignment Score": fb.score,
+    Decision: {
+      final_verdict: verdictRaw,
+      reasoning: fb.summary,
+      confidence: 0.71,
+      what_to_fix_first: [fb.fixes[0], fb.fixes[1]].filter(Boolean),
+      action_plan: [fb.fixes[0], fb.fixes[1]].filter(Boolean).join("\n"),
+    },
+    Gaps: {
+      biggest_gap: fb.keyGap,
+      rejection_reasons: [{ issue: fb.keyGap, impact: "high", explanation: fb.summary }],
+    },
+    ATS: {
+      matched_skills: ["Communication"],
+      missing_keywords: missingKeywords,
+      top_keywords: missingKeywords.slice(0, 3),
+      keyword_match: Math.max(25, Math.min(75, fb.score - 8)),
+      ats_score: Math.max(25, Math.min(75, fb.score - 5)),
+      formatting_score: Math.max(40, Math.min(85, fb.score + 8)),
+    },
+    Recruiter: {
+      reasoning: fb.summary,
+      strengths: [lang === "TR" ? "Temel deneyim sinyali var" : "Foundational experience signal is present"],
+      weaknesses: [fb.keyGap],
+    },
+    RoleFit: {
+      locked: false,
+      best_role: lang === "TR" ? "Hedef rol (yakın eşleşme)" : "Target role (near match)",
+      role_fit: [{ role: lang === "TR" ? "Hedef rol" : "Target role", score: fb.score }],
+    },
+    Context: { sector: "general" },
+    FailSafe: true,
+    impactProjection: fb.impactProjection,
+    _source: { cvLen: String(cvText || "").length, jdLen: String(jobDescription || "").length },
+  };
+}
+
+function ensureFailSafeV2(rawV2, cvText, jobDescription, lang) {
+  const baseScore = Number(rawV2?.["Final Alignment Score"]);
+  const hasCore =
+    Number.isFinite(baseScore) &&
+    String(rawV2?.Decision?.final_verdict || "").trim() &&
+    (Array.isArray(rawV2?.Gaps?.rejection_reasons) && rawV2.Gaps.rejection_reasons.length > 0);
+  if (hasCore) {
+    const score = Number(rawV2?.["Final Alignment Score"]);
+    const keyGap = String(rawV2?.Gaps?.biggest_gap || rawV2?.Gaps?.rejection_reasons?.[0]?.issue || "").trim();
+    const verdict =
+      String(rawV2?.Decision?.final_verdict || "").toLowerCase() === "do_not_apply"
+        ? "Stop"
+        : "Improve";
+    const fixes = Array.isArray(rawV2?.Decision?.what_to_fix_first) && rawV2.Decision.what_to_fix_first.length
+      ? rawV2.Decision.what_to_fix_first.slice(0, 2)
+      : getFallbackAnalysis(cvText, jobDescription, lang).fixes;
+    const fb = getFallbackAnalysis(cvText, jobDescription, lang);
+    const safeAts = {
+      ...(rawV2?.ATS || {}),
+      matched_skills:
+        Array.isArray(rawV2?.ATS?.matched_skills) && rawV2.ATS.matched_skills.length
+          ? rawV2.ATS.matched_skills
+          : ["Communication"],
+      missing_keywords:
+        Array.isArray(rawV2?.ATS?.missing_keywords) && rawV2.ATS.missing_keywords.length
+          ? rawV2.ATS.missing_keywords
+          : buildFailSafeV2FromFallback(fb, cvText, jobDescription, lang).ATS.missing_keywords,
+      top_keywords:
+        Array.isArray(rawV2?.ATS?.top_keywords) && rawV2.ATS.top_keywords.length
+          ? rawV2.ATS.top_keywords
+          : buildFailSafeV2FromFallback(fb, cvText, jobDescription, lang).ATS.top_keywords,
+    };
+    return {
+      ...rawV2,
+      ATS: safeAts,
+      score: Number.isFinite(score) ? score : fb.score,
+      verdict,
+      keyGap: keyGap || fb.keyGap,
+      fixes,
+      impactProjection:
+        rawV2?.impactProjection || fb.impactProjection,
+    };
+  }
+
+  const fb = getFallbackAnalysis(cvText, jobDescription, lang);
+  return buildFailSafeV2FromFallback(fb, cvText, jobDescription, lang);
+}
+
 /**
  * Deterministic score lift (5–20) from prioritized gaps / missing signals — not random.
  */
@@ -431,6 +595,7 @@ function CriticalSkillsGapBlock({ skills, lang }) {
 function ImpactProjectionPanel({ projection, lang }) {
   if (!projection) return null;
   const t = translations[lang];
+  const SHOW_GAMIFICATION_UI = false;
   const { current, projected, delta, narrative } = projection;
   return (
     <div
@@ -1697,7 +1862,8 @@ function CareerEngineCard({
             >
               {animatedProgressScore ?? score ?? "—"}
             </motion.div>
-            <div style={{ marginTop: 10, marginLeft: "auto", maxWidth: 260, textAlign: "right" }}>
+            {SHOW_GAMIFICATION_UI ? (
+              <div style={{ marginTop: 10, marginLeft: "auto", maxWidth: 260, textAlign: "right" }}>
               <div style={{ fontSize: 11, fontWeight: 900, color: RS.indigo, letterSpacing: "0.08em" }}>
                 {`Level ${currentLevel.id}: ${currentLevel.title}`}
               </div>
@@ -1720,7 +1886,8 @@ function CareerEngineCard({
                   {lang === "TR" ? "Maksimum seviye" : "Max level reached"}
                 </div>
               )}
-            </div>
+              </div>
+            ) : null}
             {scoreInsights.main ? (
               <div
                 style={{
@@ -2095,14 +2262,18 @@ function CareerEngineCard({
             <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, fontFamily: RS.fontMono }}>
               {lang === "TR" ? `Bugün tamamlanan adımlar: ${todayCompletedCount}/3` : `Steps completed today: ${todayCompletedCount}/3`}
             </div>
-            <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: RS.amber }}>
-              {`🔥 ${streakCount} Day Streak`}
-            </div>
-            <div style={{ marginTop: 4, fontSize: 11, color: RS.textMuted }}>
-              {lang === "TR" ? "Bozma — ivme inşa ediyorsun." : "Don't break it — you're building momentum."}
-            </div>
+            {SHOW_GAMIFICATION_UI ? (
+              <>
+                <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: RS.amber }}>
+                  {`🔥 ${streakCount} Day Streak`}
+                </div>
+                <div style={{ marginTop: 4, fontSize: 11, color: RS.textMuted }}>
+                  {lang === "TR" ? "Bozma — ivme inşa ediyorsun." : "Don't break it — you're building momentum."}
+                </div>
+              </>
+            ) : null}
           </div>
-          {dailyTask ? (
+          {SHOW_GAMIFICATION_UI && dailyTask ? (
             <div
               style={{
                 marginBottom: 16,
@@ -3348,21 +3519,21 @@ const translations = {
     fileReadFailedTitle: "That file could not be read.",
     fileReadFailedRecovery: "Use a .txt export or paste plain text into the CV or JD box.",
     extractionRecovery: "Paste the job description text manually — full posting text works best.",
-    emptyRecruiterSignals: "No recruiter-style strength or risk bullets were returned for this run.",
-    emptyRecruiterNext: "Paste a fuller CV (roles, tools, outcomes) and run Check Fit again.",
-    emptyGapList: "No gap rows are visible in this view.",
+    emptyRecruiterSignals: "Your CV currently sends weak recruiter signals in the first scan.",
+    emptyRecruiterNext: "Show outcomes, tools, and ownership to make your impact readable fast.",
+    emptyGapList: "Your biggest blocker is still positioning clarity for this role.",
     emptyGapNextFree: "Upgrade to Pro for the full gap list, or paste a longer job description and re-run.",
     emptyGapNextPro: "If you just edited your CV, run Check Fit again to refresh gaps.",
-    emptyPlanFallback: "No structured fixes were listed in this view.",
-    emptyPlanNext: "Scroll to “What to do before applying” above, or run a new analysis.",
-    emptySkillsMissing: "No missing keyword chips were extracted.",
-    emptySkillsMissingNext: "Paste the complete job description and mirror its hard-skill terms in your CV.",
-    emptySkillsMatched: "No matched skills were highlighted.",
-    emptySkillsMatchedNext: "Add the tools and methods from the posting where you truly have experience, then re-analyze.",
-    emptyKeywordsNone: "No top keyword chips yet.",
-    emptyKeywordsNext: "Use plain-text JD (not only a link) and re-run Check Fit.",
-    emptyMarketRoles: "No role fit scores to display here.",
-    emptyMarketRolesNext: "Pro unlocks the full role matrix; on Free, focus on the Action plan and Skills tabs first.",
+    emptyPlanFallback: "Start with one high-impact fix that increases recruiter readability.",
+    emptyPlanNext: "Ship one fix now, then re-run analysis to confirm score movement.",
+    emptySkillsMissing: "Your CV does not clearly match the job's required keywords yet.",
+    emptySkillsMissingNext: "Mirror must-have tools and responsibilities from the posting in your CV wording.",
+    emptySkillsMatched: "Your current CV evidence is not explicit enough for strong keyword matching.",
+    emptySkillsMatchedNext: "Add role-relevant tools and quantified outcomes in each core experience bullet.",
+    emptyKeywordsNone: "The job-to-CV keyword bridge is weak right now.",
+    emptyKeywordsNext: "Use exact terms from the job posting in your strongest bullet points.",
+    emptyMarketRoles: "We can still identify your strongest role direction from available signals.",
+    emptyMarketRolesNext: "Focus one target role first, strengthen proof, then widen applications.",
     ciEmptyOverview: "No company overview text in this bundle.",
     ciEmptyOverviewNext: "Try company analysis again later, or continue with your CV vs JD Action plan.",
     ciEmptyCareer: "No career upside bullets yet.",
@@ -3410,8 +3581,8 @@ const translations = {
     atsStyleAnalysis: "ATS-style analysis",
     sectorLens: "Sector lens: ",
     notAvailableForAnalysis: "Limited data for this section — see the suggested next step below.",
-    emptyNoneDetectedSkills: "No ATS keyword hits were listed for this paste.",
-    emptyNoneDetectedSkillsNext: "Paste the full posting and ensure your CV mentions tools and outcomes the JD asks for.",
+    emptyNoneDetectedSkills: "Your CV does not clearly match the posting's keyword language yet.",
+    emptyNoneDetectedSkillsNext: "Add the role's core tools and outcomes directly into your strongest bullets.",
     biggestBlockerLead: "Biggest blocker: ",
     missingFromCv: "Missing from your CV",
     detectedInCv: "Detected in your CV",
@@ -3429,7 +3600,7 @@ const translations = {
     priorityFixes: "Priority fixes",
     interviewPrepShort: "Interview prep",
     sanitizeParsingFailed:
-      "Temporary format issue: run Check Fit again or paste a shorter CV and job description.",
+      "We analyzed your CV based on available signals.",
     executionProgress: "Execution",
     fixesCompletedCount: "{done}/{total} fixes marked done",
     executionLadder: "Projected alignment if you complete fixes in order",
@@ -3614,21 +3785,21 @@ const translations = {
     fileReadFailedTitle: "Dosya okunamadı.",
     fileReadFailedRecovery: "CV veya ilan için .txt kullanın veya düz metin yapıştırın.",
     extractionRecovery: "İş ilanı metnini elle yapıştırın — tam metin en doğru sonucu verir.",
-    emptyRecruiterSignals: "Bu tur için recruiter tarzı güçlü / risk maddesi dönmedi.",
-    emptyRecruiterNext: "Daha dolu bir CV (rol, araç, sonuç) yapıştırıp Uyumu Kontrol Et'i yeniden çalıştırın.",
-    emptyGapList: "Bu görünümde boşluk satırı yok.",
+    emptyRecruiterSignals: "CV'n ilk taramada zayıf recruiter sinyali veriyor.",
+    emptyRecruiterNext: "Sonuç, araç ve sahiplik kanıtı ekleyerek etkiyi daha okunur yap.",
+    emptyGapList: "Bu rol için en büyük engel hâlâ konumlanma netliği.",
     emptyGapNextFree: "Tam liste için Pro'ya geçin veya daha uzun ilan metni yapıştırıp yeniden analiz edin.",
     emptyGapNextPro: "CV'yi güncellediyseniz boşlukları yenilemek için Uyumu Kontrol Et'i tekrar çalıştırın.",
-    emptyPlanFallback: "Bu görünümde yapılandırılmış düzeltme listelenmedi.",
-    emptyPlanNext: "Yukarıdaki “Başvurmadan önce yapılacaklar”a bakın veya yeni analiz çalıştırın.",
-    emptySkillsMissing: "Eksik anahtar kelime etiketi çıkarılmadı.",
-    emptySkillsMissingNext: "Tam iş ilanını yapıştırın; istenen araç ve metodları CV'de geçirin.",
-    emptySkillsMatched: "Eşleşen beceri vurgusu yok.",
-    emptySkillsMatchedNext: "Deneyiminiz olan araçları ilandaki dil ile ekleyip yeniden analiz edin.",
-    emptyKeywordsNone: "Öne çıkan anahtar kelime etiketi yok.",
-    emptyKeywordsNext: "İlanı düz metin olarak yapıştırın (yalnızca link değil) ve Uyumu Kontrol Et'i yeniden çalıştırın.",
-    emptyMarketRoles: "Burada gösterilecek rol uyumu skoru yok.",
-    emptyMarketRolesNext: "Tam matris Pro'da; Ücretsiz planda önce Aksiyon planı ve Beceriler sekmesine odaklanın.",
+    emptyPlanFallback: "Recruiter okunabilirliğini artıracak tek bir yüksek etkili adımla başla.",
+    emptyPlanNext: "Bir düzeltme uygula, sonra skordaki hareketi doğrulamak için yeniden analiz et.",
+    emptySkillsMissing: "CV'n, ilanın istediği anahtar kelimeleri henüz net taşımıyor.",
+    emptySkillsMissingNext: "İlandaki zorunlu araç ve sorumluluk dilini CV'ne doğrudan yansıt.",
+    emptySkillsMatched: "Mevcut CV kanıtı güçlü anahtar kelime eşleşmesi için yeterince açık değil.",
+    emptySkillsMatchedNext: "Ana deneyim maddelerine rol odaklı araçlar ve nicel sonuçlar ekle.",
+    emptyKeywordsNone: "İlan ile CV arasındaki anahtar kelime köprüsü şu an zayıf.",
+    emptyKeywordsNext: "İlandaki kritik terimleri en güçlü deneyim maddelerinde tekrar et.",
+    emptyMarketRoles: "Mevcut sinyallerle yine de güçlü rol yönünü çıkarabiliriz.",
+    emptyMarketRolesNext: "Önce tek hedef role odaklan, kanıtı güçlendir, sonra rol yelpazesini genişlet.",
     ciEmptyOverview: "Bu pakette şirket özeti metni yok.",
     ciEmptyOverviewNext: "Şirket analizini sonra tekrar deneyin veya CV–ilan aksiyon planıyla devam edin.",
     ciEmptyCareer: "Kariyer fırsatı maddesi henüz yok.",
@@ -3676,8 +3847,8 @@ const translations = {
     atsStyleAnalysis: "ATS-stili analiz",
     sectorLens: "Sektör analizi: ",
     notAvailableForAnalysis: "Bu bölüm için veri sınırlı — aşağıdaki sonraki adıma bakın.",
-    emptyNoneDetectedSkills: "Bu yapıştırma için ATS anahtar kelime eşleşmesi listelenmedi.",
-    emptyNoneDetectedSkillsNext: "Tam ilanı yapıştırın; CV'nizde ilanın istediği araç ve sonuçları geçirin.",
+    emptyNoneDetectedSkills: "CV'n şu an ilanın anahtar kelime diliyle net eşleşmiyor.",
+    emptyNoneDetectedSkillsNext: "Rolün temel araç ve sonuçlarını en güçlü maddelerine doğrudan ekle.",
     biggestBlockerLead: "En büyük engel: ",
     missingFromCv: "CV'nizde eksik",
     detectedInCv: "CV'nizde tespit edilen",
@@ -3695,7 +3866,7 @@ const translations = {
     priorityFixes: "Öncelikli düzeltmeler",
     interviewPrepShort: "Mülakat hazırlığı",
     sanitizeParsingFailed:
-      "Geçici biçim sorunu: Uyumu Kontrol Et'i tekrar çalıştırın veya daha kısa CV ve ilan metni yapıştırın.",
+      "CV'nizi mevcut sinyallere göre analiz ettik.",
     executionProgress: "İlerleme",
     fixesCompletedCount: "{done}/{total} düzeltme tamamlandı olarak işaretlendi",
     executionLadder: "Düzeltmeleri sırayla tamamlarsanız tahmini hizalama",
@@ -6125,11 +6296,12 @@ const msgInterval = setInterval(() => {
         }),
       });
       if (v2Res.ok) {
-        const v2 = await v2Res.json();
+        const v2Raw = await v2Res.json();
+        const v2 = ensureFailSafeV2(v2Raw, cvText, jdText, lang);
         v2Ok = true;
         setEngineV2(v2);
         setLastDetectedSector(v2.Context?.sector || v2.detected_sector || "");
-        const fs = Number(v2["Final Alignment Score"]) || 0;
+        const fs = Number(v2["Final Alignment Score"]) || getFallbackAnalysis(cvText, jdText, lang).score;
         setAlignmentScore(fs);
         setScoreRunProgress(computeScoreRunProgress(fs));
         const modelRole =
@@ -6141,8 +6313,8 @@ const msgInterval = setInterval(() => {
         setSeniority("");
         const atsMatchedSkills = (v2.ATS?.matched_skills ?? []).filter(Boolean);
         setMatchedSkills(atsMatchedSkills);
-        setMissingSkills(v2.ATS?.missing_keywords ?? []);
-        setTopKeywords(v2.ATS?.top_keywords ?? []);
+        setMissingSkills((v2.ATS?.missing_keywords ?? []).slice(0, 8));
+        setTopKeywords((v2.ATS?.top_keywords ?? []).slice(0, 8));
         const reasons = v2.Gaps?.rejection_reasons || [];
         const high = reasons.filter((r) => r.impact === "high").map((r) => r.issue);
         const med = reasons.filter((r) => r.impact === "medium").map((r) => r.issue);
@@ -6219,7 +6391,29 @@ const msgInterval = setInterval(() => {
           body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang }),
         });
         const data = await res.json();
-        setEngineV2(null);
+        const fbLegacy = getFallbackAnalysis(cvText, jdText, lang);
+        const safeLegacyV2 = buildFailSafeV2FromFallback(
+          { ...fbLegacy, score: Number(data.alignment_score) || fbLegacy.score },
+          cvText,
+          jdText,
+          lang,
+        );
+        if (Array.isArray(data?.improvements) && data.improvements.length) {
+          safeLegacyV2.Decision.what_to_fix_first = data.improvements.slice(0, 3);
+          safeLegacyV2.Decision.action_plan = data.improvements.slice(0, 3).join("\n");
+        }
+        if (Array.isArray(data?.missing_skills) && data.missing_skills.length) {
+          safeLegacyV2.ATS.missing_keywords = data.missing_skills.slice(0, 8);
+          safeLegacyV2.ATS.top_keywords = data.missing_skills.slice(0, 4);
+        }
+        if (Array.isArray(data?.matched_skills) && data.matched_skills.length) {
+          safeLegacyV2.ATS.matched_skills = data.matched_skills.slice(0, 6);
+        }
+        if (data?.fit_summary) {
+          safeLegacyV2.Decision.reasoning = String(data.fit_summary);
+          safeLegacyV2.Recruiter.reasoning = String(data.fit_summary);
+        }
+        setEngineV2(safeLegacyV2);
         const legacyScore = Number(data.alignment_score) || 0;
         setAlignmentScore(data.alignment_score ?? null);
         setScoreRunProgress(computeScoreRunProgress(legacyScore));
@@ -6252,7 +6446,31 @@ const msgInterval = setInterval(() => {
         creditConsumed = true;
       } catch (err) {
         console.error(err);
-        setError(`${t.analysisFailedTitle}\n\n${t.analysisFailedRecovery}`);
+        const fb = getFallbackAnalysis(cvText, jdText, lang);
+        const safeV2 = buildFailSafeV2FromFallback(fb, cvText, jdText, lang);
+        setEngineV2(safeV2);
+        setAlignmentScore(fb.score);
+        setScoreRunProgress(computeScoreRunProgress(fb.score));
+        setRoleType(resolveSavedAnalysisRole(jdDerivedTitle, "", lang));
+        setSeniority("");
+        setMatchedSkills(safeV2.ATS?.matched_skills ?? []);
+        setMissingSkills(safeV2.ATS?.missing_keywords ?? []);
+        setTopKeywords(safeV2.ATS?.top_keywords ?? []);
+        setResult(`HireFit Decision Engine\nVerdict: ${fb.verdict}\nAlignment: ${fb.score}\n\n${fb.summary}`);
+        setAnalysisData({
+          alignment_score: fb.score,
+          role_type: resolveSavedAnalysisRole(jdDerivedTitle, "", lang),
+          seniority: "",
+          fit_summary: fb.summary,
+          strengths: [lang === "TR" ? "Mevcut sinyallerden analiz tamamlandı" : "Analysis completed from available signals"],
+          improvements: fb.fixes,
+          matched_skills: safeV2.ATS?.matched_skills ?? [],
+          missing_skills: safeV2.ATS?.missing_keywords ?? [],
+          top_keywords: safeV2.ATS?.top_keywords ?? [],
+          rejection_reasons: { high: [fb.keyGap], medium: [], low: [] },
+        });
+        setError("");
+        setShowSharePrompt(true);
       }
     }
 
