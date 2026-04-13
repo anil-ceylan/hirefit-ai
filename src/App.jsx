@@ -625,6 +625,140 @@ function stepCtaFromText(step, lang) {
   return { label: lang === "TR" ? "Start mission →" : "Start mission →", href: null };
 }
 
+function useScore(targetScore) {
+  const [animatedScore, setAnimatedScore] = useState(
+    targetScore != null && Number.isFinite(Number(targetScore)) ? Math.round(Number(targetScore)) : null,
+  );
+  const [floatingFeedback, setFloatingFeedback] = useState(null);
+  useEffect(() => {
+    if (targetScore == null || !Number.isFinite(Number(targetScore))) {
+      setAnimatedScore(null);
+      return undefined;
+    }
+    const from = animatedScore == null || !Number.isFinite(Number(animatedScore)) ? Number(targetScore) : Number(animatedScore);
+    const to = Number(targetScore);
+    if (Math.round(from) === Math.round(to)) {
+      setAnimatedScore(Math.round(to));
+      return undefined;
+    }
+    let raf = 0;
+    const t0 = performance.now();
+    const dur = 520;
+    const tick = (now) => {
+      const u = Math.min(1, (now - t0) / dur);
+      const ease = 1 - (1 - u) ** 2;
+      setAnimatedScore(Math.round(from + (to - from) * ease));
+      if (u < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [targetScore]);
+
+  useEffect(() => {
+    if (!floatingFeedback) return undefined;
+    const id = window.setTimeout(() => setFloatingFeedback(null), 1700);
+    return () => window.clearTimeout(id);
+  }, [floatingFeedback]);
+
+  return { animatedScore, floatingFeedback, setFloatingFeedback };
+}
+
+function useLevel(score) {
+  const levels = [
+    { id: 1, min: 0, max: 20, title: "Lost Candidate" },
+    { id: 2, min: 20, max: 40, title: "Direction Found" },
+    { id: 3, min: 40, max: 60, title: "Structured Thinker" },
+    { id: 4, min: 60, max: 80, title: "Market Ready" },
+    { id: 5, min: 80, max: 100, title: "Interview Ready" },
+  ];
+  const s = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
+  const current = levels.find((lvl, idx) => s >= lvl.min && (idx === levels.length - 1 || s < lvl.max)) || levels[0];
+  const next = levels.find((lvl) => lvl.id === current.id + 1) || null;
+  const pct = next
+    ? Math.max(0, Math.min(100, Math.round(((s - current.min) / (next.min - current.min)) * 100)))
+    : 100;
+  return { currentLevel: current, nextLevel: next, progressToNext: pct };
+}
+
+function useStreak(seedKey, activityTick) {
+  const [streakCount, setStreakCount] = useState(0);
+  useEffect(() => {
+    const key = `hirefit-streak-${seedKey || "global"}`;
+    const today = new Date().toISOString().slice(0, 10);
+    const dayMs = 24 * 60 * 60 * 1000;
+    try {
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : { count: 0, lastDate: "" };
+      const last = parsed.lastDate ? new Date(parsed.lastDate).getTime() : null;
+      const now = new Date(today).getTime();
+      let nextCount = Number(parsed.count) || 0;
+      if (!last) nextCount = 1;
+      else if (now - last >= dayMs * 2) nextCount = 1;
+      else if (parsed.lastDate !== today) nextCount += 1;
+      localStorage.setItem(key, JSON.stringify({ count: nextCount, lastDate: today }));
+      setStreakCount(nextCount);
+    } catch {
+      setStreakCount(1);
+    }
+  }, [seedKey, activityTick]);
+  return { streakCount };
+}
+
+function useTasks(seedKey, lang, planFixes) {
+  const [task, setTask] = useState(null);
+  useEffect(() => {
+    const key = `hirefit-daily-task-${seedKey || "global"}`;
+    const today = new Date().toISOString().slice(0, 10);
+    const pool = [
+      { title: lang === "TR" ? "CV'ye ölçülebilir sonuç ekle" : "Add measurable results to your CV", reward: 8 },
+      { title: lang === "TR" ? "Araçları netleştir (Excel, SQL vb.)" : "Add tools clearly (Excel, SQL, etc.)", reward: 6 },
+      { title: lang === "TR" ? "Rol hedeflemeyi düzelt" : "Fix role targeting", reward: 10 },
+      { title: lang === "TR" ? "Mini proje inşa et" : "Build a mini project", reward: 12 },
+      { title: lang === "TR" ? "Kanıt yükle" : "Upload proof", reward: 7 },
+    ];
+    const fromFix = planFixes.find((f) => !f.done);
+    try {
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (parsed?.date === today && parsed?.task) {
+        setTask(parsed.task);
+        return;
+      }
+      const fallback = pool[Math.floor(Math.random() * pool.length)];
+      const next = fromFix
+        ? {
+            title: String(fromFix.issue || fallback.title),
+            reward: Math.max(4, Math.min(18, Math.round(Number(fromFix.score_impact) || fallback.reward))),
+            done: false,
+          }
+        : { ...fallback, done: false };
+      const payload = { date: today, task: next };
+      localStorage.setItem(key, JSON.stringify(payload));
+      setTask(next);
+    } catch {
+      setTask({ ...pool[0], done: false });
+    }
+  }, [seedKey, lang, JSON.stringify(planFixes.map((f) => ({ issue: f.issue, score_impact: f.score_impact, done: !!f.done })))]);
+
+  const completeTask = () => {
+    if (!task || task.done) return 0;
+    const next = { ...task, done: true };
+    setTask(next);
+    try {
+      const key = `hirefit-daily-task-${seedKey || "global"}`;
+      const today = new Date().toISOString().slice(0, 10);
+      localStorage.setItem(key, JSON.stringify({ date: today, task: next }));
+    } catch {
+      // ignore
+    }
+    return Math.max(1, Number(task.reward) || 0);
+  };
+
+  return { dailyTask: task, completeTask };
+}
+
 function ResultsBulletRow({ sentiment, children }) {
   const dot =
     sentiment === "positive"
@@ -1140,17 +1274,18 @@ function CareerEngineCard({
   interviewPrep = [],
   scoreRunProgress = { prior: null, delta: null },
   progressFingerprint = "",
+  onRerunAnalysis = () => {},
 }) {
   const [showJobs, setShowJobs] = useState(false);
   const [activeTab, setActiveTab] = useState("recruiter");
   const [uxToast, setUxToast] = useState(null);
   const [completedSteps, setCompletedSteps] = useState([]);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
-  const [animatedProgressScore, setAnimatedProgressScore] = useState(null);
-  const [scoreDeltaFloat, setScoreDeltaFloat] = useState(null);
   const [successFlashFixIdx, setSuccessFlashFixIdx] = useState(-1);
   const [stepPopup, setStepPopup] = useState(null);
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
+  const [taskBonusPoints, setTaskBonusPoints] = useState(0);
+  const [streakActivityTick, setStreakActivityTick] = useState(0);
   const [execState, setExecState] = useState(() => ({
     completed: [],
     fixProofs: [],
@@ -1229,6 +1364,21 @@ function CareerEngineCard({
     return Math.round(acc);
   }, [scoreNumeric, planFixesMemo, execState.completed]);
 
+  const scoreWithTaskBonus =
+    dynamicProgressScore != null && Number.isFinite(Number(dynamicProgressScore))
+      ? Math.min(100, Math.round(Number(dynamicProgressScore) + Number(taskBonusPoints || 0)))
+      : scoreNumeric != null && Number.isFinite(Number(scoreNumeric))
+        ? Math.min(100, Math.round(Number(scoreNumeric) + Number(taskBonusPoints || 0)))
+        : null;
+  const { animatedScore: animatedProgressScore, floatingFeedback: scoreDeltaFloat, setFloatingFeedback: setScoreDeltaFloat } = useScore(scoreWithTaskBonus);
+  const { currentLevel, nextLevel, progressToNext } = useLevel(animatedProgressScore ?? scoreWithTaskBonus ?? 0);
+  const { streakCount } = useStreak(fp || "career", streakActivityTick);
+  const { dailyTask, completeTask } = useTasks(
+    fp || "career",
+    lang,
+    planFixesMemo.map((f, idx) => ({ ...f, done: !!execState.completed[idx] })),
+  );
+
   useEffect(() => {
     setCompletedSteps(Array.isArray(execState.completed) ? execState.completed.map(Boolean) : []);
   }, [execState.completed]);
@@ -1243,45 +1393,10 @@ function CareerEngineCard({
   }, [completedSteps]);
 
   useEffect(() => {
-    const target = dynamicProgressScore ?? scoreNumeric;
-    if (target == null || !Number.isFinite(Number(target))) {
-      setAnimatedProgressScore(null);
-      return undefined;
-    }
-    const from = animatedProgressScore == null || !Number.isFinite(Number(animatedProgressScore))
-      ? Number(target)
-      : Number(animatedProgressScore);
-    if (Math.round(from) === Math.round(Number(target))) {
-      setAnimatedProgressScore(Math.round(Number(target)));
-      return undefined;
-    }
-    let raf = 0;
-    const t0 = performance.now();
-    const dur = 520;
-    const tick = (now) => {
-      const u = Math.min(1, (now - t0) / dur);
-      const ease = 1 - (1 - u) ** 2;
-      const v = Math.round(from + (Number(target) - from) * ease);
-      setAnimatedProgressScore(v);
-      if (u < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [dynamicProgressScore, scoreNumeric]);
-
-  useEffect(() => {
     if (!uxToast) return undefined;
     const id = window.setTimeout(() => setUxToast(null), 4200);
     return () => window.clearTimeout(id);
   }, [uxToast]);
-
-  useEffect(() => {
-    if (!scoreDeltaFloat) return undefined;
-    const id = window.setTimeout(() => setScoreDeltaFloat(null), 1600);
-    return () => window.clearTimeout(id);
-  }, [scoreDeltaFloat]);
 
   useEffect(() => {
     if (!stepPopup) return undefined;
@@ -1306,6 +1421,11 @@ function CareerEngineCard({
       setTodayCompletedCount(0);
     }
   }, [todayProgressKey, todayYmd]);
+
+  useEffect(() => {
+    // Treat opening this result view as a session activity ping for streak.
+    setStreakActivityTick((x) => x + 1);
+  }, []);
 
   if (!data) return null;
 
@@ -1561,8 +1681,8 @@ function CareerEngineCard({
           <div style={{ textAlign: "right", flexShrink: 0, minWidth: 140 }}>
             <div style={{ ...labelStyle, marginBottom: 8, opacity: 0.95 }}>{t.alignmentScore}</div>
             <motion.div
-              animate={{ scale: [1, 1.02, 1] }}
-              transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+              animate={{ scale: scoreDeltaFloat ? [1, 1.05, 1] : [1, 1.02, 1] }}
+              transition={{ duration: scoreDeltaFloat ? 0.8 : 2.4, repeat: scoreDeltaFloat ? 1 : Infinity, ease: "easeInOut" }}
               style={{
                 fontFamily: RS.fontMono,
                 fontSize: "clamp(56px, 7.5vw, 80px)",
@@ -1570,11 +1690,37 @@ function CareerEngineCard({
                 color: vc,
                 lineHeight: 0.95,
                 letterSpacing: "-0.03em",
-                textShadow: `0 0 56px ${rsAlpha(vc, 0.45)}, 0 0 100px ${rsAlpha(vc, 0.18)}`,
+                textShadow: scoreDeltaFloat
+                  ? `0 0 64px ${rsAlpha(RS.green, 0.45)}, 0 0 100px ${rsAlpha(vc, 0.18)}`
+                  : `0 0 56px ${rsAlpha(vc, 0.45)}, 0 0 100px ${rsAlpha(vc, 0.18)}`,
               }}
             >
-              {score ?? "—"}
+              {animatedProgressScore ?? score ?? "—"}
             </motion.div>
+            <div style={{ marginTop: 10, marginLeft: "auto", maxWidth: 260, textAlign: "right" }}>
+              <div style={{ fontSize: 11, fontWeight: 900, color: RS.indigo, letterSpacing: "0.08em" }}>
+                {`Level ${currentLevel.id}: ${currentLevel.title}`}
+              </div>
+              {nextLevel ? (
+                <>
+                  <div style={{ marginTop: 7, height: 7, borderRadius: 999, background: rsAlpha(RS.textMuted, 0.24), overflow: "hidden" }}>
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progressToNext}%` }}
+                      transition={{ duration: 0.5, ease: "easeOut" }}
+                      style={{ height: "100%", borderRadius: 999, background: `linear-gradient(90deg, ${RS.indigo}, ${RS.green})` }}
+                    />
+                  </div>
+                  <div style={{ marginTop: 5, fontSize: 10, color: RS.textMuted, fontFamily: RS.fontMono }}>
+                    {`Next level at ${nextLevel.min}`}
+                  </div>
+                </>
+              ) : (
+                <div style={{ marginTop: 5, fontSize: 10, color: RS.green, fontFamily: RS.fontMono }}>
+                  {lang === "TR" ? "Maksimum seviye" : "Max level reached"}
+                </div>
+              )}
+            </div>
             {scoreInsights.main ? (
               <div
                 style={{
@@ -1949,7 +2095,91 @@ function CareerEngineCard({
             <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, fontFamily: RS.fontMono }}>
               {lang === "TR" ? `Bugün tamamlanan adımlar: ${todayCompletedCount}/3` : `Steps completed today: ${todayCompletedCount}/3`}
             </div>
+            <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: RS.amber }}>
+              {`🔥 ${streakCount} Day Streak`}
+            </div>
+            <div style={{ marginTop: 4, fontSize: 11, color: RS.textMuted }}>
+              {lang === "TR" ? "Bozma — ivme inşa ediyorsun." : "Don't break it — you're building momentum."}
+            </div>
           </div>
+          {dailyTask ? (
+            <div
+              style={{
+                marginBottom: 16,
+                padding: "14px 16px",
+                borderRadius: 12,
+                border: `1px solid ${rsAlpha(RS.green, 0.28)}`,
+                background: `linear-gradient(135deg, ${rsAlpha(RS.green, 0.12)}, ${rsAlpha(RS.bgElevated, 0.9)})`,
+                boxShadow: `0 0 24px ${rsAlpha(RS.green, 0.12)}`,
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.08em", color: RS.green, marginBottom: 8 }}>
+                {lang === "TR" ? "TODAY'S TASK" : "TODAY'S TASK"}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: RS.textPrimary, lineHeight: 1.5 }}>{dailyTask.title}</div>
+              <div style={{ marginTop: 6, fontSize: 12, fontWeight: 800, color: RS.amber, fontFamily: RS.fontMono }}>
+                +{dailyTask.reward} pts
+              </div>
+              <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+                <button
+                  type="button"
+                  disabled={!!dailyTask.done}
+                  onClick={() => {
+                    const gain = completeTask();
+                    if (!gain) return;
+                    setTaskBonusPoints((v) => Math.min(100, Number(v || 0) + gain));
+                    setStreakActivityTick((x) => x + 1);
+                    setScoreDeltaFloat(`🔥 +${gain} points — Positioning fixed`);
+                    setStepPopup({
+                      kind: "complete",
+                      text: lang === "TR" ? `Görev tamamlandı: +${gain} puan` : `Task completed: +${gain} points`,
+                    });
+                  }}
+                  style={{
+                    padding: "9px 14px",
+                    borderRadius: 10,
+                    border: "none",
+                    cursor: dailyTask.done ? "not-allowed" : "pointer",
+                    fontWeight: 800,
+                    fontSize: 12,
+                    color: "#052e16",
+                    background: dailyTask.done ? rsAlpha(RS.textMuted, 0.35) : `linear-gradient(135deg, ${RS.green}, #34d399)`,
+                  }}
+                >
+                  {dailyTask.done ? (lang === "TR" ? "Tamamlandı" : "Completed") : (lang === "TR" ? "Complete Task" : "Complete Task")}
+                </button>
+                {dailyTask.done ? (
+                  <div style={{ fontSize: 11, fontWeight: 700, color: RS.indigo }}>
+                    {lang === "TR" ? "⚡ Yeni skorunu görmek için analizi tekrar çalıştır" : "⚡ Re-run analysis to see your new score"}
+                  </div>
+                ) : null}
+              </div>
+              {dailyTask.done ? (
+                <button
+                  type="button"
+                  onClick={onRerunAnalysis}
+                  style={{
+                    marginTop: 10,
+                    padding: "8px 13px",
+                    borderRadius: 10,
+                    border: `1px solid ${rsAlpha(RS.indigo, 0.42)}`,
+                    background: rsAlpha(RS.indigo, 0.16),
+                    color: RS.textPrimary,
+                    fontSize: 12,
+                    fontWeight: 800,
+                    cursor: "pointer",
+                  }}
+                >
+                  {lang === "TR" ? "Re-run analysis" : "Re-run analysis"}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {scoreDeltaFloat ? (
+            <div style={{ marginTop: -4, marginBottom: 12, fontSize: 12, fontWeight: 800, color: RS.green }}>
+              ⚡ You're closer to interview range
+            </div>
+          ) : null}
           {actionPlan.priority_callout ? (
             <div style={{ marginBottom: 16, padding: "14px 16px", borderRadius: 8, background: RS.bgElevated, border: `1px solid ${RS.borderSubtle}` }}>
               <div style={{ ...labelStyle, marginBottom: 8 }}>{t.whatToDoNext}</div>
@@ -2297,15 +2527,15 @@ function CareerEngineCard({
                                 <div style={{ padding: "10px 11px", borderRadius: 10, border: `1px solid ${rsAlpha(RS.red, 0.22)}`, background: rsAlpha(RS.red, 0.08) }}>
                                   <div style={{ fontSize: 10, fontWeight: 800, color: RS.red, marginBottom: 4 }}>{lang === "TR" ? "Before" : "Before"}</div>
                                   <div style={{ fontSize: 11, lineHeight: 1.45, color: RS.textSecondary }}>
-                                    <div>{lang === "TR" ? "• Net konumlanma yok" : "• No clear positioning"}</div>
-                                    <div>{lang === "TR" ? "• Elenme riski yüksek" : "• High rejection risk"}</div>
+                                    <div>{lang === "TR" ? "• Ölçülebilir etki yok" : "• No measurable impact"}</div>
+                                    <div>{lang === "TR" ? "• Recruiter için zayıf sinyal" : "• Weak recruiter signal"}</div>
                                   </div>
                                 </div>
                                 <div style={{ padding: "10px 11px", borderRadius: 10, border: `1px solid ${rsAlpha(RS.green, 0.28)}`, background: rsAlpha(RS.green, 0.1) }}>
                                   <div style={{ fontSize: 10, fontWeight: 800, color: RS.green, marginBottom: 4 }}>{lang === "TR" ? "After" : "After"}</div>
                                   <div style={{ fontSize: 11, lineHeight: 1.45, color: RS.textSecondary }}>
-                                    <div>{lang === "TR" ? "• Rol hizalaması netleşti" : "• Clear role alignment"}</div>
-                                    <div>{lang === "TR" ? "• Recruiter okunabilir sinyal" : "• Recruiter-readable signal"}</div>
+                                    <div>{lang === "TR" ? "• Nicel sonuç eklendi" : "• Added quantified result"}</div>
+                                    <div>{lang === "TR" ? "• Rol sinyali netleşti" : "• Clear role alignment"}</div>
                                   </div>
                                 </div>
                               </div>
@@ -7051,6 +7281,7 @@ export function AnalyzerPage() {
           progressFingerprint={
             alignmentScore != null ? analysisExecutionFingerprint(cvText, jdText, alignmentScore) : ""
           }
+          onRerunAnalysis={reanalyzeAfterFix}
         />
       </motion.div>
     )}
