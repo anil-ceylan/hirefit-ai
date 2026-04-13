@@ -1316,7 +1316,13 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing })
   const biggestRaw =
     (data.Gaps?.biggest_gap && String(data.Gaps.biggest_gap).trim()) ||
     (gaps[0]?.issue ? String(gaps[0].issue) : "");
-  const mainProblem = biggestRaw ? humanizeUserFacingReason(biggestRaw, lang) : "";
+  const mainProblemFromGap = biggestRaw ? humanizeUserFacingReason(biggestRaw, lang) : "";
+  const oneLineReasonRaw = String(data.Decision?.reasoning || data.Recruiter?.reasoning || "")
+    .trim()
+    .split(/[.!?]/)[0]
+    ?.trim();
+  const mainProblemFromReason = oneLineReasonRaw ? humanizeUserFacingReason(oneLineReasonRaw, lang) : "";
+  const displayedMainProblem = mainProblemFromGap || mainProblemFromReason;
 
   const planFixes = planFixesMemo;
   const primaryFix = planFixes.find((f) => f.priority === "high") || planFixes[0] || null;
@@ -1389,12 +1395,19 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing })
             >
               {currentInt != null ? currentInt : "—"}
             </div>
-            <div style={{ marginTop: 10, fontSize: 15, fontWeight: 700, color: RS.textPrimary, lineHeight: 1.45 }}>{fv.title}</div>
+            <div style={{ ...labelStyle, marginTop: 14, marginBottom: 6 }}>{t.focusOverallStatusLabel}</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: RS.textPrimary, lineHeight: 1.45 }}>{fv.title}</div>
             {rej ? (
-              <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600, color: rej.color, lineHeight: 1.5 }}>{rej.mainLine}</div>
+              <>
+                <div style={{ ...labelStyle, marginTop: 14, marginBottom: 6 }}>{t.focusRiskKicker}</div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: rej.color, lineHeight: 1.5 }}>{rej.mainLine}</div>
+              </>
             ) : null}
-            {mainProblem ? (
-              <p style={{ margin: "16px 0 0", fontSize: 16, fontWeight: 600, color: RS.textPrimary, lineHeight: 1.6, maxWidth: 560 }}>{mainProblem}</p>
+            {displayedMainProblem ? (
+              <>
+                <div style={{ ...labelStyle, marginTop: 16, marginBottom: 8 }}>{t.focusMainProblemKicker}</div>
+                <p style={{ margin: 0, fontSize: 16, fontWeight: 600, color: RS.textPrimary, lineHeight: 1.6, maxWidth: 560 }}>{displayedMainProblem}</p>
+              </>
             ) : (
               <p style={{ margin: "16px 0 0", fontSize: 15, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.65, maxWidth: 560 }}>{fv.explanation}</p>
             )}
@@ -1754,12 +1767,15 @@ const translations = {
     stepCtaApply: "Enter target zone →",
     impactUnlockedLine: "Impact unlocked",
     focusVerdictKicker: "Verdict",
+    focusOverallStatusLabel: "Overall status",
+    focusRiskKicker: "Rejection risk",
+    focusMainProblemKicker: "Main rejection reason",
     focusImpactKicker: "Score impact",
     focusImpactExpl: "Fixing this gap is worth about +{pts} points toward a stronger profile.",
     focusActionKicker: "Your one move",
     focusCtaSeeFull: "See full analysis →",
     focusCtaApplyFix: "Apply this focus to my CV →",
-    focusHiddenGapsTeaser: "There are {n} more gaps still affecting your score. Unlock the full breakdown.",
+    focusHiddenGapsTeaser: "There are {n} more gaps still affecting your score. See the full breakdown with Pro.",
   },
   TR: {
     slogan: "AI Career Decision Engine",
@@ -2026,12 +2042,15 @@ const translations = {
     stepCtaApply: "Hedef bölgeye gir →",
     impactUnlockedLine: "Etki açıldı",
     focusVerdictKicker: "Sonuç",
+    focusOverallStatusLabel: "Genel durum",
+    focusRiskKicker: "Elenme riski",
+    focusMainProblemKicker: "Ana red nedeni",
     focusImpactKicker: "Skor etkisi",
     focusImpactExpl: "Bu boşluğu kapatmak profil gücün için yaklaşık +{pts} puanlık bir kazanım demek.",
     focusActionKicker: "Tek hamlen",
     focusCtaSeeFull: "Tam analizi gör →",
     focusCtaApplyFix: "Bu odağı CV'me uygula →",
-    focusHiddenGapsTeaser: "Skorunu etkileyen {n} boşluk daha var. Tüm dökümü görmek için kilidi aç.",
+    focusHiddenGapsTeaser: "Skorunu etkileyen {n} boşluk daha var. Tüm dökümü Pro ile görebilirsin.",
   },
 };
 
