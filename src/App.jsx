@@ -67,11 +67,6 @@ function getSectorDisplayLabel(sectorKey, lang) {
   return String(sectorKey || "");
 }
 
-const SHARE_RESULT_UI = {
-  EN: { title: "Share your result", copy: "Copy text", linkedIn: "Share on LinkedIn", copied: "Copied!" },
-  TR: { title: "Sonucunu paylaş", copy: "Metni kopyala", linkedIn: "LinkedIn'de paylaş", copied: "Kopyalandı!" },
-};
-
 /** HireFit results surface — semantic colors + premium contrast. */
 const RS = {
   pageGradient: "linear-gradient(165deg, #020617 0%, #0f172a 42%, #0c1222 100%)",
@@ -1013,144 +1008,6 @@ function buildLinkedInShareUrl(shareText) {
   return `https://www.linkedin.com/feed/?shareActive=true&text=${encodeURIComponent(text)}`;
 }
 
-function ShareYourResult({ score, verdictLabel, biggestMistake, lang }) {
-  const [copied, setCopied] = useState(false);
-  const ui = SHARE_RESULT_UI[isUiTurkish(lang) ? "TR" : "EN"];
-  const text = buildShareResultText({ score, verdictLabel, biggestMistake, lang });
-  const linkedInUrl = buildLinkedInShareUrl(text);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2200);
-    } catch {
-      setCopied(false);
-    }
-  };
-  return (
-    <div
-      style={{
-        marginBottom: 20,
-        padding: "24px 32px",
-        borderRadius: 12,
-        border: `1px solid ${RS.border}`,
-        background: RS.bgSurface,
-        fontFamily: RS.fontUi,
-      }}
-    >
-      <div style={{ fontSize: 12, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: RS.textMuted, marginBottom: 12 }}>{ui.title}</div>
-      <textarea
-        readOnly
-        value={text}
-        rows={8}
-        style={{
-          width: "100%",
-          margin: "0 0 16px",
-          padding: "14px 16px",
-          borderRadius: 8,
-          background: RS.bgBase,
-          border: `1px solid ${RS.borderSubtle}`,
-          fontSize: 14,
-          lineHeight: 1.65,
-          color: RS.textSecondary,
-          resize: "vertical",
-          fontFamily: RS.fontUi,
-          outline: "none",
-        }}
-      />
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-        <button
-          type="button"
-          onClick={copy}
-          style={{
-            flex: 1,
-            minWidth: 140,
-            padding: "10px 16px",
-            borderRadius: 8,
-            border: `1px solid ${RS.borderSubtle}`,
-            background: RS.bgElevated,
-            color: RS.textSecondary,
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: "pointer",
-            fontFamily: RS.fontUi,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-          }}
-        >
-          <Copy size={15} />
-          {copied ? ui.copied : ui.copy}
-        </button>
-        <a
-          href={linkedInUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            flex: 1,
-            minWidth: 140,
-            padding: "10px 16px",
-            borderRadius: 8,
-            border: "none",
-            background: RS.indigo,
-            color: RS.textPrimary,
-            fontSize: 13,
-            fontWeight: 500,
-            cursor: "pointer",
-            fontFamily: RS.fontUi,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            textDecoration: "none",
-          }}
-        >
-          <Linkedin size={15} />
-          {ui.linkedIn}
-        </a>
-      </div>
-    </div>
-  );
-}
-
-function getMockJobsForRole(role, lang) {
-  const r = String(role || "").toLowerCase();
-  if (r.includes("product")) {
-    return [
-      { title: "Product Analyst", location: "Remote / EU", fit: 84 },
-      { title: "Junior Product Manager", location: "Berlin Hybrid", fit: 79 },
-      { title: "Growth Product Specialist", location: "Istanbul", fit: 76 },
-    ];
-  }
-  if (r.includes("marketing")) {
-    return [
-      { title: "Performance Marketing Analyst", location: "Remote", fit: 83 },
-      { title: "Growth Marketing Associate", location: "London Hybrid", fit: 78 },
-      { title: "CRM Marketing Specialist", location: "Istanbul", fit: 75 },
-    ];
-  }
-  if (r.includes("strategy")) {
-    return [
-      { title: "Strategy Analyst", location: "Remote / EU", fit: 82 },
-      { title: "Business Analyst", location: "Amsterdam Hybrid", fit: 77 },
-      { title: "Operations Strategy Associate", location: "Istanbul", fit: 74 },
-    ];
-  }
-  if (r.includes("data")) {
-    return [
-      { title: "Data Analyst", location: "Remote", fit: 85 },
-      { title: "BI Analyst", location: "Dublin Hybrid", fit: 80 },
-      { title: "Analytics Specialist", location: "Istanbul", fit: 76 },
-    ];
-  }
-  return [
-    { title: lang === "TR" ? "Analist" : "Analyst", location: "Remote", fit: 78 },
-    { title: lang === "TR" ? "Uzman" : "Specialist", location: "Hybrid", fit: 74 },
-    { title: lang === "TR" ? "Koordinatör" : "Coordinator", location: "On-site", fit: 70 },
-  ];
-}
-
 function countCvSections(cvText) {
   const t = String(cvText || "").toLowerCase();
   let n = 0;
@@ -1423,39 +1280,7 @@ function ExpandableInsightCard({
   );
 }
 
-function CareerEngineCard({
-  data,
-  lang,
-  isPro,
-  onUpgrade,
-  onFixCv,
-  optimizing,
-  onSharePrompt,
-  onOpenRoadmap = () => {},
-  matchedSkills = [],
-  missingSkills = [],
-  topKeywords = [],
-  interviewPrep = [],
-  scoreRunProgress = { prior: null, delta: null },
-  progressFingerprint = "",
-  onRerunAnalysis = () => {},
-}) {
-  const [showJobs, setShowJobs] = useState(false);
-  const [activeTab, setActiveTab] = useState("recruiter");
-  const [uxToast, setUxToast] = useState(null);
-  const [completedSteps, setCompletedSteps] = useState([]);
-  const [activeStepIndex, setActiveStepIndex] = useState(0);
-  const [successFlashFixIdx, setSuccessFlashFixIdx] = useState(-1);
-  const [stepPopup, setStepPopup] = useState(null);
-  const [todayCompletedCount, setTodayCompletedCount] = useState(0);
-  const [taskBonusPoints, setTaskBonusPoints] = useState(0);
-  const [streakActivityTick, setStreakActivityTick] = useState(0);
-  const [execState, setExecState] = useState(() => ({
-    completed: [],
-    fixProofs: [],
-    stepProofs: [],
-  }));
-
+function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing }) {
   const actionPlanMemo = useMemo(() => {
     if (!data) return { priority_callout: null, fixes: [], interview_note: null };
     return enrichActionPlan(parseActionPlan(data.Decision?.action_plan), {
@@ -1477,211 +1302,52 @@ function CareerEngineCard({
     return s != null && Number.isFinite(Number(s)) ? Number(s) : null;
   }, [data]);
 
-  const cumulativeProjected = useMemo(() => {
-    if (scoreNumeric == null || !planFixesMemo.length) return [];
-    return cumulativeScoresAfterFixes(scoreNumeric, planFixesMemo);
-  }, [scoreNumeric, planFixesMemo]);
-
-  const fp = progressFingerprint || "";
-  const nPlanFixes = planFixesMemo.length;
-
-  useEffect(() => {
-    if (!nPlanFixes) {
-      setExecState({ completed: [], fixProofs: [], stepProofs: [] });
-      return;
-    }
-    if (!fp) {
-      setExecState({
-        completed: Array.from({ length: nPlanFixes }, () => false),
-        fixProofs: Array.from({ length: nPlanFixes }, () => ""),
-        stepProofs: emptyStepProofGrid(planFixesMemo),
-      });
-      return;
-    }
-    setExecState(loadExecutionPlanState(fp, planFixesMemo));
-  }, [fp, nPlanFixes, planFixesMemo]);
-
-  const roleFitRows = data?.RoleFit?.role_fit;
-  const roleFitBest = data?.RoleFit?.best_role;
-
-  const betterRoleAlternatives = useMemo(() => {
-    const rows = Array.isArray(roleFitRows) ? roleFitRows : [];
-    if (!rows.length) return [];
-    const align = scoreNumeric;
-    const sorted = [...rows].sort((a, b) => Number(b.score) - Number(a.score));
-    if (align != null) {
-      const alts = sorted.filter((r) => Number(r.score) > align + 2);
-      if (alts.length) return alts.slice(0, 4);
-    }
-    return sorted.filter((r) => !roleFitBest || String(r.role) !== String(roleFitBest)).slice(0, 3);
-  }, [roleFitRows, scoreNumeric, roleFitBest]);
-
-  const dynamicProgressScore = useMemo(() => {
-    if (scoreNumeric == null || !planFixesMemo.length) return null;
-    let acc = scoreNumeric;
-    planFixesMemo.forEach((f, idx) => {
-      if (execState.completed[idx]) {
-        const imp = Math.max(1, Math.min(18, Math.round(Number(f?.score_impact) || 0)));
-        acc = Math.min(100, acc + imp);
-      }
-    });
-    return Math.round(acc);
-  }, [scoreNumeric, planFixesMemo, execState.completed]);
-
-  const scoreWithTaskBonus =
-    dynamicProgressScore != null && Number.isFinite(Number(dynamicProgressScore))
-      ? Math.min(100, Math.round(Number(dynamicProgressScore) + Number(taskBonusPoints || 0)))
-      : scoreNumeric != null && Number.isFinite(Number(scoreNumeric))
-        ? Math.min(100, Math.round(Number(scoreNumeric) + Number(taskBonusPoints || 0)))
-        : null;
-  const { animatedScore: animatedProgressScore, floatingFeedback: scoreDeltaFloat, setFloatingFeedback: setScoreDeltaFloat } = useScore(scoreWithTaskBonus);
-  const { currentLevel, nextLevel, progressToNext } = useLevel(animatedProgressScore ?? scoreWithTaskBonus ?? 0);
-  const { streakCount } = useStreak(fp || "career", streakActivityTick);
-  const { dailyTask, completeTask } = useTasks(
-    fp || "career",
-    lang,
-    planFixesMemo.map((f, idx) => ({ ...f, done: !!execState.completed[idx] })),
-  );
-
-  useEffect(() => {
-    setCompletedSteps(Array.isArray(execState.completed) ? execState.completed.map(Boolean) : []);
-  }, [execState.completed]);
-
-  useEffect(() => {
-    if (!completedSteps.length) {
-      setActiveStepIndex(0);
-      return;
-    }
-    const firstOpen = completedSteps.findIndex((c) => !c);
-    setActiveStepIndex(firstOpen === -1 ? Math.max(0, completedSteps.length - 1) : firstOpen);
-  }, [completedSteps]);
-
-  useEffect(() => {
-    if (!uxToast) return undefined;
-    const id = window.setTimeout(() => setUxToast(null), 4200);
-    return () => window.clearTimeout(id);
-  }, [uxToast]);
-
-  useEffect(() => {
-    if (!stepPopup) return undefined;
-    const id = window.setTimeout(() => setStepPopup(null), 1700);
-    return () => window.clearTimeout(id);
-  }, [stepPopup]);
-
-  const todayYmd = new Date().toISOString().slice(0, 10);
-  const todayProgressKey = `hirefit-today-progress-${fp || "anon"}`;
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(todayProgressKey);
-      if (!raw) {
-        setTodayCompletedCount(0);
-        return;
-      }
-      const parsed = JSON.parse(raw);
-      if (parsed?.date === todayYmd) setTodayCompletedCount(Math.max(0, Number(parsed.count) || 0));
-      else setTodayCompletedCount(0);
-    } catch {
-      setTodayCompletedCount(0);
-    }
-  }, [todayProgressKey, todayYmd]);
-
-  useEffect(() => {
-    // Treat opening this result view as a session activity ping for streak.
-    setStreakActivityTick((x) => x + 1);
-  }, []);
-
   if (!data) return null;
 
   const t = translations[lang];
-  const SHOW_GAMIFICATION_UI = false;
   const score = data["Final Alignment Score"];
-  const actionPlan = actionPlanMemo;
-  const planFixes = planFixesMemo;
+  const scoreRounded = score != null && Number.isFinite(Number(score)) ? Math.round(Number(score)) : NaN;
+  const currentInt = Number.isFinite(scoreRounded) ? scoreRounded : scoreNumeric != null ? Math.round(scoreNumeric) : null;
   const fv = getScoreFinalVerdict(score, lang);
+  const vc = fv.verdictColor || RS.textMuted;
+  const rej = score != null && Number.isFinite(Number(score)) ? getRejectionRiskFromAlignmentScore(score, lang) : null;
+
   const gaps = data.Gaps?.rejection_reasons || [];
-  const roles = data.RoleFit?.role_fit || [];
-  const best = data.RoleFit?.best_role;
-  const locked = data.RoleFit?.locked;
-  const previewStep = pickDoThisNextStep(actionPlan.fixes);
-  const highFix = actionPlan.fixes.find((f) => f.priority === "high");
-  const highImpactPts = Math.max(1, Math.min(18, Math.round(Number(highFix?.score_impact) || 0)));
   const biggestRaw =
     (data.Gaps?.biggest_gap && String(data.Gaps.biggest_gap).trim()) ||
     (gaps[0]?.issue ? String(gaps[0].issue) : "");
-  const biggest = biggestRaw ? humanizeUserFacingReason(biggestRaw, lang) : "";
+  const mainProblem = biggestRaw ? humanizeUserFacingReason(biggestRaw, lang) : "";
 
-  const jobSuggestions = getMockJobsForRole(best || roles?.[0]?.role, lang);
-  const oneLineSummary = String(data.Decision?.reasoning || data.Recruiter?.reasoning || "").split(/[.!?]/).find(Boolean)?.trim() || (lang === "TR" ? "Bu rol için kritik boşlukların var." : "There are critical gaps for this role.");
-  const vc = fv.verdictColor || RS.textMuted;
-  const aiConfidence = data.Decision?.confidence;
-  const confidenceTier = getConfidenceTierLabel(aiConfidence, lang);
-  const rej = score != null && Number.isFinite(Number(score)) ? getRejectionRiskFromAlignmentScore(score, lang) : null;
-  const matchedDisplay = (Array.isArray(matchedSkills) && matchedSkills.length > 0 ? matchedSkills : data.ATS?.matched_skills) || [];
-  const missingDisplay = (Array.isArray(missingSkills) && missingSkills.length > 0 ? missingSkills : data.ATS?.missing_keywords) || [];
-  const keywordsDisplay = (Array.isArray(topKeywords) && topKeywords.length > 0 ? topKeywords : data.ATS?.top_keywords) || [];
-  const gapActionNext = isPro ? t.emptyGapNextPro : t.emptyGapNextFree;
-  const unlockLabel = t.unlockProArrow;
-  const scoreRounded =
-    score != null && Number.isFinite(Number(score)) ? Math.round(Number(score)) : NaN;
-  const hero = Number.isFinite(scoreRounded) ? scoreHeroLines(scoreRounded, lang) : null;
-  const scoreInsights = Number.isFinite(scoreRounded)
-    ? scoreInsightBlock(scoreRounded, lang)
-    : { main: "", bench: "" };
-  const ptsGainedProg =
-    scoreNumeric != null && dynamicProgressScore != null ? Math.max(0, dynamicProgressScore - scoreNumeric) : 0;
-  const completedFixCount = execState.completed.filter(Boolean).length;
-  const firstOpenFixIdx = execState.completed.findIndex((c) => !c);
-  const nextActionText =
-    firstOpenFixIdx >= 0
-      ? (() => {
-          const fx = planFixes[firstOpenFixIdx];
-          const st = fx?.steps?.[0];
-          if (st && String(st).trim()) return String(st).trim();
-          if (fx?.issue) return humanizeUserFacingReason(String(fx.issue), lang);
-          return lang === "TR" ? "Aksiyon planına git" : "Open your action plan";
-        })()
-      : lang === "TR"
-        ? "Check Fit'i tekrar çalıştır — kazanımları kilitle"
-        : "Run Check Fit again to lock in gains";
-  const progressFillTo70 = (() => {
-    const cur = dynamicProgressScore ?? scoreNumeric;
-    if (cur == null || !Number.isFinite(Number(cur))) return 0;
-    return Math.min(100, Math.round((Number(cur) / 70) * 100));
-  })();
-  const gapTo70Steps = (() => {
-    const cur = dynamicProgressScore ?? scoreNumeric;
-    if (cur == null || !Number.isFinite(Number(cur))) return 0;
-    if (Number(cur) >= 70) return 0;
-    return Math.max(1, Math.ceil((70 - Number(cur)) / 5));
-  })();
-  const strongCandidateGap = (() => {
-    const current = dynamicProgressScore ?? scoreNumeric;
-    if (current == null || Number(current) >= 82) return 0;
-    return Math.max(0, 82 - Number(current));
-  })();
-  const stepsToStrongCandidate = (() => {
-    if (!strongCandidateGap) return 0;
-    const remaining = planFixes
-      .map((f, idx) => ({ pts: Math.max(1, Math.min(18, Math.round(Number(f?.score_impact) || 0))), done: !!execState.completed[idx] }))
-      .filter((x) => !x.done)
-      .map((x) => x.pts);
-    let acc = 0;
-    let steps = 0;
-    for (const pts of remaining) {
-      acc += pts;
-      steps += 1;
-      if (acc >= strongCandidateGap) return steps;
+  const planFixes = planFixesMemo;
+  const primaryFix = planFixes.find((f) => f.priority === "high") || planFixes[0] || null;
+  const gainPts = primaryFix
+    ? Math.max(1, Math.min(18, Math.round(Number(primaryFix.score_impact) || 6)))
+    : currentInt != null && currentInt < 72
+      ? Math.min(18, Math.max(5, Math.round((72 - currentInt) / 2)))
+      : 10;
+  const targetScore = currentInt != null ? Math.min(100, Math.round(currentInt + gainPts)) : null;
+
+  const stepPick = pickDoThisNextStep(planFixes);
+  const singleActionRaw =
+    (stepPick && String(stepPick).trim()) ||
+    (primaryFix?.issue ? String(primaryFix.issue).trim() : "") ||
+    (actionPlanMemo.priority_callout ? String(actionPlanMemo.priority_callout).trim() : "");
+  const singleAction = singleActionRaw
+    ? humanizeUserFacingReason(singleActionRaw, lang)
+    : lang === "TR"
+      ? "Önce bu odağı netleştir; ardından tam analizde adım adım ilerle."
+      : "Clarify this focus first, then follow the full guided breakdown.";
+
+  let extraHiddenCount = 0;
+  if (!isPro) {
+    extraHiddenCount = Math.max(0, gaps.length - 1);
+    if (planFixes.length > 1) {
+      extraHiddenCount = Math.max(extraHiddenCount, planFixes.length - 1);
     }
-    return remaining.length;
-  })();
-  const tabSpecs = [
-    { id: "recruiter", label: t.recruiterView },
-    { id: "deep", label: t.deepAnalysis },
-    { id: "plan", label: t.actionPlan },
-    { id: "skills", label: t.skillsKeywords },
-    { id: "market", label: t.marketInsights },
-  ];
+    if (extraHiddenCount < 1) {
+      extraHiddenCount = 3;
+    }
+  }
 
   const labelStyle = {
     fontSize: 10,
@@ -1691,22 +1357,12 @@ function CareerEngineCard({
     color: RS.textMuted,
     fontFamily: RS.fontUi,
   };
-  const sectionTitleStyle = {
-    fontSize: 16,
-    fontWeight: 800,
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    color: RS.textSecondary,
-    marginBottom: 18,
-    fontFamily: RS.fontUi,
-  };
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      whileHover={{ y: -3, boxShadow: `0 28px 90px rgba(0,0,0,0.5), 0 0 0 1px ${rsAlpha(RS.indigo, 0.12)}` }}
       style={{
         marginBottom: 28,
         borderRadius: 20,
@@ -1715,1652 +1371,67 @@ function CareerEngineCard({
         background: RS.pageGradient,
         fontFamily: RS.fontUi,
         boxShadow: `0 24px 80px rgba(0,0,0,0.45), 0 0 0 1px ${rsAlpha(RS.indigo, 0.06)}`,
-        transition: "box-shadow 0.22s ease, transform 0.22s ease",
       }}
     >
-      <div style={{ padding: "36px 36px 32px", background: rsAlpha(RS.bgSurface, 0.92), borderBottom: `1px solid ${RS.border}` }}>
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 28 }}>
-          <div style={{ flex: "1 1 280px", minWidth: 0 }}>
-            <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
-              <div
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: 16,
-                  display: "grid",
-                  placeItems: "center",
-                  flexShrink: 0,
-                  fontSize: 28,
-                  fontWeight: 800,
-                  color: vc,
-                  background: rsAlpha(vc, 0.14),
-                  border: `1px solid ${rsAlpha(vc, 0.35)}`,
-                  fontFamily: RS.fontUi,
-                  boxShadow: `0 0 28px ${rsAlpha(vc, 0.2)}`,
-                }}
-              >
-                {fv.verdictIcon || fv.icon}
-              </div>
-              <div style={{ minWidth: 0, paddingTop: 2 }}>
-                <div style={{ ...labelStyle, marginBottom: 10 }}>{t.finalVerdict}</div>
-                {hero ? (
-                  <>
-                    <div
-                      style={{
-                        fontSize: "clamp(38px, 5.5vw, 56px)",
-                        fontWeight: 900,
-                        color: vc,
-                        lineHeight: 1.05,
-                        letterSpacing: "-0.03em",
-                      }}
-                    >
-                      {hero.big}
-                    </div>
-                    <p style={{ margin: "16px 0 0", fontSize: 18, fontWeight: 700, color: RS.textPrimary, lineHeight: 1.55, maxWidth: 560 }}>
-                      {hero.line1}
-                    </p>
-                    <p style={{ margin: "12px 0 0", fontSize: 16, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.65, maxWidth: 560 }}>
-                      {hero.line2}
-                    </p>
-                    <p style={{ margin: "14px 0 0", fontSize: 14, fontWeight: 500, lineHeight: 1.65, color: RS.textMuted, maxWidth: 560 }}>{fv.explanation}</p>
-                  </>
-                ) : (
-                  <>
-                    <div style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 900, color: vc, lineHeight: 1.12, letterSpacing: "-0.02em" }}>{fv.title}</div>
-                    <p style={{ margin: "12px 0 0", fontSize: 15, fontWeight: 500, lineHeight: 1.65, color: RS.textSecondary, maxWidth: 560 }}>{fv.explanation}</p>
-                  </>
-                )}
-              </div>
-            </div>
-            <p style={{ margin: "18px 0 0", paddingLeft: 74, fontSize: 14, fontWeight: 400, lineHeight: 1.75, color: RS.textMuted }}>{oneLineSummary}</p>
-            {biggest ? (
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "flex-start",
-                  gap: 10,
-                  maxWidth: "100%",
-                  marginTop: 12,
-                  marginLeft: 74,
-                  padding: "12px 14px",
-                  borderRadius: 10,
-                  border: `1px solid ${rsAlpha(RS.red, 0.18)}`,
-                  background: rsAlpha(RS.red, 0.07),
-                }}
-              >
-                <span aria-hidden style={{ width: 6, height: 6, borderRadius: "50%", background: RS.red, flexShrink: 0, marginTop: 6 }} />
-                <span style={{ fontSize: 13, lineHeight: 1.55, textAlign: "left" }}>
-                  <span style={{ fontWeight: 500, color: RS.red }}>{t.biggestBlockerLead}</span>
-                  <span style={{ fontWeight: 400, color: RS.redDim }}>{biggest}</span>
-                </span>
-              </div>
-            ) : null}
-            {previewStep ? (
-              <div style={{ marginTop: 14, marginLeft: 74, maxWidth: "100%" }}>
-                <div style={{ ...labelStyle, marginBottom: 4 }}>{t.doThisNext}</div>
-                <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 8, maxWidth: 520, lineHeight: 1.45 }}>{t.doThisNextLeverage}</div>
-                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
-                  <span style={{ fontSize: 15, fontWeight: 600, color: RS.textPrimary, lineHeight: 1.55 }}>{previewStep}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveTab("plan");
-                      setStepPopup({
-                        kind: "start",
-                        text: lang === "TR" ? "Misyon başlatıldı" : "Mission started",
-                      });
-                    }}
-                    style={{
-                      border: "none",
-                      borderRadius: 12,
-                      padding: "10px 16px",
-                      cursor: "pointer",
-                      fontSize: 13,
-                      fontWeight: 800,
-                      color: "#0f172a",
-                      fontFamily: RS.fontUi,
-                      background: `linear-gradient(135deg, ${RS.indigo}, #a855f7)`,
-                      boxShadow: `0 4px 20px ${rsAlpha(RS.indigo, 0.35)}`,
-                      transition: "transform 0.2s ease, box-shadow 0.2s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "translateY(-1px)";
-                      e.currentTarget.style.boxShadow = `0 8px 28px ${rsAlpha(RS.indigo, 0.45)}`;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "none";
-                      e.currentTarget.style.boxShadow = `0 4px 20px ${rsAlpha(RS.indigo, 0.35)}`;
-                    }}
-                  >
-                    {t.startFixingNow}
-                  </button>
-                </div>
-                {score != null && Number.isFinite(Number(score)) && highImpactPts ? (
-                  <div style={{ fontSize: 12, color: RS.textMuted, marginTop: 8, lineHeight: 1.45, maxWidth: 520 }}>
-                    {formatBlockerTransform(score, highImpactPts, lang)}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-          <div style={{ textAlign: "right", flexShrink: 0, minWidth: 140 }}>
-            <div style={{ ...labelStyle, marginBottom: 8, opacity: 0.95 }}>{t.alignmentScore}</div>
-            <motion.div
-              animate={{ scale: scoreDeltaFloat ? [1, 1.05, 1] : [1, 1.02, 1] }}
-              transition={{ duration: scoreDeltaFloat ? 0.8 : 2.4, repeat: scoreDeltaFloat ? 1 : Infinity, ease: "easeInOut" }}
+      <div style={{ padding: "32px 32px 28px", background: rsAlpha(RS.bgSurface, 0.92), borderBottom: `1px solid ${RS.border}` }}>
+        <div style={{ ...labelStyle, marginBottom: 14 }}>{t.focusVerdictKicker}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
+          <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+            <div
               style={{
-                fontFamily: RS.fontMono,
-                fontSize: "clamp(56px, 7.5vw, 80px)",
+                fontSize: "clamp(44px, 6vw, 64px)",
                 fontWeight: 900,
                 color: vc,
-                lineHeight: 0.95,
+                lineHeight: 1,
                 letterSpacing: "-0.03em",
-                textShadow: scoreDeltaFloat
-                  ? `0 0 64px ${rsAlpha(RS.green, 0.45)}, 0 0 100px ${rsAlpha(vc, 0.18)}`
-                  : `0 0 56px ${rsAlpha(vc, 0.45)}, 0 0 100px ${rsAlpha(vc, 0.18)}`,
+                fontFamily: RS.fontMono,
               }}
             >
-              {animatedProgressScore ?? score ?? "—"}
-            </motion.div>
-            {SHOW_GAMIFICATION_UI ? (
-              <div style={{ marginTop: 10, marginLeft: "auto", maxWidth: 260, textAlign: "right" }}>
-              <div style={{ fontSize: 11, fontWeight: 900, color: RS.indigo, letterSpacing: "0.08em" }}>
-                {`Level ${currentLevel.id}: ${currentLevel.title}`}
-              </div>
-              {nextLevel ? (
-                <>
-                  <div style={{ marginTop: 7, height: 7, borderRadius: 999, background: rsAlpha(RS.textMuted, 0.24), overflow: "hidden" }}>
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${progressToNext}%` }}
-                      transition={{ duration: 0.5, ease: "easeOut" }}
-                      style={{ height: "100%", borderRadius: 999, background: `linear-gradient(90deg, ${RS.indigo}, ${RS.green})` }}
-                    />
-                  </div>
-                  <div style={{ marginTop: 5, fontSize: 10, color: RS.textMuted, fontFamily: RS.fontMono }}>
-                    {`Next level at ${nextLevel.min}`}
-                  </div>
-                </>
-              ) : (
-                <div style={{ marginTop: 5, fontSize: 10, color: RS.green, fontFamily: RS.fontMono }}>
-                  {lang === "TR" ? "Maksimum seviye" : "Max level reached"}
-                </div>
-              )}
-              </div>
-            ) : null}
-            {scoreInsights.main ? (
-              <div
-                style={{
-                  marginTop: 12,
-                  marginLeft: "auto",
-                  maxWidth: 260,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  lineHeight: 1.5,
-                  color: RS.textSecondary,
-                  textAlign: "right",
-                }}
-              >
-                {scoreInsights.main}
-              </div>
-            ) : null}
-            {scoreInsights.bench ? (
-              <div
-                style={{
-                  marginTop: 8,
-                  marginLeft: "auto",
-                  maxWidth: 260,
-                  fontSize: 11,
-                  fontWeight: 500,
-                  lineHeight: 1.45,
-                  color: RS.textMuted,
-                  textAlign: "right",
-                }}
-              >
-                {scoreInsights.bench}
-              </div>
-            ) : null}
-            {scoreRunProgress?.delta != null && scoreRunProgress?.prior != null ? (
-              <div
-                style={{
-                  fontSize: 12,
-                  marginTop: 10,
-                  fontWeight: 500,
-                  color: scoreRunProgress.delta >= 0 ? RS.green : RS.red,
-                  fontFamily: RS.fontUi,
-                  lineHeight: 1.35,
-                  maxWidth: 220,
-                  marginLeft: "auto",
-                }}
-              >
-                <div>
-                  {t.scoreVsLastRun
-                    .replace("{delta}", scoreRunProgress.delta >= 0 ? `+${scoreRunProgress.delta}` : String(scoreRunProgress.delta))
-                    .replace("{prior}", String(scoreRunProgress.prior))}
-                </div>
-                <div style={{ fontSize: 10, fontWeight: 400, color: RS.textMuted, marginTop: 4 }}>{t.reanalysisScoreHint}</div>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ padding: "18px 32px", borderBottom: `1px solid ${RS.border}`, background: rsAlpha(RS.bgSurface, 0.55) }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-          {data.Context?.sector ? (
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 500,
-                color: RS.textSecondary,
-                padding: "6px 14px",
-                borderRadius: 20,
-                border: `1px solid ${RS.borderSubtle}`,
-                background: RS.bgElevated,
-              }}
-            >
-              {t.sectorLens}
-              {getSectorDisplayLabel(data.Context.sector, lang)}
+              {currentInt != null ? currentInt : "—"}
             </div>
-          ) : null}
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 500,
-              color: RS.textSecondary,
-              padding: "6px 14px",
-              borderRadius: 20,
-              border: `1px solid ${RS.borderSubtle}`,
-              background: RS.bgElevated,
-            }}
-          >
-            {t.simulatedRecruiterPatterns}
-          </div>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 500,
-              color: RS.indigo,
-              padding: "6px 14px",
-              borderRadius: 20,
-              border: `1px solid ${rsAlpha(RS.indigo, 0.35)}`,
-              background: rsAlpha(RS.indigo, 0.12),
-            }}
-          >
-            {t.atsStyleAnalysis}
+            <div style={{ marginTop: 10, fontSize: 15, fontWeight: 700, color: RS.textPrimary, lineHeight: 1.45 }}>{fv.title}</div>
+            {rej ? (
+              <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600, color: rej.color, lineHeight: 1.5 }}>{rej.mainLine}</div>
+            ) : null}
+            {mainProblem ? (
+              <p style={{ margin: "16px 0 0", fontSize: 16, fontWeight: 600, color: RS.textPrimary, lineHeight: 1.6, maxWidth: 560 }}>{mainProblem}</p>
+            ) : (
+              <p style={{ margin: "16px 0 0", fontSize: 15, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.65, maxWidth: 560 }}>{fv.explanation}</p>
+            )}
           </div>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, background: RS.border, borderBottom: `1px solid ${RS.border}` }}>
-        <div style={{ background: RS.bgSurface, padding: "16px 32px" }}>
-          <div style={{ ...labelStyle, marginBottom: 8 }}>{lang === "TR" ? "Güven seviyesi" : "Confidence level"}</div>
-          <div style={{ fontSize: 15, fontWeight: 500, color: confidenceTier?.color || RS.textSecondary }}>
-            {confidenceTier?.label || `${t.confidenceLabel}: ${t.confidenceNA}`}
-          </div>
-        </div>
-        <div style={{ background: RS.bgSurface, padding: "16px 32px", textAlign: "right" }}>
-          <div style={{ ...labelStyle, marginBottom: 8 }}>{t.rejectionRisk}</div>
-          {rej ? (
-            <div style={{ fontSize: 15, fontWeight: 500, color: rej.color, fontFamily: RS.fontUi }}>{rej.metricsLine}</div>
-          ) : (
-            <div style={{ fontSize: 15, fontWeight: 500, color: RS.textMuted }}>—</div>
-          )}
-        </div>
-      </div>
-
-      <div
-        style={{
-          padding: "22px 32px 26px",
-          borderBottom: `1px solid ${RS.border}`,
-          background: `linear-gradient(180deg, ${rsAlpha(RS.indigo, 0.06)} 0%, ${rsAlpha(RS.bgSurface, 0.85)} 100%)`,
-          boxShadow: scoreDeltaFloat ? `inset 0 0 34px ${rsAlpha(RS.green, 0.18)}` : "none",
-          transition: "box-shadow 0.45s ease",
-        }}
-      >
-        <div style={{ ...sectionTitleStyle, marginBottom: 12 }}>{t.yourProgressTitle}</div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 8, fontFamily: RS.fontMono }}>
-          {t.yourProgressPoints.replace("{pts}", String(ptsGainedProg))}
-        </div>
-        <div style={{ fontSize: 13, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.55, marginBottom: 10, maxWidth: 640 }}>
-          {t.yourProgressNext.replace("{action}", nextActionText)}
-        </div>
-        <div style={{ fontSize: 11, fontWeight: 600, color: RS.textMuted, marginBottom: 8, letterSpacing: "0.04em" }}>
-          {t.fixesCompletedCount.replace("{done}", String(completedFixCount)).replace("{total}", String(planFixes.length || 0))}
-        </div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: RS.textMuted, marginBottom: 6, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-          {t.yourProgressBarLabel}
-        </div>
+      {currentInt != null && targetScore != null ? (
         <div
           style={{
-            width: "100%",
-            maxWidth: 480,
-            height: 12,
-            borderRadius: 999,
-            background: rsAlpha(RS.textMuted, 0.2),
-            overflow: "hidden",
-            border: `1px solid ${RS.borderSubtle}`,
+            padding: "28px 32px",
+            borderBottom: `1px solid ${RS.border}`,
+            background: `linear-gradient(180deg, ${rsAlpha(RS.indigo, 0.08)} 0%, ${rsAlpha(RS.bgSurface, 0.9)} 100%)`,
           }}
         >
-          <motion.div
-            initial={{ width: 0 }}
-            animate={{ width: `${progressFillTo70}%` }}
-            transition={{ duration: 0.7, ease: "easeOut" }}
-            style={{
-              height: "100%",
-              borderRadius: 999,
-              background: `linear-gradient(90deg, ${RS.indigo}, ${RS.green}, #22c55e)`,
-              boxShadow: `0 0 24px ${rsAlpha(RS.green, 0.38)}`,
-            }}
-          />
-        </div>
-        <div style={{ marginTop: 8, fontSize: 11, color: RS.textMuted, fontWeight: 700, fontFamily: RS.fontMono }}>
-          {(animatedProgressScore ?? (dynamicProgressScore ?? scoreNumeric) ?? 0)} → 70 → 82 → 90
-        </div>
-        <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, color: RS.amber, padding: "5px 10px", borderRadius: 999, border: `1px solid ${rsAlpha(RS.amber, 0.35)}`, background: rsAlpha(RS.amber, 0.12) }}>
-            {lang === "TR" ? "Mülakat Eşiği: 70" : "Interview Threshold: 70"}
-          </span>
-          <span style={{ fontSize: 10, fontWeight: 700, color: RS.green, padding: "5px 10px", borderRadius: 999, border: `1px solid ${rsAlpha(RS.green, 0.35)}`, background: rsAlpha(RS.green, 0.12) }}>
-            {lang === "TR" ? "Güçlü Aday: 82+" : "Strong Candidate: 82+"}
-          </span>
-        </div>
-        <div style={{ fontSize: 12, fontWeight: 700, color: RS.amber, marginTop: 12, lineHeight: 1.45, maxWidth: 560 }}>
-          {(dynamicProgressScore ?? scoreNumeric) != null && Number(dynamicProgressScore ?? scoreNumeric) >= 70
-            ? (lang === "TR" ? "Artık mülakat bölgesindesin — itmeye devam et." : "You're now in the interview zone — keep pushing.")
-            : (lang === "TR"
-              ? "Mülakat aralığına ulaşmak için 1 yüksek etkili adım daha tamamla."
-              : "Complete 1 more high-impact step to reach interview range.")}
-        </div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: RS.textSecondary, marginTop: 6, lineHeight: 1.45, maxWidth: 560 }}>
-          {stepsToStrongCandidate > 0
-            ? (lang === "TR"
-              ? `Güçlü aday statüsünü açmak için ${stepsToStrongCandidate} adım kaldı.`
-              : `${stepsToStrongCandidate} more step${stepsToStrongCandidate > 1 ? "s" : ""} to unlock strong candidate status.`)
-            : (lang === "TR" ? "Güçlü aday statüsü aktif — ivmeyi koru." : "Strong candidate status unlocked — keep momentum.")}
-        </div>
-      </div>
-
-      <div
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 6,
-          background: rsAlpha(RS.bgSurface, 0.92),
-          backdropFilter: "blur(10px)",
-          borderBottom: `1px solid ${RS.border}`,
-        }}
-      >
-        <div style={{ display: "flex", overflowX: "auto", gap: 6, padding: "4px 32px 0", WebkitOverflowScrolling: "touch" }}>
-          {tabSpecs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                flex: "1 0 auto",
-                padding: "14px 16px",
-                border: "none",
-                borderBottom: activeTab === tab.id ? `3px solid ${RS.indigo}` : "3px solid transparent",
-                background: "transparent",
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: activeTab === tab.id ? 800 : 600,
-                color: activeTab === tab.id ? RS.textPrimary : RS.textMuted,
-                fontFamily: RS.fontUi,
-                whiteSpace: "nowrap",
-                transition: "color 0.2s ease, border-color 0.2s ease",
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ padding: "32px 40px 36px", background: "transparent", minHeight: 200 }}>
-        <div style={{ display: activeTab === "recruiter" ? "block" : "none" }}>
+          <div style={{ ...labelStyle, marginBottom: 12 }}>{t.focusImpactKicker}</div>
           <div
             style={{
-              marginBottom: 22,
-              padding: "18px 20px",
-              borderRadius: 16,
-              border: `1px solid ${rsAlpha(RS.red, 0.22)}`,
-              background: `linear-gradient(135deg, ${rsAlpha(RS.red, 0.1)}, ${rsAlpha(RS.amber, 0.06)})`,
-              boxShadow: `0 12px 40px ${rsAlpha(RS.red, 0.08)}`,
+              fontSize: "clamp(22px, 3.5vw, 30px)",
+              fontWeight: 800,
+              color: RS.textPrimary,
+              fontFamily: RS.fontMono,
+              letterSpacing: "-0.02em",
             }}
           >
-            <div style={{ fontSize: 12, fontWeight: 900, color: RS.red, letterSpacing: "0.04em", marginBottom: 10 }}>{t.recruiterRealLead}</div>
-            <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: RS.textPrimary, lineHeight: 1.6, marginBottom: 12 }}>{t.recruiterRealIntro}</p>
-            <div style={{ fontSize: 14, fontWeight: 600, color: RS.textSecondary, lineHeight: 1.75 }}>
-              <div>{t.recruiterLensLine1}</div>
-              <div>{t.recruiterLensLine2}</div>
-              <div>{t.recruiterLensLine3}</div>
-            </div>
+            {currentInt} → {targetScore}
+            <span style={{ marginLeft: 12, fontSize: "clamp(18px, 2.8vw, 24px)", color: RS.green }}>+{gainPts}</span>
           </div>
-          {data.Recruiter?.reasoning ? (
-            <>
-              <div style={sectionTitleStyle}>{t.whatTheyThink}</div>
-              <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 10, lineHeight: 1.5, maxWidth: 560 }}>{t.recruiterBluntBanner}</div>
-              <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65, marginBottom: 14 }}>
-                {humanizeUserFacingReason(data.Recruiter.reasoning, lang)}
-              </div>
-            </>
-          ) : null}
-          <div style={sectionTitleStyle}>{lang === "TR" ? "Sinyaller" : "Signals"}</div>
-          {(() => {
-            const rows = [
-              ...(data.Recruiter?.strengths || []).slice(0, 12).map((s) => ({ text: s, sentiment: "positive" })),
-              ...(data.Recruiter?.weaknesses || []).slice(0, 12).map((w) => ({ text: w, sentiment: "warning" })),
-            ];
-            if (!rows.length) {
-              return <EmptyGuidance primary={t.emptyRecruiterSignals} action={t.emptyRecruiterNext} />;
-            }
-            return rows.map((row, i) => (
-              <ResultsBulletRow key={i} sentiment={row.sentiment}>
-                {humanizeUserFacingReason(row.text, lang)}
-              </ResultsBulletRow>
-            ));
-          })()}
+          <p style={{ margin: "12px 0 0", fontSize: 14, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.65, maxWidth: 560 }}>
+            {t.focusImpactExpl.replace("{pts}", String(gainPts))}
+          </p>
         </div>
+      ) : null}
 
-        <div style={{ display: activeTab === "deep" ? "block" : "none" }}>
-          {data.Decision?.reasoning ? (
-            <>
-              <div style={sectionTitleStyle}>{t.decisionReasoning}</div>
-              <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65, marginBottom: 16 }}>
-                {humanizeUserFacingReason(data.Decision.reasoning, lang)}
-              </div>
-            </>
-          ) : null}
-          <div style={sectionTitleStyle}>{t.whyYouFail}</div>
-          {gaps.length === 0 ? (
-            <EmptyGuidance primary={t.emptyGapList} action={gapActionNext} />
-          ) : !isPro ? (
-            <ProBlurGate active onUpgrade={onUpgrade} unlockLabel={unlockLabel}>
-              <div style={{ padding: "12px 14px", borderRadius: 8, border: `1px solid ${RS.border}`, background: RS.bgSurface }}>
-                <ResultsBulletRow sentiment={String(gaps[0].impact || "").toLowerCase() === "high" ? "negative" : String(gaps[0].impact || "").toLowerCase() === "medium" ? "warning" : "neutral"}>
-                  <span style={{ fontWeight: 500, color: RS.textPrimary }}>{humanizeUserFacingReason(gaps[0].issue, lang)}</span>
-                  {gaps[0].explanation ? (
-                    <span style={{ display: "block", marginTop: 4, fontSize: 13 }}>{humanizeUserFacingReason(gaps[0].explanation, lang)}</span>
-                  ) : null}
-                </ResultsBulletRow>
-              </div>
-            </ProBlurGate>
-          ) : (
-            gaps.map((g, i) => {
-              const imp = String(g.impact || "").toLowerCase();
-              const sentiment = imp === "high" ? "negative" : imp === "medium" ? "warning" : "neutral";
-              return (
-                <ResultsBulletRow key={i} sentiment={sentiment}>
-                  <span style={{ fontWeight: 500, color: RS.textPrimary }}>{humanizeUserFacingReason(g.issue, lang)}</span>
-                  {g.explanation ? (
-                    <span style={{ display: "block", marginTop: 4, fontSize: 13 }}>{humanizeUserFacingReason(g.explanation, lang)}</span>
-                  ) : null}
-                </ResultsBulletRow>
-              );
-            })
-          )}
-        </div>
-
-        <div style={{ display: activeTab === "plan" ? "block" : "none" }}>
-          {stepPopup ? (
-            <motion.div
-              initial={{ opacity: 0, y: 10, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0 }}
-              style={{
-                marginBottom: 14,
-                padding: "12px 14px",
-                borderRadius: 12,
-                border: `1px solid ${rsAlpha(RS.indigo, 0.35)}`,
-                background: `linear-gradient(135deg, ${rsAlpha(RS.indigo, 0.18)}, ${rsAlpha(RS.green, 0.1)})`,
-                boxShadow: `0 0 24px ${rsAlpha(RS.indigo, 0.22)}`,
-                fontSize: 13,
-                fontWeight: 800,
-                color: RS.textPrimary,
-              }}
-            >
-              {stepPopup.text}
-            </motion.div>
-          ) : null}
-          {uxToast ? (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
-              style={{
-                marginBottom: 18,
-                padding: "16px 18px",
-                borderRadius: 14,
-                border: `1px solid ${rsAlpha(RS.green, 0.35)}`,
-                background: rsAlpha(RS.green, 0.1),
-                boxShadow: `0 8px 32px ${rsAlpha(RS.green, 0.12)}`,
-              }}
-            >
-              <div style={{ fontWeight: 900, fontSize: 15, color: RS.green, letterSpacing: "-0.01em" }}>{t.proofAddedToast}</div>
-              <div style={{ fontSize: 13, color: RS.textSecondary, marginTop: 6, lineHeight: 1.55, fontWeight: 500 }}>{t.proofTrustToast}</div>
-              <div style={{ fontSize: 14, fontFamily: RS.fontMono, fontWeight: 800, color: RS.green, marginTop: 8 }}>
-                {t.proofImpactToast.replace("{pts}", String(uxToast.pts))}
-              </div>
-              <div style={{ fontSize: 12, fontWeight: 900, color: RS.amber, marginTop: 8, letterSpacing: "0.04em" }}>{t.impactUnlockedLine}</div>
-            </motion.div>
-          ) : null}
-          <div
-            style={{
-              marginBottom: 16,
-              padding: "14px 16px",
-              borderRadius: 12,
-              border: `1px solid ${rsAlpha(RS.indigo, 0.28)}`,
-              background: `linear-gradient(135deg, ${rsAlpha(RS.indigo, 0.12)}, ${rsAlpha(RS.bgElevated, 0.9)})`,
-              boxShadow: `0 0 24px ${rsAlpha(RS.indigo, 0.15)}`,
-            }}
-          >
-            <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.08em", color: RS.indigo, marginBottom: 6 }}>
-              {lang === "TR" ? "BUGÜNÜN İLERLEMESİ" : "TODAY'S PROGRESS"}
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, fontFamily: RS.fontMono }}>
-              {lang === "TR" ? `Bugün tamamlanan adımlar: ${todayCompletedCount}/3` : `Steps completed today: ${todayCompletedCount}/3`}
-            </div>
-            {SHOW_GAMIFICATION_UI ? (
-              <>
-                <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: RS.amber }}>
-                  {`🔥 ${streakCount} Day Streak`}
-                </div>
-                <div style={{ marginTop: 4, fontSize: 11, color: RS.textMuted }}>
-                  {lang === "TR" ? "Bozma — ivme inşa ediyorsun." : "Don't break it — you're building momentum."}
-                </div>
-              </>
-            ) : null}
-          </div>
-          {SHOW_GAMIFICATION_UI && dailyTask ? (
-            <div
-              style={{
-                marginBottom: 16,
-                padding: "14px 16px",
-                borderRadius: 12,
-                border: `1px solid ${rsAlpha(RS.green, 0.28)}`,
-                background: `linear-gradient(135deg, ${rsAlpha(RS.green, 0.12)}, ${rsAlpha(RS.bgElevated, 0.9)})`,
-                boxShadow: `0 0 24px ${rsAlpha(RS.green, 0.12)}`,
-              }}
-            >
-              <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.08em", color: RS.green, marginBottom: 8 }}>
-                {lang === "TR" ? "TODAY'S TASK" : "TODAY'S TASK"}
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: RS.textPrimary, lineHeight: 1.5 }}>{dailyTask.title}</div>
-              <div style={{ marginTop: 6, fontSize: 12, fontWeight: 800, color: RS.amber, fontFamily: RS.fontMono }}>
-                +{dailyTask.reward} pts
-              </div>
-              <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-                <button
-                  type="button"
-                  disabled={!!dailyTask.done}
-                  onClick={() => {
-                    const gain = completeTask();
-                    if (!gain) return;
-                    setTaskBonusPoints((v) => Math.min(100, Number(v || 0) + gain));
-                    setStreakActivityTick((x) => x + 1);
-                    setScoreDeltaFloat(`🔥 +${gain} points — Positioning fixed`);
-                    setStepPopup({
-                      kind: "complete",
-                      text: lang === "TR" ? `Görev tamamlandı: +${gain} puan` : `Task completed: +${gain} points`,
-                    });
-                  }}
-                  style={{
-                    padding: "9px 14px",
-                    borderRadius: 10,
-                    border: "none",
-                    cursor: dailyTask.done ? "not-allowed" : "pointer",
-                    fontWeight: 800,
-                    fontSize: 12,
-                    color: "#052e16",
-                    background: dailyTask.done ? rsAlpha(RS.textMuted, 0.35) : `linear-gradient(135deg, ${RS.green}, #34d399)`,
-                  }}
-                >
-                  {dailyTask.done ? (lang === "TR" ? "Tamamlandı" : "Completed") : (lang === "TR" ? "Complete Task" : "Complete Task")}
-                </button>
-                {dailyTask.done ? (
-                  <div style={{ fontSize: 11, fontWeight: 700, color: RS.indigo }}>
-                    {lang === "TR" ? "⚡ Yeni skorunu görmek için analizi tekrar çalıştır" : "⚡ Re-run analysis to see your new score"}
-                  </div>
-                ) : null}
-              </div>
-              {dailyTask.done ? (
-                <button
-                  type="button"
-                  onClick={onRerunAnalysis}
-                  style={{
-                    marginTop: 10,
-                    padding: "8px 13px",
-                    borderRadius: 10,
-                    border: `1px solid ${rsAlpha(RS.indigo, 0.42)}`,
-                    background: rsAlpha(RS.indigo, 0.16),
-                    color: RS.textPrimary,
-                    fontSize: 12,
-                    fontWeight: 800,
-                    cursor: "pointer",
-                  }}
-                >
-                  {lang === "TR" ? "Re-run analysis" : "Re-run analysis"}
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-          {scoreDeltaFloat ? (
-            <div style={{ marginTop: -4, marginBottom: 12, fontSize: 12, fontWeight: 800, color: RS.green }}>
-              ⚡ You're closer to interview range
-            </div>
-          ) : null}
-          {actionPlan.priority_callout ? (
-            <div style={{ marginBottom: 16, padding: "14px 16px", borderRadius: 8, background: RS.bgElevated, border: `1px solid ${RS.borderSubtle}` }}>
-              <div style={{ ...labelStyle, marginBottom: 8 }}>{t.whatToDoNext}</div>
-              <div style={{ fontSize: 14, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.55 }}>{actionPlan.priority_callout}</div>
-            </div>
-          ) : null}
-          <div style={sectionTitleStyle}>{t.priorityFixes}</div>
-          {planFixes.length ? (
-            <>
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  marginBottom: 10,
-                }}
-              >
-                <span style={{ fontSize: 12, fontWeight: 600, color: RS.textSecondary }}>{t.executionProgress}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: RS.indigo, fontFamily: RS.fontMono }}>
-                  {t.fixesCompletedCount
-                    .replace("{done}", String(execState.completed.filter(Boolean).length))
-                    .replace("{total}", String(planFixes.length))}
-                </span>
-              </div>
-              {scoreNumeric != null && cumulativeProjected.length ? (
-                <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 8, lineHeight: 1.55, fontFamily: RS.fontMono }}>
-                  {t.executionLadder}: {Math.round(scoreNumeric)}
-                  {cumulativeProjected.map((c) => ` → ${Math.round(c)}`).join("")}
-                </div>
-              ) : null}
-              {scoreNumeric != null && dynamicProgressScore != null ? (
-                <div style={{ fontSize: 12, fontWeight: 700, color: RS.green, marginBottom: 14, fontFamily: RS.fontMono, position: "relative" }}>
-                  {t.progressScoreLive
-                    .replace("{score}", String(animatedProgressScore ?? dynamicProgressScore))
-                    .replace(
-                      "{delta}",
-                      dynamicProgressScore > scoreNumeric ? `+${dynamicProgressScore - scoreNumeric}` : "0",
-                    )}
-                  {scoreDeltaFloat ? (
-                    <motion.span
-                      initial={{ opacity: 0, y: 8, scale: 0.92 }}
-                      animate={{ opacity: 1, y: -12, scale: 1 }}
-                      style={{
-                        position: "absolute",
-                        right: 0,
-                        top: -4,
-                        color: RS.green,
-                        fontWeight: 900,
-                        textShadow: `0 0 14px ${rsAlpha(RS.green, 0.5)}`,
-                      }}
-                    >
-                      {scoreDeltaFloat}
-                    </motion.span>
-                  ) : null}
-                </div>
-              ) : null}
-              {planFixes.length > 1 ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-                  {planFixes.map((_, idx) => {
-                    const done = !!completedSteps[idx];
-                    const active = idx === activeStepIndex && !done;
-                    return (
-                      <div key={`fix-line-${idx}`} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span
-                          style={{
-                            width: 20,
-                            height: 20,
-                            borderRadius: "50%",
-                            display: "grid",
-                            placeItems: "center",
-                            fontSize: 10,
-                            fontWeight: 900,
-                            color: done ? "#052e16" : active ? "#e0e7ff" : RS.textMuted,
-                            background: done ? RS.green : active ? RS.indigo : rsAlpha(RS.textMuted, 0.22),
-                            boxShadow: active ? `0 0 16px ${rsAlpha(RS.indigo, 0.45)}` : "none",
-                          }}
-                        >
-                          {idx + 1}
-                        </span>
-                        {idx < planFixes.length - 1 ? <span style={{ color: RS.textMuted, fontSize: 12 }}>→</span> : null}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : null}
-              {planFixes.map((f, i) => {
-                const sev = f.severity === "critical" || f.severity === "major" || f.severity === "minor" ? f.severity : "major";
-                const sevColor = sev === "critical" ? RS.red : sev === "major" ? RS.amber : RS.textMuted;
-                const priorityLabel = sev === "critical" ? t.fixFirst : sev === "major" ? t.priorityImportant : t.priorityOptional;
-                const res = f.resource;
-                const hasRes = res && (String(res.label || "").trim() || res.url);
-                const impPts = Math.max(1, Math.min(18, Math.round(Number(f.score_impact) || 0)));
-                const isCompletedFix = !!completedSteps[i];
-                const isActiveFix = !isCompletedFix && i === activeStepIndex;
-                const isLockedFix = !isCompletedFix && i !== activeStepIndex;
-                const scoreBeforeFix = i === 0 ? (scoreNumeric ?? 0) : cumulativeProjected[i - 1];
-                const stepIncrements = f.steps?.length ? splitImpactAcrossSteps(impPts, f.steps.length) : [];
-                return (
-                  <motion.div
-                    key={i}
-                    id={`hf-fix-${i}`}
-                    layout
-                    animate={{
-                      opacity: isLockedFix ? 0.5 : 1,
-                      scale: isActiveFix ? 1.02 : 1,
-                    }}
-                    transition={{ duration: 0.35, ease: "easeOut" }}
-                    style={{ marginBottom: i < planFixes.length - 1 ? 24 : 0 }}
-                  >
-                    {i === 0 && sev === "critical" ? (
-                      <div
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 500,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.08em",
-                          color: RS.red,
-                          marginBottom: 6,
-                          fontFamily: RS.fontUi,
-                        }}
-                      >
-                        {t.primaryBlocker}
-                      </div>
-                    ) : null}
-                    {isActiveFix ? (
-                      <div style={{ marginBottom: 8, fontSize: 10, fontWeight: 900, letterSpacing: "0.08em", color: RS.indigo }}>
-                        {lang === "TR" ? "YOU ARE HERE →" : "YOU ARE HERE →"}
-                      </div>
-                    ) : null}
-                    <div
-                      style={{
-                        padding: "20px 20px",
-                        borderRadius: 16,
-                        background: isActiveFix
-                          ? `linear-gradient(135deg, ${rsAlpha(RS.indigo, 0.16)}, ${rsAlpha(RS.bgElevated, 0.96)})`
-                          : RS.bgElevated,
-                        border: isCompletedFix
-                          ? `1px solid ${rsAlpha(RS.green, 0.4)}`
-                          : isActiveFix
-                            ? `1px solid ${rsAlpha(RS.indigo, 0.55)}`
-                            : `1px solid ${RS.borderSubtle}`,
-                        boxShadow: isCompletedFix
-                          ? `0 0 26px ${rsAlpha(RS.green, 0.24)}`
-                          : isActiveFix
-                            ? `0 0 30px ${rsAlpha(RS.indigo, 0.28)}`
-                            : `0 12px 40px rgba(0,0,0,0.2)`,
-                        transition: "border-color 0.35s ease, box-shadow 0.35s ease, transform 0.35s ease",
-                        position: "relative",
-                      }}
-                    >
-                      {successFlashFixIdx === i ? (
-                        <motion.div
-                          initial={{ opacity: 0.45 }}
-                          animate={{ opacity: 0 }}
-                          transition={{ duration: 0.7, ease: "easeOut" }}
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            borderRadius: 16,
-                            background: `radial-gradient(circle at 20% 20%, ${rsAlpha(RS.green, 0.2)}, transparent 70%)`,
-                            pointerEvents: "none",
-                          }}
-                        />
-                      ) : null}
-                      <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                        <span
-                          style={{ width: 5, height: 5, borderRadius: "50%", background: sevColor, flexShrink: 0, marginTop: 6 }}
-                          aria-hidden
-                        />
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <label
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 10,
-                              marginBottom: 10,
-                              cursor: "pointer",
-                              userSelect: "none",
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={!!isCompletedFix}
-                              disabled={isLockedFix}
-                              onChange={(e) => {
-                                const want = e.target.checked;
-                                const n = planFixes.length;
-                                if (isLockedFix && want) return;
-                                let nextActive = -1;
-                                if (want) {
-                                  const existing = String(execState.fixProofs[i] || "");
-                                  const proof = window.prompt(t.proofPromptWhenDone, existing);
-                                  if (proof === null) return;
-                                  const trimmed = String(proof).trim();
-                                  if (!trimmed) {
-                                    window.alert(t.proofRequiredShort);
-                                    return;
-                                  }
-                                  setExecState((prev) => {
-                                    const completed = Array.from({ length: n }, (_, j) => !!prev.completed[j]);
-                                    completed[i] = true;
-                                    nextActive = completed.findIndex((c) => !c);
-                                    const fixProofs = Array.from({ length: n }, (_, j) => String(prev.fixProofs[j] ?? ""));
-                                    fixProofs[i] = trimmed;
-                                    const stepProofs =
-                                      prev.stepProofs.length === n
-                                        ? prev.stepProofs.map((row) => [...row])
-                                        : emptyStepProofGrid(planFixes);
-                                    const next = { completed, fixProofs, stepProofs };
-                                    if (fp) saveExecutionPlanState(fp, next);
-                                    return next;
-                                  });
-                                  setSuccessFlashFixIdx(i);
-                                  window.setTimeout(() => setSuccessFlashFixIdx(-1), 750);
-                                  setScoreDeltaFloat(
-                                    lang === "TR"
-                                      ? `+${impPts} puan — mülakat aralığına daha yakınsın`
-                                      : `+${impPts} points — you're now closer to interview range`
-                                  );
-                                  setStepPopup({
-                                    kind: "complete",
-                                    text: lang === "TR" ? `Adım tamamlandı: +${impPts} puan` : `Step completed: +${impPts} points`,
-                                  });
-                                  setTodayCompletedCount((prev) => {
-                                    const next = Math.min(3, prev + 1);
-                                    try {
-                                      localStorage.setItem(todayProgressKey, JSON.stringify({ date: todayYmd, count: next }));
-                                    } catch {
-                                      // ignore
-                                    }
-                                    return next;
-                                  });
-                                  window.setTimeout(() => setUxToast({ pts: impPts }), 0);
-                                  window.setTimeout(() => {
-                                    if (nextActive >= 0 && nextActive !== i) {
-                                      document.getElementById(`hf-fix-${nextActive}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-                                    }
-                                  }, 220);
-                                } else {
-                                  setExecState((prev) => {
-                                    const completed = Array.from({ length: n }, (_, j) => !!prev.completed[j]);
-                                    completed[i] = false;
-                                    const fixProofs = Array.from({ length: n }, (_, j) => String(prev.fixProofs[j] ?? ""));
-                                    fixProofs[i] = "";
-                                    const stepProofs = prev.stepProofs.length === n
-                                      ? prev.stepProofs.map((row, ri) => (ri === i ? row.map(() => "") : [...row]))
-                                      : emptyStepProofGrid(planFixes);
-                                    const next = { completed, fixProofs, stepProofs };
-                                    if (fp) saveExecutionPlanState(fp, next);
-                                    return next;
-                                  });
-                                }
-                              }}
-                              aria-label={t.markFixDoneAria.replace("{n}", String(i + 1))}
-                              style={{
-                                width: 18,
-                                height: 18,
-                                accentColor: RS.indigo,
-                                cursor: isLockedFix ? "not-allowed" : "pointer",
-                                flexShrink: 0,
-                              }}
-                            />
-                            <span style={{ fontSize: 12, fontWeight: 600, color: RS.textMuted }}>
-                              {isCompletedFix
-                                ? (lang === "TR" ? "Seviye tamamlandı" : "Level completed")
-                                : (lang === "TR" ? "Complete step →" : "Complete step →")}
-                            </span>
-                          </label>
-                          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: 10, marginBottom: 4 }}>
-                            <div style={{ fontSize: 13, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.5, flex: "1 1 160px", minWidth: 0 }}>
-                              {humanizeUserFacingReason(f.issue || "—", lang)}
-                            </div>
-                            <span
-                              style={{
-                                fontSize: 13,
-                                fontWeight: 700,
-                                color: RS.green,
-                                fontFamily: RS.fontMono,
-                                flexShrink: 0,
-                              }}
-                            >
-                              +{impPts}
-                            </span>
-                          </div>
-                          {execState.fixProofs[i] ? (
-                            <div
-                              style={{
-                                fontSize: 11,
-                                color: RS.textMuted,
-                                marginTop: 4,
-                                padding: "8px 10px",
-                                borderRadius: 6,
-                                background: rsAlpha(RS.indigo, 0.08),
-                                border: `1px solid ${rsAlpha(RS.indigo, 0.2)}`,
-                                lineHeight: 1.45,
-                                wordBreak: "break-word",
-                              }}
-                            >
-                              <span style={{ fontWeight: 600, color: RS.indigo }}>{t.proofStoredLabel}</span> {execState.fixProofs[i]}
-                            </div>
-                          ) : null}
-                          {score != null && Number.isFinite(Number(score)) ? (
-                            <>
-                              <div style={{ fontSize: 13, color: RS.green, fontWeight: 800, marginTop: 8, lineHeight: 1.45, fontFamily: RS.fontMono }}>
-                                {t.fixPointsIfDone.replace("{pts}", String(impPts))}
-                              </div>
-                              <div style={{ fontSize: 13, color: RS.textMuted, marginTop: 6, lineHeight: 1.6, fontWeight: 500 }}>
-                                {formatBlockerTransform(score, impPts, lang)}
-                              </div>
-                            </>
-                          ) : null}
-                          {execState.completed[i] ? (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.96 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              style={{
-                                marginTop: 10,
-                                padding: "12px 14px",
-                                borderRadius: 12,
-                                border: `1px solid ${rsAlpha(RS.green, 0.35)}`,
-                                background: rsAlpha(RS.green, 0.08),
-                                boxShadow: `0 0 24px ${rsAlpha(RS.green, 0.25)}`,
-                              }}
-                            >
-                              <div style={{ fontSize: 13, fontWeight: 900, color: RS.green, fontFamily: RS.fontUi, letterSpacing: "-0.01em" }}>
-                                {t.fixProgressApplied.replace("{pts}", String(impPts))}
-                              </div>
-                              <div style={{ fontSize: 12, fontWeight: 800, color: RS.amber, marginTop: 6, letterSpacing: "0.02em" }}>
-                                {t.impactUnlockedLine}
-                              </div>
-                            </motion.div>
-                          ) : null}
-                          {isActiveFix ? (
-                            <div style={{ fontSize: 11, color: RS.amber, marginTop: 10, lineHeight: 1.45, fontWeight: 700 }}>
-                              {lang === "TR"
-                                ? "Adayların çoğu burada durur — bunu bitirmek seni öne geçirir. Recruiterlar 6 saniyede tarar; bu adım tam bunu düzeltir."
-                                : "Most candidates stop here — finishing this puts you ahead. Recruiters typically scan in 6 seconds — this step fixes that."}
-                            </div>
-                          ) : null}
-                          {isCompletedFix ? (
-                            <div style={{ fontSize: 12, color: RS.textSecondary, marginTop: 8, lineHeight: 1.45 }}>
-                              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
-                                <div style={{ padding: "10px 11px", borderRadius: 10, border: `1px solid ${rsAlpha(RS.red, 0.22)}`, background: rsAlpha(RS.red, 0.08) }}>
-                                  <div style={{ fontSize: 10, fontWeight: 800, color: RS.red, marginBottom: 4 }}>{lang === "TR" ? "Before" : "Before"}</div>
-                                  <div style={{ fontSize: 11, lineHeight: 1.45, color: RS.textSecondary }}>
-                                    <div>{lang === "TR" ? "• Ölçülebilir etki yok" : "• No measurable impact"}</div>
-                                    <div>{lang === "TR" ? "• Recruiter için zayıf sinyal" : "• Weak recruiter signal"}</div>
-                                  </div>
-                                </div>
-                                <div style={{ padding: "10px 11px", borderRadius: 10, border: `1px solid ${rsAlpha(RS.green, 0.28)}`, background: rsAlpha(RS.green, 0.1) }}>
-                                  <div style={{ fontSize: 10, fontWeight: 800, color: RS.green, marginBottom: 4 }}>{lang === "TR" ? "After" : "After"}</div>
-                                  <div style={{ fontSize: 11, lineHeight: 1.45, color: RS.textSecondary }}>
-                                    <div>{lang === "TR" ? "• Nicel sonuç eklendi" : "• Added quantified result"}</div>
-                                    <div>{lang === "TR" ? "• Rol sinyali netleşti" : "• Clear role alignment"}</div>
-                                  </div>
-                                </div>
-                              </div>
-                              <div style={{ fontSize: 11, fontWeight: 800, color: RS.green, marginBottom: 6 }}>
-                                {lang === "TR" ? "Ne değişti:" : "What changed:"}
-                              </div>
-                              <div>{lang === "TR" ? "✔ eylem kanıtı görünür oldu" : "✔ proof of action is now visible"}</div>
-                              <div>{lang === "TR" ? "✔ rol hizalaması güçlendi" : "✔ role alignment is stronger"}</div>
-                              <div>{lang === "TR" ? "✔ niyet sinyali netleşti" : "✔ intent signal is clearer"}</div>
-                              <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                                {[
-                                  lang === "TR" ? "Positioning Fixed" : "Positioning Fixed",
-                                  lang === "TR" ? "Proof Added" : "Proof Added",
-                                  lang === "TR" ? "Signal Strength Increased" : "Signal Strength Increased",
-                                ].map((badge) => (
-                                  <span
-                                    key={`${i}-${badge}`}
-                                    style={{
-                                      fontSize: 10,
-                                      fontWeight: 800,
-                                      color: RS.green,
-                                      border: `1px solid ${rsAlpha(RS.green, 0.35)}`,
-                                      background: rsAlpha(RS.green, 0.1),
-                                      borderRadius: 999,
-                                      padding: "4px 8px",
-                                    }}
-                                  >
-                                    {badge}
-                                  </span>
-                                ))}
-                              </div>
-                              <div style={{ marginTop: 6 }}>
-                                {lang === "TR"
-                                  ? `+${impPts} etki açıldı. ${planFixes[i + 1] ? `Sonraki adım: +${Math.max(1, Math.min(18, Math.round(Number(planFixes[i + 1]?.score_impact) || 0)))} domain credibility.` : ""}`
-                                  : `+${impPts} impact unlocked. ${planFixes[i + 1] ? `Next step unlocks: +${Math.max(1, Math.min(18, Math.round(Number(planFixes[i + 1]?.score_impact) || 0)))} domain credibility.` : ""}`}
-                              </div>
-                            </div>
-                          ) : null}
-                          {f.steps && f.steps.length ? (
-                            <>
-                              <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 10, marginBottom: 8 }}>
-                                <span
-                                  aria-hidden
-                                  style={{ width: 4, height: 4, borderRadius: "50%", background: sevColor, flexShrink: 0 }}
-                                />
-                                <span
-                                  style={{
-                                    fontSize: 10,
-                                    fontWeight: 500,
-                                    textTransform: "uppercase",
-                                    color: sevColor,
-                                    fontFamily: RS.fontUi,
-                                  }}
-                                >
-                                  {priorityLabel}
-                                </span>
-                              </div>
-                              {(() => {
-                                let prev = scoreBeforeFix;
-                                return f.steps.map((step, si) => {
-                                  const inc = stepIncrements[si] ?? 0;
-                                  const next = Math.min(100, prev + inc);
-                                  const rangeHint =
-                                    scoreNumeric != null
-                                      ? t.projectedStepHint.replace("{from}", String(Math.round(prev))).replace("{to}", String(Math.round(next)))
-                                      : "";
-                                  const stepVal = String(execState.stepProofs[i]?.[si] ?? "");
-                                  const line = (
-                                    <div key={si} id={`hf-step-${i}-${si}`} style={{ marginTop: si ? 10 : 0, paddingLeft: 13 }}>
-                                      <div
-                                        style={{
-                                          fontSize: 13,
-                                          color: RS.textSecondary,
-                                          lineHeight: 1.5,
-                                          display: "flex",
-                                          flexWrap: "wrap",
-                                          alignItems: "baseline",
-                                          gap: 8,
-                                        }}
-                                      >
-                                        <span>→ {step}</span>
-                                        {inc > 0 ? (
-                                          <span style={{ fontSize: 11, fontWeight: 700, color: RS.green, fontFamily: RS.fontMono }}>+{inc}</span>
-                                        ) : null}
-                                        {rangeHint ? (
-                                          <span style={{ fontSize: 11, color: RS.textMuted, fontFamily: RS.fontMono }}>{rangeHint}</span>
-                                        ) : null}
-                                      </div>
-                                      <div style={{ marginTop: 8, paddingLeft: 2 }}>
-                                        <div style={{ fontSize: 10, fontWeight: 600, color: RS.textMuted, marginBottom: 4, textTransform: "uppercase" }}>
-                                          {t.proofStepHeading}
-                                        </div>
-                                        <input
-                                          type="text"
-                                          value={stepVal}
-                                          disabled={isLockedFix}
-                                          placeholder={t.proofPasteLinkPlaceholder}
-                                          onBlur={(ev) => {
-                                            const v = String(ev.target.value || "").trim();
-                                            if (v.length < 8 || !inc) return;
-                                            setUxToast({ pts: inc });
-                                          }}
-                                          onChange={(ev) => {
-                                            const v = ev.target.value;
-                                            setExecState((prev) => {
-                                              const nF = planFixes.length;
-                                              const stepProofs =
-                                                prev.stepProofs.length === nF
-                                                  ? prev.stepProofs.map((row) => [...row])
-                                                  : emptyStepProofGrid(planFixes);
-                                              if (!stepProofs[i]) stepProofs[i] = [];
-                                              const row = [...(stepProofs[i] || [])];
-                                              while (row.length <= si) row.push("");
-                                              row[si] = v;
-                                              stepProofs[i] = row;
-                                              const next = { ...prev, stepProofs };
-                                              if (fp) saveExecutionPlanState(fp, next);
-                                              return next;
-                                            });
-                                          }}
-                                          style={{
-                                            width: "100%",
-                                            maxWidth: 420,
-                                            boxSizing: "border-box",
-                                            padding: "8px 10px",
-                                            borderRadius: 6,
-                                            border: `1px solid ${RS.borderSubtle}`,
-                                            background: RS.bgBase,
-                                            color: RS.textSecondary,
-                                            fontSize: 12,
-                                            fontFamily: RS.fontUi,
-                                            opacity: isLockedFix ? 0.65 : 1,
-                                          }}
-                                        />
-                                        <label
-                                          style={{
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: 8,
-                                            marginTop: 6,
-                                            fontSize: 11,
-                                            color: RS.textMuted,
-                                            cursor: isLockedFix ? "not-allowed" : "pointer",
-                                            opacity: isLockedFix ? 0.65 : 1,
-                                          }}
-                                        >
-                                          <input
-                                            type="file"
-                                            accept=".txt,.pdf,image/*"
-                                            disabled={isLockedFix}
-                                            style={{ fontSize: 11, maxWidth: 220 }}
-                                            onChange={(ev) => {
-                                              const file = ev.target.files?.[0];
-                                              ev.target.value = "";
-                                              if (!file) return;
-                                              const name = file.name || "file";
-                                              if (file.type === "text/plain" || /\.txt$/i.test(name)) {
-                                                file.text().then((txt) => {
-                                                  const snippet = String(txt || "").trim().slice(0, 1800);
-                                                  setExecState((prev) => {
-                                                    const nF = planFixes.length;
-                                                    const stepProofs =
-                                                      prev.stepProofs.length === nF
-                                                        ? prev.stepProofs.map((row) => [...row])
-                                                        : emptyStepProofGrid(planFixes);
-                                                    const row = [...(stepProofs[i] || [])];
-                                                    while (row.length <= si) row.push("");
-                                                    row[si] = snippet || `${t.proofFileLabel}: ${name}`;
-                                                    stepProofs[i] = row;
-                                                    const next = { ...prev, stepProofs };
-                                                    if (fp) saveExecutionPlanState(fp, next);
-                                                    return next;
-                                                  });
-                                                  window.setTimeout(() => setUxToast({ pts: inc || 1 }), 0);
-                                                });
-                                              } else {
-                                                setExecState((prev) => {
-                                                  const nF = planFixes.length;
-                                                  const stepProofs =
-                                                    prev.stepProofs.length === nF
-                                                      ? prev.stepProofs.map((row) => [...row])
-                                                      : emptyStepProofGrid(planFixes);
-                                                  const row = [...(stepProofs[i] || [])];
-                                                  while (row.length <= si) row.push("");
-                                                  row[si] = `${t.proofFileLabel}: ${name}`;
-                                                  stepProofs[i] = row;
-                                                  const next = { ...prev, stepProofs };
-                                                  if (fp) saveExecutionPlanState(fp, next);
-                                                  return next;
-                                                });
-                                                window.setTimeout(() => setUxToast({ pts: inc || 1 }), 0);
-                                              }
-                                            }}
-                                          />
-                                          <span>{t.proofUploadFile}</span>
-                                        </label>
-                                      </div>
-                                      {(() => {
-                                        const cta = stepCtaFromText(step, lang);
-                                        const ctaStyle = {
-                                          marginTop: 12,
-                                          display: "inline-flex",
-                                          alignItems: "center",
-                                          justifyContent: "center",
-                                          padding: "8px 14px",
-                                          borderRadius: 10,
-                                          fontSize: 12,
-                                          fontWeight: 800,
-                                          fontFamily: RS.fontUi,
-                                          cursor: "pointer",
-                                          textDecoration: "none",
-                                          border: `1px solid ${rsAlpha(RS.indigo, 0.4)}`,
-                                          background: `linear-gradient(135deg, ${rsAlpha(RS.indigo, 0.22)}, ${rsAlpha(RS.indigo, 0.06)})`,
-                                          color: RS.textPrimary,
-                                          boxShadow: `0 4px 16px ${rsAlpha(RS.indigo, 0.15)}`,
-                                        };
-                                        return cta.href ? (
-                                          <a href={cta.href} target="_blank" rel="noopener noreferrer" style={ctaStyle}>
-                                            {cta.label}
-                                          </a>
-                                        ) : (
-                                          <button
-                                            type="button"
-                                            style={ctaStyle}
-                                            disabled={isLockedFix}
-                                            onClick={() => {
-                                              setActiveTab("plan");
-                                              window.requestAnimationFrame(() => {
-                                                document.getElementById(`hf-step-${i}-${si}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-                                              });
-                                            }}
-                                          >
-                                            {cta.label}
-                                          </button>
-                                        );
-                                      })()}
-                                    </div>
-                                  );
-                                  prev = next;
-                                  return line;
-                                });
-                              })()}
-                            </>
-                          ) : null}
-                          {scoreNumeric != null && cumulativeProjected[i] != null ? (
-                            <div style={{ fontSize: 11, color: RS.indigo, marginTop: 10, lineHeight: 1.45, fontFamily: RS.fontMono }}>
-                              {t.projectedAfterFixOrder.replace("{score}", String(Math.round(cumulativeProjected[i])))}
-                            </div>
-                          ) : null}
-                          <button
-                            type="button"
-                            disabled={isLockedFix}
-                            onClick={() => {
-                              setActiveTab("plan");
-                              setStepPopup({
-                                kind: "start",
-                                text: lang === "TR" ? "Misyon başlatıldı" : "Mission started",
-                              });
-                              window.requestAnimationFrame(() => {
-                                document.getElementById(`hf-fix-${i}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-                              });
-                            }}
-                            style={{
-                              marginTop: 14,
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              gap: 8,
-                              padding: "12px 20px",
-                              borderRadius: 12,
-                              border: "none",
-                              cursor: isLockedFix ? "not-allowed" : "pointer",
-                              fontWeight: 900,
-                              fontSize: 13,
-                              fontFamily: RS.fontUi,
-                              color: "#0f172a",
-                              background: isLockedFix ? rsAlpha(RS.textMuted, 0.4) : `linear-gradient(135deg, ${RS.indigo}, #a855f7)`,
-                              boxShadow: isLockedFix ? "none" : `0 6px 24px ${rsAlpha(RS.indigo, 0.35)}`,
-                              transition: "transform 0.2s ease, box-shadow 0.2s ease",
-                            }}
-                            onMouseEnter={(e) => {
-                              if (isLockedFix) return;
-                              e.currentTarget.style.transform = "translateY(-2px)";
-                              e.currentTarget.style.boxShadow = `0 10px 32px ${rsAlpha(RS.indigo, 0.45)}`;
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = "none";
-                              e.currentTarget.style.boxShadow = isLockedFix ? "none" : `0 6px 24px ${rsAlpha(RS.indigo, 0.35)}`;
-                            }}
-                          >
-                            {isLockedFix
-                              ? (lang === "TR" ? "Unlock next level →" : "Unlock next level →")
-                              : (lang === "TR" ? "Start mission →" : "Start mission →")}
-                          </button>
-                          {hasRes ? (
-                            <div style={{ fontSize: 13, paddingLeft: 13, marginTop: 8, lineHeight: 1.45 }}>
-                              {res.url ? (
-                                <a
-                                  href={res.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{ color: RS.indigo, textDecoration: "none", cursor: "pointer" }}
-                                >
-                                  → {String(res.label || "").trim() || res.url}
-                                </a>
-                              ) : (
-                                <span style={{ color: RS.textMuted, cursor: "default" }}>→ {String(res.label || "").trim()}</span>
-                              )}
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-              {betterRoleAlternatives.length ? (
-                <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${RS.borderSubtle}` }}>
-                  <div style={sectionTitleStyle}>{t.betterRoleAlternatives}</div>
-                  <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 12, lineHeight: 1.5 }}>{t.betterRoleAlternativesSub}</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                    {betterRoleAlternatives.map((r, ri) => (
-                      <div
-                        key={`${r.role}-${ri}`}
-                        style={{
-                          padding: "12px 14px",
-                          borderRadius: 8,
-                          border: `1px solid ${RS.borderSubtle}`,
-                          background: RS.bgSurface,
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 6 }}>
-                          <span style={{ fontSize: 14, fontWeight: 600, color: RS.textPrimary }}>{r.role}</span>
-                          <span style={{ fontSize: 15, fontWeight: 700, color: RS.green, fontFamily: RS.fontMono }}>{Number(r.score) || 0}</span>
-                        </div>
-                        {r.evidence ? (
-                          <div style={{ fontSize: 12, color: RS.textSecondary, lineHeight: 1.5 }}>{humanizeUserFacingReason(r.evidence, lang)}</div>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </>
-          ) : (
-            <EmptyGuidance primary={t.emptyPlanFallback} action={t.emptyPlanNext} />
-          )}
-          {actionPlan.interview_note ? (
-            <div style={{ marginTop: 20 }}>
-              <div style={sectionTitleStyle}>{t.interviewPrepShort}</div>
-              {!isPro ? (
-                <ProBlurGate active onUpgrade={onUpgrade} unlockLabel={unlockLabel}>
-                  <div style={{ fontSize: 13, color: RS.textSecondary, lineHeight: 1.6, minHeight: 48 }}>{actionPlan.interview_note}</div>
-                </ProBlurGate>
-              ) : (
-                <div style={{ fontSize: 13, color: RS.textSecondary, lineHeight: 1.6 }}>{actionPlan.interview_note}</div>
-              )}
-            </div>
-          ) : null}
-          {isPro && (interviewPrep || []).length > 0 ? (
-            <div style={{ marginTop: 20 }}>
-              <div style={sectionTitleStyle}>{lang === "TR" ? "Mülakat soruları" : "Interview questions"}</div>
-              {(interviewPrep || []).slice(0, 4).map((q, i) => (
-                <div key={i} style={{ marginBottom: 12 }}>
-                  <ResultsBulletRow sentiment="neutral">
-                    <span style={{ color: RS.textPrimary, fontStyle: "italic" }}>&quot;{q.question}&quot;</span>
-                  </ResultsBulletRow>
-                  {q.why_asked ? <div style={{ fontSize: 13, color: RS.textMuted, marginLeft: 13, marginTop: 4 }}>{q.why_asked}</div> : null}
-                  {q.personal_angle ? <div style={{ fontSize: 13, color: RS.textSecondary, marginLeft: 13, marginTop: 4 }}>{q.personal_angle}</div> : null}
-                </div>
-              ))}
-            </div>
-          ) : isPro ? (
-            <div style={{ marginTop: 20 }}>
-              <div style={sectionTitleStyle}>{lang === "TR" ? "Mülakat soruları" : "Interview questions"}</div>
-              <EmptyGuidance primary={t.interviewEmptyGuidance} action={t.interviewEmptyNext} />
-            </div>
-          ) : null}
-        </div>
-
-        <div style={{ display: activeTab === "skills" ? "block" : "none" }}>
-          <div style={{ fontSize: 12, fontWeight: 500, color: RS.textMuted, marginBottom: 8 }}>{t.missingFromCv}</div>
-          {!isPro && missingDisplay.length > 0 ? (
-            <ProBlurGate active onUpgrade={onUpgrade} unlockLabel={unlockLabel}>
-              <div style={{ marginBottom: 16 }}>
-                {missingDisplay.slice(0, 8).map((s, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      display: "inline-flex",
-                      padding: "6px 12px",
-                      borderRadius: 20,
-                      fontSize: 12,
-                      fontWeight: 500,
-                      margin: "4px 4px 0 0",
-                      background: rsAlpha(RS.red, 0.08),
-                      border: `1px solid ${rsAlpha(RS.red, 0.35)}`,
-                      color: RS.red,
-                    }}
-                  >
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </ProBlurGate>
-          ) : (
-            <div style={{ marginBottom: 20 }}>
-              {missingDisplay.length ? (
-                missingDisplay.slice(0, 24).map((s, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      display: "inline-flex",
-                      padding: "6px 12px",
-                      borderRadius: 20,
-                      fontSize: 12,
-                      fontWeight: 500,
-                      margin: "4px 4px 0 0",
-                      background: rsAlpha(RS.red, 0.08),
-                      border: `1px solid ${rsAlpha(RS.red, 0.35)}`,
-                      color: RS.red,
-                    }}
-                  >
-                    {s}
-                  </span>
-                ))
-              ) : (
-                <EmptyGuidance primary={t.emptySkillsMissing} action={t.emptySkillsMissingNext} />
-              )}
-            </div>
-          )}
-          <div style={{ fontSize: 12, fontWeight: 500, color: RS.textMuted, marginBottom: 8 }}>{t.detectedInCv}</div>
-          <div style={{ marginBottom: 16 }}>
-            {matchedDisplay.length ? (
-              matchedDisplay.slice(0, 24).map((s, i) => (
-                <span
-                  key={i}
-                  style={{
-                    display: "inline-flex",
-                    padding: "6px 12px",
-                    borderRadius: 20,
-                    fontSize: 12,
-                    fontWeight: 500,
-                    margin: "4px 4px 0 0",
-                    background: RS.bgElevated,
-                    border: `1px solid ${RS.borderSubtle}`,
-                    color: RS.textMuted,
-                  }}
-                >
-                  {s}
-                </span>
-              ))
-            ) : (
-              <EmptyGuidance primary={t.emptySkillsMatched} action={t.emptySkillsMatchedNext} />
-            )}
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 500, color: RS.textMuted, marginBottom: 8 }}>{lang === "TR" ? "Öne çıkan anahtar kelimeler" : "Top keywords"}</div>
-          <div>
-            {keywordsDisplay.length ? (
-              keywordsDisplay.slice(0, 20).map((s, i) => (
-                <span
-                  key={i}
-                  style={{
-                    display: "inline-flex",
-                    padding: "6px 12px",
-                    borderRadius: 20,
-                    fontSize: 12,
-                    fontWeight: 500,
-                    margin: "4px 4px 0 0",
-                    background: rsAlpha(RS.indigo, 0.1),
-                    border: `1px solid ${rsAlpha(RS.indigo, 0.28)}`,
-                    color: RS.indigo,
-                  }}
-                >
-                  {s}
-                </span>
-              ))
-            ) : (
-              <EmptyGuidance primary={t.emptyKeywordsNone} action={t.emptyKeywordsNext} />
-            )}
-          </div>
-        </div>
-
-        <div style={{ display: activeTab === "market" ? "block" : "none" }}>
-          {data.CompanyIntel ? (
-            <div style={{ marginBottom: 16 }}>
-              <CompanyIntelligenceSection intel={data.CompanyIntel} lang={lang} t={t} isPro={isPro} onOpenRoadmap={onOpenRoadmap} onUpgrade={onUpgrade} />
-            </div>
-          ) : null}
-          {(data.ATS?.ats_score != null || data.ATS?.keyword_match != null || data.ATS?.formatting_score != null) && (
-            <div style={{ marginBottom: 16, padding: "14px 16px", borderRadius: 8, border: `1px solid ${RS.border}`, background: RS.bgSurface }}>
-              <div style={{ ...labelStyle, marginBottom: 10 }}>{lang === "TR" ? "ATS uyumluluğu" : "ATS compatibility"}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 14, fontSize: 14, color: RS.textSecondary }}>
-                {data.ATS?.ats_score != null ? (
-                  <span>
-                    <span style={{ color: RS.textMuted, fontWeight: 500 }}>{lang === "TR" ? "ATS skoru: " : "ATS score: "}</span>
-                    <span style={{ fontFamily: RS.fontMono, fontWeight: 500, color: RS.indigo }}>{data.ATS.ats_score}%</span>
-                  </span>
-                ) : null}
-                {data.ATS?.keyword_match != null ? (
-                  <span>
-                    <span style={{ color: RS.textMuted, fontWeight: 500 }}>{lang === "TR" ? "Kelime eşleşmesi: " : "Keyword match: "}</span>
-                    <span style={{ fontFamily: RS.fontMono, fontWeight: 500, color: RS.green }}>{data.ATS.keyword_match}%</span>
-                  </span>
-                ) : null}
-                {data.ATS?.formatting_score != null ? (
-                  <span>
-                    <span style={{ color: RS.textMuted, fontWeight: 500 }}>{lang === "TR" ? "Biçim: " : "Formatting: "}</span>
-                    <span style={{ fontFamily: RS.fontMono, fontWeight: 500, color: RS.amber }}>{data.ATS.formatting_score}%</span>
-                  </span>
-                ) : null}
-              </div>
-            </div>
-          )}
-          {locked ? (
-            <div style={{ position: "relative", padding: 16, borderRadius: 8, background: rsAlpha(RS.indigo, 0.06), border: `1px solid ${rsAlpha(RS.indigo, 0.2)}`, textAlign: "center" }}>
-              <div style={{ fontSize: 13, color: RS.textSecondary, marginBottom: 10 }}>{lang === "TR" ? "Rol matrisi Pro'da" : "Role fit matrix on Pro"}</div>
-              <button
-                type="button"
-                onClick={onUpgrade}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "10px 18px",
-                  borderRadius: 8,
-                  background: RS.indigo,
-                  border: "none",
-                  color: RS.textPrimary,
-                  fontWeight: 500,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  fontFamily: RS.fontUi,
-                }}
-              >
-                {unlockLabel}
-              </button>
-            </div>
-          ) : roles.length ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 1, background: RS.border }}>
-              {roles.map((r, i) => {
-                const isBest = best && r.role === best;
-                return (
-                  <motion.div
-                    key={i}
-                    className={`hf-role-tag ${isBest ? "hf-role-tag--best" : ""}`}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05, duration: 0.28 }}
-                    whileHover={{ y: -2 }}
-                    style={{
-                      padding: "16px 18px",
-                      borderRadius: 0,
-                      background: RS.bgSurface,
-                      border: "none",
-                    }}
-                  >
-                    <div style={{ fontSize: 12, fontWeight: 500, color: isBest ? RS.green : RS.textSecondary, marginBottom: 8 }}>
-                      {r.role}
-                      {isBest ? " ★" : ""}
-                    </div>
-                    <div style={{ height: 6, borderRadius: 999, background: RS.bgElevated, overflow: "hidden" }}>
-                      <motion.div
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(100, r.score)}%` }}
-                        transition={{ delay: 0.15 + i * 0.06, duration: 0.55, ease: "easeOut" }}
-                        style={{
-                          height: "100%",
-                          background: isBest ? RS.green : RS.indigo,
-                          borderRadius: 999,
-                        }}
-                      />
-                    </div>
-                    <div style={{ fontSize: 16, fontWeight: 500, color: RS.textPrimary, marginTop: 8, fontFamily: RS.fontMono }}>{r.score}</div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          ) : (
-            <EmptyGuidance primary={t.emptyMarketRoles} action={t.emptyMarketRolesNext} />
-          )}
-          <div style={{ marginTop: 14, display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button
-              type="button"
-              onClick={() => onSharePrompt?.()}
-              style={{
-                flex: 1,
-                minWidth: 150,
-                padding: "10px 14px",
-                borderRadius: 8,
-                border: `1px solid ${RS.borderSubtle}`,
-                background: RS.bgElevated,
-                color: RS.textSecondary,
-                fontWeight: 500,
-                fontSize: 13,
-                cursor: "pointer",
-                fontFamily: RS.fontUi,
-              }}
-            >
-              {lang === "TR" ? "Sonucu paylaş" : "Share this result"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowJobs((v) => !v)}
-              style={{
-                flex: 1,
-                minWidth: 150,
-                padding: "10px 14px",
-                borderRadius: 8,
-                border: `1px solid ${rsAlpha(RS.green, 0.35)}`,
-                background: rsAlpha(RS.green, 0.08),
-                color: RS.green,
-                fontWeight: 500,
-                fontSize: 13,
-                cursor: "pointer",
-                fontFamily: RS.fontUi,
-              }}
-            >
-              {lang === "TR" ? "Gerçek işlere başvur" : "Apply to Real Jobs"}
-            </button>
-          </div>
-          {showJobs ? (
-            <div style={{ marginTop: 12, padding: "14px 16px", borderRadius: 8, border: `1px solid ${rsAlpha(RS.green, 0.25)}`, background: rsAlpha(RS.green, 0.06) }}>
-              <div style={{ fontSize: 13, color: RS.green, fontWeight: 500, marginBottom: 8 }}>
-                {lang === "TR" ? "Bu boşlukları kapatırsan başvuruya hazırsın." : "You are ready to apply after fixing these gaps."}
-              </div>
-              <div style={{ display: "grid", gap: 8 }}>
-                {jobSuggestions.map((j, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      border: `1px solid ${RS.border}`,
-                      borderRadius: 8,
-                      padding: "10px 12px",
-                      background: RS.bgSurface,
-                    }}
-                  >
-                    <div>
-                      <div style={{ fontSize: 13, color: RS.textPrimary, fontWeight: 500 }}>{j.title}</div>
-                      <div style={{ fontSize: 12, color: RS.textMuted }}>{j.location}</div>
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 500, color: RS.green, fontFamily: RS.fontMono }}>{j.fit}%</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      </div>
-
-      <div style={{ padding: "0 32px 28px", background: "transparent" }}>
+      <div style={{ padding: "28px 32px 32px", background: RS.bgSurface }}>
+        <div style={{ ...labelStyle, marginBottom: 12 }}>{t.focusActionKicker}</div>
+        <p style={{ margin: "0 0 20px", fontSize: 17, fontWeight: 600, color: RS.textPrimary, lineHeight: 1.55, maxWidth: 640 }}>{singleAction}</p>
         <button
           type="button"
           onClick={() => {
@@ -3373,40 +1444,48 @@ function CareerEngineCard({
           disabled={optimizing && isPro}
           style={{
             width: "100%",
+            maxWidth: 420,
             padding: "16px 22px",
             borderRadius: 14,
             border: "none",
             background: `linear-gradient(135deg, ${RS.indigo}, #a855f7)`,
             color: "#0f172a",
-            fontSize: 16,
-            fontWeight: 900,
+            fontSize: 15,
+            fontWeight: 800,
             cursor: optimizing && isPro ? "wait" : "pointer",
             fontFamily: RS.fontUi,
-            display: "flex",
+            display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
             gap: 10,
             opacity: optimizing && isPro ? 0.75 : 1,
             boxShadow: `0 8px 32px ${rsAlpha(RS.indigo, 0.4)}`,
-            transition: "transform 0.2s ease, box-shadow 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            if (e.currentTarget.disabled) return;
-            e.currentTarget.style.transform = "translateY(-2px)";
-            e.currentTarget.style.boxShadow = `0 12px 40px ${rsAlpha(RS.indigo, 0.5)}`;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = "none";
-            e.currentTarget.style.boxShadow = `0 8px 32px ${rsAlpha(RS.indigo, 0.4)}`;
           }}
         >
-          {optimizing && isPro ? <Loader2 size={18} style={{ animation: "spin 0.8s linear infinite" }} /> : <Wand2 size={18} />}
-          {!isPro ? t.fixMyCvUnlock : t.fixMyCvRun}
+          {optimizing && isPro ? <Loader2 size={18} style={{ animation: "spin 0.8s linear infinite" }} /> : null}
+          {!isPro ? t.focusCtaSeeFull : optimizing && isPro ? t.optimizing : t.focusCtaApplyFix}
         </button>
+
+        {!isPro ? (
+          <div
+            style={{
+              marginTop: 22,
+              padding: "16px 18px",
+              borderRadius: 14,
+              border: `1px solid ${RS.borderSubtle}`,
+              background: rsAlpha(RS.indigo, 0.06),
+            }}
+          >
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.6 }}>
+              {t.focusHiddenGapsTeaser.replace("{n}", String(extraHiddenCount))}
+            </p>
+          </div>
+        ) : null}
       </div>
     </motion.div>
   );
 }
+
 
 const translations = {
   EN: {
@@ -3674,6 +1753,13 @@ const translations = {
     stepCtaGithub: "Open GitHub guide →",
     stepCtaApply: "Enter target zone →",
     impactUnlockedLine: "Impact unlocked",
+    focusVerdictKicker: "Verdict",
+    focusImpactKicker: "Score impact",
+    focusImpactExpl: "Fixing this gap is worth about +{pts} points toward a stronger profile.",
+    focusActionKicker: "Your one move",
+    focusCtaSeeFull: "See full analysis →",
+    focusCtaApplyFix: "Apply this focus to my CV →",
+    focusHiddenGapsTeaser: "There are {n} more gaps still affecting your score. Unlock the full breakdown.",
   },
   TR: {
     slogan: "AI Career Decision Engine",
@@ -3939,6 +2025,13 @@ const translations = {
     stepCtaGithub: "GitHub rehberi →",
     stepCtaApply: "Hedef bölgeye gir →",
     impactUnlockedLine: "Etki açıldı",
+    focusVerdictKicker: "Sonuç",
+    focusImpactKicker: "Skor etkisi",
+    focusImpactExpl: "Bu boşluğu kapatmak profil gücün için yaklaşık +{pts} puanlık bir kazanım demek.",
+    focusActionKicker: "Tek hamlen",
+    focusCtaSeeFull: "Tam analizi gör →",
+    focusCtaApplyFix: "Bu odağı CV'me uygula →",
+    focusHiddenGapsTeaser: "Skorunu etkileyen {n} boşluk daha var. Tüm dökümü görmek için kilidi aç.",
   },
 };
 
@@ -4334,153 +2427,6 @@ function firstTwoSentences(text) {
   if (!t) return "";
   const parts = t.match(/[^.!?]+[.!?]?/g) || [t];
   return parts.slice(0, 2).join(" ").trim();
-}
-
-function CompanyIntelligenceSection({ intel, lang, t, isPro, onOpenRoadmap, onUpgrade }) {
-  if (!intel) return null;
-  const r = intel.report || {};
-  const ex = intel.extracted || {};
-  const cvv = intel.cv_vs_sector || {};
-  const missingTrend = Array.isArray(cvv.missing_trending) ? cvv.missing_trending : [];
-  const matchedTrend = Array.isArray(cvv.matched_trending) ? cvv.matched_trending : [];
-  const overviewRaw = String(r.company_structure || "").trim();
-  const overview = firstTwoSentences(overviewRaw) || overviewRaw.slice(0, 280);
-  const careerRaw = String(r.career_opportunities || "").trim();
-  const careerBullets = careerRaw
-    ? careerRaw
-        .split(/\n+|(?<=[.!?])\s+/)
-        .map((x) => x.trim())
-        .filter(Boolean)
-        .slice(0, 3)
-    : [];
-  const sectorPos = String(r.sector_position || "").trim();
-  const cvNarrative = String(cvv.narrative || "").trim();
-  const hasBody = overview || careerBullets.length || sectorPos || cvNarrative || missingTrend.length || matchedTrend.length || (ex.company_name && String(ex.company_name).trim());
-  if (!hasBody) return null;
-
-  const hasCompanyName = Boolean(ex.company_name && String(ex.company_name).trim());
-  const subCard = {
-    background: RS.bgElevated,
-    borderRadius: 8,
-    padding: "14px 16px",
-    border: `1px solid ${RS.borderSubtle}`,
-  };
-  const subTitle = { fontSize: 12, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: RS.textMuted, marginBottom: 8, fontFamily: RS.fontUi };
-
-  return (
-    <div
-      style={{
-        marginBottom: 0,
-        padding: "24px 32px",
-        borderRadius: 12,
-        border: `1px solid ${RS.border}`,
-        background: RS.bgSurface,
-        fontFamily: RS.fontUi,
-      }}
-    >
-      <div style={{ fontSize: 12, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: RS.textMuted, marginBottom: 16 }}>
-        {hasCompanyName ? t.companyIntelTitle : t.companyIntelSectorTitle}
-      </div>
-      {hasCompanyName ? (
-        <div style={{ fontSize: 15, fontWeight: 600, color: RS.textPrimary, marginBottom: 16 }}>
-          {ex.company_name}
-          {ex.sector_inferred ? <span style={{ fontWeight: 500, color: RS.textSecondary, fontSize: 14 }}> · {ex.sector_inferred}</span> : null}
-        </div>
-      ) : ex.sector_inferred ? (
-        <div style={{ fontSize: 14, fontWeight: 500, color: RS.textSecondary, marginBottom: 16 }}>{ex.sector_inferred}</div>
-      ) : null}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <div style={subCard}>
-          <div style={subTitle}>{t.ciCompanyStructure}</div>
-          <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65 }}>
-            {overview || <EmptyGuidance primary={t.ciEmptyOverview} action={t.ciEmptyOverviewNext} />}
-          </div>
-        </div>
-        <div style={subCard}>
-          <div style={subTitle}>{t.ciCareerOpportunities}</div>
-          {careerBullets.length ? (
-            <ul style={{ margin: 0, paddingLeft: 18, color: RS.textSecondary, fontSize: 14, lineHeight: 1.65 }}>
-              {careerBullets.map((line, i) => (
-                <li key={i} style={{ marginBottom: 6 }}>
-                  {line}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <EmptyGuidance primary={t.ciEmptyCareer} action={t.ciEmptyCareerNext} />
-          )}
-        </div>
-        <div style={subCard}>
-          <div style={subTitle}>{t.ciSectorPosition}</div>
-          <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65 }}>
-            {sectorPos || <EmptyGuidance primary={t.ciEmptySector} action={t.ciEmptySectorNext} />}
-          </div>
-        </div>
-        <div style={subCard}>
-          <div style={subTitle}>{t.ciCvVsTrends}</div>
-          {cvNarrative ? <div style={{ fontSize: 14, color: RS.textSecondary, lineHeight: 1.65, marginBottom: 10 }}>{cvNarrative}</div> : null}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {missingTrend.slice(0, 12).map((s, i) => (
-              <span
-                key={`m-${i}`}
-                style={{
-                  display: "inline-flex",
-                  padding: "4px 10px",
-                  borderRadius: 20,
-                  fontSize: 12,
-                  fontWeight: 500,
-                  background: rsAlpha(RS.red, 0.08),
-                  border: `1px solid ${rsAlpha(RS.red, 0.35)}`,
-                  color: RS.red,
-                }}
-              >
-                {s}
-              </span>
-            ))}
-            {matchedTrend.slice(0, 12).map((s, i) => (
-              <span
-                key={`k-${i}`}
-                style={{
-                  display: "inline-flex",
-                  padding: "4px 10px",
-                  borderRadius: 20,
-                  fontSize: 12,
-                  fontWeight: 500,
-                  background: RS.bgBase,
-                  border: `1px solid ${RS.borderSubtle}`,
-                  color: RS.green,
-                }}
-              >
-                {s}
-              </span>
-            ))}
-          </div>
-          {!cvNarrative && !missingTrend.length && !matchedTrend.length ? (
-            <EmptyGuidance primary={t.ciEmptyCvTrends} action={t.ciEmptyCvTrendsNext} />
-          ) : null}
-        </div>
-      </div>
-      <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
-        <button
-          type="button"
-          onClick={() => (isPro ? onOpenRoadmap() : onUpgrade())}
-          style={{
-            padding: "8px 14px",
-            borderRadius: 8,
-            border: "none",
-            background: RS.indigo,
-            color: RS.textPrimary,
-            fontWeight: 500,
-            fontSize: 13,
-            cursor: "pointer",
-            fontFamily: RS.fontUi,
-          }}
-        >
-          {isPro ? t.ciRoadmapCta : t.unlockProArrow}
-        </button>
-      </div>
-    </div>
-  );
 }
 
 /** First plausible job title line from pasted JD (labeled or heuristic). */
@@ -7489,40 +5435,8 @@ export function AnalyzerPage() {
           onUpgrade={openUpgrade}
           onFixCv={optimizeCv}
           optimizing={optimizing}
-          onSharePrompt={handleSharePrompt}
-          onOpenRoadmap={generateLearningPlan}
-          matchedSkills={matchedSkills}
-          missingSkills={missingSkills}
-          topKeywords={topKeywords}
-          interviewPrep={analysisData?.interview_prep ?? []}
-          scoreRunProgress={scoreRunProgress}
-          progressFingerprint={
-            alignmentScore != null ? analysisExecutionFingerprint(cvText, jdText, alignmentScore) : ""
-          }
-          onRerunAnalysis={reanalyzeAfterFix}
         />
       </motion.div>
-    )}
-    {engineV2 && alignmentScore !== null && (
-      <ShareYourResult
-        score={alignmentScore}
-        verdictLabel={getScoreFinalVerdict(alignmentScore, lang).shareLabel}
-        biggestMistake={humanizeUserFacingReason(
-          String(engineV2?.Gaps?.biggest_gap || engineV2?.Gaps?.rejection_reasons?.[0]?.issue || "").trim(),
-          lang,
-        )}
-        lang={lang}
-      />
-    )}
-    {engineV2?.CompanyIntel && alignmentScore !== null && lang === "TR" && (
-      <CompanyIntelligenceSection
-        intel={engineV2.CompanyIntel}
-        lang={lang}
-        t={t}
-        isPro={isPro}
-        onOpenRoadmap={generateLearningPlan}
-        onUpgrade={openUpgrade}
-      />
     )}
     {!engineV2 && (decisionData || decisionLoading) && (
       <motion.div key="decision" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.28 }}>
@@ -7542,7 +5456,7 @@ export function AnalyzerPage() {
     )}
     </AnimatePresence>
 
-    {((!engineV2) || lang === "TR") && alignmentScore !== null && analysisData && (
+    {!engineV2 && alignmentScore !== null && analysisData && (
       <>
         <DashboardResults
           data={analysisData}
