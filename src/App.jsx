@@ -6141,8 +6141,21 @@ export function PrivacyPage() {
 }
 
 export function RoadmapRoute() {
-  const { navigate, lang, t, learningPlan, roleType, seniority } = useOutletContext();
-  return <RoadmapPage navigate={navigate} lang={lang} t={t} learningPlan={learningPlan} roleType={roleType} seniority={seniority} />;
+  const { navigate, lang, t, learningPlan, roleType, seniority, analysisData, cvText, jdText, alignmentScore } = useOutletContext();
+  return (
+    <RoadmapPage
+      navigate={navigate}
+      lang={lang}
+      t={t}
+      learningPlan={learningPlan}
+      roleType={roleType}
+      seniority={seniority}
+      analysisData={analysisData}
+      cvText={cvText}
+      jdText={jdText}
+      alignmentScore={alignmentScore}
+    />
+  );
 }
 
 export function LoginPage() {

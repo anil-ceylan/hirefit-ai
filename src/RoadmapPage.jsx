@@ -104,6 +104,67 @@ function computeJourneyStepIndex(roadmapSteps, taskCatalog, completedIds) {
   return Math.max(0, roadmapSteps.length - 1);
 }
 
+function analysisExecutionFingerprint(cv, jd, alignmentScore) {
+  const a = String(cv || "").slice(0, 2400);
+  const b = String(jd || "").slice(0, 2400);
+  const s = `${Math.round(Number(alignmentScore) || 0)}|${a}|${b}`;
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return `v1_${(h >>> 0).toString(16)}`;
+}
+
+const LS_FIX_PROGRESS = "hirefit-fix-progress-";
+
+function emptyFixProofGrid(fixes) {
+  return {
+    completed: Array.from({ length: fixes.length }, () => false),
+    fixProofs: Array.from({ length: fixes.length }, () => ""),
+  };
+}
+
+function loadRoadmapFixExecutionState(fp, fixes) {
+  if (!fp || !fixes.length) return emptyFixProofGrid(fixes);
+  try {
+    const raw = localStorage.getItem(LS_FIX_PROGRESS + fp);
+    if (!raw) return emptyFixProofGrid(fixes);
+    const parsed = JSON.parse(raw);
+    return {
+      completed:
+        Array.isArray(parsed.completed) && parsed.completed.length === fixes.length
+          ? parsed.completed.map(Boolean)
+          : Array.from({ length: fixes.length }, () => false),
+      fixProofs:
+        Array.isArray(parsed.fixProofs) && parsed.fixProofs.length === fixes.length
+          ? parsed.fixProofs.map((v) => String(v ?? ""))
+          : Array.from({ length: fixes.length }, () => ""),
+    };
+  } catch {
+    return emptyFixProofGrid(fixes);
+  }
+}
+
+function saveRoadmapFixExecutionState(fp, state) {
+  if (!fp || !state) return;
+  try {
+    const raw = localStorage.getItem(LS_FIX_PROGRESS + fp);
+    const prev = raw ? JSON.parse(raw) : {};
+    localStorage.setItem(
+      LS_FIX_PROGRESS + fp,
+      JSON.stringify({
+        ...prev,
+        completed: Array.isArray(state.completed) ? state.completed : [],
+        fixProofs: Array.isArray(state.fixProofs) ? state.fixProofs : [],
+        updatedAt: Date.now(),
+      })
+    );
+  } catch {
+    // ignore
+  }
+}
+
 /** NEW: LinkedIn-ready share copy from roadmap steps + role (growth). */
 function escapeXmlText(s) {
   return String(s ?? "")
@@ -341,7 +402,7 @@ async function rasterizeSvgStringToPngBlob(svgString, scale = 2) {
   });
 }
 
-export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType, seniority }) {
+export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType, seniority, analysisData, cvText, jdText, alignmentScore }) {
   const uid = useId().replace(/:/g, "");
   const gradId = `roadmap-grad-${uid}`;
   const glowFilterId = `roadmap-glow-${uid}`;
@@ -399,6 +460,8 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
   const displayPctRef = useRef(0);
   const pctAnimRaf = useRef(null);
   const [pulseStepIndex, setPulseStepIndex] = useState(-1);
+  const [fixExecState, setFixExecState] = useState({ completed: [], fixProofs: [] });
+  const [proofDrafts, setProofDrafts] = useState({});
   const pulseClearRef = useRef(null);
   const prevJourneyStepRef = useRef(-1);
 
@@ -839,10 +902,30 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
   const effectivePlan = (learningPlan || storedPlan || "").trim();
   const effectiveRole = roleType || storedMeta.roleType || "";
   const effectiveSeniority = seniority || storedMeta.seniority || "";
+  const actionPlanFixes = useMemo(() => {
+    const fixes = analysisData?.ActionPlan?.fixes;
+    return Array.isArray(fixes) ? fixes : [];
+  }, [analysisData]);
+  const progressEngineEnabled = actionPlanFixes.length > 0;
+  const fixPlanKey = useMemo(
+    () => (progressEngineEnabled ? analysisExecutionFingerprint(cvText, jdText, alignmentScore) : ""),
+    [progressEngineEnabled, cvText, jdText, alignmentScore]
+  );
 
   const roadmapSteps = useMemo(
-    () => (effectivePlan ? parseLearningRoadmapToSteps(effectivePlan, lang) : []),
-    [effectivePlan, lang]
+    () =>
+      progressEngineEnabled
+        ? actionPlanFixes.map((fix, idx) => ({
+            id: String(fix?.id || `fix-${idx + 1}`),
+            title: String(fix?.issue || (lang === "TR" ? `Düzeltme ${idx + 1}` : `Fix ${idx + 1}`)),
+            description: String(fix?.explanation || ""),
+            score_impact: Math.max(1, Math.min(18, Math.round(Number(fix?.score_impact) || 0))),
+            steps: Array.isArray(fix?.steps) ? fix.steps : [],
+          }))
+        : effectivePlan
+          ? parseLearningRoadmapToSteps(effectivePlan, lang)
+          : [],
+    [progressEngineEnabled, actionPlanFixes, effectivePlan, lang]
   );
 
   const taskCatalog = useMemo(() => buildRoadmapTaskCatalog(roadmapSteps, lang), [roadmapSteps, lang]);
@@ -851,10 +934,28 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
     [effectivePlan, roadmapSteps.length]
   );
   const catalogKey = useMemo(() => taskCatalog.map((x) => x.id).join("\0"), [taskCatalog]);
-  const retentionTotal = taskCatalog.length;
-  const completedCount = completedTaskIds.length;
+  const retentionTotal = progressEngineEnabled ? roadmapSteps.length : taskCatalog.length;
+  const completedCount = progressEngineEnabled ? fixExecState.completed.filter(Boolean).length : completedTaskIds.length;
   const retentionProgressPercent =
     retentionTotal > 0 ? Math.min(100, Math.round((completedCount / retentionTotal) * 100)) : 0;
+  const liveInterviewScore = useMemo(() => {
+    const base = Math.max(0, Math.min(100, Math.round(Number(alignmentScore) || 0)));
+    if (!progressEngineEnabled) return base;
+    let score = base;
+    roadmapSteps.forEach((step, idx) => {
+      if (fixExecState.completed[idx]) score = Math.min(100, score + (step.score_impact || 0));
+    });
+    return score;
+  }, [alignmentScore, progressEngineEnabled, roadmapSteps, fixExecState.completed]);
+
+  useEffect(() => {
+    if (!progressEngineEnabled) {
+      setFixExecState({ completed: [], fixProofs: [] });
+      return;
+    }
+    setFixExecState(loadRoadmapFixExecutionState(fixPlanKey, roadmapSteps));
+    setProofDrafts({});
+  }, [progressEngineEnabled, fixPlanKey, roadmapSteps]);
 
   const socialProofAheadPct = useMemo(
     () => mockCandidateAheadPercentile(retentionProgressPercent, completedCount),
@@ -912,6 +1013,13 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
   }, [retentionProgressPercent]);
 
   const stepDoneByRetention = useMemo(() => {
+    if (progressEngineEnabled) {
+      const map = new Map();
+      roadmapSteps.forEach((_, idx) => {
+        map.set(idx, !!fixExecState.completed[idx]);
+      });
+      return map;
+    }
     const done = new Set(completedTaskIds);
     const map = new Map();
     for (let si = 0; si < roadmapSteps.length; si++) {
@@ -919,9 +1027,13 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
       map.set(si, ids.length > 0 && ids.every((id) => done.has(id)));
     }
     return map;
-  }, [taskCatalog, completedTaskIds, roadmapSteps.length]);
+  }, [progressEngineEnabled, roadmapSteps, fixExecState.completed, taskCatalog, completedTaskIds, roadmapSteps.length]);
 
   const journeyStepIndex = useMemo(() => {
+    if (progressEngineEnabled) {
+      const firstIncomplete = fixExecState.completed.findIndex((c) => !c);
+      return firstIncomplete === -1 ? Math.max(0, roadmapSteps.length - 1) : firstIncomplete;
+    }
     if (!roadmapSteps.length || !taskCatalog.length) return 0;
     const done = new Set(completedTaskIds);
     for (let si = 0; si < roadmapSteps.length; si++) {
@@ -929,7 +1041,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
       if (ids.some((id) => !done.has(id))) return si;
     }
     return Math.max(0, roadmapSteps.length - 1);
-  }, [roadmapSteps.length, taskCatalog, completedTaskIds]);
+  }, [progressEngineEnabled, fixExecState.completed, roadmapSteps.length, taskCatalog, completedTaskIds]);
 
   useEffect(() => {
     if (roadmapSteps.length === 0) return;
@@ -1161,6 +1273,30 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
     setPulseStepIndex(stepIdx);
     if (pulseClearRef.current) window.clearTimeout(pulseClearRef.current);
     pulseClearRef.current = window.setTimeout(() => setPulseStepIndex(-1), 2200);
+  };
+
+  const submitFixProof = (stepIndex) => {
+    const proof = String(proofDrafts[stepIndex] ?? fixExecState.fixProofs[stepIndex] ?? "").trim();
+    if (!proof) {
+      window.alert(lang === "TR" ? "Tamamlamak için kanıt girin." : "Add proof before completing this node.");
+      return;
+    }
+    setFixExecState((prev) => {
+      const completed = Array.from({ length: roadmapSteps.length }, (_, i) => !!prev.completed[i]);
+      const fixProofs = Array.from({ length: roadmapSteps.length }, (_, i) => String(prev.fixProofs[i] ?? ""));
+      completed[stepIndex] = true;
+      fixProofs[stepIndex] = proof;
+      const next = { completed, fixProofs };
+      saveRoadmapFixExecutionState(fixPlanKey, next);
+      return next;
+    });
+    setProofDrafts((prev) => ({ ...prev, [stepIndex]: proof }));
+    setRetentionToast(
+      (lang === "TR" ? "🔥 +" : "🔥 +") +
+        String(roadmapSteps[stepIndex]?.score_impact || 0) +
+        (lang === "TR" ? " puan açıldı" : " points unlocked")
+    );
+    window.setTimeout(() => setRetentionToast(null), 2500);
   };
 
   const completeDailyTask = async () => {
@@ -1424,6 +1560,25 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
     const futureJourney = i > journeyStepIndex;
     const isHovered = roadmapHovered === stepKey || roadmapSelection === stepKey;
     const isExpanded = Boolean(roadmapStepExpanded[i]);
+    const firstIncomplete = progressEngineEnabled ? fixExecState.completed.findIndex((c) => !c) : -1;
+    const isCompletedNode = progressEngineEnabled ? !!fixExecState.completed[i] : isDone;
+    const isActiveNode =
+      progressEngineEnabled &&
+      !isCompletedNode &&
+      (i === firstIncomplete || (firstIncomplete >= 0 && i === firstIncomplete + 1));
+    const isLockedNode = progressEngineEnabled && !isCompletedNode && !isActiveNode;
+    const statusIcon = isCompletedNode ? "✅" : isActiveNode ? "🔓" : "🔒";
+    const statusLabel = isCompletedNode
+      ? lang === "TR"
+        ? "Tamamlandı"
+        : "Completed"
+      : isActiveNode
+        ? lang === "TR"
+          ? "Aktif"
+          : "Active"
+        : lang === "TR"
+          ? "Kilitli"
+          : "Locked";
     const borderColor = isJourneyCurrent
       ? "rgba(199,210,254,0.98)"
       : isDone
@@ -1482,7 +1637,30 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
       { kind: "practice", tag: lang === "TR" ? "Pratik" : "Practice" },
       { kind: "apply", tag: lang === "TR" ? "Uygula" : "Apply" },
     ];
-    const lpaReadonlyBlock = (
+    const lpaReadonlyBlock = progressEngineEnabled ? (
+      <div style={sectionGap} onClick={(e) => e.stopPropagation()}>
+        <div style={sectionLabel}>{lang === "TR" ? "AKSİYON ADIMLARI" : "ACTION STEPS"}</div>
+        {(Array.isArray(step.steps) ? step.steps : []).map((line, idx) => (
+          <div
+            key={`fix-step-${i}-${idx}`}
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "flex-start",
+              marginBottom: idx === step.steps.length - 1 ? 0 : 8,
+              padding: "8px 10px",
+              borderRadius: 10,
+              border: "1px solid rgba(99,102,241,0.14)",
+              background: "rgba(255,255,255,0.02)",
+              opacity: isLockedNode ? 0.45 : 1,
+            }}
+          >
+            <span style={{ color: "#818cf8", fontWeight: 800, fontSize: 12 }}>{idx + 1}.</span>
+            <span style={{ ...sectionValue, fontSize: 12 }}>{String(line || "").trim()}</span>
+          </div>
+        ))}
+      </div>
+    ) : (
       <div style={sectionGap} onClick={(e) => e.stopPropagation()}>
         <div style={sectionLabel}>{lang === "TR" ? "ÖĞREN · PRATİK · UYGULA" : "LEARN · PRACTICE · APPLY"}</div>
         {lpaKindsMeta.map(({ kind, tag }) => {
@@ -1592,6 +1770,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
             role="button"
             tabIndex={0}
             onClick={() => {
+              if (isLockedNode) return;
               setRoadmapFocusIndex(i);
               setRoadmapSelection(stepKey);
               scrollCardIntoView(cardRefs.current[i]);
@@ -1599,6 +1778,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
+                if (isLockedNode) return;
                 setRoadmapFocusIndex(i);
                 setRoadmapSelection(stepKey);
                 scrollCardIntoView(cardRefs.current[i]);
@@ -1620,7 +1800,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
               border: `1px solid ${borderColor}`,
               backdropFilter: "blur(10px)",
               WebkitBackdropFilter: "blur(10px)",
-              cursor: "pointer",
+              cursor: isLockedNode ? "not-allowed" : "pointer",
               boxShadow: isHovered
                 ? "0 12px 32px rgba(0,0,0,0.45)"
                 : isJourneyCurrent
@@ -1665,6 +1845,25 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
           >
             {step.title || (lang === "TR" ? "Adım" : "Step")}
           </div>
+          {progressEngineEnabled ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: isCompletedNode ? "#86efac" : isActiveNode ? "#93c5fd" : "#94a3b8" }}>
+                {statusIcon} {statusLabel}
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: "#0f172a",
+                  borderRadius: 999,
+                  padding: "5px 10px",
+                  background: "linear-gradient(135deg, #fbbf24, #f59e0b)",
+                }}
+              >
+                +{step.score_impact || 0}
+              </div>
+            </div>
+          ) : null}
           {!stepBodyOpen ? (
             <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 2 }}>
               <p
@@ -1838,6 +2037,58 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                 <ChevronUp size={14} aria-hidden />
                 {lang === "TR" ? "Adımı daralt" : "Hide step details"}
               </button>
+              {progressEngineEnabled ? (
+                <div onClick={(e) => e.stopPropagation()} style={{ marginTop: 14 }}>
+                  <div style={{ ...sectionLabel, marginBottom: 6 }}>{lang === "TR" ? "KANIT" : "PROOF"}</div>
+                  <input
+                    type="text"
+                    value={String(proofDrafts[i] ?? fixExecState.fixProofs[i] ?? "")}
+                    disabled={isLockedNode || isCompletedNode}
+                    onChange={(e) => setProofDrafts((prev) => ({ ...prev, [i]: e.target.value }))}
+                    placeholder={lang === "TR" ? "Link veya kısa kanıt girin…" : "Paste link or proof…"}
+                    style={{
+                      width: "100%",
+                      boxSizing: "border-box",
+                      padding: "10px 12px",
+                      borderRadius: 8,
+                      border: "1px solid rgba(148,163,184,0.28)",
+                      background: "rgba(15,23,42,0.62)",
+                      color: "#e2e8f0",
+                      fontSize: 12,
+                      marginBottom: 10,
+                      opacity: isLockedNode ? 0.55 : 1,
+                    }}
+                  />
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10, lineHeight: 1.45 }}>
+                    {lang === "TR"
+                      ? `Tamamlarsan skor: ${liveInterviewScore} → ${Math.min(100, liveInterviewScore + (step.score_impact || 0))} (+${step.score_impact || 0})`
+                      : `Complete this → your score: ${liveInterviewScore} → ${Math.min(100, liveInterviewScore + (step.score_impact || 0))} (+${step.score_impact || 0})`}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isLockedNode || isCompletedNode}
+                    onClick={() => submitFixProof(i)}
+                    style={{
+                      padding: "9px 14px",
+                      borderRadius: 8,
+                      border: "none",
+                      cursor: isLockedNode || isCompletedNode ? "not-allowed" : "pointer",
+                      fontWeight: 800,
+                      fontSize: 12,
+                      color: "#0f172a",
+                      background: isLockedNode || isCompletedNode ? "rgba(148,163,184,0.35)" : "linear-gradient(135deg, #34d399, #22c55e)",
+                    }}
+                  >
+                    {isCompletedNode
+                      ? lang === "TR"
+                        ? "Tamamlandı"
+                        : "Completed"
+                      : lang === "TR"
+                        ? "Kanıt Gönder"
+                        : "Submit Proof"}
+                  </button>
+                </div>
+              ) : null}
             </>
           )}
           </div>
