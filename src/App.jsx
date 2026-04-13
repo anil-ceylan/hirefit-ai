@@ -595,7 +595,6 @@ function CriticalSkillsGapBlock({ skills, lang }) {
 function ImpactProjectionPanel({ projection, lang }) {
   if (!projection) return null;
   const t = translations[lang];
-  const SHOW_GAMIFICATION_UI = false;
   const { current, projected, delta, narrative } = projection;
   return (
     <div
@@ -1595,6 +1594,7 @@ function CareerEngineCard({
   if (!data) return null;
 
   const t = translations[lang];
+  const SHOW_GAMIFICATION_UI = false;
   const score = data["Final Alignment Score"];
   const actionPlan = actionPlanMemo;
   const planFixes = planFixesMemo;
