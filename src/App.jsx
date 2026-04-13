@@ -1489,7 +1489,7 @@ function BlurPreviewCard({ title, lines, cardId, onHoverCard }) {
   );
 }
 
-function CareerEngineProBlurPreview({ data, lang, planFixes, t, onUpgrade }) {
+function CareerEngineProBlurPreview({ data, lang, t, onUpgrade }) {
   const previewLabelStyle = {
     fontSize: 11,
     fontWeight: 700,
@@ -1499,7 +1499,23 @@ function CareerEngineProBlurPreview({ data, lang, planFixes, t, onUpgrade }) {
     fontFamily: RS.fontUi,
     marginBottom: 14,
   };
-  const L = useMemo(() => buildV2PreviewLines(data, lang, planFixes, t), [data, lang, planFixes, t]);
+  const derivedPlanFixes = useMemo(() => {
+    const parsed = enrichActionPlan(parseActionPlan(data?.Decision?.action_plan), {
+      lang: lang === "TR" ? "tr" : "en",
+      roleFit: data?.RoleFit,
+      gaps: data?.Gaps,
+      verdict: data?.Decision?.final_verdict,
+    });
+    let fixes = (parsed?.fixes || []).filter((f) => f.issue || (f.steps && f.steps.length));
+    if (!fixes.length && Array.isArray(data?.Decision?.what_to_fix_first)) {
+      fixes = data.Decision.what_to_fix_first
+        .map((line) => String(line || "").trim())
+        .filter(Boolean)
+        .map((line) => ({ issue: line, steps: [line] }));
+    }
+    return fixes;
+  }, [data, lang]);
+  const L = useMemo(() => buildV2PreviewLines(data, lang, derivedPlanFixes, t), [data, lang, derivedPlanFixes, t]);
   const freeRecruiter = useMemo(() => truncatePreviewForFree(L.recruiter), [L.recruiter]);
   const freeGaps = useMemo(() => truncatePreviewForFree(L.gaps), [L.gaps]);
   const freePlan = useMemo(() => truncatePreviewForFree(L.plan), [L.plan]);
@@ -1864,7 +1880,6 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing })
                 {t.focusHiddenGapsTeaser.replace("{n}", String(extraHiddenCount))}
               </p>
             </div>
-            <CareerEngineProBlurPreview data={data} lang={lang} planFixes={planFixes} t={t} onUpgrade={onUpgrade} />
           </>
         ) : (
           <CareerEngineProDetailGrid data={data} lang={lang} t={t} planFixes={planFixes} />
@@ -4418,6 +4433,62 @@ function HireFitLayout() {
     };
   }, [analysisData]);
 
+  const previewData = useMemo(() => {
+    if (engineV2) return engineV2;
+    if (!analysisData && !decisionData) return null;
+    const legacyReasons = analysisData?.rejection_reasons || {};
+    const toRows = (arr, impact) =>
+      (Array.isArray(arr) ? arr : []).map((issue) => ({
+        issue: String(issue || "").trim(),
+        impact,
+      }));
+    const reasonRows = [
+      ...toRows(legacyReasons.high, "high"),
+      ...toRows(legacyReasons.medium, "medium"),
+      ...toRows(legacyReasons.low, "low"),
+    ].filter((x) => x.issue);
+    const roleRows = Array.isArray(analysisData?.role_matches)
+      ? analysisData.role_matches.map((r) => ({
+          role: r.role,
+          score: Number(r.match_score) || 0,
+        }))
+      : [];
+    const scoreFromData =
+      alignmentScore != null
+        ? Number(alignmentScore)
+        : Number(analysisData?.alignment_score ?? NaN);
+    const fixes = Array.isArray(analysisData?.improvements)
+      ? analysisData.improvements
+      : Array.isArray(decisionData?.fixes)
+        ? decisionData.fixes
+        : [];
+    return {
+      "Final Alignment Score": Number.isFinite(scoreFromData) ? scoreFromData : null,
+      Recruiter: {
+        reasoning: String(decisionData?.summary || analysisData?.fit_summary || "").trim(),
+        strengths: Array.isArray(analysisData?.strengths) ? analysisData.strengths : [],
+        weaknesses: [],
+      },
+      Gaps: {
+        rejection_reasons: reasonRows,
+        biggest_gap: reasonRows[0]?.issue || "",
+      },
+      Decision: {
+        reasoning: String(decisionData?.summary || analysisData?.fit_summary || "").trim(),
+        action_plan: fixes.map((f) => String(f || "").trim()).filter(Boolean).join("\n"),
+        what_to_fix_first: fixes,
+      },
+      ATS: {
+        ats_score: analysisData?.score_breakdown?.experience_depth ?? null,
+        keyword_match: analysisData?.score_breakdown?.keyword_match ?? null,
+      },
+      RoleFit: {
+        best_role: String(analysisData?.role_type || roleRows[0]?.role || "").trim(),
+        role_fit: roleRows,
+      },
+    };
+  }, [engineV2, analysisData, decisionData, alignmentScore]);
+
   const handleSharePrompt = () => {
     if (alignmentScore == null) return;
     setShowSharePrompt(true);
@@ -5891,6 +5962,10 @@ export function AnalyzerPage() {
       </motion.div>
     )}
     </AnimatePresence>
+
+    {!isPro && !decisionLoading && previewData && (
+      <CareerEngineProBlurPreview data={previewData} lang={lang} t={t} onUpgrade={openUpgrade} />
+    )}
 
     {!engineV2 && alignmentScore !== null && analysisData && (
       <>
