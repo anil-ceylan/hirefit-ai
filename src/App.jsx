@@ -12,7 +12,7 @@ import {
   CheckCircle2, ArrowRight, LogIn, LogOut, Download, Mail,
   Zap, Star, TrendingUp, Crown, Linkedin, Instagram, Link2, Workflow,
   ChevronRight, Eye, Layers, ListChecks, KeyRound, LineChart,
-  Cpu, FileUp,
+  Cpu, FileUp, Lock,
 } from "lucide-react";
 
 import * as pdfjsLib from "pdfjs-dist";
@@ -250,6 +250,36 @@ function humanizeUserFacingReason(text, lang) {
   if (!raw) return raw;
   if (RAW_PARSE_FAIL_RE.test(raw)) return translations[lang]?.sanitizeParsingFailed || raw;
   return raw;
+}
+
+const HF_ANALYTICS_DEBOUNCE_MS = 900;
+const hfAnalyticsLastFire = new Map();
+
+/** Forwards to gtag, Plausible, or dataLayer when available (no-op otherwise). */
+function hirefitTrack(eventName, params = {}) {
+  if (typeof window === "undefined") return;
+  try {
+    const payload = { event: eventName, ...params };
+    if (typeof window.gtag === "function") {
+      window.gtag("event", eventName, params);
+    }
+    if (typeof window.plausible === "function") {
+      window.plausible(eventName, { props: params });
+    }
+    if (Array.isArray(window.dataLayer)) {
+      window.dataLayer.push({ ...payload, ts: Date.now() });
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function hirefitTrackDebounced(dedupeKey, eventName, params = {}) {
+  const now = Date.now();
+  const last = hfAnalyticsLastFire.get(dedupeKey) || 0;
+  if (now - last < HF_ANALYTICS_DEBOUNCE_MS) return;
+  hfAnalyticsLastFire.set(dedupeKey, now);
+  hirefitTrack(eventName, params);
 }
 
 function getFallbackAnalysis(cvText, jobDescription, lang = "EN") {
@@ -1280,6 +1310,344 @@ function ExpandableInsightCard({
   );
 }
 
+const previewGridStyle = {
+  display: "grid",
+  gap: 10,
+  gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))",
+};
+
+const PREVIEW_FREE_FIRST_MAX = 220;
+const PREVIEW_FREE_REST_MAX = 130;
+
+function truncatePreviewForFree(lines) {
+  if (!lines.length) return lines;
+  const cap = (s, n) => {
+    const x = String(s || "").trim();
+    if (x.length <= n) return x;
+    return `${x.slice(0, n).trimEnd()}…`;
+  };
+  return [cap(lines[0], PREVIEW_FREE_FIRST_MAX), ...lines.slice(1).map((l) => cap(l, PREVIEW_FREE_REST_MAX))];
+}
+
+function gapImpactLabel(g, tr) {
+  const lo = String(g?.impact || "").toLowerCase();
+  if (lo === "high") return tr.previewImpactHigh;
+  if (lo === "medium") return tr.previewImpactMedium;
+  if (lo === "low" || g?.impact) return tr.previewImpactLow;
+  return "";
+}
+
+/** Lines for all four preview cards — always derived from this run's CV+JD payload. */
+function buildV2PreviewLines(data, lang, planFixes, tr) {
+  const h = (s) => humanizeUserFacingReason(String(s || "").trim(), lang);
+
+  const recruiterLines = [];
+  const reasoning = String(data?.Recruiter?.reasoning || "").trim();
+  if (reasoning) {
+    const sents = reasoning
+      .split(/(?<=[.!?])\s+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (sents[0]) recruiterLines.push(h(sents[0]));
+    if (sents[1]) recruiterLines.push(h(sents[1]));
+    if (sents.length > 2) recruiterLines.push(h(sents.slice(2, 4).join(" ")));
+  }
+  const strengths = data?.Recruiter?.strengths || [];
+  const weaknesses = data?.Recruiter?.weaknesses || [];
+  for (const s of strengths) {
+    if (s && recruiterLines.length < 6) recruiterLines.push(`● ${h(String(s))}`);
+  }
+  for (const w of weaknesses) {
+    if (w && recruiterLines.length < 6) recruiterLines.push(`● ${h(String(w))}`);
+  }
+  if (!recruiterLines.length) recruiterLines.push(h(tr.previewFallbackRecruiterFirst));
+
+  const gapLines = [];
+  for (const g of data?.Gaps?.rejection_reasons || []) {
+    const imp = gapImpactLabel(g, tr);
+    gapLines.push(`● ${h(String(g.issue || "—"))}${imp ? ` — ${imp}` : ""}`);
+  }
+  if (!gapLines.length) gapLines.push(h(tr.previewEmptyGapsBrief));
+
+  const planLines = [];
+  const fixes = planFixes || [];
+  fixes.forEach((f, i) => {
+    const st = f.steps?.[0];
+    const line = st && String(st).trim() ? String(st).trim() : String(f.issue || "").trim();
+    if (line && planLines.length < 8) planLines.push(`${i + 1}. ${h(line)}`);
+  });
+  if (!planLines.length) planLines.push(h(tr.previewEmptyPlan));
+
+  const ex = data?.CompanyIntel?.extracted || {};
+  const companyLine =
+    ex.company_name && String(ex.company_name).trim()
+      ? `${String(ex.company_name).trim()}${ex.sector_inferred ? ` · ${ex.sector_inferred}` : ""}`
+      : ex.sector_inferred
+        ? String(ex.sector_inferred)
+        : "";
+  const atsParts = [];
+  if (data?.ATS?.ats_score != null) atsParts.push(`${tr.previewAtsScoreShort}: ${data.ATS.ats_score}%`);
+  if (data?.ATS?.keyword_match != null) atsParts.push(`${tr.previewKeywordMatchShort}: ${data.ATS.keyword_match}%`);
+  const atsLine = atsParts.join(" · ");
+  const best = data?.RoleFit?.best_role;
+  const roles = Array.isArray(data?.RoleFit?.role_fit) ? data.RoleFit.role_fit : [];
+  const careerLine = best || roles[0]?.role ? `${tr.previewCareerDirPrefix}: ${best || roles[0]?.role}` : "";
+  const marketLines = [companyLine, atsLine, careerLine].map((x) => String(x || "").trim()).filter(Boolean);
+  if (!marketLines.length) marketLines.push(h(tr.previewEmptyMarket));
+
+  return { recruiter: recruiterLines, gaps: gapLines, plan: planLines, market: marketLines };
+}
+
+function BlurPreviewCard({ title, lines, cardId, onHoverCard }) {
+  const [hover, setHover] = useState(false);
+  const bg = RS.bgElevated;
+  const firstLine = lines[0] || "";
+  const restLines = lines.slice(1);
+  return (
+    <div
+      role="presentation"
+      onMouseEnter={() => {
+        setHover(true);
+        onHoverCard?.(cardId);
+      }}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        background: bg,
+        border: `1px solid ${hover ? rsAlpha(RS.indigo, 0.38) : RS.border}`,
+        borderRadius: 10,
+        padding: "14px 16px",
+        position: "relative",
+        overflow: "hidden",
+        minHeight: 112,
+        transition: "transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease",
+        transform: hover ? "translateY(-3px)" : "none",
+        boxShadow: hover ? `0 14px 40px rgba(0,0,0,0.38), 0 0 0 1px ${rsAlpha(RS.indigo, 0.12)}` : "none",
+        cursor: "default",
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 500, color: RS.textPrimary, marginBottom: 8 }}>{title}</div>
+      {firstLine ? (
+        <div style={{ fontSize: 12, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.55, marginBottom: restLines.length ? 6 : 0 }}>{firstLine}</div>
+      ) : null}
+      {restLines.length > 0 ? (
+        <div style={{ position: "relative", marginTop: 2, minHeight: 44 }}>
+          <div
+            style={{
+              filter: "blur(5px)",
+              pointerEvents: "none",
+              userSelect: "none",
+              WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.15) 100%)",
+              maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.15) 100%)",
+            }}
+          >
+            {restLines.map((line, i) => (
+              <div key={i} style={{ fontSize: 12, color: RS.textSecondary, lineHeight: 1.55 }}>
+                {line}
+              </div>
+            ))}
+          </div>
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              background: `linear-gradient(to bottom, ${rsAlpha(bg, 0)} 0%, ${rsAlpha(bg, 0.2)} 40%, ${rsAlpha(bg, 0.88)} 82%, ${bg} 100%)`,
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: "62%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              zIndex: 2,
+              pointerEvents: "none",
+            }}
+            aria-hidden
+          >
+            <Lock size={16} color={RS.textMuted} strokeWidth={2} />
+          </div>
+        </div>
+      ) : (
+        <div style={{ position: "relative", minHeight: 40, marginTop: 4 }}>
+          <div
+            style={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              zIndex: 2,
+              pointerEvents: "none",
+            }}
+            aria-hidden
+          >
+            <Lock size={16} color={RS.textMuted} strokeWidth={2} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CareerEngineProBlurPreview({ data, lang, planFixes, t, onUpgrade }) {
+  const previewLabelStyle = {
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: RS.textMuted,
+    fontFamily: RS.fontUi,
+    marginBottom: 14,
+  };
+  const L = useMemo(() => buildV2PreviewLines(data, lang, planFixes, t), [data, lang, planFixes, t]);
+  const freeRecruiter = useMemo(() => truncatePreviewForFree(L.recruiter), [L.recruiter]);
+  const freeGaps = useMemo(() => truncatePreviewForFree(L.gaps), [L.gaps]);
+  const freePlan = useMemo(() => truncatePreviewForFree(L.plan), [L.plan]);
+  const freeMarket = useMemo(() => truncatePreviewForFree(L.market), [L.market]);
+
+  useEffect(() => {
+    hirefitTrack("v2_preview_section_view", { lang });
+  }, [lang]);
+
+  const onHoverCard = useCallback(
+    (cardId) => {
+      hirefitTrackDebounced(`v2_hover_${cardId}_${lang}`, "v2_preview_card_hover", { card: cardId, lang });
+    },
+    [lang],
+  );
+
+  const onCta = useCallback(() => {
+    hirefitTrack("v2_preview_upgrade_cta", { lang, source: "preview_strip" });
+    onUpgrade();
+  }, [lang, onUpgrade]);
+
+  return (
+    <div style={{ marginTop: 22 }}>
+      <div style={previewLabelStyle}>{t.focusPreviewSectionTitle}</div>
+      <div
+        style={{
+          background: rsAlpha(RS.indigo, 0.08),
+          border: `1px solid ${rsAlpha(RS.indigo, 0.2)}`,
+          borderRadius: 10,
+          padding: "14px 18px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 14,
+          flexWrap: "wrap",
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, color: RS.textPrimary }}>{t.focusPreviewCtaTitle}</div>
+          <div style={{ fontSize: 12, fontWeight: 500, color: RS.textSecondary, marginTop: 4, lineHeight: 1.5 }}>{t.focusPreviewCtaSubtitle}</div>
+        </div>
+        <button
+          type="button"
+          onClick={onCta}
+          style={{
+            flexShrink: 0,
+            padding: "8px 16px",
+            borderRadius: 8,
+            border: "none",
+            background: RS.indigo,
+            color: "#ffffff",
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: "pointer",
+            fontFamily: RS.fontUi,
+          }}
+        >
+          {t.focusPreviewUpgradeBtn}
+        </button>
+      </div>
+      <div style={previewGridStyle}>
+        <BlurPreviewCard title={t.focusPreviewCardRecruiter} lines={freeRecruiter} cardId="recruiter" onHoverCard={onHoverCard} />
+        <BlurPreviewCard title={t.focusPreviewCardGaps} lines={freeGaps} cardId="gaps" onHoverCard={onHoverCard} />
+        <BlurPreviewCard title={t.focusPreviewCardPlan} lines={freePlan} cardId="plan" onHoverCard={onHoverCard} />
+        <BlurPreviewCard title={t.focusPreviewCardMarket} lines={freeMarket} cardId="market" onHoverCard={onHoverCard} />
+      </div>
+    </div>
+  );
+}
+
+function ProDetailCard({ title, children }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div
+      role="presentation"
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        background: RS.bgElevated,
+        border: `1px solid ${hover ? rsAlpha(RS.indigo, 0.35) : RS.border}`,
+        borderRadius: 10,
+        padding: "14px 16px",
+        minHeight: 112,
+        transition: "transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease",
+        transform: hover ? "translateY(-2px)" : "none",
+        boxShadow: hover ? `0 12px 32px rgba(0,0,0,0.32)` : "none",
+      }}
+    >
+      <div style={{ fontSize: 12, fontWeight: 500, color: RS.textPrimary, marginBottom: 8 }}>{title}</div>
+      <div style={{ fontSize: 12, color: RS.textSecondary, lineHeight: 1.55 }}>{children}</div>
+    </div>
+  );
+}
+
+function CareerEngineProDetailGrid({ data, lang, t, planFixes }) {
+  const previewLabelStyle = {
+    fontSize: 11,
+    fontWeight: 700,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    color: RS.textMuted,
+    fontFamily: RS.fontUi,
+    marginBottom: 14,
+  };
+  const L = useMemo(() => buildV2PreviewLines(data, lang, planFixes, t), [data, lang, planFixes, t]);
+
+  useEffect(() => {
+    hirefitTrack("v2_pro_detail_section_view", { lang });
+  }, [lang]);
+
+  return (
+    <div style={{ marginTop: 22 }}>
+      <div style={previewLabelStyle}>{t.focusProDetailTitle}</div>
+      <div style={previewGridStyle}>
+        <ProDetailCard title={t.focusPreviewCardRecruiter}>
+          {L.recruiter.map((line, i) => (
+            <div key={i} style={{ marginBottom: i < L.recruiter.length - 1 ? 6 : 0 }}>
+              {line}
+            </div>
+          ))}
+        </ProDetailCard>
+        <ProDetailCard title={t.focusPreviewCardGaps}>
+          {L.gaps.map((line, i) => (
+            <div key={i} style={{ marginBottom: i < L.gaps.length - 1 ? 6 : 0 }}>
+              {line}
+            </div>
+          ))}
+        </ProDetailCard>
+        <ProDetailCard title={t.focusPreviewCardPlan}>
+          {L.plan.map((line, i) => (
+            <div key={i} style={{ marginBottom: i < L.plan.length - 1 ? 6 : 0 }}>
+              {line}
+            </div>
+          ))}
+        </ProDetailCard>
+        <ProDetailCard title={t.focusPreviewCardMarket}>
+          {L.market.map((line, i) => (
+            <div key={i} style={{ marginBottom: i < L.market.length - 1 ? 8 : 0 }}>
+              {line}
+            </div>
+          ))}
+        </ProDetailCard>
+      </div>
+    </div>
+  );
+}
+
 function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing }) {
   const actionPlanMemo = useMemo(() => {
     if (!data) return { priority_callout: null, fixes: [], interview_note: null };
@@ -1449,9 +1817,11 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing })
           type="button"
           onClick={() => {
             if (!isPro) {
+              hirefitTrack("v2_focus_primary_upgrade_cta", { lang, source: "verdict_block" });
               onUpgrade();
               return;
             }
+            hirefitTrack("v2_focus_apply_fix_cta", { lang });
             onFixCv();
           }}
           disabled={optimizing && isPro}
@@ -1480,20 +1850,25 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing })
         </button>
 
         {!isPro ? (
-          <div
-            style={{
-              marginTop: 22,
-              padding: "16px 18px",
-              borderRadius: 14,
-              border: `1px solid ${RS.borderSubtle}`,
-              background: rsAlpha(RS.indigo, 0.06),
-            }}
-          >
-            <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.6 }}>
-              {t.focusHiddenGapsTeaser.replace("{n}", String(extraHiddenCount))}
-            </p>
-          </div>
-        ) : null}
+          <>
+            <div
+              style={{
+                marginTop: 22,
+                padding: "16px 18px",
+                borderRadius: 14,
+                border: `1px solid ${RS.borderSubtle}`,
+                background: rsAlpha(RS.indigo, 0.06),
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.6 }}>
+                {t.focusHiddenGapsTeaser.replace("{n}", String(extraHiddenCount))}
+              </p>
+            </div>
+            <CareerEngineProBlurPreview data={data} lang={lang} planFixes={planFixes} t={t} onUpgrade={onUpgrade} />
+          </>
+        ) : (
+          <CareerEngineProDetailGrid data={data} lang={lang} t={t} planFixes={planFixes} />
+        )}
       </div>
     </motion.div>
   );
@@ -1776,6 +2151,27 @@ const translations = {
     focusCtaSeeFull: "See full analysis →",
     focusCtaApplyFix: "Apply this focus to my CV →",
     focusHiddenGapsTeaser: "There are {n} more gaps still affecting your score. See the full breakdown with Pro.",
+    focusPreviewSectionTitle: "What's in your full analysis?",
+    focusPreviewCtaTitle: "See exactly why you get screened out",
+    focusPreviewCtaSubtitle: "Full recruiter read on your CV vs this JD, every gap ranked, fixes ordered by score impact, plus company and ATS context.",
+    focusPreviewUpgradeBtn: "Reveal my full report →",
+    focusPreviewCardRecruiter: "Recruiter view",
+    focusPreviewCardGaps: "All gaps",
+    focusPreviewCardPlan: "Action plan",
+    focusPreviewCardMarket: "Company & market",
+    focusProDetailTitle: "Detailed breakdown",
+    previewFallbackRecruiterFirst: "Recruiter signals for this CV and job will appear here after Pro.",
+    previewEmptyGapsBrief: "Gap list vs this posting is available in the full analysis.",
+    previewAtsScoreShort: "ATS score",
+    previewKeywordMatchShort: "Keyword match",
+    previewCareerDirPrefix: "Career direction",
+    previewImpactHigh: "Critical",
+    previewImpactMedium: "Major",
+    previewImpactLow: "Minor",
+    previewEmptyRecruiter: "No recruiter signals in this run.",
+    previewEmptyGaps: "No gap list in this run.",
+    previewEmptyPlan: "No action plan steps in this run.",
+    previewEmptyMarket: "No company or market block in this run.",
   },
   TR: {
     slogan: "AI Career Decision Engine",
@@ -2051,6 +2447,27 @@ const translations = {
     focusCtaSeeFull: "Tam analizi gör →",
     focusCtaApplyFix: "Bu odağı CV'me uygula →",
     focusHiddenGapsTeaser: "Skorunu etkileyen {n} boşluk daha var. Tüm dökümü Pro ile görebilirsin.",
+    focusPreviewSectionTitle: "Pro analizinde neler var?",
+    focusPreviewCtaTitle: "Neden elendiğini satır satır gör",
+    focusPreviewCtaSubtitle: "Bu ilana göre recruiter taraması, tüm boşluklar, skora göre sıralı düzeltmeler ve şirket ile ATS bağlamı.",
+    focusPreviewUpgradeBtn: "Tam raporumu aç →",
+    focusPreviewCardRecruiter: "Recruiter görüşü",
+    focusPreviewCardGaps: "Tüm boşluklar",
+    focusPreviewCardPlan: "Aksiyon planı",
+    focusPreviewCardMarket: "Şirket ve pazar",
+    focusProDetailTitle: "Detaylı döküm",
+    previewFallbackRecruiterFirst: "Bu CV ve bu ilan için işe alım uzmanı görüşü Pro’da görünür.",
+    previewEmptyGapsBrief: "Bu ilana karşı boşluk listesi tam analizde yer alır.",
+    previewAtsScoreShort: "ATS skoru",
+    previewKeywordMatchShort: "Kelime eşleşmesi",
+    previewCareerDirPrefix: "Kariyer yönü",
+    previewImpactHigh: "Kritik",
+    previewImpactMedium: "Majör",
+    previewImpactLow: "Minör",
+    previewEmptyRecruiter: "Bu turda recruiter metni yok.",
+    previewEmptyGaps: "Bu turda boşluk listesi yok.",
+    previewEmptyPlan: "Bu turda aksiyon adımı yok.",
+    previewEmptyMarket: "Bu turda şirket veya pazar özeti yok.",
   },
 };
 
