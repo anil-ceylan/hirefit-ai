@@ -4649,10 +4649,10 @@ function LandingPageAmbient() {
         .hf-hero-scrim--video {
           background: linear-gradient(
             90deg,
-            rgba(10,10,20,0.68) 0%,
-            rgba(10,10,20,0.36) 32%,
-            rgba(10,10,20,0.1) 58%,
-            rgba(10,10,20,0.02) 100%
+            rgba(8,10,22,0.52) 0%,
+            rgba(8,10,22,0.28) 34%,
+            rgba(8,10,22,0.08) 60%,
+            rgba(8,10,22,0.02) 100%
           );
         }
         .hf-hero-scrim--static {
@@ -4717,11 +4717,6 @@ function LandingPageAmbient() {
       }}
     >
       <div className="hf-ambient-base" aria-hidden />
-      <div className="hf-ambient-orbs" aria-hidden>
-        <div className="hf-ambient-orb hf-ambient-orb--1" />
-        <div className="hf-ambient-orb hf-ambient-orb--2" />
-        <div className="hf-ambient-orb hf-ambient-orb--3" />
-      </div>
       <div
         aria-hidden
         style={{
@@ -4749,7 +4744,8 @@ function LandingPageAmbient() {
               width: "108%",
               height: "108%",
               objectFit: "cover",
-              filter: "saturate(1.18) contrast(1.08) brightness(1.12)",
+              opacity: 0.88,
+              filter: "saturate(1.12) contrast(1.06) brightness(1.08)",
             }}
           />
         ) : null}
@@ -4767,7 +4763,7 @@ function LandingPageAmbient() {
             x: isDesktop ? [0, 32, -20, 0] : [0, 26, -16, 0],
             y: isDesktop ? [0, -22, 16, 0] : [0, -18, 14, 0],
             scale: isDesktop ? [1, 1.06, 0.97, 1] : [1, 1.05, 0.98, 1],
-            opacity: isDesktop ? [0.38, 0.54, 0.46, 0.38] : [0.28, 0.4, 0.34, 0.28],
+            opacity: isDesktop ? [0.22, 0.32, 0.27, 0.22] : [0.16, 0.24, 0.2, 0.16],
           }}
           transition={{ duration: 46, repeat: Infinity, ease: "easeInOut" }}
         />
@@ -4814,6 +4810,12 @@ function LandingPageAmbient() {
           }}
         />
       </div>
+      <div className="hf-ambient-mesh" aria-hidden />
+      <div className="hf-ambient-orbs hf-ambient-orbs--overlay" aria-hidden>
+        <div className="hf-ambient-orb hf-ambient-orb--1" />
+        <div className="hf-ambient-orb hf-ambient-orb--2" />
+        <div className="hf-ambient-orb hf-ambient-orb--3" />
+      </div>
       <div
         aria-hidden
         className={videoFailed ? "hf-hero-scrim hf-hero-scrim--static" : "hf-hero-scrim hf-hero-scrim--video"}
@@ -4833,7 +4835,7 @@ function LandingPageAmbient() {
           pointerEvents: "none",
           zIndex: 0,
           background:
-            "radial-gradient(ellipse 110% 92% at 88% 8%, rgba(56,189,248,0.62) 0%, transparent 52%), radial-gradient(ellipse 82% 70% at 8% 88%, rgba(99,102,241,0.42) 0%, transparent 50%), radial-gradient(ellipse 95% 72% at 52% 102%, rgba(251,146,60,0.38) 0%, transparent 48%)",
+            "radial-gradient(ellipse 110% 92% at 88% 8%, rgba(56,189,248,0.42) 0%, transparent 52%), radial-gradient(ellipse 82% 70% at 8% 88%, rgba(99,102,241,0.3) 0%, transparent 50%), radial-gradient(ellipse 95% 72% at 52% 102%, rgba(251,146,60,0.26) 0%, transparent 48%)",
           mixBlendMode: "screen",
         }}
       />
@@ -4863,9 +4865,9 @@ function LandingPageAmbient() {
           position: "absolute",
           inset: 0,
           backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px)",
-          backgroundSize: "64px 64px",
-          opacity: 0.22,
+            "linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px)",
+          backgroundSize: "96px 96px",
+          opacity: 0.07,
           pointerEvents: "none",
           zIndex: 0,
         }}
