@@ -1836,11 +1836,78 @@ function inferTargetTrack(jdText, lang) {
   return lang === "TR" ? "hedef ilan hattı" : "target posting track";
 }
 
+function buildPersonalizedProjectEngine({ lang, biggestGap, missingSkills, topRole, background, jdText, score }) {
+  const jd = String(jdText || "").toLowerCase();
+  const roleLower = String(topRole || "").toLowerCase();
+  const miss = Array.isArray(missingSkills) ? missingSkills.map((x) => String(x).trim()).filter(Boolean) : [];
+  const primaryMissing = miss.slice(0, 3);
+
+  const domain = jd.includes("retail") || jd.includes("fmcg")
+    ? (lang === "TR" ? "FMCG / Perakende" : "FMCG / Retail")
+    : jd.includes("finance") || jd.includes("bank")
+      ? (lang === "TR" ? "Finans" : "Finance")
+      : jd.includes("health")
+        ? (lang === "TR" ? "Sağlık" : "Healthcare")
+        : jd.includes("telecom")
+          ? (lang === "TR" ? "Telekom" : "Telecom")
+          : (lang === "TR" ? "İş & Analitik" : "Business & Analytics");
+
+  const preferredTool = miss.find((s) => /power bi|tableau|excel|sql|python/i.test(s)) ||
+    (jd.includes("sql") ? "SQL" : jd.includes("power bi") ? "Power BI" : "Power BI");
+  const dataSource = jd.includes("retail") || jd.includes("fmcg")
+    ? "Kaggle retail dataset"
+    : jd.includes("finance")
+      ? "World Bank + Kaggle market dataset"
+      : "Kaggle public business dataset";
+
+  let title = "";
+  if (roleLower.includes("data")) {
+    title = lang === "TR"
+      ? `${domain} için ${preferredTool} Tabanlı Karar Dashboard'u`
+      : `${preferredTool}-Based ${domain} Decision Dashboard`;
+  } else if (roleLower.includes("business")) {
+    title = lang === "TR"
+      ? `${domain} İş Süreci Optimizasyon Vaka Çalışması`
+      : `${domain} Process Optimization Case Study`;
+  } else {
+    title = lang === "TR"
+      ? `${domain} Performans Analiz Projesi`
+      : `${domain} Performance Analysis Project`;
+  }
+
+  const why = lang === "TR"
+    ? `${biggestGap || "En kritik boşluğun"} şu an ilk eleme riski yaratıyor. ${background} profilin analitik temel veriyor; bu proje eksik olan gerçek iş çıktısı sinyalini doğrudan üretir.`
+    : `${biggestGap || "Your biggest gap"} currently drives first-screen rejection risk. Your ${background} already gives you analytical foundation; this project directly creates the missing real-world execution signal.`;
+
+  const steps = lang === "TR"
+    ? [
+        `1) ${dataSource} üzerinden ${domain} odaklı bir veri seti seç.`,
+        `2) Veriyi temizle, metrikleri tanımla ve ${primaryMissing[0] || "SQL/Excel"} ile analiz katmanı kur.`,
+        `3) ${preferredTool} ile karar dashboard'u oluştur (en az 3 KPI).`,
+        "4) 3 iş içgörüsü çıkar ve her biri için önerilen aksiyonu yaz.",
+      ]
+    : [
+        `1) Pick a ${domain} dataset from ${dataSource}.`,
+        `2) Clean/structure data and build analysis logic with ${primaryMissing[0] || "SQL/Excel"}.`,
+        `3) Build a decision dashboard in ${preferredTool} with at least 3 KPIs.`,
+        "4) Extract 3 business insights and attach a clear action for each.",
+      ];
+
+  const projectedGain = Math.max(12, Math.min(22, Math.round((70 - (Number(score) || 50)) / 1.8)));
+  const outcome = lang === "TR"
+    ? `Recruiter tarafında “gerçek problem çözümü + ölçülebilir çıktı” sinyali üretir. CV'de somut proje kanıtı açar ve eşleşme skorunu yaklaşık +${projectedGain} puan artırır.`
+    : `Creates a recruiter-visible signal of real problem solving plus measurable output. It adds concrete project proof to your CV and can lift your match score by about +${projectedGain} points.`;
+  const timeEstimate = lang === "TR" ? "Tahmini süre: 5–10 gün" : "Estimated time: 5–10 days";
+
+  return { title, why, steps, outcome, timeEstimate };
+}
+
 function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
   const strengths = Array.isArray(data?.Recruiter?.strengths) ? data.Recruiter.strengths.map((x) => String(x).trim()).filter(Boolean) : [];
   const matched = Array.isArray(data?.ATS?.matched_skills) ? data.ATS.matched_skills.map((x) => String(x).trim()).filter(Boolean) : [];
   const gaps = Array.isArray(data?.Gaps?.rejection_reasons) ? data.Gaps.rejection_reasons : [];
   const bigGap = String(data?.Gaps?.biggest_gap || gaps[0]?.issue || "").trim();
+  const missingSkills = Array.isArray(data?.ATS?.missing_keywords) ? data.ATS.missing_keywords : [];
   const background = inferCandidateBackground(cvText, lang);
   const targetTrack = inferTargetTrack(jdText, lang);
   const originalRole = String(data?.RoleFit?.best_role || "").trim() || (lang === "TR" ? "orijinal hedef rol" : "your original target role");
@@ -1887,19 +1954,6 @@ function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
         ? (lang === "TR" ? "İş Analisti → Strateji Analisti → Strateji Yöneticisi" : "Business Analyst → Strategy Analyst → Strategy Manager")
         : (lang === "TR" ? "Analist → Kıdemli Analist → Yönetici" : "Analyst → Senior Analyst → Manager");
 
-  const projectTitle = lang === "TR"
-    ? `${topRole} için Gerçek Dünya Etki Projesi`
-    : `Real-World Impact Project for ${topRole}`;
-  const projectWhy = lang === "TR"
-    ? `Çünkü ${targetTrack} için ${bigGap || "kritik boşluğunu"} kapatıp ${background} gücünü görünür hale getirmen gerekiyor.`
-    : `Because for this ${targetTrack}, you need to close ${bigGap || "your key gap"} and make your ${background} strengths visible.`;
-  const projectWhat = lang === "TR"
-    ? "Kaggle veya World Bank verisiyle dashboard ve kısa insight raporu üret."
-    : "Use Kaggle or World Bank data to build a dashboard plus short insight report.";
-  const projectOutcome = lang === "TR"
-    ? "Analitik + iş etkisi sinyalini aynı anda kanıtlarsın."
-    : "You prove analytical and business impact in one artifact.";
-
   const phaseImmediate = [
     lang === "TR" ? `${topRole} odağını CV özetinin ilk iki satırına taşı.` : `Rewrite your CV summary around ${topRole}.`,
     lang === "TR" ? "Deneyim bölümüne 2 ölçülebilir sonuç ekle." : "Add 2 measurable outcomes to experience bullets.",
@@ -1918,6 +1972,15 @@ function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
 
   const base = Number.isFinite(Number(score)) ? Number(score) : 45;
   const projected = Math.max(base + 20, 70);
+  const project = buildPersonalizedProjectEngine({
+    lang,
+    biggestGap: bigGap,
+    missingSkills,
+    topRole,
+    background,
+    jdText,
+    score: base,
+  });
   return {
     background,
     targetTrack,
@@ -1939,7 +2002,7 @@ function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
     careerPathWhy: lang === "TR"
       ? "Bu yol mevcut güçlü yanlarını büyütürken kritik boşluklarını kapatır."
       : "This path builds on your strengths while closing your key gaps.",
-    project: { title: projectTitle, why: projectWhy, what: projectWhat, outcome: projectOutcome },
+    project,
     phases: { immediate: phaseImmediate, strategic: phaseStrategic, application: phaseApplication },
     transformation: {
       fit: `${Math.round(base)} → ${Math.round(projected)}+`,
@@ -1981,11 +2044,17 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
       {isPro ? (
         <>
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestProjectTitle}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestProjectSectionTitle}</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo }}>{model.project.title}</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: RS.textSecondary }}>{model.project.why}</div>
-            <div style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>{model.project.what}</div>
+            <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: RS.textPrimary }}>{t.bestProjectWhyTitle}</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>{model.project.why}</div>
+            <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: RS.textPrimary }}>{t.bestProjectWhatTitle}</div>
+            {model.project.steps.map((step, i) => (
+              <div key={`pstep-${i}`} style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>{step}</div>
+            ))}
+            <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: RS.textPrimary }}>{t.bestProjectOutcomeTitle}</div>
             <div style={{ marginTop: 4, fontSize: 12, color: RS.green }}>{model.project.outcome}</div>
+            <div style={{ marginTop: 6, fontSize: 12, color: RS.textMuted }}>{model.project.timeEstimate}</div>
           </div>
 
           <div style={{ marginBottom: 12 }}>
@@ -2012,6 +2081,10 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
         </>
       ) : (
         <div style={{ marginTop: 8 }}>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestProjectSectionTitle}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo }}>{model.project.title}</div>
+          </div>
           <div style={{ fontSize: 12, color: RS.textMuted, marginBottom: 10 }}>{t.bestPathFreeHint}</div>
           <button
             type="button"
@@ -2541,8 +2614,11 @@ const translations = {
     bestPathSignalLine: "Profile signal: {bg} → target track: {track}",
     bestPathRolesTitle: "Based on your profile, you are a stronger fit for:",
     bestPathWhyRolesTitle: "Why these roles fit",
-    bestPathFreeHint: "Free preview shows role direction only. Unlock Pro for career path, project, full roadmap, and expected transformation.",
-    bestProjectTitle: "Best project for YOU:",
+    bestPathFreeHint: "Free preview shows roles and project title only. Unlock Pro for the full project breakdown and roadmap.",
+    bestProjectSectionTitle: "Your best project to fix this",
+    bestProjectWhyTitle: "Why this project",
+    bestProjectWhatTitle: "What you will do",
+    bestProjectOutcomeTitle: "Expected outcome",
     bestPathCareerTitle: "Best path for you:",
     bestPathRoadmapTitle: "Execution roadmap",
     bestPathPhaseImmediate: "PHASE 1 — Immediate Fix (0–7 days)",
@@ -2892,8 +2968,11 @@ const translations = {
     bestPathSignalLine: "Profil sinyali: {bg} → hedef hat: {track}",
     bestPathRolesTitle: "Profiline göre daha güçlü olduğun roller:",
     bestPathWhyRolesTitle: "Bu roller neden daha uygun",
-    bestPathFreeHint: "Ücretsiz görünüm sadece rol yönünü gösterir. Kariyer yolu, proje, tam yol haritası ve dönüşüm için Pro'yu aç.",
-    bestProjectTitle: "SENİN için en iyi proje:",
+    bestPathFreeHint: "Ücretsiz görünüm sadece roller ve proje başlığını gösterir. Tam proje dökümü ve yol haritası için Pro'yu aç.",
+    bestProjectSectionTitle: "Your best project to fix this",
+    bestProjectWhyTitle: "Bu proje neden en doğru seçim",
+    bestProjectWhatTitle: "Ne yapacaksın",
+    bestProjectOutcomeTitle: "Beklenen çıktı",
     bestPathCareerTitle: "Senin için en iyi yol:",
     bestPathRoadmapTitle: "Yürütme yol haritası",
     bestPathPhaseImmediate: "PHASE 1 — Immediate Fix (0–7 gün)",
@@ -5904,13 +5983,14 @@ export function RoadmapRoute() {
 }
 
 export function LoginPage() {
-  const { t, T, lang, email, setEmail, password, setPassword, error, login, loginWithGoogle } = useOutletContext();
+  const { t, T: ctxTheme, lang, email, setEmail, password, setPassword, error, login, loginWithGoogle } = useOutletContext();
+  const theme = ctxTheme || T;
   return (
         <div style={{ ...styles.container, padding: "80px 24px" }}>
           <div style={{ maxWidth: 440, margin: "0 auto" }}>
             <div className="hf-card" style={{ padding: 40 }}>
               <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "28px", fontWeight: 800, marginBottom: 8 }}>{t.welcomeBack}</h2>
-              <p style={{ color: T.textSub, fontSize: "14px", marginBottom: 28 }}>{t.signInDesc}</p>
+              <p style={{ color: theme.textSub, fontSize: "14px", marginBottom: 28 }}>{t.signInDesc}</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <input className="hf-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={lang === "TR" ? "E-posta adresi" : "Email address"} />
                 <input type="password" className="hf-input" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={lang === "TR" ? "Şifre" : "Password"} />
@@ -5929,14 +6009,15 @@ export function LoginPage() {
 
 export function DashboardPage() {
   const {
-    t, lang, T, history, loadHistoryItem, clearHistory, averageScore, isPro, isAdminUser, plan, waitlist, scoreHistory, navigate,
+    t, lang, T: ctxTheme, history, loadHistoryItem, clearHistory, averageScore, isPro, isAdminUser, plan, waitlist, scoreHistory, navigate,
     adminTargetEmail, setAdminTargetEmail, adminGrantBusy, adminGrantError, adminGrantNotice, setUserProAccessByAdmin,
   } = useOutletContext();
+  const theme = ctxTheme || T;
   return (
         <div style={{ ...styles.container, padding: "48px 24px" }}>
           <div style={{ marginBottom: 32 }}>
             <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: "42px", fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 8 }}>{t.dashboard}</h1>
-            <p style={{ color: T.textSub, fontSize: "16px" }}>{t.dashboardDesc}</p>
+            <p style={{ color: theme.textSub, fontSize: "16px" }}>{t.dashboardDesc}</p>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
             <StatCard title={t.totalAnalyses} value={history.length} icon={<History size={16} color={T.blue} />} />
@@ -5955,7 +6036,7 @@ export function DashboardPage() {
                     ? ["Gerçek kimlik doğrulama (Supabase)", "Veritabanı destekli raporlar", "Paylaşılabilir rapor URL'leri", "Stripe ödeme sistemi", "İşe alım uzmanı paneli modu"]
                     : ["Real authentication (Supabase / Clerk)", "Database-backed saved reports", "Shareable public report URLs", "Stripe checkout for Pro plan", "Recruiter dashboard mode"]
                   ).map((item) => (
-                    <li key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: T.textSub }}>
+                    <li key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: theme.textSub }}>
                       <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.blue, flexShrink: 0 }} />{item}
                     </li>
                   ))}
@@ -5967,7 +6048,7 @@ export function DashboardPage() {
                   <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
                     {lang === "TR" ? "Admin Pro Erişimi" : "Admin Pro Access"}
                   </h3>
-                  <p style={{ fontSize: 13, color: T.textSub, margin: "0 0 10px" }}>
+                  <p style={{ fontSize: 13, color: theme.textSub, margin: "0 0 10px" }}>
                     {lang === "TR"
                       ? "Kullanıcıya manuel Pro aç/kapat. Bu kullanıcı için paywall anında güncellenir."
                       : "Manually toggle Pro for any user. Paywall updates immediately for that user."}
@@ -5980,9 +6061,9 @@ export function DashboardPage() {
                       width: "100%",
                       padding: "10px 12px",
                       borderRadius: 10,
-                      border: `1px solid ${T.border}`,
+                      border: `1px solid ${theme.border}`,
                       background: "rgba(255,255,255,0.02)",
-                      color: T.text,
+                      color: theme.text,
                       marginBottom: 10,
                     }}
                   />
@@ -5996,9 +6077,9 @@ export function DashboardPage() {
                       style={{
                         padding: "10px 14px",
                         borderRadius: 10,
-                        border: `1px solid ${T.border}`,
+                        border: `1px solid ${theme.border}`,
                         background: "transparent",
-                        color: T.textSub,
+                        color: theme.textSub,
                         fontWeight: 700,
                         cursor: adminGrantBusy ? "wait" : "pointer",
                       }}
