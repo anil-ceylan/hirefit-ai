@@ -2004,6 +2004,7 @@ function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
       : "This path builds on your strengths while closing your key gaps.",
     project,
     phases: { immediate: phaseImmediate, strategic: phaseStrategic, application: phaseApplication },
+    roadmapTop3: [phaseImmediate[0], phaseStrategic[0], phaseApplication[0]].filter(Boolean).slice(0, 3),
     transformation: {
       fit: `${Math.round(base)} → ${Math.round(projected)}+`,
       confidence: lang === "TR" ? "Mülakat olasılığı belirgin şekilde artar." : "Interview probability increases significantly.",
@@ -2027,18 +2028,15 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
         {model.roles.map((r, i) => (
           <div key={`${r.role}-${i}`} style={{ marginBottom: 8, padding: "9px 10px", borderRadius: 10, border: `1px solid ${RS.border}`, background: RS.bgElevated }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary }}>{r.role} ({r.score}%)</div>
-            <div style={{ fontSize: 12, color: RS.textSecondary, marginTop: 4 }}>{r.why}</div>
+            <div style={{ fontSize: 12, color: RS.textSecondary, marginTop: 4 }}>{clampBullet(r.why, 90)}</div>
           </div>
         ))}
       </div>
 
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestPathWhyRolesTitle}</div>
-        {model.roleFitWhy.map((line, i) => (
-          <div key={`why-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: i < model.roleFitWhy.length - 1 ? 5 : 0 }}>
-            {line}
-          </div>
-        ))}
+        <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestPathWrongRoleTitle}</div>
+        <div style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 5 }}>{clampBullet(model.roleFitWhy?.[1] || "", 110)}</div>
+        <div style={{ fontSize: 12, color: RS.textSecondary }}>{clampBullet(model.roleFitWhy?.[0] || "", 110)}</div>
       </div>
 
       {isPro ? (
@@ -2046,15 +2044,9 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestProjectSectionTitle}</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo }}>{model.project.title}</div>
-            <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: RS.textPrimary }}>{t.bestProjectWhyTitle}</div>
-            <div style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>{model.project.why}</div>
-            <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: RS.textPrimary }}>{t.bestProjectWhatTitle}</div>
-            {model.project.steps.map((step, i) => (
-              <div key={`pstep-${i}`} style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>{step}</div>
-            ))}
-            <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: RS.textPrimary }}>{t.bestProjectOutcomeTitle}</div>
-            <div style={{ marginTop: 4, fontSize: 12, color: RS.green }}>{model.project.outcome}</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: RS.textMuted }}>{model.project.timeEstimate}</div>
+            <div style={{ marginTop: 6, fontSize: 12, color: RS.textSecondary }}>• {clampBullet(model.project.why, 120)}</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>• {clampBullet(model.project.steps?.[0] || "", 120)}</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: RS.green }}>• {clampBullet(`${model.project.outcome} ${model.project.timeEstimate}`, 120)}</div>
           </div>
 
           <div style={{ marginBottom: 12 }}>
@@ -2065,12 +2057,7 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
 
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestPathRoadmapTitle}</div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: RS.textMuted, marginBottom: 4 }}>{t.bestPathPhaseImmediate}</div>
-            {model.phases.immediate.map((x, i) => <div key={`im-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 4 }}>→ {x}</div>)}
-            <div style={{ fontSize: 12, fontWeight: 700, color: RS.textMuted, marginTop: 8, marginBottom: 4 }}>{t.bestPathPhaseStrategic}</div>
-            {model.phases.strategic.map((x, i) => <div key={`st-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 4 }}>→ {x}</div>)}
-            <div style={{ fontSize: 12, fontWeight: 700, color: RS.textMuted, marginTop: 8, marginBottom: 4 }}>{t.bestPathPhaseApplication}</div>
-            {model.phases.application.map((x, i) => <div key={`ap-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 4 }}>→ {x}</div>)}
+            {model.roadmapTop3.map((x, i) => <div key={`r3-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 4 }}>→ {clampBullet(x, 110)}</div>)}
           </div>
 
           <div>
@@ -2129,7 +2116,7 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
   const roadmapLines = roadmapFixes
     .map((f) => clampBullet(f?.issue || f?.steps?.[0] || "", 110))
     .filter(Boolean)
-    .slice(0, 6);
+    .slice(0, 3);
   const summaryLine = clampBullet(String(data?.Decision?.reasoning || data?.Recruiter?.reasoning || ""), 110);
   const rowStyle = { marginBottom: 6, fontSize: 12, color: RS.textSecondary, lineHeight: 1.55 };
   const summaryStyle = {
@@ -2163,7 +2150,7 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
         </div>
       </div>
 
-      <details open style={{ border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px", background: rsAlpha(RS.bgElevated, 0.65), marginBottom: 8 }}>
+      <details style={{ border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px", background: rsAlpha(RS.bgElevated, 0.65), marginBottom: 8 }}>
         <summary style={summaryStyle}>
           <AlertCircle size={14} color={RS.redDim} />
           {t.scanWhyRejectedTitle}
@@ -2322,6 +2309,20 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, c
       }}
     >
       <div style={{ padding: "32px 32px 28px", background: rsAlpha(RS.bgSurface, 0.92), borderBottom: `1px solid ${RS.border}` }}>
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: `1px solid ${rsAlpha(RS.indigo, 0.35)}`,
+            background: rsAlpha(RS.indigo, 0.14),
+          }}
+        >
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, marginBottom: 4 }}>
+            {t.doThisFirstTitle}
+          </div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, lineHeight: 1.45 }}>{clampBullet(singleAction, 110)}</div>
+        </div>
         <div style={{ ...labelStyle, marginBottom: 14 }}>{t.focusVerdictKicker}</div>
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-start", justifyContent: "space-between", gap: 24 }}>
           <div style={{ flex: "1 1 240px", minWidth: 0 }}>
@@ -2741,6 +2742,7 @@ const translations = {
     bestPathSignalLine: "Profile signal: {bg} → target track: {track}",
     bestPathRolesTitle: "Based on your profile, you are a stronger fit for:",
     bestPathWhyRolesTitle: "Why these roles fit",
+    bestPathWrongRoleTitle: "Why this role is wrong",
     bestPathFreeHint: "Free preview shows roles and project title only. Unlock Pro for the full project breakdown and roadmap.",
     bestProjectSectionTitle: "Your best project to fix this",
     bestProjectWhyTitle: "Why this project",
@@ -2753,6 +2755,7 @@ const translations = {
     bestPathPhaseApplication: "PHASE 3 — Application Strategy",
     bestPathTransformTitle: "If you follow this path:",
     bestPathTransformFit: "Fit score: {fit}",
+    doThisFirstTitle: "DO THIS FIRST",
     scanSectionLabel: "Quick decision view",
     scanCriticalGapTitle: "Critical gap",
     scanOneMoveTitle: "One move",
@@ -3104,6 +3107,7 @@ const translations = {
     bestPathSignalLine: "Profil sinyali: {bg} → hedef hat: {track}",
     bestPathRolesTitle: "Profiline göre daha güçlü olduğun roller:",
     bestPathWhyRolesTitle: "Bu roller neden daha uygun",
+    bestPathWrongRoleTitle: "Bu rol neden yanlış eşleşme",
     bestPathFreeHint: "Ücretsiz görünüm sadece roller ve proje başlığını gösterir. Tam proje dökümü ve yol haritası için Pro'yu aç.",
     bestProjectSectionTitle: "Your best project to fix this",
     bestProjectWhyTitle: "Bu proje neden en doğru seçim",
@@ -3116,6 +3120,7 @@ const translations = {
     bestPathPhaseApplication: "PHASE 3 — Application Strategy",
     bestPathTransformTitle: "Bu yolu uygularsan:",
     bestPathTransformFit: "Fit skoru: {fit}",
+    doThisFirstTitle: "ÖNCE BUNU YAP",
     scanSectionLabel: "Hızlı karar görünümü",
     scanCriticalGapTitle: "Kritik boşluk",
     scanOneMoveTitle: "Tek hamle",
