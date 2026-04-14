@@ -1834,6 +1834,7 @@ function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
   const bigGap = String(data?.Gaps?.biggest_gap || gaps[0]?.issue || "").trim();
   const background = inferCandidateBackground(cvText, lang);
   const targetTrack = inferTargetTrack(jdText, lang);
+  const originalRole = String(data?.RoleFit?.best_role || "").trim() || (lang === "TR" ? "orijinal hedef rol" : "your original target role");
   const roleRows = Array.isArray(data?.RoleFit?.role_fit) ? [...data.RoleFit.role_fit] : [];
   roleRows.sort((a, b) => Number(b?.score || 0) - Number(a?.score || 0));
 
@@ -1911,6 +1912,18 @@ function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
   return {
     background,
     targetTrack,
+    originalRole,
+    roleFitWhy: [
+      lang === "TR"
+        ? `CV sinyalin (${background}) ${targetTrack} için daha güçlü eşleşme üretiyor.`
+        : `Your CV signal (${background}) aligns better with this ${targetTrack}.`,
+      lang === "TR"
+        ? `${originalRole} tarafında görülen ana mismatch: ${bigGap || "rol beklentisi ile profil sinyali ayrışıyor"}.`
+        : `Main mismatch with ${originalRole}: ${bigGap || "role expectation and profile signal are not aligned"}.`,
+      lang === "TR"
+        ? "Bu yüzden alternatif rollerde daha yüksek kısa liste olasılığı oluşuyor."
+        : "That is why these alternative roles create a stronger shortlist probability.",
+    ],
     roles: roleCandidates.slice(0, 3),
     topRole,
     careerPath,
@@ -1948,19 +1961,24 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
       </div>
 
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestProjectTitle}</div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo }}>{model.project.title}</div>
-        {isPro ? (
-          <>
-            <div style={{ marginTop: 6, fontSize: 12, color: RS.textSecondary }}>{model.project.why}</div>
-            <div style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>{model.project.what}</div>
-            <div style={{ marginTop: 4, fontSize: 12, color: RS.green }}>{model.project.outcome}</div>
-          </>
-        ) : null}
+        <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestPathWhyRolesTitle}</div>
+        {model.roleFitWhy.map((line, i) => (
+          <div key={`why-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: i < model.roleFitWhy.length - 1 ? 5 : 0 }}>
+            {line}
+          </div>
+        ))}
       </div>
 
       {isPro ? (
         <>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestProjectTitle}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo }}>{model.project.title}</div>
+            <div style={{ marginTop: 6, fontSize: 12, color: RS.textSecondary }}>{model.project.why}</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>{model.project.what}</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: RS.green }}>{model.project.outcome}</div>
+          </div>
+
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestPathCareerTitle}</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo }}>{model.careerPath}</div>
@@ -1985,6 +2003,7 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
         </>
       ) : (
         <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 12, color: RS.textMuted, marginBottom: 10 }}>{t.bestPathFreeHint}</div>
           <button
             type="button"
             onClick={onUpgrade}
@@ -2512,6 +2531,8 @@ const translations = {
     bestPathForwardTitle: "Your best path forward",
     bestPathSignalLine: "Profile signal: {bg} → target track: {track}",
     bestPathRolesTitle: "Based on your profile, you are a stronger fit for:",
+    bestPathWhyRolesTitle: "Why these roles fit",
+    bestPathFreeHint: "Free preview shows role direction only. Unlock Pro for career path, project, full roadmap, and expected transformation.",
     bestProjectTitle: "Best project for YOU:",
     bestPathCareerTitle: "Best path for you:",
     bestPathRoadmapTitle: "Execution roadmap",
@@ -2861,6 +2882,8 @@ const translations = {
     bestPathForwardTitle: "Your best path forward",
     bestPathSignalLine: "Profil sinyali: {bg} → hedef hat: {track}",
     bestPathRolesTitle: "Profiline göre daha güçlü olduğun roller:",
+    bestPathWhyRolesTitle: "Bu roller neden daha uygun",
+    bestPathFreeHint: "Ücretsiz görünüm sadece rol yönünü gösterir. Kariyer yolu, proje, tam yol haritası ve dönüşüm için Pro'yu aç.",
     bestProjectTitle: "SENİN için en iyi proje:",
     bestPathCareerTitle: "Senin için en iyi yol:",
     bestPathRoadmapTitle: "Yürütme yol haritası",
