@@ -4622,7 +4622,7 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
 
 const Navbar = NavBar;
 
-function HeroSection({ navigate, lang }) {
+function LandingPageAmbient() {
   useEffect(() => {
     let el = document.getElementById("hero-styles");
     if (!el) {
@@ -4641,17 +4641,49 @@ function HeroSection({ navigate, lang }) {
           .hf-hero-col-right { flex: 1 1 auto !important; max-width: 100% !important; width: 100%; }
           .hf-hero-headline { font-size: clamp(28px, 7vw, 40px) !important; line-height: 1.05 !important; }
         }
+        @keyframes hfHeroSheen {
+          0% { background-position: 0% 50%; }
+          100% { background-position: 100% 50%; }
+        }
+        .hf-hero-scrim--video {
+          background: linear-gradient(
+            90deg,
+            rgba(10,10,20,0.68) 0%,
+            rgba(10,10,20,0.36) 32%,
+            rgba(10,10,20,0.1) 58%,
+            rgba(10,10,20,0.02) 100%
+          );
+        }
+        .hf-hero-scrim--static {
+          background: linear-gradient(165deg, #0A0A0B 0%, #12121c 45%, #0A0A0B 100%);
+        }
+        .hf-hero-sheen {
+          background: linear-gradient(
+            105deg,
+            transparent 0%,
+            rgba(56,189,248,0.14) 22%,
+            rgba(99,102,241,0.12) 42%,
+            rgba(251,146,60,0.1) 58%,
+            rgba(56,189,248,0.12) 78%,
+            transparent 100%
+          );
+          background-size: 220% 100%;
+          animation: hfHeroSheen 22s ease-in-out infinite alternate;
+          mix-blend-mode: screen;
+          opacity: 0.85;
+        }
         @media (min-width: 901px) {
           .hf-hero-inner { padding: 0 96px !important; gap: 96px !important; min-height: min(92vh, 920px) !important; }
-          .hf-hero-radial-glow { opacity: 0.82 !important; }
-          .hf-hero.hf-hero--no-video .hf-hero-radial-glow { opacity: 0.62 !important; }
-          .hf-hero-card-halo { filter: blur(28px) !important; opacity: 1 !important; }
+          .hf-hero-radial-glow { opacity: 0.92 !important; }
+          .hf-hero.hf-hero--no-video .hf-hero-radial-glow { opacity: 0.72 !important; }
+          .hf-hero-card-halo { filter: blur(34px) !important; opacity: 1 !important; }
+          .hf-hero-sheen { opacity: 0.95 !important; }
         }
-        .hf-hero-radial-glow { opacity: 0.76; }
-        .hf-hero.hf-hero--no-video .hf-hero-radial-glow { opacity: 0.58; }
+        .hf-hero-radial-glow { opacity: 0.88; }
+        .hf-hero.hf-hero--no-video .hf-hero-radial-glow { opacity: 0.66; }
         @media (max-width: 900px) {
-          .hf-hero-radial-glow { opacity: 0.64 !important; }
-          .hf-hero.hf-hero--no-video .hf-hero-radial-glow { opacity: 0.52 !important; }
+          .hf-hero-radial-glow { opacity: 0.72 !important; }
+          .hf-hero.hf-hero--no-video .hf-hero-radial-glow { opacity: 0.56 !important; }
         }
         .hero-fade { animation: heroFadeUp 0.6s ease both; }
         .shimmer-text { background: linear-gradient(90deg, #f87171 0%, #fb923c 25%, #f87171 50%, #fb923c 75%, #f87171 100%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 3s linear infinite; }
@@ -4659,28 +4691,6 @@ function HeroSection({ navigate, lang }) {
       `;
   }, []);
 
-  const fakeResult = {
-    EN: {
-      decision: "Not Likely",
-      decisionColor: "#f87171",
-      decisionBg: "rgba(239,68,68,0.08)",
-      decisionBorder: "rgba(239,68,68,0.2)",
-      mistake: "No measurable impact. Every bullet says 'responsible for'.",
-      fix: "Replace with numbers. 'Grew email list by 40% in 3 months.'",
-      insight: "This CV looks like everyone else's. Nothing stands out in 7 seconds.",
-    },
-    TR: {
-      decision: "Düşük İhtimal",
-      decisionColor: "#f87171",
-      decisionBg: "rgba(239,68,68,0.08)",
-      decisionBorder: "rgba(239,68,68,0.2)",
-      mistake: "Ölçülebilir etki yok. Her madde 'sorumlu oldum' diyor.",
-      fix: "Rakam ekle. '3 ayda email listesini %40 büyüttüm.'",
-      insight: "Bu CV herkesinkiyle aynı. 7 saniyede hiçbir şey öne çıkmıyor.",
-    }
-  };
-
-  const r = fakeResult[lang];
   const [videoFailed, setVideoFailed] = useState(false);
   const [isDesktop, setIsDesktop] = useState(() =>
     typeof window !== "undefined" && window.matchMedia("(min-width: 901px)").matches
@@ -4695,16 +4705,14 @@ function HeroSection({ navigate, lang }) {
   }, []);
 
   return (
-    <section
+    <div
       className={`hf-hero${videoFailed ? " hf-hero--no-video" : ""}`}
       style={{
-        width: "100vw",
-        minHeight: "100vh",
-        background: "#050508",
-        position: "relative",
+        position: "absolute",
+        inset: 0,
+        zIndex: 0,
+        pointerEvents: "none",
         overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
       }}
     >
       <div
@@ -4720,6 +4728,7 @@ function HeroSection({ navigate, lang }) {
         {!videoFailed ? (
           <video
             key={HERO_VIDEO_SRC}
+            aria-hidden
             autoPlay
             muted
             loop
@@ -4733,7 +4742,7 @@ function HeroSection({ navigate, lang }) {
               width: "108%",
               height: "108%",
               objectFit: "cover",
-              filter: "saturate(1.12) contrast(1.06) brightness(1.06)",
+              filter: "saturate(1.18) contrast(1.08) brightness(1.12)",
             }}
           />
         ) : null}
@@ -4742,17 +4751,16 @@ function HeroSection({ navigate, lang }) {
             position: "absolute",
             inset: "-16%",
             pointerEvents: "none",
-            opacity: 0.28,
             mixBlendMode: "screen",
             background:
-              "linear-gradient(130deg, rgba(59,130,246,0.28) 0%, rgba(14,165,233,0.12) 30%, rgba(249,115,22,0.18) 58%, rgba(59,130,246,0.24) 100%)",
-            filter: "blur(32px)",
+              "linear-gradient(130deg, rgba(59,130,246,0.38) 0%, rgba(14,165,233,0.2) 30%, rgba(251,146,60,0.28) 58%, rgba(99,102,241,0.32) 100%)",
+            filter: "blur(28px)",
           }}
           animate={{
             x: isDesktop ? [0, 32, -20, 0] : [0, 26, -16, 0],
             y: isDesktop ? [0, -22, 16, 0] : [0, -18, 14, 0],
             scale: isDesktop ? [1, 1.06, 0.97, 1] : [1, 1.05, 0.98, 1],
-            opacity: isDesktop ? [0.28, 0.42, 0.34, 0.28] : [0.24, 0.34, 0.28, 0.24],
+            opacity: isDesktop ? [0.38, 0.54, 0.46, 0.38] : [0.28, 0.4, 0.34, 0.28],
           }}
           transition={{ duration: 46, repeat: Infinity, ease: "easeInOut" }}
         />
@@ -4762,7 +4770,7 @@ function HeroSection({ navigate, lang }) {
             width: "760px",
             height: "760px",
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(59,130,246,0.24) 0%, transparent 62%)",
+            background: "radial-gradient(circle, rgba(59,130,246,0.38) 0%, transparent 58%)",
             top: "-220px",
             left: "-160px",
             filter: "blur(88px)",
@@ -4776,7 +4784,7 @@ function HeroSection({ navigate, lang }) {
             width: "680px",
             height: "680px",
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(29, 78, 216, 0.2) 0%, transparent 62%)",
+            background: "radial-gradient(circle, rgba(29, 78, 216, 0.32) 0%, transparent 58%)",
             bottom: "-160px",
             right: "-60px",
             filter: "blur(78px)",
@@ -4790,7 +4798,7 @@ function HeroSection({ navigate, lang }) {
             width: "560px",
             height: "560px",
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(249, 115, 22, 0.2) 0%, transparent 65%)",
+            background: "radial-gradient(circle, rgba(251, 146, 60, 0.34) 0%, transparent 62%)",
             top: "28%",
             left: "40%",
             filter: "blur(72px)",
@@ -4801,14 +4809,12 @@ function HeroSection({ navigate, lang }) {
       </div>
       <div
         aria-hidden
+        className={videoFailed ? "hf-hero-scrim hf-hero-scrim--static" : "hf-hero-scrim hf-hero-scrim--video"}
         style={{
           position: "absolute",
           inset: 0,
           pointerEvents: "none",
           zIndex: 0,
-          background: videoFailed
-            ? "linear-gradient(165deg, #0A0A0B 0%, #12121c 45%, #0A0A0B 100%)"
-            : "linear-gradient(90deg, rgba(6,6,10,0.9) 0%, rgba(6,6,10,0.58) 40%, rgba(6,6,10,0.22) 68%, rgba(6,6,10,0.08) 100%)",
         }}
       />
       <div
@@ -4820,8 +4826,18 @@ function HeroSection({ navigate, lang }) {
           pointerEvents: "none",
           zIndex: 0,
           background:
-            "radial-gradient(ellipse 100% 88% at 90% 10%, rgba(56,189,248,0.4) 0%, transparent 50%), radial-gradient(ellipse 75% 62% at 10% 86%, rgba(59,130,246,0.26) 0%, transparent 48%), radial-gradient(ellipse 86% 64% at 48% 100%, rgba(249,115,22,0.2) 0%, transparent 45%)",
+            "radial-gradient(ellipse 110% 92% at 88% 8%, rgba(56,189,248,0.62) 0%, transparent 52%), radial-gradient(ellipse 82% 70% at 8% 88%, rgba(99,102,241,0.42) 0%, transparent 50%), radial-gradient(ellipse 95% 72% at 52% 102%, rgba(251,146,60,0.38) 0%, transparent 48%)",
           mixBlendMode: "screen",
+        }}
+      />
+      <div
+        aria-hidden
+        className="hf-hero-sheen"
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 0,
         }}
       />
       <div
@@ -4831,7 +4847,7 @@ function HeroSection({ navigate, lang }) {
           inset: 0,
           pointerEvents: "none",
           zIndex: 0,
-          background: "radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.45) 100%)",
+          background: "radial-gradient(ellipse 90% 85% at 50% 42%, transparent 0%, rgba(0,0,0,0.14) 55%, rgba(0,0,0,0.36) 100%)",
         }}
       />
       <div
@@ -4867,6 +4883,44 @@ function HeroSection({ navigate, lang }) {
         transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
       />
 
+    </div>
+  );
+}
+
+function HeroSection({ navigate, lang }) {
+  const fakeResult = {
+    EN: {
+      decision: "Not Likely",
+      decisionColor: "#f87171",
+      decisionBg: "rgba(239,68,68,0.08)",
+      decisionBorder: "rgba(239,68,68,0.2)",
+      mistake: "No measurable impact. Every bullet says 'responsible for'.",
+      fix: "Replace with numbers. 'Grew email list by 40% in 3 months.'",
+      insight: "This CV looks like everyone else's. Nothing stands out in 7 seconds.",
+    },
+    TR: {
+      decision: "Düşük İhtimal",
+      decisionColor: "#f87171",
+      decisionBg: "rgba(239,68,68,0.08)",
+      decisionBorder: "rgba(239,68,68,0.2)",
+      mistake: "Ölçülebilir etki yok. Her madde 'sorumlu oldum' diyor.",
+      fix: "Rakam ekle. '3 ayda email listesini %40 büyüttüm.'",
+      insight: "Bu CV herkesinkiyle aynı. 7 saniyede hiçbir şey öne çıkmıyor.",
+    }
+  };
+
+  const r = fakeResult[lang];
+  return (
+    <section
+      style={{
+        width: "100vw",
+        minHeight: "100vh",
+        position: "relative",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       <div
         className="hf-hero-inner"
         style={{
@@ -4945,20 +4999,20 @@ function HeroSection({ navigate, lang }) {
                 pointerEvents: "none",
                 background:
                   "radial-gradient(ellipse at 25% 20%, rgba(56,189,248,0.28), transparent 62%), radial-gradient(ellipse at 80% 78%, rgba(249,115,22,0.2), transparent 60%)",
-                filter: "blur(22px)",
-                opacity: 0.9,
+                filter: "blur(26px)",
+                opacity: 1,
               }}
             />
             <div
               style={{
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.1)",
                 borderRadius: 20,
                 padding: "16px 16px 14px",
                 position: "relative",
                 overflow: "hidden",
                 boxShadow:
-                  "0 26px 56px rgba(0,0,0,0.42), 0 0 54px rgba(56,189,248,0.18), 0 0 46px rgba(249,115,22,0.12)",
+                  "0 28px 64px rgba(0,0,0,0.48), 0 0 72px rgba(56,189,248,0.28), 0 0 56px rgba(251,146,60,0.2), inset 0 1px 0 rgba(255,255,255,0.06)",
               }}
             >
               <div
@@ -6416,16 +6470,21 @@ export function LandingPage() {
         width: "100%",
         minHeight: "100vh",
         overflowX: "hidden",
-        background: "#0A0A0B",
+        position: "relative",
+        isolation: "isolate",
+        background: "#050508",
       }}
     >
-      <HeroSection navigate={navigate} lang={lang} />
-      <FeatureCards lang={lang} />
-      <TrustSection lang={lang} />
-      <ComparisonSection lang={lang} />
-      <PricingSection navigate={navigate} lang={lang} />
-      <ProLiveSection navigate={navigate} lang={lang} />
-      <Footer navigate={navigate} lang={lang} />
+      <LandingPageAmbient />
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <HeroSection navigate={navigate} lang={lang} />
+        <FeatureCards lang={lang} />
+        <TrustSection lang={lang} />
+        <ComparisonSection lang={lang} />
+        <PricingSection navigate={navigate} lang={lang} />
+        <ProLiveSection navigate={navigate} lang={lang} />
+        <Footer navigate={navigate} lang={lang} />
+      </div>
     </div>
   );
 }
