@@ -1372,27 +1372,60 @@ function buildV2PreviewLines(data, lang, planFixes, tr) {
       .map((x) => x.trim())
       .filter(Boolean)[0] || tr.previewFallbackReality;
 
-  const recruiterLines = [
-    h(tr.previewRecruiterReqLine.replace("{req}", requirementSignal)),
-    h(tr.previewRecruiterRealityLine.replace("{reality}", cvRealityRaw)),
-    h(tr.previewRecruiterConsequenceLine),
-  ];
-  const reasoning = String(data?.Recruiter?.reasoning || "").trim();
-  const sents = reasoning
-    .split(/(?<=[.!?])\s+/)
-    .map((x) => x.trim())
-    .filter(Boolean);
-  if (sents[1]) recruiterLines.push(h(sents[1]));
-  if (sents[2]) recruiterLines.push(h(sents[2]));
+  const recruiterLines = [h(tr.previewRecruiterDecisionIntro)];
   const strengths = data?.Recruiter?.strengths || [];
   const weaknesses = data?.Recruiter?.weaknesses || [];
-  for (const s of strengths) {
-    if (s && recruiterLines.length < 8) recruiterLines.push(`● ${h(String(s))}`);
+  const gapRows = Array.isArray(data?.Gaps?.rejection_reasons) ? data.Gaps.rejection_reasons : [];
+  const reasonPool = [];
+  for (const g of gapRows.slice(0, 3)) {
+    if (g?.issue) reasonPool.push(h(String(g.issue)));
   }
-  for (const w of weaknesses) {
-    if (w && recruiterLines.length < 8) recruiterLines.push(`● ${h(String(w))}`);
+  for (const w of weaknesses.slice(0, 3)) {
+    if (w) reasonPool.push(h(String(w)));
   }
-  if (!recruiterLines.length) recruiterLines.push(h(tr.previewFallbackRecruiterFirst));
+  if (Array.isArray(data?.ATS?.missing_keywords)) {
+    for (const kw of data.ATS.missing_keywords.slice(0, 2)) {
+      if (kw) reasonPool.push(h(tr.previewRecruiterMissingKeyword.replace("{kw}", String(kw))));
+    }
+  }
+  const dedupReasons = Array.from(new Set(reasonPool.map((x) => String(x).trim()).filter(Boolean))).slice(0, 3);
+  if (!dedupReasons.length) {
+    dedupReasons.push(h(tr.previewRecruiterRealityLine.replace("{reality}", cvRealityRaw)));
+    dedupReasons.push(h(tr.previewRecruiterReqLine.replace("{req}", requirementSignal)));
+  }
+  dedupReasons.forEach((r) => recruiterLines.push(`● ${r}`));
+
+  const roleRowsRaw = Array.isArray(data?.RoleFit?.role_fit) ? data.RoleFit.role_fit : [];
+  const sortedRoles = [...roleRowsRaw].sort((a, b) => Number(b?.score || 0) - Number(a?.score || 0));
+  const bestRole = String(data?.RoleFit?.best_role || sortedRoles[0]?.role || "").trim();
+  const altRoles = sortedRoles
+    .filter((r) => String(r?.role || "").trim() && String(r.role).trim() !== bestRole)
+    .map((r) => String(r.role).trim())
+    .slice(0, 2);
+  if (altRoles.length < 2) {
+    const matched = Array.isArray(data?.ATS?.matched_skills) ? data.ATS.matched_skills.map((x) => String(x).toLowerCase()) : [];
+    const fallbackRoles = matched.some((s) => /sql|excel|tableau|power bi|python|analytics|analysis/.test(s))
+      ? [tr.previewFallbackRoleAData, tr.previewFallbackRoleBData]
+      : [tr.previewFallbackRoleA, tr.previewFallbackRoleB];
+    for (const fr of fallbackRoles) {
+      if (altRoles.length >= 2) break;
+      if (!altRoles.includes(fr)) altRoles.push(fr);
+    }
+  }
+  recruiterLines.push(h(tr.previewRecruiterAltIntro));
+  altRoles.slice(0, 2).forEach((role) => recruiterLines.push(`● ${role}`));
+
+  recruiterLines.push(h(tr.previewRecruiterBecauseIntro));
+  const becausePool = [];
+  for (const s of strengths.slice(0, 2)) {
+    if (s) becausePool.push(h(String(s)));
+  }
+  for (const m of (data?.ATS?.matched_skills || []).slice(0, 3)) {
+    if (m) becausePool.push(h(tr.previewRecruiterBecauseSkill.replace("{skill}", String(m))));
+  }
+  const becauseRows = Array.from(new Set(becausePool.map((x) => String(x).trim()).filter(Boolean))).slice(0, 3);
+  if (!becauseRows.length) becauseRows.push(h(tr.previewFallbackRecruiterFirst));
+  becauseRows.forEach((r) => recruiterLines.push(`● ${r}`));
 
   const gapLines = [];
   for (const g of data?.Gaps?.rejection_reasons || []) {
@@ -1457,7 +1490,7 @@ function buildV2PreviewLines(data, lang, planFixes, tr) {
   if (data?.ATS?.keyword_match != null) atsParts.push(`${tr.previewKeywordMatchShort}: ${data.ATS.keyword_match}%`);
   const atsLine = atsParts.length ? atsParts.join(" · ") : tr.previewAtsFallback;
   const best = data?.RoleFit?.best_role;
-  const roles = Array.isArray(data?.RoleFit?.role_fit) ? data.RoleFit.role_fit : [];
+  const roles = roleRowsRaw;
   const careerLine = best || roles[0]?.role
     ? `${tr.previewCareerDirPrefix}: ${best || roles[0]?.role}`
     : tr.previewCareerDirectionFallback;
@@ -1617,6 +1650,10 @@ function CareerEngineProBlurPreview({ data, lang, t, onUpgrade }) {
     hirefitTrack("v2_preview_upgrade_cta", { lang, source: "preview_strip" });
     onUpgrade();
   }, [lang, onUpgrade]);
+  const recruiterVisibleCount = useMemo(() => {
+    const idx = freeRecruiter.findIndex((line) => String(line || "").trim() === String(t.previewRecruiterAltIntro || "").trim());
+    return idx > 1 ? idx : 4;
+  }, [freeRecruiter, t.previewRecruiterAltIntro]);
 
   return (
     <div style={{ marginTop: 22 }}>
@@ -1659,7 +1696,7 @@ function CareerEngineProBlurPreview({ data, lang, t, onUpgrade }) {
         </button>
       </div>
       <div style={previewGridStyle}>
-        <BlurPreviewCard title={t.focusPreviewCardRecruiter} lines={freeRecruiter} cardId="recruiter" onHoverCard={onHoverCard} t={t} visibleCount={3} />
+        <BlurPreviewCard title={t.focusPreviewCardRecruiter} lines={freeRecruiter} cardId="recruiter" onHoverCard={onHoverCard} t={t} visibleCount={recruiterVisibleCount} />
         <BlurPreviewCard title={t.focusPreviewCardGaps} lines={freeGaps} cardId="gaps" onHoverCard={onHoverCard} t={t} visibleCount={3} />
         <BlurPreviewCard title={t.focusPreviewCardPlan} lines={freePlan} cardId="plan" onHoverCard={onHoverCard} t={t} visibleCount={3} />
         <BlurPreviewCard title={t.focusPreviewCardMarket} lines={freeMarket} cardId="market" onHoverCard={onHoverCard} t={t} visibleCount={3} />
@@ -2263,9 +2300,18 @@ const translations = {
     previewHiddenCountLine: "+{n} more insights hidden",
     previewFallbackRequirement: "role-fit baseline requirement",
     previewFallbackReality: "Your current CV signal is not yet aligned to this requirement.",
+    previewRecruiterDecisionIntro: "If I were the recruiter, I would likely reject you for this role because:",
     previewRecruiterReqLine: "This role requires: {req}",
     previewRecruiterRealityLine: "Your CV currently shows: {reality}",
     previewRecruiterConsequenceLine: "→ This mismatch creates early rejection risk in first screening.",
+    previewRecruiterMissingKeyword: "Missing keyword signal for this role: {kw}",
+    previewRecruiterAltIntro: "However, you are a stronger fit for:",
+    previewRecruiterBecauseIntro: "Because:",
+    previewRecruiterBecauseSkill: "You already show signal in: {skill}",
+    previewFallbackRoleA: "Business Analyst",
+    previewFallbackRoleB: "Operations Analyst",
+    previewFallbackRoleAData: "Data Analyst",
+    previewFallbackRoleBData: "Business Analyst",
     previewFallbackRecruiterFirst: "Recruiter signals for this CV and job will appear here after Pro.",
     previewEmptyGapsBrief: "Gap list vs this posting is available in the full analysis.",
     previewGapWhyDegree: "This posting explicitly filters for engineering-aligned education signals.",
@@ -2587,9 +2633,18 @@ const translations = {
     previewHiddenCountLine: "+{n} içgörü daha gizli",
     previewFallbackRequirement: "rol için temel gereklilik sinyali",
     previewFallbackReality: "Mevcut CV sinyalin bu gereklilikle henüz örtüşmüyor.",
+    previewRecruiterDecisionIntro: "Ben recruiter olsaydım bu rol için seni büyük olasılıkla elerdim, çünkü:",
     previewRecruiterReqLine: "Bu rolün gerektirdiği sinyal: {req}",
     previewRecruiterRealityLine: "CV'nde şu sinyal öne çıkıyor: {reality}",
     previewRecruiterConsequenceLine: "→ Bu uyumsuzluk ilk elemede erken red riskini artırır.",
+    previewRecruiterMissingKeyword: "Bu rol için eksik anahtar kelime sinyali: {kw}",
+    previewRecruiterAltIntro: "Buna karşın daha güçlü uyduğun roller:",
+    previewRecruiterBecauseIntro: "Çünkü:",
+    previewRecruiterBecauseSkill: "Zaten güçlü sinyal verdiğin alan: {skill}",
+    previewFallbackRoleA: "İş Analisti",
+    previewFallbackRoleB: "Operasyon Analisti",
+    previewFallbackRoleAData: "Veri Analisti",
+    previewFallbackRoleBData: "İş Analisti",
     previewFallbackRecruiterFirst: "Bu CV ve bu ilan için işe alım uzmanı görüşü Pro’da görünür.",
     previewEmptyGapsBrief: "Bu ilana karşı boşluk listesi tam analizde yer alır.",
     previewGapWhyDegree: "Bu ilanda mühendislik odaklı eğitim sinyali açık bir eleme filtresi.",
