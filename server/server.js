@@ -925,6 +925,78 @@ return res.json(cleaned);
   }
 });
 
+const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
+const isAdminEmail = (email) => {
+  const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
+  return Boolean(adminEmail) && normalizeEmail(email) === adminEmail;
+};
+
+app.post("/api/admin/pro-access", async (req, res) => {
+  try {
+    const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
+    if (!adminEmail) {
+      return res.status(500).json({ error: "ADMIN_EMAIL is not configured" });
+    }
+
+    const authHeader = String(req.get("authorization") || req.headers.authorization || "");
+    const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+    const accessToken = tokenMatch?.[1]?.trim();
+    if (!accessToken) {
+      return res.status(401).json({ error: "Missing bearer token" });
+    }
+
+    const targetEmail = normalizeEmail(req.body?.targetEmail);
+    const grantPro = Boolean(req.body?.grantPro);
+    if (!targetEmail) {
+      return res.status(400).json({ error: "targetEmail is required" });
+    }
+
+    if (!process.env.VITE_SUPABASE_URL || !process.env.VITE_SUPABASE_ANON_KEY || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return res.status(500).json({ error: "Supabase environment variables are missing" });
+    }
+
+    const { createClient } = await import("@supabase/supabase-js");
+    const authClient = createClient(process.env.VITE_SUPABASE_URL, process.env.VITE_SUPABASE_ANON_KEY);
+    const {
+      data: { user: requester },
+      error: requesterError,
+    } = await authClient.auth.getUser(accessToken);
+    if (requesterError || !requester) {
+      return res.status(401).json({ error: "Invalid session token" });
+    }
+    if (!isAdminEmail(requester.email)) {
+      return res.status(403).json({ error: "Only admin can update user access" });
+    }
+
+    const adminClient = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const { data: usersPage, error: usersError } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (usersError) {
+      return res.status(500).json({ error: "Failed to load users" });
+    }
+    const targetUser = usersPage?.users?.find((u) => normalizeEmail(u.email) === targetEmail);
+    if (!targetUser) {
+      return res.status(404).json({ error: "Target user not found" });
+    }
+
+    const plan = grantPro ? "pro" : "free";
+    const { error: upsertError } = await adminClient
+      .from("user_plans")
+      .upsert({ user_id: targetUser.id, plan }, { onConflict: "user_id" });
+    if (upsertError) {
+      return res.status(500).json({ error: "Failed to update user plan", details: upsertError.message });
+    }
+
+    return res.json({
+      ok: true,
+      targetEmail,
+      plan,
+      adminGranted: grantPro,
+    });
+  } catch (e) {
+    return res.status(500).json({ error: "Admin access update failed", details: e?.message || "Unknown error" });
+  }
+});
+
 const lemonWebhookHandler = async (req, res) => {
   const secret = process.env.LEMON_WEBHOOK_SECRET;
   const signature = String(req.get("x-signature") || req.headers["x-signature"] || "")

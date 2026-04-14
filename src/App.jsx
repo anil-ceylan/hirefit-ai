@@ -24,6 +24,10 @@ const HF_API_BASE =
   typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL
     ? String(import.meta.env.VITE_API_URL).replace(/\/$/, "")
     : "https://hirefit-ai-production.up.railway.app";
+const ADMIN_EMAIL =
+  typeof import.meta !== "undefined" && import.meta.env?.VITE_ADMIN_EMAIL
+    ? String(import.meta.env.VITE_ADMIN_EMAIL).trim().toLowerCase()
+    : "";
 
 /** 30-day rolling window for free-tier analysis_count reset (user_plans.last_reset_at). */
 const USER_PLAN_RESET_MS = 30 * 24 * 60 * 60 * 1000;
@@ -33,6 +37,11 @@ function userPlanNeedsReset(lastResetAt) {
   const t = new Date(lastResetAt).getTime();
   if (Number.isNaN(t)) return false;
   return Date.now() - t >= USER_PLAN_RESET_MS;
+}
+
+function isAdmin(user) {
+  if (!user?.email || !ADMIN_EMAIL) return false;
+  return String(user.email).trim().toLowerCase() === ADMIN_EMAIL;
 }
 
 const HF_SECTOR_VALUES = [
@@ -4846,6 +4855,10 @@ function HireFitLayout() {
   const [showPaywall, setShowPaywall] = useState(false);
   /** Logged-in users: row from user_plans (analysis_count, last_reset_at, plan). */
   const [userPlanRow, setUserPlanRow] = useState(null);
+  const [adminTargetEmail, setAdminTargetEmail] = useState("");
+  const [adminGrantBusy, setAdminGrantBusy] = useState(false);
+  const [adminGrantError, setAdminGrantError] = useState("");
+  const [adminGrantNotice, setAdminGrantNotice] = useState("");
   const [showAnonSavePrompt, setShowAnonSavePrompt] = useState(false);
   const [deadline, setDeadline] = useState("1_week");
   const [targetRole, setTargetRole] = useState("");
@@ -4870,6 +4883,8 @@ function HireFitLayout() {
   });
 
   const t = translations[lang];
+  const isAdminUser = useMemo(() => isAdmin(user), [user]);
+  const hasProAccess = Boolean(isPro || isAdminUser);
   const cvLoaded = cvText.trim().length > 24;
   const jdLoaded = jdText.trim().length > 40;
   const jobUrlIsLinkedIn = useMemo(() => isLinkedInJobUrl(jobUrl), [jobUrl]);
@@ -5116,7 +5131,8 @@ function HireFitLayout() {
         setError(lang === "TR" ? "Plan bilgisi yüklenemedi. Tekrar dene." : "Could not load your plan. Try again.");
         return;
       }
-      if (row.plan !== "pro" && (row.analysis_count ?? 0) >= 2) {
+      const hasPaidOrAdminAccess = row.plan === "pro" || isAdmin(user);
+      if (!hasPaidOrAdminAccess && (row.analysis_count ?? 0) >= 2) {
         setShowPaywall(true);
         return;
       }
@@ -5162,7 +5178,7 @@ const msgInterval = setInterval(() => {
           jobDescription: jdText,
           sector,
           lang: lang === "TR" ? "tr" : "en",
-          isPro,
+          isPro: hasProAccess,
         }),
       });
       if (v2Res.ok) {
@@ -5226,7 +5242,7 @@ const msgInterval = setInterval(() => {
             sector: v2.Context?.sector ?? "",
           },
           role_matches: roleMatchesFromV2,
-          interview_prep: isPro ? buildInterviewPrepFromV2(v2, lang) : [],
+          interview_prep: hasProAccess ? buildInterviewPrepFromV2(v2, lang) : [],
           confidence_score: confNum,
         });
         setScoreHistory((prev) =>
@@ -5571,6 +5587,53 @@ const msgInterval = setInterval(() => {
 
   const openUpgrade = () => window.open(LEMONSQUEEZY_PRO_CHECKOUT, "_blank");
 
+  const setUserProAccessByAdmin = useCallback(
+    async (grantPro) => {
+      if (!isAdminUser) {
+        setAdminGrantError(lang === "TR" ? "Bu işlem sadece admin için açık." : "This action is admin-only.");
+        return;
+      }
+      const targetEmail = String(adminTargetEmail || "").trim().toLowerCase();
+      if (!targetEmail.includes("@")) {
+        setAdminGrantError(lang === "TR" ? "Geçerli bir kullanıcı email'i gir." : "Enter a valid user email.");
+        return;
+      }
+      setAdminGrantBusy(true);
+      setAdminGrantError("");
+      setAdminGrantNotice("");
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const accessToken = session?.access_token;
+        if (!accessToken) throw new Error(lang === "TR" ? "Oturum token bulunamadı." : "Missing session token.");
+        const res = await fetch(`${HF_API_BASE}/api/admin/pro-access`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ targetEmail, grantPro: Boolean(grantPro) }),
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(payload?.error || (lang === "TR" ? "Admin güncellemesi başarısız." : "Admin update failed."));
+        setAdminGrantNotice(
+          grantPro
+            ? (lang === "TR" ? `Pro erişimi açıldı: ${targetEmail}` : `Pro access granted: ${targetEmail}`)
+            : (lang === "TR" ? `Pro erişimi kaldırıldı: ${targetEmail}` : `Pro access revoked: ${targetEmail}`)
+        );
+        if (user?.email && String(user.email).trim().toLowerCase() === targetEmail) {
+          await syncUserPlanForUser(user.id);
+        }
+      } catch (e) {
+        setAdminGrantError(String(e?.message || (lang === "TR" ? "Admin işlemi başarısız." : "Admin action failed.")));
+      } finally {
+        setAdminGrantBusy(false);
+      }
+    },
+    [adminTargetEmail, isAdminUser, lang, syncUserPlanForUser, user]
+  );
+
   const sectorLabels = lang === "TR"
     ? ["Otomatik", "Teknoloji / Startup", "Danışmanlık", "Finans", "FMCG / Perakende", "Sağlık", "Kamu", "Telekom / Donanım", "Ürün Tasarımı / UX"]
     : ["Auto-detect", "Tech / Startup", "Consulting", "Finance", "FMCG / Retail", "Healthcare", "Government", "Telecom / Hardware", "Product Design / UX"];
@@ -5591,7 +5654,8 @@ const msgInterval = setInterval(() => {
     error,
     login,
     loginWithGoogle,
-    isPro,
+    isPro: hasProAccess,
+    isAdminUser,
     plan,
     waitlist,
     history,
@@ -5669,6 +5733,12 @@ const msgInterval = setInterval(() => {
     reanalysisResult,
     setError,
     scoreRunProgress,
+    adminTargetEmail,
+    setAdminTargetEmail,
+    adminGrantBusy,
+    adminGrantError,
+    adminGrantNotice,
+    setUserProAccessByAdmin,
   };
 
   return (
@@ -5858,7 +5928,8 @@ export function LoginPage() {
 
 export function DashboardPage() {
   const {
-    t, lang, T, history, loadHistoryItem, clearHistory, averageScore, isPro, plan, waitlist, scoreHistory, navigate,
+    t, lang, T, history, loadHistoryItem, clearHistory, averageScore, isPro, isAdminUser, plan, waitlist, scoreHistory, navigate,
+    adminTargetEmail, setAdminTargetEmail, adminGrantBusy, adminGrantError, adminGrantNotice, setUserProAccessByAdmin,
   } = useOutletContext();
   return (
         <div style={{ ...styles.container, padding: "48px 24px" }}>
@@ -5890,6 +5961,54 @@ export function DashboardPage() {
                 </ul>
                 <button className="hf-btn-primary" onClick={() => navigate("/app")} style={{ marginTop: 24, fontSize: "14px" }}>{t.openProduct} <ArrowRight size={14} /></button>
               </div>
+              {isAdminUser ? (
+                <div className="hf-card" style={{ padding: 22 }}>
+                  <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
+                    {lang === "TR" ? "Admin Pro Erişimi" : "Admin Pro Access"}
+                  </h3>
+                  <p style={{ fontSize: 13, color: T.textSub, margin: "0 0 10px" }}>
+                    {lang === "TR"
+                      ? "Kullanıcıya manuel Pro aç/kapat. Bu kullanıcı için paywall anında güncellenir."
+                      : "Manually toggle Pro for any user. Paywall updates immediately for that user."}
+                  </p>
+                  <input
+                    value={adminTargetEmail}
+                    onChange={(e) => setAdminTargetEmail(e.target.value)}
+                    placeholder={lang === "TR" ? "kullanici@email.com" : "user@email.com"}
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: `1px solid ${T.border}`,
+                      background: "rgba(255,255,255,0.02)",
+                      color: T.text,
+                      marginBottom: 10,
+                    }}
+                  />
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button className="hf-btn-primary" disabled={adminGrantBusy} onClick={() => setUserProAccessByAdmin(true)} style={{ fontSize: 13 }}>
+                      {lang === "TR" ? "Pro Aç" : "Grant Pro"}
+                    </button>
+                    <button
+                      disabled={adminGrantBusy}
+                      onClick={() => setUserProAccessByAdmin(false)}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 10,
+                        border: `1px solid ${T.border}`,
+                        background: "transparent",
+                        color: T.textSub,
+                        fontWeight: 700,
+                        cursor: adminGrantBusy ? "wait" : "pointer",
+                      }}
+                    >
+                      {lang === "TR" ? "Pro Kapat" : "Revoke Pro"}
+                    </button>
+                  </div>
+                  {adminGrantNotice ? <div style={{ marginTop: 10, fontSize: 12, color: "#34d399" }}>{adminGrantNotice}</div> : null}
+                  {adminGrantError ? <div style={{ marginTop: 10, fontSize: 12, color: "#f87171" }}>{adminGrantError}</div> : null}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
