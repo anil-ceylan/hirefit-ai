@@ -2109,6 +2109,124 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
   );
 }
 
+function clampBullet(text, max = 120) {
+  const raw = String(text || "").replace(/\s+/g, " ").trim();
+  if (!raw) return "";
+  if (raw.length <= max) return raw;
+  return `${raw.slice(0, Math.max(40, max - 1)).trim()}...`;
+}
+
+function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro, onUpgrade, bestPathLabel }) {
+  const reasons = Array.isArray(data?.Gaps?.rejection_reasons) ? data.Gaps.rejection_reasons : [];
+  const topGaps = reasons.slice(0, 3);
+  const moreGaps = reasons.slice(3);
+  const roadmapFixes = enrichActionPlan(parseActionPlan(data?.Decision?.action_plan), {
+    lang: lang === "TR" ? "tr" : "en",
+    roleFit: data?.RoleFit,
+    gaps: data?.Gaps,
+    verdict: data?.Decision?.final_verdict,
+  })?.fixes || [];
+  const roadmapLines = roadmapFixes
+    .map((f) => clampBullet(f?.issue || f?.steps?.[0] || "", 110))
+    .filter(Boolean)
+    .slice(0, 6);
+  const summaryLine = clampBullet(String(data?.Decision?.reasoning || data?.Recruiter?.reasoning || ""), 110);
+  const rowStyle = { marginBottom: 6, fontSize: 12, color: RS.textSecondary, lineHeight: 1.55 };
+  const summaryStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: 13,
+    fontWeight: 700,
+    color: RS.textPrimary,
+    cursor: "pointer",
+    listStyle: "none",
+  };
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, marginBottom: 10 }}>
+        {t.scanSectionLabel}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8, marginBottom: 10 }}>
+        <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px" }}>
+          <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 4 }}>{t.scanCriticalGapTitle}</div>
+          <div style={{ fontSize: 12, color: RS.textPrimary, fontWeight: 700 }}>{clampBullet(mainProblem, 90)}</div>
+        </div>
+        <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px" }}>
+          <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 4 }}>{t.scanOneMoveTitle}</div>
+          <div style={{ fontSize: 12, color: RS.textPrimary, fontWeight: 700 }}>{clampBullet(singleAction, 90)}</div>
+        </div>
+        <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px" }}>
+          <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 4 }}>{t.scanBestPathTitle}</div>
+          <div style={{ fontSize: 12, color: RS.textPrimary, fontWeight: 700 }}>{clampBullet(bestPathLabel, 90)}</div>
+        </div>
+      </div>
+
+      <details open style={{ border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px", background: rsAlpha(RS.bgElevated, 0.65), marginBottom: 8 }}>
+        <summary style={summaryStyle}>
+          <AlertCircle size={14} color={RS.redDim} />
+          {t.scanWhyRejectedTitle}
+        </summary>
+        <div style={{ marginTop: 8 }}>
+          {mainProblem ? <div style={rowStyle}>• {clampBullet(mainProblem)}</div> : null}
+          {summaryLine ? <div style={rowStyle}>• {summaryLine}</div> : null}
+          {!mainProblem && !summaryLine ? <div style={rowStyle}>• {t.previewEmptyRecruiter}</div> : null}
+        </div>
+      </details>
+
+      <details style={{ border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px", background: rsAlpha(RS.bgElevated, 0.65), marginBottom: 8 }}>
+        <summary style={summaryStyle}>
+          <ListChecks size={14} color={RS.amber} />
+          {t.scanAllGapsTitle}
+        </summary>
+        <div style={{ marginTop: 8 }}>
+          {topGaps.length ? topGaps.map((g, i) => (
+            <div key={`gap-${i}`} style={rowStyle}>
+              • {clampBullet(humanizeUserFacingReason(g?.issue || "", lang), 95)} {g?.impact ? `— ${gapImpactLabel(g.impact, t)}` : ""}
+            </div>
+          )) : <div style={rowStyle}>• {t.previewEmptyGaps}</div>}
+          {moreGaps.length ? (
+            <details style={{ marginTop: 8 }}>
+              <summary style={{ ...summaryStyle, fontSize: 12, color: RS.textMuted }}>{t.scanMoreGaps.replace("{n}", String(moreGaps.length))}</summary>
+              <div style={{ marginTop: 6 }}>
+                {moreGaps.map((g, i) => (
+                  <div key={`gap-more-${i}`} style={rowStyle}>• {clampBullet(humanizeUserFacingReason(g?.issue || "", lang), 95)}</div>
+                ))}
+              </div>
+            </details>
+          ) : null}
+        </div>
+      </details>
+
+      <details style={{ border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px", background: rsAlpha(RS.bgElevated, 0.65) }}>
+        <summary style={summaryStyle}>
+          <Layers size={14} color={RS.indigo} />
+          {t.scanFullRoadmapTitle}
+        </summary>
+        <div style={{ marginTop: 8 }}>
+          {isPro ? (
+            roadmapLines.length ? roadmapLines.map((line, i) => (
+              <div key={`rm-${i}`} style={rowStyle}>• {line}</div>
+            )) : <div style={rowStyle}>• {t.previewEmptyPlan}</div>
+          ) : (
+            <>
+              <div style={rowStyle}>• {t.scanRoadmapLocked}</div>
+              <button
+                type="button"
+                onClick={onUpgrade}
+                style={{ marginTop: 6, border: "none", borderRadius: 8, background: RS.indigo, color: "#fff", padding: "8px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+              >
+                {t.focusPreviewUpgradeBtn}
+              </button>
+            </>
+          )}
+        </div>
+      </details>
+    </div>
+  );
+}
+
 function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, cvText, jdText }) {
   const actionPlanMemo = useMemo(() => {
     if (!data) return { priority_callout: null, fixes: [], interview_note: null };
@@ -2322,9 +2440,18 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, c
               {t.focusHiddenGapsTeaser.replace("{n}", String(extraHiddenCount))}
             </p>
           </div>
-        ) : (
-          <CareerEngineProDetailGrid data={data} lang={lang} t={t} planFixes={planFixes} />
-        )}
+        ) : null}
+
+        <DecisionScanSections
+          data={data}
+          lang={lang}
+          t={t}
+          mainProblem={displayedMainProblem || fv.explanation}
+          singleAction={singleAction}
+          isPro={isPro}
+          onUpgrade={onUpgrade}
+          bestPathLabel={t.bestPathForwardTitle}
+        />
 
         <BestPathForwardBlock data={data} lang={lang} t={t} isPro={isPro} onUpgrade={onUpgrade} score={scoreNumeric ?? score} cvText={cvText} jdText={jdText} />
       </div>
@@ -2626,6 +2753,15 @@ const translations = {
     bestPathPhaseApplication: "PHASE 3 — Application Strategy",
     bestPathTransformTitle: "If you follow this path:",
     bestPathTransformFit: "Fit score: {fit}",
+    scanSectionLabel: "Quick decision view",
+    scanCriticalGapTitle: "Critical gap",
+    scanOneMoveTitle: "One move",
+    scanBestPathTitle: "Best path",
+    scanWhyRejectedTitle: "Why you get rejected",
+    scanAllGapsTitle: "All gaps",
+    scanMoreGaps: "Show {n} more gaps",
+    scanFullRoadmapTitle: "Full roadmap",
+    scanRoadmapLocked: "Full roadmap is available in Pro only.",
     focusPreviewSectionTitle: "What's in your full analysis?",
     focusPreviewCtaTitle: "See exactly why you get screened out",
     focusPreviewCtaSubtitle: "Full recruiter read on your CV vs this JD, every gap ranked, fixes ordered by score impact, plus company and ATS context.",
@@ -2980,6 +3116,15 @@ const translations = {
     bestPathPhaseApplication: "PHASE 3 — Application Strategy",
     bestPathTransformTitle: "Bu yolu uygularsan:",
     bestPathTransformFit: "Fit skoru: {fit}",
+    scanSectionLabel: "Hızlı karar görünümü",
+    scanCriticalGapTitle: "Kritik boşluk",
+    scanOneMoveTitle: "Tek hamle",
+    scanBestPathTitle: "En iyi yol",
+    scanWhyRejectedTitle: "Neden eleniyorsun",
+    scanAllGapsTitle: "Tüm boşluklar",
+    scanMoreGaps: "{n} boşluk daha göster",
+    scanFullRoadmapTitle: "Tam yol haritası",
+    scanRoadmapLocked: "Tam yol haritası sadece Pro'da açık.",
     focusPreviewSectionTitle: "Pro analizinde neler var?",
     focusPreviewCtaTitle: "Neden elendiğini satır satır gör",
     focusPreviewCtaSubtitle: "Bu ilana göre recruiter taraması, tüm boşluklar, skora göre sıralı düzeltmeler ve şirket ile ATS bağlamı.",
