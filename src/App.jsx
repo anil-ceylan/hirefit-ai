@@ -1337,72 +1337,148 @@ function gapImpactLabel(g, tr) {
   return "";
 }
 
+function explainGapReason(issue, fallback, tr) {
+  const raw = String(issue || "").toLowerCase();
+  if (raw.includes("degree") || raw.includes("mühendislik") || raw.includes("engineering")) {
+    return tr.previewGapWhyDegree;
+  }
+  if (raw.includes("english") || raw.includes("ingilizce") || raw.includes("language")) {
+    return tr.previewGapWhyLanguage;
+  }
+  if (raw.includes("sector") || raw.includes("domain") || raw.includes("sektör")) {
+    return tr.previewGapWhySector;
+  }
+  if (raw.includes("metric") || raw.includes("quant") || raw.includes("ölç") || raw.includes("impact")) {
+    return tr.previewGapWhyImpact;
+  }
+  if (raw.includes("position") || raw.includes("headline") || raw.includes("positioning") || raw.includes("target")) {
+    return tr.previewGapWhyPositioning;
+  }
+  return String(fallback || "").trim() || tr.previewGapWhyGeneric;
+}
+
 /** Lines for all four preview cards — always derived from this run's CV+JD payload. */
 function buildV2PreviewLines(data, lang, planFixes, tr) {
   const h = (s) => humanizeUserFacingReason(String(s || "").trim(), lang);
-
-  const recruiterLines = [];
-  const reasoning = String(data?.Recruiter?.reasoning || "").trim();
-  if (reasoning) {
-    const sents = reasoning
+  const reqFromGap = String(data?.Gaps?.biggest_gap || data?.Gaps?.rejection_reasons?.[0]?.issue || "").trim();
+  const reqFromRole = String(data?.RoleFit?.best_role || data?.RoleFit?.role_fit?.[0]?.role || "").trim();
+  const reqFromKeywords = Array.isArray(data?.ATS?.missing_keywords) && data.ATS.missing_keywords[0]
+    ? String(data.ATS.missing_keywords[0]).trim()
+    : "";
+  const requirementSignal = reqFromGap || reqFromRole || reqFromKeywords || tr.previewFallbackRequirement;
+  const cvRealityRaw =
+    String(data?.Recruiter?.reasoning || data?.Decision?.reasoning || "")
       .split(/(?<=[.!?])\s+/)
       .map((x) => x.trim())
-      .filter(Boolean);
-    if (sents[0]) recruiterLines.push(h(sents[0]));
-    if (sents[1]) recruiterLines.push(h(sents[1]));
-    if (sents.length > 2) recruiterLines.push(h(sents.slice(2, 4).join(" ")));
-  }
+      .filter(Boolean)[0] || tr.previewFallbackReality;
+
+  const recruiterLines = [
+    h(tr.previewRecruiterReqLine.replace("{req}", requirementSignal)),
+    h(tr.previewRecruiterRealityLine.replace("{reality}", cvRealityRaw)),
+    h(tr.previewRecruiterConsequenceLine),
+  ];
+  const reasoning = String(data?.Recruiter?.reasoning || "").trim();
+  const sents = reasoning
+    .split(/(?<=[.!?])\s+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  if (sents[1]) recruiterLines.push(h(sents[1]));
+  if (sents[2]) recruiterLines.push(h(sents[2]));
   const strengths = data?.Recruiter?.strengths || [];
   const weaknesses = data?.Recruiter?.weaknesses || [];
   for (const s of strengths) {
-    if (s && recruiterLines.length < 6) recruiterLines.push(`● ${h(String(s))}`);
+    if (s && recruiterLines.length < 8) recruiterLines.push(`● ${h(String(s))}`);
   }
   for (const w of weaknesses) {
-    if (w && recruiterLines.length < 6) recruiterLines.push(`● ${h(String(w))}`);
+    if (w && recruiterLines.length < 8) recruiterLines.push(`● ${h(String(w))}`);
   }
   if (!recruiterLines.length) recruiterLines.push(h(tr.previewFallbackRecruiterFirst));
 
   const gapLines = [];
   for (const g of data?.Gaps?.rejection_reasons || []) {
     const imp = gapImpactLabel(g, tr);
-    gapLines.push(`● ${h(String(g.issue || "—"))}${imp ? ` — ${imp}` : ""}`);
+    const issue = h(String(g.issue || "—"));
+    const why = h(explainGapReason(issue, g.explanation, tr));
+    gapLines.push(`● ${issue}${imp ? ` — ${imp}` : ""}`);
+    gapLines.push(why);
   }
   if (!gapLines.length) gapLines.push(h(tr.previewEmptyGapsBrief));
 
   const planLines = [];
   const fixes = planFixes || [];
-  fixes.forEach((f, i) => {
+  fixes.forEach((f) => {
+    const issueRaw = String(f.issue || "").toLowerCase();
+    if ((issueRaw.includes("degree") || issueRaw.includes("engineering") || issueRaw.includes("mühendislik")) && !planLines.includes(h(tr.previewPlanStrategic1))) {
+      planLines.push(h(tr.previewPlanStrategic1));
+      return;
+    }
+    if ((issueRaw.includes("sector") || issueRaw.includes("domain") || issueRaw.includes("sektör") || issueRaw.includes("position")) && !planLines.includes(h(tr.previewPlanStrategic2))) {
+      planLines.push(h(tr.previewPlanStrategic2));
+      return;
+    }
+    if ((issueRaw.includes("metric") || issueRaw.includes("quant") || issueRaw.includes("impact") || issueRaw.includes("ölç")) && !planLines.includes(h(tr.previewPlanStrategic3))) {
+      planLines.push(h(tr.previewPlanStrategic3));
+      return;
+    }
     const st = f.steps?.[0];
     const line = st && String(st).trim() ? String(st).trim() : String(f.issue || "").trim();
-    if (line && planLines.length < 8) planLines.push(`${i + 1}. ${h(line)}`);
+    if (line && planLines.length < 8) planLines.push(`${planLines.length + 1}. ${h(line)}`);
   });
+  const strategicFallbacks = [
+    tr.previewPlanStrategic1,
+    tr.previewPlanStrategic2,
+    tr.previewPlanStrategic3,
+    tr.previewPlanStrategic4,
+    tr.previewPlanStrategic5,
+    tr.previewPlanStrategic6,
+  ].map((x) => h(x));
+  for (const item of strategicFallbacks) {
+    if (planLines.length >= 6) break;
+    const hasSame = planLines.some((ln) => ln.toLowerCase() === item.toLowerCase());
+    if (!hasSame) planLines.push(item);
+  }
   if (!planLines.length) planLines.push(h(tr.previewEmptyPlan));
 
   const ex = data?.CompanyIntel?.extracted || {};
+  const companyReport = data?.CompanyIntel?.report || {};
   const companyLine =
     ex.company_name && String(ex.company_name).trim()
       ? `${String(ex.company_name).trim()}${ex.sector_inferred ? ` · ${ex.sector_inferred}` : ""}`
       : ex.sector_inferred
         ? String(ex.sector_inferred)
         : "";
+  const sectorPos = String(companyReport?.sector_position || "").trim();
+  const valuesLine = sectorPos || tr.previewCompanyValueFallback;
+  const mismatchLine = reqFromGap
+    ? tr.previewCompanyMismatchLine.replace("{gap}", reqFromGap)
+    : tr.previewCompanyMismatchFallback;
   const atsParts = [];
   if (data?.ATS?.ats_score != null) atsParts.push(`${tr.previewAtsScoreShort}: ${data.ATS.ats_score}%`);
   if (data?.ATS?.keyword_match != null) atsParts.push(`${tr.previewKeywordMatchShort}: ${data.ATS.keyword_match}%`);
-  const atsLine = atsParts.join(" · ");
+  const atsLine = atsParts.length ? atsParts.join(" · ") : tr.previewAtsFallback;
   const best = data?.RoleFit?.best_role;
   const roles = Array.isArray(data?.RoleFit?.role_fit) ? data.RoleFit.role_fit : [];
-  const careerLine = best || roles[0]?.role ? `${tr.previewCareerDirPrefix}: ${best || roles[0]?.role}` : "";
-  const marketLines = [companyLine, atsLine, careerLine].map((x) => String(x || "").trim()).filter(Boolean);
+  const careerLine = best || roles[0]?.role
+    ? `${tr.previewCareerDirPrefix}: ${best || roles[0]?.role}`
+    : tr.previewCareerDirectionFallback;
+  const marketLines = [
+    companyLine ? tr.previewCompanyFocusLine.replace("{company}", companyLine) : tr.previewCompanyFocusFallback,
+    tr.previewCompanyValueLine.replace("{value}", valuesLine),
+    mismatchLine,
+    tr.previewCompanyDirectionLine.replace("{direction}", careerLine),
+    atsLine,
+  ].map((x) => String(x || "").trim()).filter(Boolean);
   if (!marketLines.length) marketLines.push(h(tr.previewEmptyMarket));
 
   return { recruiter: recruiterLines, gaps: gapLines, plan: planLines, market: marketLines };
 }
 
-function BlurPreviewCard({ title, lines, cardId, onHoverCard }) {
+function BlurPreviewCard({ title, lines, cardId, onHoverCard, t, visibleCount = 3 }) {
   const [hover, setHover] = useState(false);
   const bg = RS.bgElevated;
-  const firstLine = lines[0] || "";
-  const restLines = lines.slice(1);
+  const visibleLines = lines.slice(0, Math.max(2, visibleCount));
+  const restLines = lines.slice(Math.max(2, visibleCount));
+  const hiddenCount = restLines.length;
   return (
     <div
       role="presentation"
@@ -1426,18 +1502,20 @@ function BlurPreviewCard({ title, lines, cardId, onHoverCard }) {
       }}
     >
       <div style={{ fontSize: 12, fontWeight: 500, color: RS.textPrimary, marginBottom: 8 }}>{title}</div>
-      {firstLine ? (
-        <div style={{ fontSize: 12, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.55, marginBottom: restLines.length ? 6 : 0 }}>{firstLine}</div>
-      ) : null}
+      {visibleLines.map((line, i) => (
+        <div key={`v-${i}`} style={{ fontSize: 12, fontWeight: i === 0 ? 500 : 400, color: RS.textSecondary, lineHeight: 1.55, marginBottom: 4 }}>
+          {line}
+        </div>
+      ))}
       {restLines.length > 0 ? (
-        <div style={{ position: "relative", marginTop: 2, minHeight: 44 }}>
+        <div style={{ position: "relative", marginTop: 2, minHeight: 48 }}>
           <div
             style={{
               filter: "blur(5px)",
               pointerEvents: "none",
               userSelect: "none",
-              WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.15) 100%)",
-              maskImage: "linear-gradient(to bottom, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.15) 100%)",
+              WebkitMaskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0) 100%)",
+              maskImage: "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0) 100%)",
             }}
           >
             {restLines.map((line, i) => (
@@ -1451,7 +1529,7 @@ function BlurPreviewCard({ title, lines, cardId, onHoverCard }) {
               position: "absolute",
               inset: 0,
               pointerEvents: "none",
-              background: `linear-gradient(to bottom, ${rsAlpha(bg, 0)} 0%, ${rsAlpha(bg, 0.2)} 40%, ${rsAlpha(bg, 0.88)} 82%, ${bg} 100%)`,
+              background: `linear-gradient(to bottom, ${rsAlpha(bg, 0)} 0%, ${rsAlpha(bg, 0.14)} 32%, ${rsAlpha(bg, 0.92)} 78%, ${bg} 100%)`,
             }}
           />
           <div
@@ -1485,6 +1563,9 @@ function BlurPreviewCard({ title, lines, cardId, onHoverCard }) {
           </div>
         </div>
       )}
+      <div style={{ marginTop: 8, fontSize: 11, fontWeight: 700, color: RS.textMuted }}>
+        {t.previewHiddenCountLine.replace("{n}", String(hiddenCount))}
+      </div>
     </div>
   );
 }
@@ -1578,10 +1659,10 @@ function CareerEngineProBlurPreview({ data, lang, t, onUpgrade }) {
         </button>
       </div>
       <div style={previewGridStyle}>
-        <BlurPreviewCard title={t.focusPreviewCardRecruiter} lines={freeRecruiter} cardId="recruiter" onHoverCard={onHoverCard} />
-        <BlurPreviewCard title={t.focusPreviewCardGaps} lines={freeGaps} cardId="gaps" onHoverCard={onHoverCard} />
-        <BlurPreviewCard title={t.focusPreviewCardPlan} lines={freePlan} cardId="plan" onHoverCard={onHoverCard} />
-        <BlurPreviewCard title={t.focusPreviewCardMarket} lines={freeMarket} cardId="market" onHoverCard={onHoverCard} />
+        <BlurPreviewCard title={t.focusPreviewCardRecruiter} lines={freeRecruiter} cardId="recruiter" onHoverCard={onHoverCard} t={t} visibleCount={3} />
+        <BlurPreviewCard title={t.focusPreviewCardGaps} lines={freeGaps} cardId="gaps" onHoverCard={onHoverCard} t={t} visibleCount={3} />
+        <BlurPreviewCard title={t.focusPreviewCardPlan} lines={freePlan} cardId="plan" onHoverCard={onHoverCard} t={t} visibleCount={3} />
+        <BlurPreviewCard title={t.focusPreviewCardMarket} lines={freeMarket} cardId="market" onHoverCard={onHoverCard} t={t} visibleCount={3} />
       </div>
     </div>
   );
@@ -1781,6 +1862,9 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing })
             </div>
             <div style={{ ...labelStyle, marginTop: 14, marginBottom: 6 }}>{t.focusOverallStatusLabel}</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: RS.textPrimary, lineHeight: 1.45 }}>{fv.title}</div>
+            <div style={{ marginTop: 8, fontSize: 12, fontWeight: 500, color: RS.textMuted, lineHeight: 1.5 }}>
+              {t.focusTrustLine}
+            </div>
             {rej ? (
               <>
                 <div style={{ ...labelStyle, marginTop: 14, marginBottom: 6 }}>{t.focusRiskKicker}</div>
@@ -2160,23 +2244,51 @@ const translations = {
     focusOverallStatusLabel: "Overall status",
     focusRiskKicker: "Rejection risk",
     focusMainProblemKicker: "Main rejection reason",
+    focusTrustLine: "Based on CV vs job requirement mismatch analysis",
     focusImpactKicker: "Score impact",
     focusImpactExpl: "Fixing this gap is worth about +{pts} points toward a stronger profile.",
     focusActionKicker: "Your one move",
-    focusCtaSeeFull: "See full analysis →",
+    focusCtaSeeFull: "See exactly why you get rejected →",
     focusCtaApplyFix: "Apply this focus to my CV →",
     focusHiddenGapsTeaser: "There are {n} more gaps still affecting your score. See the full breakdown with Pro.",
     focusPreviewSectionTitle: "What's in your full analysis?",
     focusPreviewCtaTitle: "See exactly why you get screened out",
     focusPreviewCtaSubtitle: "Full recruiter read on your CV vs this JD, every gap ranked, fixes ordered by score impact, plus company and ATS context.",
-    focusPreviewUpgradeBtn: "Reveal my full report →",
+    focusPreviewUpgradeBtn: "Reveal your full rejection breakdown →",
     focusPreviewCardRecruiter: "Recruiter view",
     focusPreviewCardGaps: "All gaps",
     focusPreviewCardPlan: "Action plan",
     focusPreviewCardMarket: "Company & market",
     focusProDetailTitle: "Detailed breakdown",
+    previewHiddenCountLine: "+{n} more insights hidden",
+    previewFallbackRequirement: "role-fit baseline requirement",
+    previewFallbackReality: "Your current CV signal is not yet aligned to this requirement.",
+    previewRecruiterReqLine: "This role requires: {req}",
+    previewRecruiterRealityLine: "Your CV currently shows: {reality}",
+    previewRecruiterConsequenceLine: "→ This mismatch creates early rejection risk in first screening.",
     previewFallbackRecruiterFirst: "Recruiter signals for this CV and job will appear here after Pro.",
     previewEmptyGapsBrief: "Gap list vs this posting is available in the full analysis.",
+    previewGapWhyDegree: "This posting explicitly filters for engineering-aligned education signals.",
+    previewGapWhyLanguage: "Language proficiency is a hard gate in the shortlisting stage.",
+    previewGapWhySector: "Domain context is expected to reduce ramp-up risk.",
+    previewGapWhyImpact: "Recruiters need quantified outcomes to trust execution quality.",
+    previewGapWhyPositioning: "Positioning misalignment makes your fit signal weaker than it should be.",
+    previewGapWhyGeneric: "This gap weakens decision confidence during recruiter screening.",
+    previewPlanStrategic1: "1. Stop applying to roles that require strict engineering credentials.",
+    previewPlanStrategic2: "2. Reposition your CV toward strategy and analytics-heavy role tracks.",
+    previewPlanStrategic3: "3. Add one measurable project with clear impact metrics.",
+    previewPlanStrategic4: "4. Reframe your top bullets around business outcomes, not only responsibilities.",
+    previewPlanStrategic5: "5. Match job-keyword language in your summary and core experience.",
+    previewPlanStrategic6: "6. Re-run fit check and apply only when rejection risk drops.",
+    previewCompanyFocusLine: "{company}",
+    previewCompanyFocusFallback: "Company context is detected from your target role and sector signals.",
+    previewCompanyValueLine: "What they prioritize: {value}",
+    previewCompanyValueFallback: "Technical execution and role-specific delivery proof.",
+    previewCompanyMismatchLine: "→ Your current profile shows a mismatch on: {gap}",
+    previewCompanyMismatchFallback: "→ Your current profile signal is weaker than the role expectation.",
+    previewCompanyDirectionLine: "→ Better fit direction: {direction}",
+    previewAtsFallback: "ATS fit context will be unlocked with full analysis.",
+    previewCareerDirectionFallback: "strategy / analytics / business tracks",
     previewAtsScoreShort: "ATS score",
     previewKeywordMatchShort: "Keyword match",
     previewCareerDirPrefix: "Career direction",
@@ -2459,20 +2571,48 @@ const translations = {
     focusImpactKicker: "Skor etkisi",
     focusImpactExpl: "Bu boşluğu kapatmak profil gücün için yaklaşık +{pts} puanlık bir kazanım demek.",
     focusActionKicker: "Tek hamlen",
-    focusCtaSeeFull: "Tam analizi gör →",
+    focusCtaSeeFull: "Neden elendiğini tam gör →",
     focusCtaApplyFix: "Bu odağı CV'me uygula →",
     focusHiddenGapsTeaser: "Skorunu etkileyen {n} boşluk daha var. Tüm dökümü Pro ile görebilirsin.",
     focusPreviewSectionTitle: "Pro analizinde neler var?",
     focusPreviewCtaTitle: "Neden elendiğini satır satır gör",
     focusPreviewCtaSubtitle: "Bu ilana göre recruiter taraması, tüm boşluklar, skora göre sıralı düzeltmeler ve şirket ile ATS bağlamı.",
-    focusPreviewUpgradeBtn: "Tam raporumu aç →",
+    focusPreviewUpgradeBtn: "Tam red dökümünü aç →",
     focusPreviewCardRecruiter: "Recruiter görüşü",
     focusPreviewCardGaps: "Tüm boşluklar",
     focusPreviewCardPlan: "Aksiyon planı",
     focusPreviewCardMarket: "Şirket ve pazar",
     focusProDetailTitle: "Detaylı döküm",
+    focusTrustLine: "CV ve iş gerekliliği uyumsuzluk analizine dayanır",
+    previewHiddenCountLine: "+{n} içgörü daha gizli",
+    previewFallbackRequirement: "rol için temel gereklilik sinyali",
+    previewFallbackReality: "Mevcut CV sinyalin bu gereklilikle henüz örtüşmüyor.",
+    previewRecruiterReqLine: "Bu rolün gerektirdiği sinyal: {req}",
+    previewRecruiterRealityLine: "CV'nde şu sinyal öne çıkıyor: {reality}",
+    previewRecruiterConsequenceLine: "→ Bu uyumsuzluk ilk elemede erken red riskini artırır.",
     previewFallbackRecruiterFirst: "Bu CV ve bu ilan için işe alım uzmanı görüşü Pro’da görünür.",
     previewEmptyGapsBrief: "Bu ilana karşı boşluk listesi tam analizde yer alır.",
+    previewGapWhyDegree: "Bu ilanda mühendislik odaklı eğitim sinyali açık bir eleme filtresi.",
+    previewGapWhyLanguage: "Dil seviyesi kısa liste aşamasında doğrudan eşik etkisi yaratır.",
+    previewGapWhySector: "Alan deneyimi, adaptasyon riskini düşürmek için beklenir.",
+    previewGapWhyImpact: "İşe alım uzmanı, uygulama kalitesini sayısal sonuçlarla doğrular.",
+    previewGapWhyPositioning: "Konumlanma zayıf kalınca rol uyum sinyali düşer.",
+    previewGapWhyGeneric: "Bu boşluk, işe alım kararındaki güveni aşağı çeker.",
+    previewPlanStrategic1: "1. Mühendislik diploması isteyen rollere başvurmayı durdur.",
+    previewPlanStrategic2: "2. CV'ni strateji ve analitik rol hattına göre yeniden konumlandır.",
+    previewPlanStrategic3: "3. Ölçülebilir etkisi olan tek bir proje ekle.",
+    previewPlanStrategic4: "4. Üst maddeleri görev değil, iş sonucu odaklı yeniden yaz.",
+    previewPlanStrategic5: "5. İlanın anahtar dilini özet ve deneyim bölümüne eşleştir.",
+    previewPlanStrategic6: "6. Uyumu tekrar ölç, red riski düşmeden başvuru yapma.",
+    previewCompanyFocusLine: "{company}",
+    previewCompanyFocusFallback: "Şirket bağlamı hedef rol ve sektör sinyallerinden çıkarıldı.",
+    previewCompanyValueLine: "Öncelik verdikleri alan: {value}",
+    previewCompanyValueFallback: "Teknik uygulama gücü ve role özgü teslimat kanıtı.",
+    previewCompanyMismatchLine: "→ Profilinde şu alanda uyumsuzluk görünüyor: {gap}",
+    previewCompanyMismatchFallback: "→ Profil sinyalin, rol beklentisinin gerisinde kalıyor.",
+    previewCompanyDirectionLine: "→ Daha uygun yön: {direction}",
+    previewAtsFallback: "ATS uyum detayları tam analizde açılır.",
+    previewCareerDirectionFallback: "strateji / analitik / iş odaklı rol hatları",
     previewAtsScoreShort: "ATS skoru",
     previewKeywordMatchShort: "Kelime eşleşmesi",
     previewCareerDirPrefix: "Kariyer yönü",
