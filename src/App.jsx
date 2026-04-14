@@ -2014,84 +2014,102 @@ function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
 
 function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, jdText }) {
   const model = useMemo(() => buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }), [data, lang, score, t, cvText, jdText]);
+  const cardStyle = {
+    border: `1px solid ${RS.border}`,
+    borderRadius: 14,
+    background: RS.bgElevated,
+    padding: "24px",
+    minHeight: 180,
+  };
   return (
-    <div style={{ marginTop: 22, padding: "16px 18px", borderRadius: 14, border: `1px solid ${RS.borderSubtle}`, background: rsAlpha(RS.indigo, 0.05) }}>
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, marginBottom: 10 }}>
+    <div style={{ marginTop: 24, padding: "24px", borderRadius: 16, border: `1px solid ${RS.borderSubtle}`, background: rsAlpha(RS.indigo, 0.05) }}>
+      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, marginBottom: 10 }}>
         {t.bestPathForwardTitle}
       </div>
       <div style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 10 }}>
         {t.bestPathSignalLine.replace("{bg}", model.background).replace("{track}", model.targetTrack)}
       </div>
-
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 8 }}>{t.bestPathRolesTitle}</div>
-        {model.roles.map((r, i) => (
-          <div key={`${r.role}-${i}`} style={{ marginBottom: 8, padding: "9px 10px", borderRadius: 10, border: `1px solid ${RS.border}`, background: RS.bgElevated }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary }}>{r.role} ({r.score}%)</div>
-            <div style={{ fontSize: 12, color: RS.textSecondary, marginTop: 4 }}>{clampBullet(r.why, 90)}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 24 }}>
+        <div style={cardStyle}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 14 }}>
+            <Target size={16} color={RS.indigo} />
+            {t.bestPathRolesTitle}
           </div>
-        ))}
-      </div>
-
-      <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestPathWrongRoleTitle}</div>
-        <div style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 5 }}>{clampBullet(model.roleFitWhy?.[1] || "", 110)}</div>
-        <div style={{ fontSize: 12, color: RS.textSecondary }}>{clampBullet(model.roleFitWhy?.[0] || "", 110)}</div>
-      </div>
-
-      {isPro ? (
-        <>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestProjectSectionTitle}</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo }}>{model.project.title}</div>
-            <div style={{ marginTop: 6, fontSize: 12, color: RS.textSecondary }}>• {clampBullet(model.project.why, 120)}</div>
-            <div style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>• {clampBullet(model.project.steps?.[0] || "", 120)}</div>
-            <div style={{ marginTop: 4, fontSize: 12, color: RS.green }}>• {clampBullet(`${model.project.outcome} ${model.project.timeEstimate}`, 120)}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {model.roles.map((r, i) => (
+              <div key={`${r.role}-${i}`} style={{ border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px", background: rsAlpha(RS.bgSurface, 0.55) }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: RS.textPrimary }}>{r.role}</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: RS.indigo }}>{r.score}%</div>
+                </div>
+                <div style={{ fontSize: 12, color: RS.textSecondary, marginTop: 4 }}>{clampBullet(r.why, 88)}</div>
+              </div>
+            ))}
           </div>
-
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestPathCareerTitle}</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo }}>{model.careerPath}</div>
-            <div style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>{model.careerPathWhy}</div>
-          </div>
-
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestPathRoadmapTitle}</div>
-            {model.roadmapTop3.map((x, i) => <div key={`r3-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 4 }}>→ {clampBullet(x, 110)}</div>)}
-          </div>
-
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestPathTransformTitle}</div>
-            <div style={{ fontSize: 12, color: RS.green, marginBottom: 4 }}>→ {t.bestPathTransformFit.replace("{fit}", model.transformation.fit)}</div>
-            <div style={{ fontSize: 12, color: RS.green }}>→ {model.transformation.confidence}</div>
-          </div>
-        </>
-      ) : (
-        <div style={{ marginTop: 8 }}>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestProjectSectionTitle}</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo }}>{model.project.title}</div>
-          </div>
-          <div style={{ fontSize: 12, color: RS.textMuted, marginBottom: 10 }}>{t.bestPathFreeHint}</div>
-          <button
-            type="button"
-            onClick={onUpgrade}
-            style={{
-              border: "none",
-              borderRadius: 10,
-              padding: "9px 14px",
-              background: RS.indigo,
-              color: "#fff",
-              fontSize: 12,
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: RS.fontUi,
-            }}
-          >
-            {t.focusPreviewUpgradeBtn}
-          </button>
         </div>
-      )}
+
+        <div style={cardStyle}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 12 }}>
+            <AlertCircle size={16} color={RS.redDim} />
+            {t.bestPathWrongRoleTitle}
+          </div>
+          <div style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 6 }}>• {clampBullet(model.roleFitWhy?.[1] || "", 115)}</div>
+          <div style={{ fontSize: 12, color: RS.textSecondary }}>• {clampBullet(model.roleFitWhy?.[0] || "", 115)}</div>
+        </div>
+
+        {isPro ? (
+          <>
+            <div style={cardStyle}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 12 }}>
+                <Workflow size={16} color={RS.indigo} />
+                {t.bestProjectSectionTitle}
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: RS.indigo, marginBottom: 8 }}>{model.project.title}</div>
+              <div style={{ marginTop: 6, fontSize: 12, color: RS.textSecondary }}>• {clampBullet(model.project.why, 120)}</div>
+              <div style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>• {clampBullet(model.project.steps?.[0] || "", 120)}</div>
+              <div style={{ marginTop: 4, fontSize: 12, color: RS.green }}>• {clampBullet(`${model.project.outcome} ${model.project.timeEstimate}`, 120)}</div>
+            </div>
+
+            <div style={cardStyle}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 12 }}>
+                <Layers size={16} color={RS.indigo} />
+                {t.bestPathRoadmapTitle}
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo, marginBottom: 8 }}>{model.careerPath}</div>
+              {model.roadmapTop3.map((x, i) => <div key={`r3-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 5 }}>→ {clampBullet(x, 108)}</div>)}
+            </div>
+
+            <div style={{ ...cardStyle, minHeight: 140 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 10 }}>{t.bestPathTransformTitle}</div>
+              <div style={{ fontSize: 12, color: RS.green, marginBottom: 5 }}>→ {t.bestPathTransformFit.replace("{fit}", model.transformation.fit)}</div>
+              <div style={{ fontSize: 12, color: RS.green }}>→ {model.transformation.confidence}</div>
+            </div>
+          </>
+        ) : (
+          <div style={{ ...cardStyle, minHeight: 140 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 10 }}>{t.bestProjectSectionTitle}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: RS.indigo, marginBottom: 10 }}>{model.project.title}</div>
+            <div style={{ fontSize: 12, color: RS.textMuted, marginBottom: 10 }}>{t.bestPathFreeHint}</div>
+            <button
+              type="button"
+              onClick={onUpgrade}
+              style={{
+                border: "none",
+                borderRadius: 10,
+                padding: "10px 14px",
+                background: RS.indigo,
+                color: "#fff",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: RS.fontUi,
+              }}
+            >
+              {t.focusPreviewUpgradeBtn}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -2131,26 +2149,27 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
   };
 
   return (
-    <div style={{ marginTop: 16 }}>
+    <div style={{ marginTop: 24 }}>
       <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, marginBottom: 10 }}>
         {t.scanSectionLabel}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8, marginBottom: 10 }}>
-        <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 24, marginBottom: 24 }}>
+        <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", minHeight: 130 }}>
           <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 4 }}>{t.scanCriticalGapTitle}</div>
           <div style={{ fontSize: 12, color: RS.textPrimary, fontWeight: 700 }}>{clampBullet(mainProblem, 90)}</div>
         </div>
-        <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px" }}>
+        <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", minHeight: 130 }}>
           <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 4 }}>{t.scanOneMoveTitle}</div>
           <div style={{ fontSize: 12, color: RS.textPrimary, fontWeight: 700 }}>{clampBullet(singleAction, 90)}</div>
         </div>
-        <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px" }}>
+        <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", minHeight: 130 }}>
           <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 4 }}>{t.scanBestPathTitle}</div>
           <div style={{ fontSize: 12, color: RS.textPrimary, fontWeight: 700 }}>{clampBullet(bestPathLabel, 90)}</div>
         </div>
       </div>
 
-      <details style={{ border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px", background: rsAlpha(RS.bgElevated, 0.65), marginBottom: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 24 }}>
+      <details style={{ border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", background: rsAlpha(RS.bgElevated, 0.65), minHeight: 170 }}>
         <summary style={summaryStyle}>
           <AlertCircle size={14} color={RS.redDim} />
           {t.scanWhyRejectedTitle}
@@ -2162,7 +2181,7 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
         </div>
       </details>
 
-      <details style={{ border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px", background: rsAlpha(RS.bgElevated, 0.65), marginBottom: 8 }}>
+      <details style={{ border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", background: rsAlpha(RS.bgElevated, 0.65), minHeight: 170 }}>
         <summary style={summaryStyle}>
           <ListChecks size={14} color={RS.amber} />
           {t.scanAllGapsTitle}
@@ -2186,7 +2205,7 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
         </div>
       </details>
 
-      <details style={{ border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px", background: rsAlpha(RS.bgElevated, 0.65) }}>
+      <details style={{ border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", background: rsAlpha(RS.bgElevated, 0.65), minHeight: 170 }}>
         <summary style={summaryStyle}>
           <Layers size={14} color={RS.indigo} />
           {t.scanFullRoadmapTitle}
@@ -2210,6 +2229,7 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
           )}
         </div>
       </details>
+      </div>
     </div>
   );
 }
