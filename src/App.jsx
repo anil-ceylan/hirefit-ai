@@ -1238,6 +1238,119 @@ function AiLivePipelinePanel({ lang, loading, hasOutput, cvReady, jdReady, extra
   );
 }
 
+function AnalysisThinkingOverlay({ lang, loading }) {
+  const [activeIdx, setActiveIdx] = useState(0);
+  useEffect(() => {
+    if (!loading) {
+      setActiveIdx(0);
+      return;
+    }
+    setActiveIdx(0);
+    const delays = [860, 980, 1120, 900];
+    const ids = [];
+    let total = 0;
+    delays.forEach((ms, i) => {
+      total += ms;
+      ids.push(window.setTimeout(() => setActiveIdx(i + 1), total));
+    });
+    return () => ids.forEach((id) => window.clearTimeout(id));
+  }, [loading]);
+
+  if (!loading) return null;
+
+  const steps = [
+    lang === "TR" ? "CV parsing" : "CV parsing",
+    lang === "TR" ? "Skill matching" : "Skill matching",
+    lang === "TR" ? "Gap detection" : "Gap detection",
+    lang === "TR" ? "Recruiter simulation" : "Recruiter simulation",
+    lang === "TR" ? "Strategy building" : "Strategy building",
+  ];
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1400,
+        background: "rgba(2, 6, 23, 0.78)",
+        backdropFilter: "blur(2px)",
+        display: "grid",
+        placeItems: "center",
+        padding: 20,
+      }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.98 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.25 }}
+        style={{
+          width: "min(760px, 96vw)",
+          borderRadius: 18,
+          border: `1px solid ${rsAlpha(RS.indigo, 0.32)}`,
+          background: "linear-gradient(165deg, #0b1220 0%, #101a2e 55%, #0a0f1b 100%)",
+          padding: "30px 28px",
+          position: "relative",
+          overflow: "hidden",
+          boxShadow: "0 24px 90px rgba(0,0,0,0.5)",
+        }}
+      >
+        <motion.div
+          aria-hidden
+          animate={{ opacity: [0.2, 0.5, 0.2], scale: [0.98, 1.02, 0.98] }}
+          transition={{ repeat: Infinity, duration: 2.1, ease: "easeInOut" }}
+          style={{
+            position: "absolute",
+            inset: -30,
+            background: `radial-gradient(circle at 50% 0%, ${rsAlpha(RS.indigo, 0.25)}, transparent 60%)`,
+            pointerEvents: "none",
+          }}
+        />
+        <div style={{ position: "relative" }}>
+          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, marginBottom: 10 }}>
+            {lang === "TR" ? "AI pipeline" : "AI pipeline"}
+          </div>
+          <div style={{ fontSize: "clamp(18px, 2.8vw, 24px)", fontWeight: 800, color: RS.textPrimary, marginBottom: 18 }}>
+            {lang === "TR" ? "Profilin derin analiz ediliyor..." : "Analyzing your profile deeply..."}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {steps.slice(0, Math.min(steps.length, activeIdx + 1)).map((label, i) => {
+              const done = activeIdx > i;
+              const active = activeIdx === i;
+              return (
+                <motion.div
+                  key={`${label}-${i}`}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    minHeight: 38,
+                    borderRadius: 10,
+                    border: `1px solid ${done ? rsAlpha(RS.green, 0.38) : rsAlpha(RS.border, 0.9)}`,
+                    background: done ? rsAlpha(RS.green, 0.08) : rsAlpha(RS.bgElevated, 0.55),
+                    padding: "8px 12px",
+                  }}
+                >
+                  {done ? (
+                    <CheckCircle2 size={16} color={RS.green} />
+                  ) : active ? (
+                    <Loader2 size={16} color={RS.indigo} style={{ animation: "spin 0.8s linear infinite" }} />
+                  ) : (
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: rsAlpha(RS.textMuted, 0.6) }} />
+                  )}
+                  <span style={{ fontSize: 14, fontWeight: 700, color: done ? "#bbf7d0" : RS.textPrimary }}>{label}</span>
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 function SharePromptModal({ open, lang, score, verdictLabel, biggestMistake, onClose }) {
   const [copied, setCopied] = useState(false);
   if (!open) return null;
@@ -6282,6 +6395,7 @@ export function AnalyzerPage() {
   } = useOutletContext();
   return (
   <div className="hf-analyzer-page" style={{ maxWidth: 1320, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
+    <AnalysisThinkingOverlay lang={lang} loading={loading} />
 
     {/* HEADER */}
     <div className="hf-analyzer-hero">
