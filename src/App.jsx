@@ -1437,25 +1437,25 @@ function buildV2PreviewLines(data, lang, planFixes, tr) {
   }
   if (!gapLines.length) gapLines.push(h(tr.previewEmptyGapsBrief));
 
-  const planLines = [];
+  const rawTasks = [];
   const fixes = planFixes || [];
   fixes.forEach((f) => {
     const issueRaw = String(f.issue || "").toLowerCase();
-    if ((issueRaw.includes("degree") || issueRaw.includes("engineering") || issueRaw.includes("mühendislik")) && !planLines.includes(h(tr.previewPlanStrategic1))) {
-      planLines.push(h(tr.previewPlanStrategic1));
+    if ((issueRaw.includes("degree") || issueRaw.includes("engineering") || issueRaw.includes("mühendislik")) && !rawTasks.includes(h(tr.previewPlanStrategic1))) {
+      rawTasks.push(h(tr.previewPlanStrategic1));
       return;
     }
-    if ((issueRaw.includes("sector") || issueRaw.includes("domain") || issueRaw.includes("sektör") || issueRaw.includes("position")) && !planLines.includes(h(tr.previewPlanStrategic2))) {
-      planLines.push(h(tr.previewPlanStrategic2));
+    if ((issueRaw.includes("sector") || issueRaw.includes("domain") || issueRaw.includes("sektör") || issueRaw.includes("position")) && !rawTasks.includes(h(tr.previewPlanStrategic2))) {
+      rawTasks.push(h(tr.previewPlanStrategic2));
       return;
     }
-    if ((issueRaw.includes("metric") || issueRaw.includes("quant") || issueRaw.includes("impact") || issueRaw.includes("ölç")) && !planLines.includes(h(tr.previewPlanStrategic3))) {
-      planLines.push(h(tr.previewPlanStrategic3));
+    if ((issueRaw.includes("metric") || issueRaw.includes("quant") || issueRaw.includes("impact") || issueRaw.includes("ölç")) && !rawTasks.includes(h(tr.previewPlanStrategic3))) {
+      rawTasks.push(h(tr.previewPlanStrategic3));
       return;
     }
     const st = f.steps?.[0];
     const line = st && String(st).trim() ? String(st).trim() : String(f.issue || "").trim();
-    if (line && planLines.length < 8) planLines.push(`${planLines.length + 1}. ${h(line)}`);
+    if (line && rawTasks.length < 6) rawTasks.push(h(line));
   });
   const strategicFallbacks = [
     tr.previewPlanStrategic1,
@@ -1466,11 +1466,29 @@ function buildV2PreviewLines(data, lang, planFixes, tr) {
     tr.previewPlanStrategic6,
   ].map((x) => h(x));
   for (const item of strategicFallbacks) {
-    if (planLines.length >= 6) break;
-    const hasSame = planLines.some((ln) => ln.toLowerCase() === item.toLowerCase());
-    if (!hasSame) planLines.push(item);
+    if (rawTasks.length >= 3) break;
+    const hasSame = rawTasks.some((ln) => ln.toLowerCase() === item.toLowerCase());
+    if (!hasSame) rawTasks.push(item);
   }
-  if (!planLines.length) planLines.push(h(tr.previewEmptyPlan));
+  const weekTasks = rawTasks.slice(0, 3);
+  while (weekTasks.length < 3) weekTasks.push(h(tr.previewPlanStrategic3));
+  const impacts = fixes
+    .slice(0, 3)
+    .map((f) => Math.max(1, Math.min(18, Math.round(Number(f?.score_impact) || 0))))
+    .filter((n) => Number.isFinite(n));
+  const impactPoints = impacts.length ? impacts.reduce((a, b) => a + b, 0) : 12;
+  const interviewLiftPct = Math.max(8, Math.min(38, impactPoints * 2));
+  const planLines = [
+    h(tr.previewWeek1Label),
+    `- ${weekTasks[0]}`,
+    h(tr.previewWeek2Label),
+    `- ${weekTasks[1]}`,
+    h(tr.previewWeek3Label),
+    `- ${weekTasks[2]}`,
+    h(tr.previewExpectedImpactLabel),
+    h(tr.previewInterviewImpactLine.replace("{x}", String(interviewLiftPct))),
+    h(tr.previewProfileStrengthLine.replace("{y}", String(impactPoints))),
+  ];
 
   const ex = data?.CompanyIntel?.extracted || {};
   const companyReport = data?.CompanyIntel?.report || {};
@@ -1654,6 +1672,10 @@ function CareerEngineProBlurPreview({ data, lang, t, onUpgrade }) {
     const idx = freeRecruiter.findIndex((line) => String(line || "").trim() === String(t.previewRecruiterAltIntro || "").trim());
     return idx > 1 ? idx : 4;
   }, [freeRecruiter, t.previewRecruiterAltIntro]);
+  const planVisibleCount = useMemo(() => {
+    const idx = freePlan.findIndex((line) => String(line || "").trim() === String(t.previewWeek2Label || "").trim());
+    return idx > 1 ? idx : 2;
+  }, [freePlan, t.previewWeek2Label]);
 
   return (
     <div style={{ marginTop: 22 }}>
@@ -1698,7 +1720,7 @@ function CareerEngineProBlurPreview({ data, lang, t, onUpgrade }) {
       <div style={previewGridStyle}>
         <BlurPreviewCard title={t.focusPreviewCardRecruiter} lines={freeRecruiter} cardId="recruiter" onHoverCard={onHoverCard} t={t} visibleCount={recruiterVisibleCount} />
         <BlurPreviewCard title={t.focusPreviewCardGaps} lines={freeGaps} cardId="gaps" onHoverCard={onHoverCard} t={t} visibleCount={3} />
-        <BlurPreviewCard title={t.focusPreviewCardPlan} lines={freePlan} cardId="plan" onHoverCard={onHoverCard} t={t} visibleCount={3} />
+        <BlurPreviewCard title={t.focusPreviewCardPlan} lines={freePlan} cardId="plan" onHoverCard={onHoverCard} t={t} visibleCount={planVisibleCount} />
         <BlurPreviewCard title={t.focusPreviewCardMarket} lines={freeMarket} cardId="market" onHoverCard={onHoverCard} t={t} visibleCount={3} />
       </div>
     </div>
@@ -2326,6 +2348,12 @@ const translations = {
     previewPlanStrategic4: "4. Reframe your top bullets around business outcomes, not only responsibilities.",
     previewPlanStrategic5: "5. Match job-keyword language in your summary and core experience.",
     previewPlanStrategic6: "6. Re-run fit check and apply only when rejection risk drops.",
+    previewWeek1Label: "Week 1:",
+    previewWeek2Label: "Week 2:",
+    previewWeek3Label: "Week 3:",
+    previewExpectedImpactLabel: "Expected impact:",
+    previewInterviewImpactLine: "Interview probability: +{x}%",
+    previewProfileStrengthLine: "Profile strength: +{y} points",
     previewCompanyFocusLine: "{company}",
     previewCompanyFocusFallback: "Company context is detected from your target role and sector signals.",
     previewCompanyValueLine: "What they prioritize: {value}",
@@ -2659,6 +2687,12 @@ const translations = {
     previewPlanStrategic4: "4. Üst maddeleri görev değil, iş sonucu odaklı yeniden yaz.",
     previewPlanStrategic5: "5. İlanın anahtar dilini özet ve deneyim bölümüne eşleştir.",
     previewPlanStrategic6: "6. Uyumu tekrar ölç, red riski düşmeden başvuru yapma.",
+    previewWeek1Label: "1. Hafta:",
+    previewWeek2Label: "2. Hafta:",
+    previewWeek3Label: "3. Hafta:",
+    previewExpectedImpactLabel: "Beklenen etki:",
+    previewInterviewImpactLine: "Mülakat olasılığı: +%{x}",
+    previewProfileStrengthLine: "Profil gücü: +{y} puan",
     previewCompanyFocusLine: "{company}",
     previewCompanyFocusFallback: "Şirket bağlamı hedef rol ve sektör sinyallerinden çıkarıldı.",
     previewCompanyValueLine: "Öncelik verdikleri alan: {value}",
