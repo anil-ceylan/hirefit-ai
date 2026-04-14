@@ -3678,16 +3678,30 @@ function AmbientBackgroundLayer() {
   const blobBase = {
     position: "fixed",
     borderRadius: "999px",
-    filter: "blur(70px)",
+    filter: "blur(56px)",
     willChange: "transform, opacity",
-    opacity: 0.15,
+    opacity: 0.18,
     pointerEvents: "none",
     zIndex: 5,
-    mixBlendMode: "soft-light",
+    mixBlendMode: "normal",
     transform: "translateZ(0)",
   };
   return (
     <div aria-hidden style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 5 }}>
+      <motion.div
+        style={{
+          position: "fixed",
+          inset: "-20%",
+          pointerEvents: "none",
+          zIndex: 5,
+          opacity: 0.16,
+          background:
+            "radial-gradient(42% 40% at 15% 20%, rgba(99,102,241,0.34) 0%, rgba(99,102,241,0) 72%), radial-gradient(40% 42% at 85% 20%, rgba(56,189,248,0.3) 0%, rgba(56,189,248,0) 72%), radial-gradient(46% 46% at 50% 85%, rgba(168,85,247,0.28) 0%, rgba(168,85,247,0) 74%)",
+          willChange: "transform, opacity",
+        }}
+        animate={{ x: [0, 18, -12, 0], y: [0, -14, 10, 0], opacity: [0.12, 0.18, 0.14, 0.12] }}
+        transition={{ duration: 26, repeat: Infinity, ease: "easeInOut" }}
+      />
       <motion.div
         style={{
           ...blobBase,
@@ -3728,11 +3742,11 @@ function AmbientBackgroundLayer() {
         style={{
           position: "fixed",
           inset: 0,
-          opacity: 0.14,
+          opacity: 0.16,
           pointerEvents: "none",
           zIndex: 5,
           backgroundImage:
-            "radial-gradient(ellipse at top, rgba(99,102,241,0.2), transparent 60%), repeating-radial-gradient(circle at 0 0, rgba(255,255,255,0.06), rgba(255,255,255,0.06) 1px, transparent 1px, transparent 3px)",
+            "radial-gradient(ellipse at top, rgba(99,102,241,0.22), transparent 60%), repeating-radial-gradient(circle at 0 0, rgba(255,255,255,0.07), rgba(255,255,255,0.07) 1px, transparent 1px, transparent 3px)",
           backgroundSize: "100% 100%, 3px 3px",
         }}
       />
