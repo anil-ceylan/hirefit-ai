@@ -5644,6 +5644,7 @@ const msgInterval = setInterval(() => {
     location,
     lang,
     setLang,
+    T,
     t,
     user,
     logout,
