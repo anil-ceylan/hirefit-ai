@@ -29,6 +29,12 @@ const ADMIN_EMAIL =
     ? String(import.meta.env.VITE_ADMIN_EMAIL).trim().toLowerCase()
     : "";
 
+/** Landing hero loop: set `VITE_HERO_VIDEO_URL` or add `public/videos/hero-ambient.mp4`. */
+const HERO_VIDEO_SRC =
+  typeof import.meta !== "undefined" && import.meta.env?.VITE_HERO_VIDEO_URL
+    ? String(import.meta.env.VITE_HERO_VIDEO_URL).trim()
+    : "/videos/hero-ambient.mp4";
+
 /** 30-day rolling window for free-tier analysis_count reset (user_plans.last_reset_at). */
 const USER_PLAN_RESET_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -3678,75 +3684,75 @@ function AmbientBackgroundLayer() {
   const blobBase = {
     position: "fixed",
     borderRadius: "999px",
-    filter: "blur(56px)",
+    filter: "blur(52px)",
     willChange: "transform, opacity",
-    opacity: 0.18,
+    opacity: 0.26,
     pointerEvents: "none",
-    zIndex: 5,
+    zIndex: 0,
     mixBlendMode: "normal",
     transform: "translateZ(0)",
   };
   return (
-    <div aria-hidden style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 5 }}>
+    <div aria-hidden style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
       <motion.div
         style={{
           position: "fixed",
           inset: "-20%",
           pointerEvents: "none",
-          zIndex: 5,
-          opacity: 0.16,
+          zIndex: 0,
+          opacity: 0.22,
           background:
-            "radial-gradient(42% 40% at 15% 20%, rgba(99,102,241,0.34) 0%, rgba(99,102,241,0) 72%), radial-gradient(40% 42% at 85% 20%, rgba(56,189,248,0.3) 0%, rgba(56,189,248,0) 72%), radial-gradient(46% 46% at 50% 85%, rgba(168,85,247,0.28) 0%, rgba(168,85,247,0) 74%)",
+            "radial-gradient(42% 40% at 15% 20%, rgba(99,102,241,0.42) 0%, rgba(99,102,241,0) 72%), radial-gradient(40% 42% at 85% 20%, rgba(56,189,248,0.38) 0%, rgba(56,189,248,0) 72%), radial-gradient(46% 46% at 50% 85%, rgba(168,85,247,0.36) 0%, rgba(168,85,247,0) 74%)",
           willChange: "transform, opacity",
         }}
-        animate={{ x: [0, 18, -12, 0], y: [0, -14, 10, 0], opacity: [0.12, 0.18, 0.14, 0.12] }}
+        animate={{ x: [0, 18, -12, 0], y: [0, -14, 10, 0], opacity: [0.18, 0.28, 0.22, 0.18] }}
         transition={{ duration: 26, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
         style={{
           ...blobBase,
-          width: 540,
-          height: 540,
+          width: 580,
+          height: 580,
           top: "-14%",
           left: "-10%",
-          background: "radial-gradient(circle, rgba(99,102,241,0.85) 0%, rgba(99,102,241,0) 68%)",
+          background: "radial-gradient(circle, rgba(99,102,241,0.95) 0%, rgba(99,102,241,0) 68%)",
         }}
-        animate={{ x: [0, 60, 0], y: [0, 35, 0], scale: [1, 1.08, 1], opacity: [0.12, 0.2, 0.12] }}
+        animate={{ x: [0, 60, 0], y: [0, 35, 0], scale: [1, 1.08, 1], opacity: [0.18, 0.32, 0.18] }}
         transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
         style={{
           ...blobBase,
-          width: 480,
-          height: 480,
+          width: 520,
+          height: 520,
           right: "-8%",
           top: "8%",
-          background: "radial-gradient(circle, rgba(56,189,248,0.8) 0%, rgba(56,189,248,0) 66%)",
+          background: "radial-gradient(circle, rgba(56,189,248,0.9) 0%, rgba(56,189,248,0) 66%)",
         }}
-        animate={{ x: [0, -70, 0], y: [0, 40, 0], scale: [1.02, 0.96, 1.02], opacity: [0.1, 0.17, 0.1] }}
+        animate={{ x: [0, -70, 0], y: [0, 40, 0], scale: [1.02, 0.96, 1.02], opacity: [0.16, 0.28, 0.16] }}
         transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
         style={{
           ...blobBase,
-          width: 560,
-          height: 560,
+          width: 600,
+          height: 600,
           left: "22%",
           bottom: "-22%",
-          background: "radial-gradient(circle, rgba(168,85,247,0.72) 0%, rgba(168,85,247,0) 70%)",
+          background: "radial-gradient(circle, rgba(168,85,247,0.82) 0%, rgba(168,85,247,0) 70%)",
         }}
-        animate={{ x: [0, 35, 0], y: [0, -55, 0], scale: [0.98, 1.04, 0.98], opacity: [0.09, 0.15, 0.09] }}
+        animate={{ x: [0, 35, 0], y: [0, -55, 0], scale: [0.98, 1.04, 0.98], opacity: [0.14, 0.26, 0.14] }}
         transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
       />
       <div
         style={{
           position: "fixed",
           inset: 0,
-          opacity: 0.16,
+          opacity: 0.22,
           pointerEvents: "none",
-          zIndex: 5,
+          zIndex: 0,
           backgroundImage:
-            "radial-gradient(ellipse at top, rgba(99,102,241,0.22), transparent 60%), repeating-radial-gradient(circle at 0 0, rgba(255,255,255,0.07), rgba(255,255,255,0.07) 1px, transparent 1px, transparent 3px)",
+            "radial-gradient(ellipse at top, rgba(99,102,241,0.32), transparent 58%), repeating-radial-gradient(circle at 0 0, rgba(255,255,255,0.09), rgba(255,255,255,0.09) 1px, transparent 1px, transparent 3px)",
           backgroundSize: "100% 100%, 3px 3px",
         }}
       />
@@ -4635,6 +4641,18 @@ function HeroSection({ navigate, lang }) {
           .hf-hero-col-right { flex: 1 1 auto !important; max-width: 100% !important; width: 100%; }
           .hf-hero-headline { font-size: clamp(28px, 7vw, 40px) !important; line-height: 1.05 !important; }
         }
+        @media (min-width: 901px) {
+          .hf-hero-inner { padding: 0 96px !important; gap: 96px !important; min-height: min(92vh, 920px) !important; }
+          .hf-hero-radial-glow { opacity: 0.82 !important; }
+          .hf-hero.hf-hero--no-video .hf-hero-radial-glow { opacity: 0.62 !important; }
+          .hf-hero-card-halo { filter: blur(28px) !important; opacity: 1 !important; }
+        }
+        .hf-hero-radial-glow { opacity: 0.76; }
+        .hf-hero.hf-hero--no-video .hf-hero-radial-glow { opacity: 0.58; }
+        @media (max-width: 900px) {
+          .hf-hero-radial-glow { opacity: 0.64 !important; }
+          .hf-hero.hf-hero--no-video .hf-hero-radial-glow { opacity: 0.52 !important; }
+        }
         .hero-fade { animation: heroFadeUp 0.6s ease both; }
         .shimmer-text { background: linear-gradient(90deg, #f87171 0%, #fb923c 25%, #f87171 50%, #fb923c 75%, #f87171 100%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 3s linear infinite; }
         .shimmer-blue { background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 25%, #f472b6 50%, #a78bfa 75%, #60a5fa 100%); background-size: 200% auto; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer 4s linear infinite; }
@@ -4663,13 +4681,26 @@ function HeroSection({ navigate, lang }) {
   };
 
   const r = fakeResult[lang];
+  const [videoFailed, setVideoFailed] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== "undefined" && window.matchMedia("(min-width: 901px)").matches
+  );
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 901px)");
+    const onChange = () => setIsDesktop(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
 
   return (
     <section
+      className={`hf-hero${videoFailed ? " hf-hero--no-video" : ""}`}
       style={{
         width: "100vw",
         minHeight: "100vh",
-        background: "#0A0A0B",
+        background: "#050508",
         position: "relative",
         overflow: "hidden",
         display: "flex",
@@ -4686,16 +4717,55 @@ function HeroSection({ navigate, lang }) {
           zIndex: 0,
         }}
       >
+        {!videoFailed ? (
+          <video
+            key={HERO_VIDEO_SRC}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="auto"
+            src={HERO_VIDEO_SRC}
+            onError={() => setVideoFailed(true)}
+            style={{
+              position: "absolute",
+              inset: "-4%",
+              width: "108%",
+              height: "108%",
+              objectFit: "cover",
+              filter: "saturate(1.12) contrast(1.06) brightness(1.06)",
+            }}
+          />
+        ) : null}
+        <motion.div
+          style={{
+            position: "absolute",
+            inset: "-16%",
+            pointerEvents: "none",
+            opacity: 0.28,
+            mixBlendMode: "screen",
+            background:
+              "linear-gradient(130deg, rgba(59,130,246,0.28) 0%, rgba(14,165,233,0.12) 30%, rgba(249,115,22,0.18) 58%, rgba(59,130,246,0.24) 100%)",
+            filter: "blur(32px)",
+          }}
+          animate={{
+            x: isDesktop ? [0, 32, -20, 0] : [0, 26, -16, 0],
+            y: isDesktop ? [0, -22, 16, 0] : [0, -18, 14, 0],
+            scale: isDesktop ? [1, 1.06, 0.97, 1] : [1, 1.05, 0.98, 1],
+            opacity: isDesktop ? [0.28, 0.42, 0.34, 0.28] : [0.24, 0.34, 0.28, 0.24],
+          }}
+          transition={{ duration: 46, repeat: Infinity, ease: "easeInOut" }}
+        />
         <div
           style={{
             position: "absolute",
-            width: "700px",
-            height: "700px",
+            width: "760px",
+            height: "760px",
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(109, 40, 217, 0.1) 0%, transparent 65%)",
-            top: "-200px",
-            left: "-150px",
-            filter: "blur(90px)",
+            background: "radial-gradient(circle, rgba(59,130,246,0.24) 0%, transparent 62%)",
+            top: "-220px",
+            left: "-160px",
+            filter: "blur(88px)",
             animation: "blobFloat1 12s ease-in-out infinite alternate",
             pointerEvents: "none",
           }}
@@ -4703,13 +4773,13 @@ function HeroSection({ navigate, lang }) {
         <div
           style={{
             position: "absolute",
-            width: "600px",
-            height: "600px",
+            width: "680px",
+            height: "680px",
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(29, 78, 216, 0.08) 0%, transparent 65%)",
-            bottom: "-150px",
-            right: "-50px",
-            filter: "blur(80px)",
+            background: "radial-gradient(circle, rgba(29, 78, 216, 0.2) 0%, transparent 62%)",
+            bottom: "-160px",
+            right: "-60px",
+            filter: "blur(78px)",
             animation: "blobFloat2 15s ease-in-out infinite alternate",
             pointerEvents: "none",
           }}
@@ -4717,32 +4787,84 @@ function HeroSection({ navigate, lang }) {
         <div
           style={{
             position: "absolute",
-            width: "400px",
-            height: "400px",
+            width: "560px",
+            height: "560px",
             borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(15, 118, 110, 0.07) 0%, transparent 65%)",
-            top: "30%",
-            left: "35%",
-            filter: "blur(70px)",
+            background: "radial-gradient(circle, rgba(249, 115, 22, 0.2) 0%, transparent 65%)",
+            top: "28%",
+            left: "40%",
+            filter: "blur(72px)",
             animation: "blobFloat1 20s ease-in-out infinite alternate-reverse",
             pointerEvents: "none",
           }}
         />
       </div>
-      <div aria-hidden style={{ position: "absolute", inset: 0, background: "#0A0A0B", pointerEvents: "none", zIndex: 0 }} />
-      <div aria-hidden style={{ position: "absolute", inset: 0, background: "rgba(10,10,11,0.5)", pointerEvents: "none", zIndex: 0 }} />
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 0,
+          background: videoFailed
+            ? "linear-gradient(165deg, #0A0A0B 0%, #12121c 45%, #0A0A0B 100%)"
+            : "linear-gradient(90deg, rgba(6,6,10,0.9) 0%, rgba(6,6,10,0.58) 40%, rgba(6,6,10,0.22) 68%, rgba(6,6,10,0.08) 100%)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="hf-hero-radial-glow"
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 0,
+          background:
+            "radial-gradient(ellipse 100% 88% at 90% 10%, rgba(56,189,248,0.4) 0%, transparent 50%), radial-gradient(ellipse 75% 62% at 10% 86%, rgba(59,130,246,0.26) 0%, transparent 48%), radial-gradient(ellipse 86% 64% at 48% 100%, rgba(249,115,22,0.2) 0%, transparent 45%)",
+          mixBlendMode: "screen",
+        }}
+      />
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 0,
+          background: "radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.45) 100%)",
+        }}
+      />
       <div
         aria-hidden
         style={{
           position: "absolute",
           inset: 0,
           backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px)",
+            "linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px)",
           backgroundSize: "64px 64px",
-          opacity: 0.4,
+          opacity: 0.45,
           pointerEvents: "none",
           zIndex: 0,
         }}
+      />
+      <motion.div
+        aria-hidden
+        className="hf-hero-noise"
+        style={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 0,
+          mixBlendMode: "soft-light",
+          backgroundImage: "radial-gradient(rgba(255,255,255,0.62) 0.6px, transparent 0.6px)",
+          backgroundSize: "3px 3px",
+        }}
+        animate={{
+          opacity: isDesktop ? [0.12, 0.19, 0.12] : [0.09, 0.14, 0.09],
+          x: [0, -2, 0],
+          y: [0, 1.5, 0],
+        }}
+        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
       />
 
       <div
@@ -4755,6 +4877,8 @@ function HeroSection({ navigate, lang }) {
           gap: "80px",
           width: "100%",
           boxSizing: "border-box",
+          position: "relative",
+          zIndex: 1,
         }}
       >
           <div
@@ -4801,7 +4925,8 @@ function HeroSection({ navigate, lang }) {
                 fontWeight: 700,
                 fontSize: 15,
                 fontFamily: "'DM Sans', sans-serif",
-                boxShadow: "0 0 36px rgba(99,102,241,0.32), inset 0 1px 0 rgba(255,255,255,0.12)",
+                boxShadow:
+                  "0 0 48px rgba(99,102,241,0.55), 0 0 96px rgba(56,189,248,0.2), inset 0 1px 0 rgba(255,255,255,0.18)",
                 transition: "transform 0.2s ease, box-shadow 0.2s ease",
               }}
             >
@@ -4809,7 +4934,21 @@ function HeroSection({ navigate, lang }) {
             </button>
           </div>
 
-          <div className="hf-hero-col-right">
+          <div className="hf-hero-col-right" style={{ position: "relative" }}>
+            <div
+              aria-hidden
+              className="hf-hero-card-halo"
+              style={{
+                position: "absolute",
+                inset: "-28px -20px",
+                borderRadius: 26,
+                pointerEvents: "none",
+                background:
+                  "radial-gradient(ellipse at 25% 20%, rgba(56,189,248,0.28), transparent 62%), radial-gradient(ellipse at 80% 78%, rgba(249,115,22,0.2), transparent 60%)",
+                filter: "blur(22px)",
+                opacity: 0.9,
+              }}
+            />
             <div
               style={{
                 background: "rgba(255,255,255,0.03)",
@@ -4818,7 +4957,8 @@ function HeroSection({ navigate, lang }) {
                 padding: "16px 16px 14px",
                 position: "relative",
                 overflow: "hidden",
-                boxShadow: "0 24px 48px rgba(0,0,0,0.35)",
+                boxShadow:
+                  "0 26px 56px rgba(0,0,0,0.42), 0 0 54px rgba(56,189,248,0.18), 0 0 46px rgba(249,115,22,0.12)",
               }}
             >
               <div
