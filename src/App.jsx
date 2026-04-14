@@ -1,7 +1,7 @@
 import "./App.css";
 import { parseActionPlan, enrichActionPlan, pickDoThisNextStep } from "../lib/analyze-v2/actionPlanNormalize.js";
 import supabase from "./supabaseClient";
-import RoadmapPage from "./RoadmapPage.jsx";
+import PersonalizedRoadmapPage from "./PersonalizedRoadmapPage.jsx";
 import { TrustSection, ComparisonSection } from "./HireFitSections";
 import { useNavigate, useLocation, Outlet, useOutletContext } from "react-router-dom";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -5571,16 +5571,16 @@ export function PrivacyPage() {
 }
 
 export function RoadmapRoute() {
-  const { navigate, lang, t, learningPlan, roleType, seniority, analysisData, cvText, jdText, alignmentScore } = useOutletContext();
+  const { navigate, lang, t, isPro, openUpgrade, analysisData, engineV2, cvText, jdText, alignmentScore } = useOutletContext();
   return (
-    <RoadmapPage
+    <PersonalizedRoadmapPage
       navigate={navigate}
       lang={lang}
       t={t}
-      learningPlan={learningPlan}
-      roleType={roleType}
-      seniority={seniority}
+      isPro={isPro}
+      openUpgrade={openUpgrade}
       analysisData={analysisData}
+      engineV2={engineV2}
       cvText={cvText}
       jdText={jdText}
       alignmentScore={alignmentScore}
