@@ -261,6 +261,21 @@ function humanizeUserFacingReason(text, lang) {
   return raw;
 }
 
+const RAW_TECH_ERROR_RE =
+  /\b(stack|exception|uncaught|syntaxerror|referenceerror|typeerror|status\s*\d{3}|failed to fetch|networkerror|json|timeout|internal server error|openai|anthropic|groq|supabase)\b/i;
+
+function sanitizeUserErrorMessage(raw, lang) {
+  const txt = String(raw || "").trim();
+  if (!txt) return "";
+  if (RAW_PARSE_FAIL_RE.test(txt)) return translations[lang]?.sanitizeParsingFailed || txt;
+  if (RAW_TECH_ERROR_RE.test(txt)) return translations[lang]?.sanitizeGenericError || txt;
+  return txt;
+}
+
+function hasMeaningfulText(v) {
+  return String(v || "").trim().length > 0;
+}
+
 const HF_ANALYTICS_DEBOUNCE_MS = 900;
 const hfAnalyticsLastFire = new Map();
 
@@ -2127,6 +2142,19 @@ function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
 
 function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, jdText }) {
   const model = useMemo(() => buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }), [data, lang, score, t, cvText, jdText]);
+  const roles = Array.isArray(model.roles) ? model.roles.slice(0, 3) : [];
+  const wrongRoleItems = [model.roleFitWhy?.[1], model.roleFitWhy?.[0]].map((x) => clampBullet(x || "", 115)).filter(hasMeaningfulText).slice(0, 3);
+  const projectLines = [
+    clampBullet(model.project?.why || "", 120),
+    clampBullet(model.project?.steps?.[0] || "", 120),
+    clampBullet(`${model.project?.outcome || ""} ${model.project?.timeEstimate || ""}`, 120),
+  ].filter(hasMeaningfulText).slice(0, 3);
+  const roadmapLines = Array.isArray(model.roadmapTop3) ? model.roadmapTop3.map((x) => clampBullet(x, 108)).filter(hasMeaningfulText).slice(0, 3) : [];
+  const hasProject = hasMeaningfulText(model.project?.title);
+  const hasTransformation = hasMeaningfulText(model.transformation?.fit) || hasMeaningfulText(model.transformation?.confidence);
+  const hasRoles = roles.length > 0;
+  const hasWrongRole = wrongRoleItems.length > 0;
+  const hasRoadmap = roadmapLines.length > 0 || hasMeaningfulText(model.careerPath);
   const cardStyle = {
     border: `1px solid ${RS.border}`,
     borderRadius: 14,
@@ -2143,13 +2171,14 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
         {t.bestPathSignalLine.replace("{bg}", model.background).replace("{track}", model.targetTrack)}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 24 }}>
+        {hasRoles ? (
         <div style={cardStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 14 }}>
             <Target size={16} color={RS.indigo} />
             {t.bestPathRolesTitle}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {model.roles.map((r, i) => (
+            {roles.map((r, i) => (
               <div key={`${r.role}-${i}`} style={{ border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px", background: rsAlpha(RS.bgSurface, 0.55) }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: RS.textPrimary }}>{r.role}</div>
@@ -2160,46 +2189,56 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
             ))}
           </div>
         </div>
+        ) : null}
 
+        {hasWrongRole ? (
         <div style={cardStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 12 }}>
             <AlertCircle size={16} color={RS.redDim} />
             {t.bestPathWrongRoleTitle}
           </div>
-          <div style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 6 }}>• {clampBullet(model.roleFitWhy?.[1] || "", 115)}</div>
-          <div style={{ fontSize: 12, color: RS.textSecondary }}>• {clampBullet(model.roleFitWhy?.[0] || "", 115)}</div>
+          {wrongRoleItems.map((line, i) => (
+            <div key={`wrong-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: i < wrongRoleItems.length - 1 ? 6 : 0 }}>• {line}</div>
+          ))}
         </div>
+        ) : null}
 
         {isPro ? (
           <>
+            {hasProject ? (
             <div style={cardStyle}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 12 }}>
                 <Workflow size={16} color={RS.indigo} />
                 {t.bestProjectSectionTitle}
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, color: RS.indigo, marginBottom: 8 }}>{model.project.title}</div>
-              <div style={{ marginTop: 6, fontSize: 12, color: RS.textSecondary }}>• {clampBullet(model.project.why, 120)}</div>
-              <div style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>• {clampBullet(model.project.steps?.[0] || "", 120)}</div>
-              <div style={{ marginTop: 4, fontSize: 12, color: RS.green }}>• {clampBullet(`${model.project.outcome} ${model.project.timeEstimate}`, 120)}</div>
+              {projectLines.map((line, i) => (
+                <div key={`project-line-${i}`} style={{ marginTop: i === 0 ? 6 : 4, fontSize: 12, color: i === projectLines.length - 1 ? RS.green : RS.textSecondary }}>• {line}</div>
+              ))}
             </div>
+            ) : null}
 
+            {hasRoadmap ? (
             <div style={cardStyle}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 12 }}>
                 <Layers size={16} color={RS.indigo} />
                 {t.bestPathRoadmapTitle}
               </div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo, marginBottom: 8 }}>{model.careerPath}</div>
-              {model.roadmapTop3.map((x, i) => <div key={`r3-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 5 }}>→ {clampBullet(x, 108)}</div>)}
+              {hasMeaningfulText(model.careerPath) ? <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo, marginBottom: 8 }}>{model.careerPath}</div> : null}
+              {roadmapLines.map((x, i) => <div key={`r3-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 5 }}>→ {x}</div>)}
             </div>
+            ) : null}
 
+            {hasTransformation ? (
             <div style={{ ...cardStyle, minHeight: 140 }}>
               <div style={{ fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 10 }}>{t.bestPathTransformTitle}</div>
-              <div style={{ fontSize: 12, color: RS.green, marginBottom: 5 }}>→ {t.bestPathTransformFit.replace("{fit}", model.transformation.fit)}</div>
-              <div style={{ fontSize: 12, color: RS.green }}>→ {model.transformation.confidence}</div>
+              {hasMeaningfulText(model.transformation?.fit) ? <div style={{ fontSize: 12, color: RS.green, marginBottom: 5 }}>→ {t.bestPathTransformFit.replace("{fit}", model.transformation.fit)}</div> : null}
+              {hasMeaningfulText(model.transformation?.confidence) ? <div style={{ fontSize: 12, color: RS.green }}>→ {model.transformation.confidence}</div> : null}
             </div>
+            ) : null}
           </>
         ) : (
-          <div style={{ ...cardStyle, minHeight: 140 }}>
+          hasProject ? <div style={{ ...cardStyle, minHeight: 140 }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 10 }}>{t.bestProjectSectionTitle}</div>
             <div style={{ fontSize: 14, fontWeight: 700, color: RS.indigo, marginBottom: 10 }}>{model.project.title}</div>
             <div style={{ fontSize: 12, color: RS.textMuted, marginBottom: 10 }}>{t.bestPathFreeHint}</div>
@@ -2220,7 +2259,7 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
             >
               {t.focusPreviewUpgradeBtn}
             </button>
-          </div>
+          </div> : null
         )}
       </div>
     </div>
@@ -2249,6 +2288,11 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
     .filter(Boolean)
     .slice(0, 3);
   const summaryLine = clampBullet(String(data?.Decision?.reasoning || data?.Recruiter?.reasoning || ""), 110);
+  const whyItems = [clampBullet(mainProblem), summaryLine].filter(hasMeaningfulText).slice(0, 3);
+  const showWhyCard = whyItems.length > 0;
+  const showGapsCard = topGaps.length > 0 || moreGaps.length > 0;
+  const showRoadmapCard = roadmapLines.length > 0;
+  if (!showWhyCard && !showGapsCard && !showRoadmapCard) return null;
   const rowStyle = { marginBottom: 6, fontSize: 12, color: RS.textSecondary, lineHeight: 1.55 };
   const summaryStyle = {
     display: "flex",
@@ -2282,29 +2326,27 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 24 }}>
-      <details style={{ border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", background: rsAlpha(RS.bgElevated, 0.65), minHeight: 170 }}>
+      {showWhyCard ? <details style={{ border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", background: rsAlpha(RS.bgElevated, 0.65), minHeight: 170 }}>
         <summary style={summaryStyle}>
           <AlertCircle size={14} color={RS.redDim} />
           {t.scanWhyRejectedTitle}
         </summary>
         <div style={{ marginTop: 8 }}>
-          {mainProblem ? <div style={rowStyle}>• {clampBullet(mainProblem)}</div> : null}
-          {summaryLine ? <div style={rowStyle}>• {summaryLine}</div> : null}
-          {!mainProblem && !summaryLine ? <div style={rowStyle}>• {t.previewEmptyRecruiter}</div> : null}
+          {whyItems.map((item, i) => <div key={`why-item-${i}`} style={rowStyle}>• {item}</div>)}
         </div>
-      </details>
+      </details> : null}
 
-      <details style={{ border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", background: rsAlpha(RS.bgElevated, 0.65), minHeight: 170 }}>
+      {showGapsCard ? <details style={{ border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", background: rsAlpha(RS.bgElevated, 0.65), minHeight: 170 }}>
         <summary style={summaryStyle}>
           <ListChecks size={14} color={RS.amber} />
           {t.scanAllGapsTitle}
         </summary>
         <div style={{ marginTop: 8 }}>
-          {topGaps.length ? topGaps.map((g, i) => (
+          {topGaps.map((g, i) => (
             <div key={`gap-${i}`} style={rowStyle}>
               • {clampBullet(humanizeUserFacingReason(g?.issue || "", lang), 95)} {g?.impact ? `— ${gapImpactLabel(g.impact, t)}` : ""}
             </div>
-          )) : <div style={rowStyle}>• {t.previewEmptyGaps}</div>}
+          ))}
           {moreGaps.length ? (
             <details style={{ marginTop: 8 }}>
               <summary style={{ ...summaryStyle, fontSize: 12, color: RS.textMuted }}>{t.scanMoreGaps.replace("{n}", String(moreGaps.length))}</summary>
@@ -2316,18 +2358,18 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
             </details>
           ) : null}
         </div>
-      </details>
+      </details> : null}
 
-      <details style={{ border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", background: rsAlpha(RS.bgElevated, 0.65), minHeight: 170 }}>
+      {showRoadmapCard ? <details style={{ border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", background: rsAlpha(RS.bgElevated, 0.65), minHeight: 170 }}>
         <summary style={summaryStyle}>
           <Layers size={14} color={RS.indigo} />
           {t.scanFullRoadmapTitle}
         </summary>
         <div style={{ marginTop: 8 }}>
           {isPro ? (
-            roadmapLines.length ? roadmapLines.map((line, i) => (
+            roadmapLines.map((line, i) => (
               <div key={`rm-${i}`} style={rowStyle}>• {line}</div>
-            )) : <div style={rowStyle}>• {t.previewEmptyPlan}</div>
+            ))
           ) : (
             <>
               <div style={rowStyle}>• {t.scanRoadmapLocked}</div>
@@ -2341,7 +2383,7 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
             </>
           )}
         </div>
-      </details>
+      </details> : null}
       </div>
     </div>
   );
@@ -2787,6 +2829,8 @@ const translations = {
     interviewPrepShort: "Interview prep",
     sanitizeParsingFailed:
       "We analyzed your CV based on available signals.",
+    sanitizeGenericError:
+      "We hit a temporary issue while processing your analysis. Please try again in a moment.",
     executionProgress: "Execution",
     fixesCompletedCount: "{done}/{total} fixes marked done",
     executionLadder: "Projected alignment if you complete fixes in order",
@@ -3154,6 +3198,8 @@ const translations = {
     interviewPrepShort: "Mülakat hazırlığı",
     sanitizeParsingFailed:
       "CV'nizi mevcut sinyallere göre analiz ettik.",
+    sanitizeGenericError:
+      "Analiz işlenirken geçici bir sorun oluştu. Lütfen kısa süre sonra tekrar deneyin.",
     executionProgress: "İlerleme",
     fixesCompletedCount: "{done}/{total} düzeltme tamamlandı olarak işaretlendi",
     executionLadder: "Düzeltmeleri sırayla tamamlarsanız tahmini hizalama",
@@ -5913,7 +5959,7 @@ const msgInterval = setInterval(() => {
     if (!email.trim() || !password.trim()) { setError(lang === "TR" ? "Lütfen hem email hem de şifreyi girin." : "Please enter both email and password."); return; }
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError) { setError(authError.message); return; }
+      if (authError) { setError(sanitizeUserErrorMessage(authError.message, lang)); return; }
       setUser(data.user); setEmail(""); setPassword(""); setError(""); navigate("/dashboard");
     } catch { setError(lang === "TR" ? "Giriş başarısız." : "Login failed."); }
   };
@@ -5988,7 +6034,7 @@ const msgInterval = setInterval(() => {
           await syncUserPlanForUser(user.id);
         }
       } catch (e) {
-        setAdminGrantError(String(e?.message || (lang === "TR" ? "Admin işlemi başarısız." : "Admin action failed.")));
+        setAdminGrantError(sanitizeUserErrorMessage(String(e?.message || (lang === "TR" ? "Admin işlemi başarısız." : "Admin action failed.")), lang));
       } finally {
         setAdminGrantBusy(false);
       }
@@ -6393,6 +6439,7 @@ export function AnalyzerPage() {
     downloadText, reanalyzeAfterFix, roadmapLoading, generateLearningPlan, decisionImpactContext,
     reanalysisResult, history, clearHistory, loadHistoryItem, scoreRunProgress,
   } = useOutletContext();
+  const safeUiError = useMemo(() => sanitizeUserErrorMessage(error, lang), [error, lang]);
   return (
   <div className="hf-analyzer-page" style={{ maxWidth: 1320, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
     <AnalysisThinkingOverlay lang={lang} loading={loading} />
@@ -6750,7 +6797,7 @@ export function AnalyzerPage() {
     </div>
 
     {/* ERROR */}
-    {error && (
+    {safeUiError && (
       <div
         style={{
           display: "flex",
@@ -6767,7 +6814,7 @@ export function AnalyzerPage() {
         }}
       >
         <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-        <span>{error}</span>
+        <span>{safeUiError}</span>
       </div>
     )}
 
