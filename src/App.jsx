@@ -1804,7 +1804,211 @@ function CareerEngineProDetailGrid({ data, lang, t, planFixes }) {
   );
 }
 
-function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing }) {
+function inferCandidateBackground(cvText, lang) {
+  const src = String(cvText || "").toLowerCase();
+  if (!src) return lang === "TR" ? "genel profil" : "general profile";
+  const hasMis = src.includes("management information systems") || src.includes("yönetim bilişim");
+  const hasIndustrial = src.includes("industrial") || src.includes("endüstri");
+  const hasBusiness = src.includes("business") || src.includes("işletme");
+  const hasEngineering = src.includes("engineering") || src.includes("mühendis");
+  if (hasMis) return lang === "TR" ? "Yönetim Bilişim odaklı profil" : "Management Information Systems profile";
+  if (hasIndustrial) return lang === "TR" ? "Endüstri odaklı profil" : "Industrial profile";
+  if (hasEngineering) return lang === "TR" ? "Mühendislik odaklı profil" : "Engineering-focused profile";
+  if (hasBusiness) return lang === "TR" ? "İş odaklı profil" : "Business-focused profile";
+  return lang === "TR" ? "analitik ağırlıklı profil" : "analytics-leaning profile";
+}
+
+function inferTargetTrack(jdText, lang) {
+  const src = String(jdText || "").toLowerCase();
+  if (!src) return lang === "TR" ? "hedef rol" : "target role";
+  if (src.includes("data") || src.includes("analyst") || src.includes("sql")) return lang === "TR" ? "analitik odaklı rol hattı" : "analytics role track";
+  if (src.includes("strategy") || src.includes("consult")) return lang === "TR" ? "strateji odaklı rol hattı" : "strategy role track";
+  if (src.includes("engineer") || src.includes("mühendis")) return lang === "TR" ? "mühendislik odaklı rol hattı" : "engineering role track";
+  return lang === "TR" ? "hedef ilan hattı" : "target posting track";
+}
+
+function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
+  const strengths = Array.isArray(data?.Recruiter?.strengths) ? data.Recruiter.strengths.map((x) => String(x).trim()).filter(Boolean) : [];
+  const matched = Array.isArray(data?.ATS?.matched_skills) ? data.ATS.matched_skills.map((x) => String(x).trim()).filter(Boolean) : [];
+  const gaps = Array.isArray(data?.Gaps?.rejection_reasons) ? data.Gaps.rejection_reasons : [];
+  const bigGap = String(data?.Gaps?.biggest_gap || gaps[0]?.issue || "").trim();
+  const background = inferCandidateBackground(cvText, lang);
+  const targetTrack = inferTargetTrack(jdText, lang);
+  const roleRows = Array.isArray(data?.RoleFit?.role_fit) ? [...data.RoleFit.role_fit] : [];
+  roleRows.sort((a, b) => Number(b?.score || 0) - Number(a?.score || 0));
+
+  const roleCandidates = roleRows.slice(0, 3).map((r, idx) => {
+    const role = String(r?.role || "").trim() || `${lang === "TR" ? "Rol" : "Role"} ${idx + 1}`;
+    const scoreNum = Math.max(40, Math.min(92, Math.round(Number(r?.score || 0))));
+    const whySeed = strengths[idx] || matched[idx] || strengths[0] || matched[0] || bigGap;
+    const why = whySeed
+      ? (lang === "TR"
+        ? `${background} içinde ${whySeed} sinyali güçlü olduğu için bu rolde daha güçlü görünüyorsun.`
+        : `Your ${background} already shows ${whySeed} signal, so this role is a stronger fit.`)
+      : (lang === "TR"
+        ? `${background} bu role daha yakın sinyal veriyor.`
+        : `Your current ${background} signal is closer to this role.`);
+    return { role, score: scoreNum, why };
+  });
+
+  while (roleCandidates.length < 3) {
+    const fallback = lang === "TR"
+      ? [
+          { role: "Veri Analisti", score: 72, why: "Analitik düşünme ve yapılandırılmış problem çözme sinyalin güçlü." },
+          { role: "İş Analisti", score: 68, why: "İş ve veri yorumlama arasında köprü kuran bir profilin var." },
+          { role: "Operasyon Analisti", score: 64, why: "Süreç, raporlama ve karar desteği tarafında güçlü temel var." },
+        ]
+      : [
+          { role: "Data Analyst", score: 72, why: "You already show analytical thinking and structured problem solving." },
+          { role: "Business Analyst", score: 68, why: "Your background aligns with business plus data interpretation." },
+          { role: "Operations Analyst", score: 64, why: "You have strong process and reporting foundations." },
+        ];
+    const next = fallback.find((x) => !roleCandidates.some((r) => r.role.toLowerCase() === x.role.toLowerCase()));
+    if (!next) break;
+    roleCandidates.push(next);
+  }
+
+  const topRole = roleCandidates[0]?.role || (lang === "TR" ? "Analist" : "Analyst");
+  const topLower = topRole.toLowerCase();
+  const careerPath =
+    topLower.includes("data")
+      ? (lang === "TR" ? "Veri Analisti → Ürün Analisti → Ürün Yöneticisi" : "Data Analyst → Product Analyst → Product Manager")
+      : topLower.includes("business")
+        ? (lang === "TR" ? "İş Analisti → Strateji Analisti → Strateji Yöneticisi" : "Business Analyst → Strategy Analyst → Strategy Manager")
+        : (lang === "TR" ? "Analist → Kıdemli Analist → Yönetici" : "Analyst → Senior Analyst → Manager");
+
+  const projectTitle = lang === "TR"
+    ? `${topRole} için Gerçek Dünya Etki Projesi`
+    : `Real-World Impact Project for ${topRole}`;
+  const projectWhy = lang === "TR"
+    ? `Çünkü ${targetTrack} için ${bigGap || "kritik boşluğunu"} kapatıp ${background} gücünü görünür hale getirmen gerekiyor.`
+    : `Because for this ${targetTrack}, you need to close ${bigGap || "your key gap"} and make your ${background} strengths visible.`;
+  const projectWhat = lang === "TR"
+    ? "Kaggle veya World Bank verisiyle dashboard ve kısa insight raporu üret."
+    : "Use Kaggle or World Bank data to build a dashboard plus short insight report.";
+  const projectOutcome = lang === "TR"
+    ? "Analitik + iş etkisi sinyalini aynı anda kanıtlarsın."
+    : "You prove analytical and business impact in one artifact.";
+
+  const phaseImmediate = [
+    lang === "TR" ? `${topRole} odağını CV özetinin ilk iki satırına taşı.` : `Rewrite your CV summary around ${topRole}.`,
+    lang === "TR" ? "Deneyim bölümüne 2 ölçülebilir sonuç ekle." : "Add 2 measurable outcomes to experience bullets.",
+    lang === "TR" ? `Başlıktaki rol konumunu ${topRole} ile hizala.` : `Align headline positioning to ${topRole}.`,
+  ];
+  const phaseStrategic = [
+    lang === "TR" ? "Yukarıdaki kişisel projeyi bitir ve tek linkte yayınla." : "Ship the personalized project and publish one proof link.",
+    lang === "TR" ? `Eksik becerilere odaklı mikro öğrenme yap: ${(data?.ATS?.missing_keywords || []).slice(0, 2).join(", ") || "SQL, BI"}` : `Run focused learning on missing skills: ${(data?.ATS?.missing_keywords || []).slice(0, 2).join(", ") || "SQL, BI"}.`,
+    lang === "TR" ? "Projeden 3 net bullet çıkarıp CV'ye ekle." : "Extract 3 impact bullets from project and add to CV.",
+  ];
+  const phaseApplication = [
+    lang === "TR" ? `${topRole} ve yakın rollere odaklan; ${targetTrack} dışındaki rolleri ele.` : `Apply only to ${topRole} and adjacent roles; cut roles outside this ${targetTrack}.`,
+    lang === "TR" ? "İlanlarda analitik araç sinyali olan şirketleri hedefle." : "Target postings with explicit analytics-tool demand.",
+    lang === "TR" ? "Her başvuruda özeti ilana göre hızlıca özelleştir." : "Do a quick summary tailoring for each application.",
+  ];
+
+  const base = Number.isFinite(Number(score)) ? Number(score) : 45;
+  const projected = Math.max(base + 20, 70);
+  return {
+    background,
+    targetTrack,
+    roles: roleCandidates.slice(0, 3),
+    topRole,
+    careerPath,
+    careerPathWhy: lang === "TR"
+      ? "Bu yol mevcut güçlü yanlarını büyütürken kritik boşluklarını kapatır."
+      : "This path builds on your strengths while closing your key gaps.",
+    project: { title: projectTitle, why: projectWhy, what: projectWhat, outcome: projectOutcome },
+    phases: { immediate: phaseImmediate, strategic: phaseStrategic, application: phaseApplication },
+    transformation: {
+      fit: `${Math.round(base)} → ${Math.round(projected)}+`,
+      confidence: lang === "TR" ? "Mülakat olasılığı belirgin şekilde artar." : "Interview probability increases significantly.",
+    },
+  };
+}
+
+function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, jdText }) {
+  const model = useMemo(() => buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }), [data, lang, score, t, cvText, jdText]);
+  return (
+    <div style={{ marginTop: 22, padding: "16px 18px", borderRadius: 14, border: `1px solid ${RS.borderSubtle}`, background: rsAlpha(RS.indigo, 0.05) }}>
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, marginBottom: 10 }}>
+        {t.bestPathForwardTitle}
+      </div>
+      <div style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 10 }}>
+        {t.bestPathSignalLine.replace("{bg}", model.background).replace("{track}", model.targetTrack)}
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 8 }}>{t.bestPathRolesTitle}</div>
+        {model.roles.map((r, i) => (
+          <div key={`${r.role}-${i}`} style={{ marginBottom: 8, padding: "9px 10px", borderRadius: 10, border: `1px solid ${RS.border}`, background: RS.bgElevated }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary }}>{r.role} ({r.score}%)</div>
+            <div style={{ fontSize: 12, color: RS.textSecondary, marginTop: 4 }}>{r.why}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestProjectTitle}</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo }}>{model.project.title}</div>
+        {isPro ? (
+          <>
+            <div style={{ marginTop: 6, fontSize: 12, color: RS.textSecondary }}>{model.project.why}</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>{model.project.what}</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: RS.green }}>{model.project.outcome}</div>
+          </>
+        ) : null}
+      </div>
+
+      {isPro ? (
+        <>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestPathCareerTitle}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo }}>{model.careerPath}</div>
+            <div style={{ marginTop: 4, fontSize: 12, color: RS.textSecondary }}>{model.careerPathWhy}</div>
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestPathRoadmapTitle}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: RS.textMuted, marginBottom: 4 }}>{t.bestPathPhaseImmediate}</div>
+            {model.phases.immediate.map((x, i) => <div key={`im-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 4 }}>→ {x}</div>)}
+            <div style={{ fontSize: 12, fontWeight: 700, color: RS.textMuted, marginTop: 8, marginBottom: 4 }}>{t.bestPathPhaseStrategic}</div>
+            {model.phases.strategic.map((x, i) => <div key={`st-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 4 }}>→ {x}</div>)}
+            <div style={{ fontSize: 12, fontWeight: 700, color: RS.textMuted, marginTop: 8, marginBottom: 4 }}>{t.bestPathPhaseApplication}</div>
+            {model.phases.application.map((x, i) => <div key={`ap-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 4 }}>→ {x}</div>)}
+          </div>
+
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: RS.textPrimary, marginBottom: 6 }}>{t.bestPathTransformTitle}</div>
+            <div style={{ fontSize: 12, color: RS.green, marginBottom: 4 }}>→ {t.bestPathTransformFit.replace("{fit}", model.transformation.fit)}</div>
+            <div style={{ fontSize: 12, color: RS.green }}>→ {model.transformation.confidence}</div>
+          </div>
+        </>
+      ) : (
+        <div style={{ marginTop: 8 }}>
+          <button
+            type="button"
+            onClick={onUpgrade}
+            style={{
+              border: "none",
+              borderRadius: 10,
+              padding: "9px 14px",
+              background: RS.indigo,
+              color: "#fff",
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: RS.fontUi,
+            }}
+          >
+            {t.focusPreviewUpgradeBtn}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, cvText, jdText }) {
   const actionPlanMemo = useMemo(() => {
     if (!data) return { priority_callout: null, fixes: [], interview_note: null };
     return enrichActionPlan(parseActionPlan(data.Decision?.action_plan), {
@@ -1868,16 +2072,11 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing })
       ? "Önce bu odağı netleştir; ardından tam analizde adım adım ilerle."
       : "Clarify this focus first, then follow the full guided breakdown.";
 
-  let extraHiddenCount = 0;
-  if (!isPro) {
-    extraHiddenCount = Math.max(0, gaps.length - 1);
-    if (planFixes.length > 1) {
-      extraHiddenCount = Math.max(extraHiddenCount, planFixes.length - 1);
-    }
-    if (extraHiddenCount < 1) {
-      extraHiddenCount = 3;
-    }
+  let extraHiddenCount = Math.max(0, gaps.length - 1);
+  if (planFixes.length > 1) {
+    extraHiddenCount = Math.max(extraHiddenCount, planFixes.length - 1);
   }
+  if (extraHiddenCount < 1) extraHiddenCount = 3;
 
   const labelStyle = {
     fontSize: 10,
@@ -2009,24 +2208,24 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing })
         </button>
 
         {!isPro ? (
-          <>
-            <div
-              style={{
-                marginTop: 22,
-                padding: "16px 18px",
-                borderRadius: 14,
-                border: `1px solid ${RS.borderSubtle}`,
-                background: rsAlpha(RS.indigo, 0.06),
-              }}
-            >
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.6 }}>
-                {t.focusHiddenGapsTeaser.replace("{n}", String(extraHiddenCount))}
-              </p>
-            </div>
-          </>
+          <div
+            style={{
+              marginTop: 22,
+              padding: "16px 18px",
+              borderRadius: 14,
+              border: `1px solid ${RS.borderSubtle}`,
+              background: rsAlpha(RS.indigo, 0.06),
+            }}
+          >
+            <p style={{ margin: 0, fontSize: 14, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.6 }}>
+              {t.focusHiddenGapsTeaser.replace("{n}", String(extraHiddenCount))}
+            </p>
+          </div>
         ) : (
           <CareerEngineProDetailGrid data={data} lang={lang} t={t} planFixes={planFixes} />
         )}
+
+        <BestPathForwardBlock data={data} lang={lang} t={t} isPro={isPro} onUpgrade={onUpgrade} score={scoreNumeric ?? score} cvText={cvText} jdText={jdText} />
       </div>
     </motion.div>
   );
@@ -2310,6 +2509,17 @@ const translations = {
     focusCtaSeeFull: "See exactly why you get rejected →",
     focusCtaApplyFix: "Apply this focus to my CV →",
     focusHiddenGapsTeaser: "There are {n} more gaps still affecting your score. See the full breakdown with Pro.",
+    bestPathForwardTitle: "Your best path forward",
+    bestPathSignalLine: "Profile signal: {bg} → target track: {track}",
+    bestPathRolesTitle: "Based on your profile, you are a stronger fit for:",
+    bestProjectTitle: "Best project for YOU:",
+    bestPathCareerTitle: "Best path for you:",
+    bestPathRoadmapTitle: "Execution roadmap",
+    bestPathPhaseImmediate: "PHASE 1 — Immediate Fix (0–7 days)",
+    bestPathPhaseStrategic: "PHASE 2 — Strategic Build (2–4 weeks)",
+    bestPathPhaseApplication: "PHASE 3 — Application Strategy",
+    bestPathTransformTitle: "If you follow this path:",
+    bestPathTransformFit: "Fit score: {fit}",
     focusPreviewSectionTitle: "What's in your full analysis?",
     focusPreviewCtaTitle: "See exactly why you get screened out",
     focusPreviewCtaSubtitle: "Full recruiter read on your CV vs this JD, every gap ranked, fixes ordered by score impact, plus company and ATS context.",
@@ -2648,6 +2858,17 @@ const translations = {
     focusCtaSeeFull: "Neden elendiğini tam gör →",
     focusCtaApplyFix: "Bu odağı CV'me uygula →",
     focusHiddenGapsTeaser: "Skorunu etkileyen {n} boşluk daha var. Tüm dökümü Pro ile görebilirsin.",
+    bestPathForwardTitle: "Your best path forward",
+    bestPathSignalLine: "Profil sinyali: {bg} → hedef hat: {track}",
+    bestPathRolesTitle: "Profiline göre daha güçlü olduğun roller:",
+    bestProjectTitle: "SENİN için en iyi proje:",
+    bestPathCareerTitle: "Senin için en iyi yol:",
+    bestPathRoadmapTitle: "Yürütme yol haritası",
+    bestPathPhaseImmediate: "PHASE 1 — Immediate Fix (0–7 gün)",
+    bestPathPhaseStrategic: "PHASE 2 — Strategic Build (2–4 hafta)",
+    bestPathPhaseApplication: "PHASE 3 — Application Strategy",
+    bestPathTransformTitle: "Bu yolu uygularsan:",
+    bestPathTransformFit: "Fit skoru: {fit}",
     focusPreviewSectionTitle: "Pro analizinde neler var?",
     focusPreviewCtaTitle: "Neden elendiğini satır satır gör",
     focusPreviewCtaSubtitle: "Bu ilana göre recruiter taraması, tüm boşluklar, skora göre sıralı düzeltmeler ve şirket ile ATS bağlamı.",
@@ -5665,61 +5886,6 @@ export function AnalyzerPage() {
     downloadText, reanalyzeAfterFix, roadmapLoading, generateLearningPlan, decisionImpactContext,
     reanalysisResult, history, clearHistory, loadHistoryItem, scoreRunProgress,
   } = useOutletContext();
-  const previewData = useMemo(() => {
-    if (engineV2) return engineV2;
-    if (!analysisData && !decisionData) return null;
-    const legacyReasons = analysisData?.rejection_reasons || {};
-    const toRows = (arr, impact) =>
-      (Array.isArray(arr) ? arr : []).map((issue) => ({
-        issue: String(issue || "").trim(),
-        impact,
-      }));
-    const reasonRows = [
-      ...toRows(legacyReasons.high, "high"),
-      ...toRows(legacyReasons.medium, "medium"),
-      ...toRows(legacyReasons.low, "low"),
-    ].filter((x) => x.issue);
-    const roleRows = Array.isArray(analysisData?.role_matches)
-      ? analysisData.role_matches.map((r) => ({
-          role: r.role,
-          score: Number(r.match_score) || 0,
-        }))
-      : [];
-    const scoreFromData =
-      alignmentScore != null
-        ? Number(alignmentScore)
-        : Number(analysisData?.alignment_score ?? NaN);
-    const fixes = Array.isArray(analysisData?.improvements)
-      ? analysisData.improvements
-      : Array.isArray(decisionData?.fixes)
-        ? decisionData.fixes
-        : [];
-    return {
-      "Final Alignment Score": Number.isFinite(scoreFromData) ? scoreFromData : null,
-      Recruiter: {
-        reasoning: String(decisionData?.summary || analysisData?.fit_summary || "").trim(),
-        strengths: Array.isArray(analysisData?.strengths) ? analysisData.strengths : [],
-        weaknesses: [],
-      },
-      Gaps: {
-        rejection_reasons: reasonRows,
-        biggest_gap: reasonRows[0]?.issue || "",
-      },
-      Decision: {
-        reasoning: String(decisionData?.summary || analysisData?.fit_summary || "").trim(),
-        action_plan: fixes.map((f) => String(f || "").trim()).filter(Boolean).join("\n"),
-        what_to_fix_first: fixes,
-      },
-      ATS: {
-        ats_score: analysisData?.score_breakdown?.experience_depth ?? null,
-        keyword_match: analysisData?.score_breakdown?.keyword_match ?? null,
-      },
-      RoleFit: {
-        best_role: String(analysisData?.role_type || roleRows[0]?.role || "").trim(),
-        role_fit: roleRows,
-      },
-    };
-  }, [engineV2, analysisData, decisionData, alignmentScore]);
   return (
   <div className="hf-analyzer-page" style={{ maxWidth: 1320, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
 
@@ -6170,6 +6336,8 @@ export function AnalyzerPage() {
           onUpgrade={openUpgrade}
           onFixCv={optimizeCv}
           optimizing={optimizing}
+          cvText={cvText}
+          jdText={jdText}
         />
       </motion.div>
     )}
@@ -6190,10 +6358,6 @@ export function AnalyzerPage() {
       </motion.div>
     )}
     </AnimatePresence>
-
-    {!isPro && !decisionLoading && previewData && (
-      <CareerEngineProBlurPreview data={previewData} lang={lang} t={t} onUpgrade={openUpgrade} />
-    )}
 
     {!engineV2 && alignmentScore !== null && analysisData && (
       <>
