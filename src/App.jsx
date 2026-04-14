@@ -3682,12 +3682,12 @@ function AmbientBackgroundLayer() {
     willChange: "transform, opacity",
     opacity: 0.15,
     pointerEvents: "none",
-    zIndex: 0,
-    mixBlendMode: "screen",
+    zIndex: 5,
+    mixBlendMode: "soft-light",
     transform: "translateZ(0)",
   };
   return (
-    <div aria-hidden style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
+    <div aria-hidden style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 5 }}>
       <motion.div
         style={{
           ...blobBase,
@@ -3695,9 +3695,9 @@ function AmbientBackgroundLayer() {
           height: 540,
           top: "-14%",
           left: "-10%",
-          background: "radial-gradient(circle, rgba(99,102,241,0.65) 0%, rgba(99,102,241,0) 68%)",
+          background: "radial-gradient(circle, rgba(99,102,241,0.85) 0%, rgba(99,102,241,0) 68%)",
         }}
-        animate={{ x: [0, 60, 0], y: [0, 35, 0], scale: [1, 1.08, 1], opacity: [0.11, 0.18, 0.11] }}
+        animate={{ x: [0, 60, 0], y: [0, 35, 0], scale: [1, 1.08, 1], opacity: [0.12, 0.2, 0.12] }}
         transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
@@ -3707,9 +3707,9 @@ function AmbientBackgroundLayer() {
           height: 480,
           right: "-8%",
           top: "8%",
-          background: "radial-gradient(circle, rgba(56,189,248,0.55) 0%, rgba(56,189,248,0) 66%)",
+          background: "radial-gradient(circle, rgba(56,189,248,0.8) 0%, rgba(56,189,248,0) 66%)",
         }}
-        animate={{ x: [0, -70, 0], y: [0, 40, 0], scale: [1.02, 0.96, 1.02], opacity: [0.1, 0.16, 0.1] }}
+        animate={{ x: [0, -70, 0], y: [0, 40, 0], scale: [1.02, 0.96, 1.02], opacity: [0.1, 0.17, 0.1] }}
         transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
@@ -3719,18 +3719,18 @@ function AmbientBackgroundLayer() {
           height: 560,
           left: "22%",
           bottom: "-22%",
-          background: "radial-gradient(circle, rgba(168,85,247,0.5) 0%, rgba(168,85,247,0) 70%)",
+          background: "radial-gradient(circle, rgba(168,85,247,0.72) 0%, rgba(168,85,247,0) 70%)",
         }}
-        animate={{ x: [0, 35, 0], y: [0, -55, 0], scale: [0.98, 1.04, 0.98], opacity: [0.09, 0.14, 0.09] }}
+        animate={{ x: [0, 35, 0], y: [0, -55, 0], scale: [0.98, 1.04, 0.98], opacity: [0.09, 0.15, 0.09] }}
         transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
       />
       <div
         style={{
           position: "fixed",
           inset: 0,
-          opacity: 0.12,
+          opacity: 0.14,
           pointerEvents: "none",
-          zIndex: 0,
+          zIndex: 5,
           backgroundImage:
             "radial-gradient(ellipse at top, rgba(99,102,241,0.2), transparent 60%), repeating-radial-gradient(circle at 0 0, rgba(255,255,255,0.06), rgba(255,255,255,0.06) 1px, transparent 1px, transparent 3px)",
           backgroundSize: "100% 100%, 3px 3px",
