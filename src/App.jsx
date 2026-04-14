@@ -1,4 +1,5 @@
 import "./App.css";
+import "./landing-ambient.css";
 import { parseActionPlan, enrichActionPlan, pickDoThisNextStep } from "../lib/analyze-v2/actionPlanNormalize.js";
 import supabase from "./supabaseClient";
 import PersonalizedRoadmapPage from "./PersonalizedRoadmapPage.jsx";
@@ -3435,7 +3436,7 @@ const styles = {
     maxWidth: "none",
     margin: 0,
     overflowX: "hidden",
-    background: "linear-gradient(165deg, #020617 0%, #0f172a 50%, #0c1222 100%)",
+    background: "linear-gradient(165deg, #05070f 0%, #0a0f1a 48%, #080d16 100%)",
     color: T.text,
     fontFamily: "'DM Sans', sans-serif",
     position: "relative",
@@ -3700,13 +3701,13 @@ function AmbientBackgroundLayer() {
           inset: "-20%",
           pointerEvents: "none",
           zIndex: 0,
-          opacity: 0.22,
+          opacity: 0.18,
           background:
-            "radial-gradient(42% 40% at 15% 20%, rgba(99,102,241,0.42) 0%, rgba(99,102,241,0) 72%), radial-gradient(40% 42% at 85% 20%, rgba(56,189,248,0.38) 0%, rgba(56,189,248,0) 72%), radial-gradient(46% 46% at 50% 85%, rgba(168,85,247,0.36) 0%, rgba(168,85,247,0) 74%)",
+            "radial-gradient(42% 40% at 15% 20%, rgba(99,102,241,0.28) 0%, rgba(99,102,241,0) 72%), radial-gradient(40% 42% at 85% 20%, rgba(56,189,248,0.24) 0%, rgba(56,189,248,0) 72%), radial-gradient(46% 46% at 50% 85%, rgba(168,85,247,0.22) 0%, rgba(168,85,247,0) 74%)",
           willChange: "transform, opacity",
         }}
-        animate={{ x: [0, 18, -12, 0], y: [0, -14, 10, 0], opacity: [0.18, 0.28, 0.22, 0.18] }}
-        transition={{ duration: 26, repeat: Infinity, ease: "easeInOut" }}
+        animate={{ x: [0, 14, -10, 0], y: [0, -10, 8, 0], opacity: [0.14, 0.22, 0.18, 0.14] }}
+        transition={{ duration: 28, repeat: Infinity, ease: "easeInOut" }}
       />
       <motion.div
         style={{
@@ -3752,7 +3753,7 @@ function AmbientBackgroundLayer() {
           pointerEvents: "none",
           zIndex: 0,
           backgroundImage:
-            "radial-gradient(ellipse at top, rgba(99,102,241,0.32), transparent 58%), repeating-radial-gradient(circle at 0 0, rgba(255,255,255,0.09), rgba(255,255,255,0.09) 1px, transparent 1px, transparent 3px)",
+            "radial-gradient(ellipse at top, rgba(99,102,241,0.2), transparent 58%), repeating-radial-gradient(circle at 0 0, rgba(255,255,255,0.06), rgba(255,255,255,0.06) 1px, transparent 1px, transparent 3px)",
           backgroundSize: "100% 100%, 3px 3px",
         }}
       />
@@ -4706,7 +4707,7 @@ function LandingPageAmbient() {
 
   return (
     <div
-      className={`hf-hero${videoFailed ? " hf-hero--no-video" : ""}`}
+      className={`hf-ambient-root hf-hero${videoFailed ? " hf-hero--no-video" : ""}`}
       style={{
         position: "absolute",
         inset: 0,
@@ -4715,6 +4716,12 @@ function LandingPageAmbient() {
         overflow: "hidden",
       }}
     >
+      <div className="hf-ambient-base" aria-hidden />
+      <div className="hf-ambient-orbs" aria-hidden>
+        <div className="hf-ambient-orb hf-ambient-orb--1" />
+        <div className="hf-ambient-orb hf-ambient-orb--2" />
+        <div className="hf-ambient-orb hf-ambient-orb--3" />
+      </div>
       <div
         aria-hidden
         style={{
@@ -4847,7 +4854,7 @@ function LandingPageAmbient() {
           inset: 0,
           pointerEvents: "none",
           zIndex: 0,
-          background: "radial-gradient(ellipse 90% 85% at 50% 42%, transparent 0%, rgba(0,0,0,0.14) 55%, rgba(0,0,0,0.36) 100%)",
+          background: "radial-gradient(ellipse 90% 85% at 50% 42%, transparent 0%, rgba(5,7,15,0.12) 55%, rgba(5,7,15,0.32) 100%)",
         }}
       />
       <div
@@ -4858,30 +4865,12 @@ function LandingPageAmbient() {
           backgroundImage:
             "linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px)",
           backgroundSize: "64px 64px",
-          opacity: 0.45,
+          opacity: 0.22,
           pointerEvents: "none",
           zIndex: 0,
         }}
       />
-      <motion.div
-        aria-hidden
-        className="hf-hero-noise"
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 0,
-          mixBlendMode: "soft-light",
-          backgroundImage: "radial-gradient(rgba(255,255,255,0.62) 0.6px, transparent 0.6px)",
-          backgroundSize: "3px 3px",
-        }}
-        animate={{
-          opacity: isDesktop ? [0.12, 0.19, 0.12] : [0.09, 0.14, 0.09],
-          x: [0, -2, 0],
-          y: [0, 1.5, 0],
-        }}
-        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-      />
+      <div className="hf-ambient-noise-film" aria-hidden />
 
     </div>
   );
@@ -4912,6 +4901,7 @@ function HeroSection({ navigate, lang }) {
   const r = fakeResult[lang];
   return (
     <section
+      className="hf-section hf-section--hero"
       style={{
         width: "100vw",
         minHeight: "100vh",
@@ -5187,7 +5177,7 @@ function FeatureCards({ lang }) {
   ];
 
   return (
-    <section style={{ padding: "80px 0" }}>
+    <section className="hf-section hf-section--features" style={{ padding: "80px 0" }}>
       <div style={styles.container}>
         <div style={{ textAlign: "center", marginBottom: 56 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)", fontSize: "11px", fontWeight: 700, color: "#60a5fa", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>
@@ -5202,7 +5192,7 @@ function FeatureCards({ lang }) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
           {features.map(({ icon, tag, tagColor, tagBg, title, desc, accent, glow, border, stat }) => (
-            <div key={title} style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 24, padding: 32, transition: "all 0.3s ease", position: "relative", overflow: "hidden" }}>
+            <div key={title} className="hf-elevated-card" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 24, padding: 32, transition: "all 0.3s ease", position: "relative", overflow: "hidden" }}>
               <div style={{ position: "absolute", top: 0, right: 0, width: 200, height: 200, borderRadius: "50%", background: `radial-gradient(circle, ${glow}, transparent 70%)`, pointerEvents: "none" }} />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                 <div style={{ width: 52, height: 52, borderRadius: 16, background: "rgba(255,255,255,0.04)", border: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px" }}>{icon}</div>
@@ -5238,7 +5228,7 @@ const coachFeatures = lang === "TR"
   
 
   return (
-    <section style={{ padding: "80px 0" }}>
+    <section className="hf-section hf-section--pricing" style={{ padding: "80px 0" }}>
       <div style={styles.container}>
         <div style={{ textAlign: "center", marginBottom: 48 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)", fontSize: "11px", fontWeight: 700, color: "#60a5fa", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>
@@ -5301,7 +5291,7 @@ const LEMONSQUEEZY_PRO_CHECKOUT =
 
 function ProLiveSection({ navigate, lang }) {
   return (
-    <section style={{ padding: "80px 0 100px" }}>
+    <section className="hf-section hf-section--pro" style={{ padding: "80px 0 100px" }}>
       <div style={styles.container}>
         <div
           style={{
@@ -5407,7 +5397,7 @@ function Footer({ navigate, lang }) {
   const productLinks = lang === "TR" ? [["CV Analiz Et", "/app"], ["Panel", "/dashboard"], ["Fiyatlandırma", "/"]] : [["Analyze CV", "/app"], ["Dashboard", "/dashboard"], ["Pricing", "/"]];
 
   return (
-    <footer style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "48px 0 32px" }}>
+    <footer className="hf-section hf-section--footer" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "48px 0 32px" }}>
       <div style={styles.container}>
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 48, marginBottom: 48 }}>
           <div>
@@ -6472,7 +6462,7 @@ export function LandingPage() {
         overflowX: "hidden",
         position: "relative",
         isolation: "isolate",
-        background: "#050508",
+        background: "transparent",
       }}
     >
       <LandingPageAmbient />

@@ -91,7 +91,7 @@ export function TrustSection({ lang }) {
       ];
 
   return (
-    <section style={{ padding: "80px 0", background: "#0A0A0B" }}>
+    <section className="hf-section hf-section--trust" style={{ padding: "80px 0" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 48 }}>
           <div style={pill}>{tr ? "Güven" : "Trust"}</div>
@@ -207,7 +207,7 @@ export function ComparisonSection({ lang }) {
   };
 
   return (
-    <section style={{ padding: "80px 0", background: "#0A0A0B" }}>
+    <section className="hf-section hf-section--compare" style={{ padding: "80px 0" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           <div style={pill}>{tr ? "Karşılaştırma" : "Comparison"}</div>

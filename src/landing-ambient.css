@@ -1,0 +1,267 @@
+/**
+ * HireFit — premium ambient background system (landing + app shell alignment).
+ * Performance: GPU-friendly transforms, reduced-motion support, containment on root.
+ */
+
+:root {
+  --hf-bg-deep: #05070f;
+  --hf-bg-deep-mid: #080d18;
+  --hf-bg-footer: #03050c;
+  --hf-orb-blue: rgba(80, 120, 255, 0.14);
+  --hf-orb-purple: rgba(120, 80, 255, 0.12);
+  --hf-orb-cyan: rgba(60, 200, 220, 0.1);
+  --hf-orb-orange: rgba(255, 140, 80, 0.1);
+}
+
+/* --- Full-page ambient stack (inside LandingPageAmbient) --- */
+
+.hf-ambient-root {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  contain: layout style paint;
+}
+
+.hf-ambient-base {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    165deg,
+    var(--hf-bg-deep) 0%,
+    var(--hf-bg-deep-mid) 42%,
+    #060a12 100%
+  );
+}
+
+.hf-ambient-orbs {
+  position: absolute;
+  inset: -5%;
+  pointer-events: none;
+}
+
+.hf-ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(88px);
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  opacity: 0.95;
+}
+
+/* Blue — top-left / mid-left */
+.hf-ambient-orb--1 {
+  width: min(72vw, 900px);
+  height: min(72vw, 900px);
+  left: -18%;
+  top: 8%;
+  background: radial-gradient(
+    circle at 35% 40%,
+    rgba(80, 120, 255, 0.16) 0%,
+    rgba(80, 120, 255, 0.06) 38%,
+    transparent 62%
+  );
+  animation: hfOrbDriftA 18s ease-in-out infinite alternate;
+}
+
+/* Purple / cyan — center-right */
+.hf-ambient-orb--2 {
+  width: min(65vw, 780px);
+  height: min(65vw, 780px);
+  right: -12%;
+  top: 22%;
+  background: radial-gradient(
+    circle at 60% 45%,
+    rgba(120, 90, 255, 0.14) 0%,
+    rgba(60, 190, 210, 0.08) 45%,
+    transparent 58%
+  );
+  animation: hfOrbDriftB 16s ease-in-out infinite alternate;
+}
+
+/* Orange — bottom band (CTA zone) */
+.hf-ambient-orb--3 {
+  width: min(85vw, 1000px);
+  height: min(50vw, 520px);
+  left: 18%;
+  bottom: -8%;
+  background: radial-gradient(
+    circle at 50% 0%,
+    rgba(255, 140, 80, 0.12) 0%,
+    rgba(255, 120, 90, 0.05) 42%,
+    transparent 65%
+  );
+  animation: hfOrbDriftC 20s ease-in-out infinite alternate;
+}
+
+@keyframes hfOrbDriftA {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.88;
+  }
+  50% {
+    transform: translate(2.5%, -2%) scale(1.03);
+    opacity: 1;
+  }
+}
+
+@keyframes hfOrbDriftB {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1.02);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate(-2%, 1.5%) scale(1);
+    opacity: 0.98;
+  }
+}
+
+@keyframes hfOrbDriftC {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.82;
+  }
+  50% {
+    transform: translate(1.5%, -1%) scale(1.04);
+    opacity: 0.95;
+  }
+}
+
+/* Ultra-light film grain — removes “flat gradient” feel */
+.hf-ambient-noise-film {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hf-ambient-orb--1,
+  .hf-ambient-orb--2,
+  .hf-ambient-orb--3 {
+    animation: none !important;
+    opacity: 0.75;
+  }
+}
+
+/* --- Section-local atmosphere (landing page) --- */
+
+.hf-section {
+  position: relative;
+  isolation: isolate;
+}
+
+.hf-section > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hf-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+}
+
+/* Hero: stronger focal glow + slight lift behind card area */
+.hf-section--hero::before {
+  opacity: 1;
+  background: radial-gradient(
+      ellipse 70% 55% at 78% 42%,
+      rgba(99, 102, 241, 0.09) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 50% 45% at 22% 55%,
+      rgba(56, 189, 248, 0.05) 0%,
+      transparent 50%
+    );
+  mix-blend-mode: soft-light;
+}
+
+/* Features: cleaner, calmer */
+.hf-section--features::before {
+  opacity: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(5, 7, 15, 0.35) 0%,
+    transparent 40%,
+    rgba(5, 7, 15, 0.2) 100%
+  );
+  mix-blend-mode: multiply;
+}
+
+/* Trust / comparison: minimal tint */
+.hf-section--trust::before,
+.hf-section--compare::before {
+  opacity: 1;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(8, 12, 22, 0.25) 50%,
+    transparent 100%
+  );
+}
+
+/* Pricing: conversion emphasis — purple + warm */
+.hf-section--pricing::before {
+  opacity: 1;
+  background: radial-gradient(
+      ellipse 90% 70% at 50% 20%,
+      rgba(139, 92, 246, 0.1) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse 60% 50% at 80% 80%,
+      rgba(251, 146, 60, 0.07) 0%,
+      transparent 50%
+    );
+  mix-blend-mode: soft-light;
+}
+
+/* Pro CTA band */
+.hf-section--pro::before {
+  opacity: 1;
+  background: radial-gradient(
+    ellipse 80% 60% at 50% 50%,
+    rgba(59, 130, 246, 0.08) 0%,
+    transparent 65%
+  );
+  mix-blend-mode: soft-light;
+}
+
+/* Footer: fade darker, almost no glow */
+.hf-section--footer::before {
+  opacity: 1;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--hf-bg-footer) 55%,
+    #020308 100%
+  );
+  mix-blend-mode: normal;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hf-hero-sheen {
+    animation: none !important;
+  }
+}
+
+/* Subtle float / depth on dense card grids */
+.hf-elevated-card {
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
