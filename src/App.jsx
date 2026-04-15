@@ -273,6 +273,17 @@ const RAW_PARSE_FAIL_RE = /\b(parsing failed|gpt parsing failed|parse failed|jso
 function humanizeUserFacingReason(text, lang) {
   const raw = String(text || "").trim();
   if (!raw) return raw;
+  const tr = String(lang || "").trim().toLowerCase() === "tr";
+  if (tr) {
+    const norm = raw.toLowerCase();
+    if (norm === "no measurable impact") return "Ölçülebilir etki görünmüyor";
+    if (norm === "foundational experience signal is present") return "Temel deneyim sinyali var";
+    if (norm === "target role") return "Hedef rol";
+    if (norm === "target role (near match)") return "Hedef rol (yakın eşleşme)";
+    if (norm.startsWith("recommended path:")) {
+      return raw.replace(/recommended path:/i, "Önerilen rota:");
+    }
+  }
   if (RAW_PARSE_FAIL_RE.test(raw)) return translations[lang]?.sanitizeParsingFailed || raw;
   return raw;
 }
@@ -323,6 +334,7 @@ function hirefitTrackDebounced(dedupeKey, eventName, params = {}) {
 }
 
 function getFallbackAnalysis(cvText, jobDescription, lang = "EN") {
+  const tr = String(lang || "").trim().toLowerCase() === "tr";
   const cv = String(cvText || "");
   const jd = String(jobDescription || "");
   const cvL = cv.toLowerCase();
@@ -341,26 +353,38 @@ function getFallbackAnalysis(cvText, jobDescription, lang = "EN") {
 
   const verdict = score < 55 ? "Stop" : "Improve";
   const keyGap = !hasMetrics
-    ? "No measurable impact"
+    ? (tr ? "Ölçülebilir etki görünmüyor" : "No measurable impact")
     : visibleTools.length === 0
-      ? "No visible tools stack"
+      ? (tr ? "Görünür araç seti sinyali yok" : "No visible tools stack")
       : mismatch
-        ? "Role targeting mismatch"
-        : "Low recruiter-readable proof";
+        ? (tr ? "Rol hedefleme uyumsuzluğu" : "Role targeting mismatch")
+        : (tr ? "Recruiter için okunabilir kanıt düşük" : "Low recruiter-readable proof");
 
   const fixes = !hasMetrics
     ? [
-        "Add 2 quantified outcome bullets with clear before/after impact.",
-        "Map your strongest project to the target role using the job's tool language.",
+        tr
+          ? "Açık önce/sonra etkisiyle 2 ölçülebilir sonuç maddesi ekle."
+          : "Add 2 quantified outcome bullets with clear before/after impact.",
+        tr
+          ? "En güçlü projeni ilandaki araç dilini kullanarak hedef role bağla."
+          : "Map your strongest project to the target role using the job's tool language.",
       ]
     : visibleTools.length === 0
       ? [
-          "Add concrete tools used per experience bullet (Excel, SQL, dashboards, etc.).",
-          "Attach one proof link that shows execution quality (repo, case study, dashboard).",
+          tr
+            ? "Her deneyim maddesine kullanılan somut araçları ekle (Excel, SQL, dashboard vb.)."
+            : "Add concrete tools used per experience bullet (Excel, SQL, dashboards, etc.).",
+          tr
+            ? "Uygulama kalitesini gösteren tek bir kanıt linki ekle (repo, vaka, dashboard)."
+            : "Attach one proof link that shows execution quality (repo, case study, dashboard).",
         ]
       : [
-          "Retarget the headline and top summary to this exact role and function.",
-          "Show one result + one tool in each key experience bullet.",
+          tr
+            ? "Başlık ve üst özeti bu role ve fonksiyona net şekilde yeniden hedefle."
+            : "Retarget the headline and top summary to this exact role and function.",
+          tr
+            ? "Her kritik deneyim maddesinde bir sonuç + bir araç göster."
+            : "Show one result + one tool in each key experience bullet.",
         ];
 
   const bump = 12;
@@ -369,7 +393,7 @@ function getFallbackAnalysis(cvText, jobDescription, lang = "EN") {
     after: Math.min(100, score + bump),
     delta: bump,
     narrative:
-      lang === "TR"
+      tr
         ? `Bu iyileştirmelerle skorun ${score} → ${Math.min(100, score + bump)} (+${bump}) olabilir.`
         : `With these fixes your score can move ${score} → ${Math.min(100, score + bump)} (+${bump}).`,
   };
@@ -388,10 +412,11 @@ function getFallbackAnalysis(cvText, jobDescription, lang = "EN") {
 }
 
 function buildFailSafeV2FromFallback(fb, cvText, jobDescription, lang) {
+  const tr = String(lang || "").trim().toLowerCase() === "tr";
   const verdictRaw = fb.verdict === "Stop" ? "do_not_apply" : "apply_with_fixes";
   const inferredRole =
     extractJobTitleFromJd(jobDescription) ||
-    (lang === "TR" ? "Yakın eşleşen rol" : "Nearby fit role");
+    (tr ? "Yakın eşleşen rol" : "Nearby fit role");
   const topKeywordSeed = String(jobDescription || "")
     .toLowerCase()
     .split(/[^a-z0-9+#.]+/i)
@@ -426,7 +451,7 @@ function buildFailSafeV2FromFallback(fb, cvText, jobDescription, lang) {
     },
     Recruiter: {
       reasoning: fb.summary,
-      strengths: [lang === "TR" ? "Temel deneyim sinyali var" : "Foundational experience signal is present"],
+      strengths: [tr ? "Temel deneyim sinyali var" : "Foundational experience signal is present"],
       weaknesses: [fb.keyGap],
     },
     RoleFit: {
@@ -2198,10 +2223,14 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
             {roles.map((r, i) => (
               <div key={`${r.role}-${i}`} style={{ border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px", background: rsAlpha(RS.bgSurface, 0.55) }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: RS.textPrimary }}>{r.role}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: RS.textPrimary }}>
+                    {humanizeUserFacingReason(r.role, lang)}
+                  </div>
                   <div style={{ fontSize: 12, fontWeight: 800, color: RS.indigo }}>{r.score}%</div>
                 </div>
-                <div style={{ fontSize: 12, color: RS.textSecondary, marginTop: 4 }}>{clampBullet(r.why, 88)}</div>
+                <div style={{ fontSize: 12, color: RS.textSecondary, marginTop: 4 }}>
+                  {clampBullet(humanizeUserFacingReason(r.why, lang), 88)}
+                </div>
               </div>
             ))}
           </div>

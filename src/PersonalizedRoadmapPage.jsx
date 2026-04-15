@@ -43,22 +43,22 @@ function detectRoleCandidates({ engineV2, analysisData, cvText, lang }) {
   const inferred = [];
   const pushInf = (role, score, why) => inferred.push({ role, score, why });
   if (/sql|python|power bi|tableau|analytics|analysis|veri/i.test(cv)) {
-    pushInf("Data Analyst", 72, lang === "TR"
+    pushInf(lang === "TR" ? "Veri Analisti" : "Data Analyst", 72, lang === "TR"
       ? "CV'nde analitik düşünme ve veriyle çalışma sinyali var."
       : "Your CV already shows analytical thinking and data signal.");
   }
   if (/business|stakeholder|report|excel|process|iş/i.test(cv)) {
-    pushInf("Business Analyst", 68, lang === "TR"
+    pushInf(lang === "TR" ? "İş Analisti" : "Business Analyst", 68, lang === "TR"
       ? "İş ve veri yorumlama arasında köprü kuran bir profilin var."
       : "Your background aligns with business plus data interpretation.");
   }
   if (/product|roadmap|feature|user|ux/i.test(cv)) {
-    pushInf("Product Analyst", 64, lang === "TR"
+    pushInf(lang === "TR" ? "Ürün Analisti" : "Product Analyst", 64, lang === "TR"
       ? "Ürün ve karar desteği tarafında güçlü sinyallerin var."
       : "You show good signal for product-facing analytical work.");
   }
   if (/operations|operasyon|planning|forecast/i.test(cv)) {
-    pushInf("Operations Analyst", 62, lang === "TR"
+    pushInf(lang === "TR" ? "Operasyon Analisti" : "Operations Analyst", 62, lang === "TR"
       ? "Operasyonel düşünme ve yapı kurma sinyalin net."
       : "You show operational structure and process thinking.");
   }
@@ -465,7 +465,7 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
 
       <div style={blockStyle()}>
         <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-          {lang === "TR" ? "Role redirection" : "Role redirection"}
+          {lang === "TR" ? "Rol yönlendirmesi" : "Role redirection"}
         </div>
         <div style={{ fontSize: 14, color: "#e2e8f0", marginBottom: 10 }}>
           {lang === "TR"
@@ -484,7 +484,7 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
         <>
           <div style={blockStyle()}>
             <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-              {lang === "TR" ? "Career path" : "Career path"}
+              {lang === "TR" ? "Kariyer yolu" : "Career path"}
             </div>
             <div style={{ fontSize: 14, color: "#e2e8f0", marginBottom: 6 }}>
               {lang === "TR" ? "Senin için en iyi yol:" : "Best path for you:"}
@@ -519,7 +519,7 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
 
       <div style={blockStyle()}>
         <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-          {lang === "TR" ? "Career Navigation Map" : "Career Navigation Map"}
+          {lang === "TR" ? "Kariyer Navigasyon Haritası" : "Career Navigation Map"}
         </div>
         <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 12, lineHeight: 1.6 }}>
           {tr
@@ -542,7 +542,7 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
       {isPro ? (
         <div style={blockStyle()}>
           <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-            {lang === "TR" ? "Expected transformation" : "Expected transformation"}
+            {lang === "TR" ? "Beklenen dönüşüm" : "Expected transformation"}
           </div>
           <div style={{ fontSize: 13, color: "#e2e8f0", marginBottom: 6 }}>
             {lang === "TR" ? "Bu yolu uygularsan:" : "If you follow this path:"}
