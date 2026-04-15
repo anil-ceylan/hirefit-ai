@@ -4498,7 +4498,8 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
   }, []);
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
+    const onScroll = () => setScrolled(window.scrollY > 40);
+    onScroll();
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
@@ -4564,7 +4565,7 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
   const avatarLetter = (user?.email?.[0] || account.primary?.[0] || "?").toUpperCase();
 
   return (
-    <nav className="hf-nav-root" data-scrolled={scrolled ? "true" : "false"}>
+    <nav className={`hf-nav-root${scrolled ? " scrolled" : ""}`} data-scrolled={scrolled ? "true" : "false"}>
       <div className="hf-nav-inner-row">
         <div className="hf-nav-logo-cluster" style={{ display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }} onClick={() => navigate("/")}>
           <div className="hf-logo-wrap hf-monogram" style={{ width: 48, height: 48, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden", flexShrink: 0, boxShadow: "0 0 0 1px rgba(255,255,255,0.14) inset, 0 10px 28px rgba(15,23,42,0.45)", transform: hovered === "logo" ? "scale(1.06) rotate(-4deg)" : "scale(1)", transition: "transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s ease" }} onMouseEnter={() => setHovered("logo")} onMouseLeave={() => setHovered(null)}>
