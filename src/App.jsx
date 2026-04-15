@@ -10,6 +10,7 @@ import {
   HowItWorksSection,
   DecisionEngineExplainedSection,
   BeforeAfterSection,
+  HiringLogicQaSection,
   YourNextMovePanel,
 } from "./HireFitSections";
 import { useNavigate, useLocation, Outlet, useOutletContext } from "react-router-dom";
@@ -6588,6 +6589,7 @@ export function LandingPage() {
         <FeatureCards lang={lang} />
         <DecisionEngineExplainedSection lang={lang} />
         <BeforeAfterSection lang={lang} />
+        <HiringLogicQaSection lang={lang} />
         <PricingSection navigate={navigate} lang={lang} />
         <TrustSection lang={lang} />
         <ComparisonSection lang={lang} />

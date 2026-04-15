@@ -423,6 +423,200 @@ export function TrustSection({ lang }) {
   );
 }
 
+export function HiringLogicQaSection({ lang }) {
+  const tr = lang === "TR";
+  const items = tr
+    ? [
+        {
+          q: "HireFit CV’min eleneceğini nasıl biliyor?",
+          a: [
+            "CV’ni ilandaki gerçek işe alım sinyalleriyle karşılaştırır: araçlar, kapsam, seviye ve kanıt.",
+            "Sonra “yazım kalitesi” değil “eleme simülasyonu” çalıştırır.",
+            "Sinyal zayıfsa red riski yükselir.",
+          ],
+        },
+        {
+          q: "Neden ölçülebilir sonuca bu kadar odaklanıyorsunuz?",
+          a: [
+            "Recruiter emek değil, etki arar.",
+            "\"Responsible for\" görünmez; \"maliyeti %18 düşürdüm\" görünür.",
+            "İlk elemede potansiyelden çok kanıt kazanır.",
+          ],
+        },
+        {
+          q: "HireFit neden bazen başvurma diyor?",
+          a: [
+            "Çünkü zamanlama da stratejidir.",
+            "Profil rol barının çok altındaysa hemen başvuru çoğunlukla sessiz red olur.",
+            "Önce kısa bir düzeltme, sonra başvuru daha yüksek dönüşüm verir.",
+          ],
+        },
+        {
+          q: "Neden sadece beceri değil, proje öneriyorsunuz?",
+          a: [
+            "CV’de beceri bir iddia, proje ise kanıttır.",
+            "Hiring ekipleri repo, dashboard, vaka çıktısı gibi görünür üretime güvenir.",
+            "Kararı değiştiren şey “biliyorum” değil “yaptım” sinyalidir.",
+          ],
+        },
+        {
+          q: "Bu sadece ATS anahtar kelime aracı değil mi?",
+          a: [
+            "Hayır. Anahtar kelime sadece ilk katman.",
+            "HireFit rol uyumu, deneyim derinliği, etki kalitesi ve güvenilirlik sinyallerini de okur.",
+            "ATS’yi geçmek mülakat için tek başına yetmez.",
+          ],
+        },
+        {
+          q: "ChatGPT’den farkı ne?",
+          a: [
+            "Genel sohbet yerine başvuru öncesi karar verir.",
+            "Çıktısı net: risk, ana boşluk, ilk hamle.",
+            "Daha az laf, daha çok işe alım mantığı.",
+          ],
+        },
+        {
+          q: "Bu gerçekten şansımı artırır mı?",
+          a: [
+            "Evet, önerilen düzeltmeleri uygularsan.",
+            "CV’lerin çoğu saniyeler içinde taranır; zayıf sinyal hızla elenir.",
+            "Kanıt, hedefleme ve alaka arttığında görüşme olasılığı yükselir.",
+          ],
+        },
+        {
+          q: "Neden cevaplar bu kadar direkt?",
+          a: [
+            "Çünkü hiring süreci direkt.",
+            "Recruiter uzun geri bildirim yazmaz; ilerler ya da eler.",
+            "Açık gerçek, geç gelen sessiz redden daha değerlidir.",
+          ],
+        },
+      ]
+    : [
+        {
+          q: "How does HireFit know if my CV will be rejected?",
+          a: [
+            "It compares your CV against real hiring signals in the JD: tools, scope, level, and proof.",
+            "Then it runs a rejection simulation, not a writing critique.",
+            "If those signals are weak, rejection risk goes up.",
+          ],
+        },
+        {
+          q: "Why do you focus on measurable results?",
+          a: [
+            "Recruiters evaluate impact, not effort.",
+            "\"Responsible for\" gets ignored; \"increased X by 30%\" gets attention.",
+            "Proof beats potential in first-round screening.",
+          ],
+        },
+        {
+          q: "Why does HireFit sometimes tell me NOT to apply?",
+          a: [
+            "Because timing is strategy.",
+            "If your profile is far below the hiring bar, applying now usually means silent rejection.",
+            "Fix first, then apply with a stronger conversion chance.",
+          ],
+        },
+        {
+          q: "Why do you suggest projects instead of just skills?",
+          a: [
+            "Skills on a CV are claims; projects are evidence.",
+            "Hiring teams trust visible output: repo, dashboard, case, shipped work.",
+            "Decisions change when proof is concrete.",
+          ],
+        },
+        {
+          q: "Isn’t this just an ATS keyword tool?",
+          a: [
+            "No. Keywords are only one layer.",
+            "HireFit also checks role fit, depth of experience, impact quality, and credibility signals.",
+            "Passing ATS alone doesn’t secure interviews.",
+          ],
+        },
+        {
+          q: "How is this different from ChatGPT?",
+          a: [
+            "It is built for pre-apply decision logic, not general conversation.",
+            "Output is structured: risk, core gap, and first move.",
+            "Less generic advice, more recruiter pattern matching.",
+          ],
+        },
+        {
+          q: "Can this actually improve my chances?",
+          a: [
+            "Yes, if you execute the fixes.",
+            "Most CVs are filtered in seconds when signal quality is weak.",
+            "Better proof, targeting, and relevance increase interview odds.",
+          ],
+        },
+        {
+          q: "Why are the answers so direct?",
+          a: [
+            "Because hiring decisions are direct.",
+            "Recruiters scan fast; they don’t write long feedback.",
+            "Clear truth now is better than silent rejection later.",
+          ],
+        },
+      ];
+
+  return (
+    <section className="hf-section hf-section--qa" style={{ padding: "80px 0" }}>
+      <div style={container}>
+        <div style={{ textAlign: "center", marginBottom: 42 }}>
+          <div style={pill}>{tr ? "Sıkı gerçekler" : "Hiring reality Q/A"}</div>
+          <h2 style={h2}>{tr ? "Bu araç neden güvenilir?" : "Why this is credible"}</h2>
+          <p style={sub}>
+            {tr
+              ? "Bu bölüm “SSS” değil. İşe alımın nasıl çalıştığını recruiter mantığıyla açıklar."
+              : "Not a generic FAQ. This explains hiring mechanics with recruiter-first logic."}
+          </p>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+            gap: 14,
+          }}
+        >
+          {items.map((item) => (
+            <div key={item.q} className="hf-micro-lift hf-glass-card" style={glassCardStyle({ padding: 22, borderRadius: 16 })}>
+              <div style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+                <span
+                  style={{
+                    width: 22,
+                    height: 22,
+                    minWidth: 22,
+                    borderRadius: 999,
+                    display: "grid",
+                    placeItems: "center",
+                    background: "rgba(99,102,241,0.18)",
+                    border: "1px solid rgba(99,102,241,0.35)",
+                    color: "#c7d2fe",
+                    fontSize: 12,
+                    fontWeight: 900,
+                    lineHeight: 1,
+                  }}
+                >
+                  ?
+                </span>
+                <h3 style={{ margin: 0, fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#f8fafc", lineHeight: 1.3 }}>
+                  {item.q}
+                </h3>
+              </div>
+              <div style={{ color: "#cbd5e1", fontSize: 14, lineHeight: 1.6 }}>
+                {item.a.map((line) => (
+                  <div key={`${item.q}-${line}`}>{line}</div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function ComparisonSection({ lang }) {
   const tr = lang === "TR";
   const rows = tr
