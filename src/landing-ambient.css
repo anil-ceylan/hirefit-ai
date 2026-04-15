@@ -820,3 +820,118 @@
     max-width: min(120px, 42vw);
   }
 }
+
+/* --- Premium CTA + card lift (landing + panels) --- */
+
+@keyframes hfCtaGradientShift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.hf-cta-primary {
+  background: linear-gradient(120deg, #2563eb 0%, #6366f1 38%, #7c3aed 72%, #06b6d4 100%);
+  background-size: 200% 200%;
+  animation: hfCtaGradientShift 6s ease infinite;
+  box-shadow:
+    0 14px 44px rgba(99, 102, 241, 0.42),
+    0 0 0 1px rgba(255, 255, 255, 0.12) inset,
+    0 0 40px rgba(56, 189, 248, 0.2);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.28s ease,
+    filter 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.hf-cta-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.07);
+  box-shadow:
+    0 20px 56px rgba(99, 102, 241, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.16) inset,
+    0 0 56px rgba(129, 140, 248, 0.35);
+}
+
+.hf-cta-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.hf-micro-lift {
+  transition:
+    transform 0.26s ease,
+    box-shadow 0.28s ease,
+    border-color 0.26s ease;
+}
+
+.hf-micro-lift:hover {
+  transform: translateY(-4px);
+}
+
+.hf-badge-soft {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #93c5fd;
+  border: 1px solid rgba(147, 197, 253, 0.28);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.hf-glass-card {
+  position: relative;
+}
+
+.hf-btn-secondary-ghost:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  transform: translateY(-1px);
+}
+
+/* Mid-landing sections: softer light than hero */
+.hf-section--social::before {
+  opacity: 1;
+  background: radial-gradient(ellipse 85% 55% at 50% 25%, rgba(99, 102, 241, 0.07), transparent 58%);
+  mix-blend-mode: soft-light;
+}
+
+.hf-section--how::before {
+  opacity: 1;
+  background: linear-gradient(180deg, rgba(5, 8, 18, 0.2) 0%, transparent 42%, rgba(5, 8, 18, 0.28) 100%);
+}
+
+.hf-section--decision::before {
+  opacity: 1;
+  background:
+    radial-gradient(ellipse 70% 48% at 18% 42%, rgba(56, 189, 248, 0.06), transparent 55%),
+    radial-gradient(ellipse 65% 45% at 88% 58%, rgba(129, 140, 248, 0.06), transparent 52%);
+  mix-blend-mode: soft-light;
+}
+
+.hf-section--before-after::before {
+  opacity: 1;
+  background: linear-gradient(165deg, rgba(3, 5, 14, 0.35) 0%, transparent 48%, rgba(3, 5, 14, 0.25) 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hf-cta-primary {
+    animation: none;
+    background-size: 100% 100%;
+  }
+
+  .hf-micro-lift:hover {
+    transform: none;
+  }
+
+  .hf-btn-secondary-ghost:hover:not(:disabled) {
+    transform: none;
+  }
+}

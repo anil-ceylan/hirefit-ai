@@ -1,5 +1,23 @@
-import { Fragment } from "react";
-import { ShieldCheck, Lock, Eye, Server, BadgeCheck, X } from "lucide-react";
+import { Fragment, useMemo } from "react";
+import { motion } from "framer-motion";
+import { parseActionPlan, enrichActionPlan, pickDoThisNextStep } from "../lib/analyze-v2/actionPlanNormalize.js";
+import {
+  ShieldCheck,
+  Lock,
+  Eye,
+  Server,
+  BadgeCheck,
+  X,
+  Sparkles,
+  CheckCircle2,
+  Cpu,
+  Wand2,
+  RotateCcw,
+  Zap,
+  Loader2,
+  TrendingUp,
+  FileText,
+} from "lucide-react";
 
 const container = {
   maxWidth: "1500px",
@@ -35,12 +53,271 @@ const h2 = {
 };
 
 const sub = {
-  color: "#64748b",
+  color: "#94a3b8",
   fontSize: "16px",
   maxWidth: 560,
   margin: "0 auto 48px",
   lineHeight: 1.65,
 };
+
+const RAW_PARSE_FAIL_RE = /\b(parsing failed|gpt parsing failed|parse failed|json parse)\b/i;
+
+function softReason(text, lang) {
+  const raw = String(text || "").trim();
+  if (!raw) return raw;
+  if (RAW_PARSE_FAIL_RE.test(raw)) {
+    return lang === "TR" ? "Analiz çıktısı ayrıştırılamadı." : "We couldn't parse this insight cleanly.";
+  }
+  return raw;
+}
+
+function glassCardStyle(extra = {}) {
+  return {
+    borderRadius: 20,
+    border: "1px solid rgba(255,255,255,0.1)",
+    background: "linear-gradient(165deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+    boxShadow:
+      "0 24px 64px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 0 1px rgba(0,0,0,0.35)",
+    backdropFilter: "blur(20px) saturate(1.25)",
+    WebkitBackdropFilter: "blur(20px) saturate(1.25)",
+    ...extra,
+  };
+}
+
+export function SocialProofSection({ lang }) {
+  const tr = lang === "TR";
+  const logos = tr
+    ? ["Teknoloji", "Finans", "Ürün", "Danışmanlık", "Startup"]
+    : ["Technology", "Finance", "Product", "Consulting", "Startups"];
+  return (
+    <section className="hf-section hf-section--social" style={{ padding: "56px 0 32px" }}>
+      <div style={container}>
+        <div style={{ textAlign: "center", marginBottom: 28 }}>
+          <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+            <span className="hf-badge-soft">
+              <Cpu size={12} strokeWidth={2.2} />
+              {tr ? "Karar öncelikli" : "Decision-first"}
+            </span>
+            <span className="hf-badge-soft">
+              <Sparkles size={12} strokeWidth={2.2} />
+              AI-powered
+            </span>
+          </div>
+          <p
+            style={{
+              margin: 0,
+              fontSize: "13px",
+              fontWeight: 700,
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+              color: "#64748b",
+            }}
+          >
+            {tr ? "5.000+ profesyonele güvenildi (yer tutucu)" : "Trusted by 5,000+ professionals (placeholder)"}
+          </p>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            justifyContent: "center",
+            gap: 10,
+            opacity: 0.85,
+          }}
+        >
+          {logos.map((name) => (
+            <div
+              key={name}
+              className="hf-micro-lift"
+              style={{
+                ...glassCardStyle({ padding: "10px 18px", borderRadius: 999 }),
+                fontSize: 12,
+                fontWeight: 600,
+                color: "#94a3b8",
+              }}
+            >
+              {name}
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function HowItWorksSection({ lang }) {
+  const tr = lang === "TR";
+  const steps = tr
+    ? [
+        { n: "1", title: "CV + ilanı yapıştır", body: "Gerçek ilan metniyle eşleştiririz — tahmin değil.", icon: FileText },
+        { n: "2", title: "Kararı ve boşlukları gör", body: "Red riski, eksik anahtar kelimeler ve net boşluklar.", icon: Zap },
+        { n: "3", title: "Düzelt → tekrar analiz et", body: "Aynı döngü: düzelt, tekrar çalıştır, ilerlemeyi gör.", icon: RotateCcw },
+      ]
+    : [
+        { n: "1", title: "Paste CV + real JD", body: "We match against the actual posting — not guesses.", icon: FileText },
+        { n: "2", title: "See the decision + gaps", body: "Rejection risk, missing keywords, and clear gaps.", icon: Zap },
+        { n: "3", title: "Fix → re-run", body: "Same loop: fix, re-analyze, watch strength climb.", icon: RotateCcw },
+      ];
+
+  return (
+    <section className="hf-section hf-section--how" style={{ padding: "72px 0" }}>
+      <div style={container}>
+        <div style={{ textAlign: "center", marginBottom: 44 }}>
+          <div style={pill}>{tr ? "Nasıl çalışır" : "How it works"}</div>
+          <h2 style={h2}>{tr ? "Üç adımda netlik" : "Clarity in three steps"}</h2>
+          <p style={sub}>
+            {tr
+              ? "Skor için değil — başvurup başvurmama ve sıradaki hamle için buradasınız."
+              : "Not for vanity scores — you’re here for apply / don’t apply and your next move."}
+          </p>
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 18,
+          }}
+        >
+          {steps.map((s, i) => (
+            <motion.div
+              key={s.n}
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ duration: 0.35, delay: i * 0.06 }}
+              className="hf-micro-lift hf-glass-card"
+              style={{
+                ...glassCardStyle({ padding: 26 }),
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 12,
+                  background: "rgba(99,102,241,0.15)",
+                  border: "1px solid rgba(99,102,241,0.25)",
+                  display: "grid",
+                  placeItems: "center",
+                  marginBottom: 14,
+                }}
+              >
+                <s.icon size={18} color="#a5b4fc" />
+              </div>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#64748b", marginBottom: 8 }}>STEP {s.n}</div>
+              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 800, margin: "0 0 10px", color: "#f1f5f9" }}>{s.title}</h3>
+              <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.6, color: "#94a3b8" }}>{s.body}</p>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function DecisionEngineExplainedSection({ lang }) {
+  const tr = lang === "TR";
+  const blocks = tr
+    ? [
+        { k: "Sorun", tone: "#fb7185", body: "Tek cümlede neden eleniyorsun — spekülasyon değil, sinyal." },
+        { k: "Boşluk", tone: "#fbbf24", body: "Eksik beceri, anahtar kelime ve deneyim sinyali yan yana." },
+        { k: "Aksiyon", tone: "#4ade80", body: "Bugün yapılacak tek net hamle — sonra tekrar analiz." },
+      ]
+    : [
+        { k: "Problem", tone: "#fb7185", body: "One line on why you’re filtered out — signal, not vibes." },
+        { k: "Gap", tone: "#fbbf24", body: "Missing skills, keywords, and experience signal — side by side." },
+        { k: "Action", tone: "#4ade80", body: "One finishable move today — then re-run the same analysis." },
+      ];
+
+  return (
+    <section className="hf-section hf-section--decision" style={{ padding: "72px 0" }}>
+      <div style={container}>
+        <div style={{ textAlign: "center", marginBottom: 40 }}>
+          <div style={pill}>{tr ? "Karar motoru" : "Decision engine"}</div>
+          <h2 style={h2}>{tr ? "Skor değil — karar + aksiyon" : "Not a score — a decision + action"}</h2>
+          <p style={sub}>
+            {tr
+              ? "HireFit bir ‘analiz aracı’ gibi değil; başvuru öncesi karar ve tekrar çalıştırma döngüsü gibi davranır."
+              : "HireFit behaves less like a ‘smart analyzer’ and more like a pre-apply decision loop you can re-run."}
+          </p>
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 14,
+          }}
+        >
+          {blocks.map((b) => (
+            <div key={b.k} className="hf-micro-lift hf-glass-card" style={glassCardStyle({ padding: 22 })}>
+              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: b.tone, marginBottom: 10 }}>{b.k}</div>
+              <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.65, color: "#cbd5e1" }}>{b.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export function BeforeAfterSection({ lang }) {
+  const tr = lang === "TR";
+  return (
+    <section className="hf-section hf-section--before-after" style={{ padding: "72px 0" }}>
+      <div style={container}>
+        <div style={{ textAlign: "center", marginBottom: 36 }}>
+          <div style={pill}>{tr ? "Önce / Sonra" : "Before / After"}</div>
+          <h2 style={h2}>{tr ? "Aynı başvuru — daha güçlü profil" : "Same application — stronger profile"}</h2>
+          <p style={sub}>
+            {tr
+              ? "Örnek: ölçülebilir etki + doğru anahtar kelimeler → profil gücü yükselir."
+              : "Example: measurable impact + the right keywords → profile strength climbs."}
+          </p>
+        </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: 18,
+            maxWidth: 920,
+            margin: "0 auto",
+          }}
+        >
+          <div className="hf-micro-lift hf-glass-card" style={glassCardStyle({ padding: 24 })}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#fb7185", marginBottom: 12 }}>{tr ? "ÖNCE" : "BEFORE"}</div>
+            <ul style={{ margin: 0, paddingLeft: 18, color: "#94a3b8", fontSize: 14, lineHeight: 1.7 }}>
+              {(tr
+                ? ["Belirsiz madde başlıkları", "İlanda geçen kritik kelimeler eksik", "Etki ölçülebilir değil"]
+                : ["Vague bullets", "Missing critical JD keywords", "No measurable impact"]).map((x) => (
+                <li key={x}>{x}</li>
+              ))}
+            </ul>
+            <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>{tr ? "Profil gücü" : "Profile strength"}</div>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, color: "#f87171" }}>54</div>
+            </div>
+          </div>
+          <div className="hf-micro-lift hf-glass-card" style={glassCardStyle({ padding: 24 })}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#4ade80", marginBottom: 12 }}>{tr ? "SONRA" : "AFTER"}</div>
+            <ul style={{ margin: 0, paddingLeft: 18, color: "#94a3b8", fontSize: 14, lineHeight: 1.7 }}>
+              {(tr
+                ? ["Madde başına metrik + sonuç", "İlan diliyle hizalı anahtar kelimeler", "7 saniyede okunur hikâye"]
+                : ["Metrics + outcomes per bullet", "Keywords aligned to the posting", "A story recruiters scan in 7s"]).map((x) => (
+                <li key={x}>{x}</li>
+              ))}
+            </ul>
+            <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>{tr ? "Profil gücü" : "Profile strength"}</div>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, color: "#4ade80" }}>81</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 export function TrustSection({ lang }) {
   const tr = lang === "TR";
@@ -273,5 +550,348 @@ export function ComparisonSection({ lang }) {
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Post-analysis “decision → action” panel (analyzer). Complements CareerEngineCard without duplicating the full verdict UI.
+ */
+export function YourNextMovePanel({
+  lang,
+  engineV2,
+  missingSkills = [],
+  topKeywords = [],
+  alignmentScore,
+  reanalysisResult,
+  optimizedCv = "",
+  onFixCv,
+  onReanalyze,
+  optimizing,
+  isPro,
+  onUpgrade,
+}) {
+  const tr = lang === "TR";
+  const data = engineV2;
+
+  const { problemLine, oneAction, currentInt, targetInt, gainPts } = useMemo(() => {
+    if (!data) {
+      return {
+        problemLine: "",
+        oneAction: "",
+        currentInt: null,
+        targetInt: null,
+        gainPts: 10,
+      };
+    }
+    const rawScore = data["Final Alignment Score"];
+    const scoreNum = rawScore != null && Number.isFinite(Number(rawScore)) ? Number(rawScore) : null;
+    const current = scoreNum ?? (alignmentScore != null && Number.isFinite(Number(alignmentScore)) ? Math.round(Number(alignmentScore)) : null);
+
+    const plan = enrichActionPlan(parseActionPlan(data.Decision?.action_plan), {
+      lang: tr ? "tr" : "en",
+      roleFit: data.RoleFit,
+      gaps: data.Gaps,
+      verdict: data.Decision?.final_verdict,
+    });
+    const planFixes = plan.fixes.filter((f) => f.issue || (f.steps && f.steps.length));
+    const primaryFix = planFixes.find((f) => f.priority === "high") || planFixes[0] || null;
+    const stepPick = pickDoThisNextStep(planFixes);
+    const singleActionRaw =
+      (stepPick && String(stepPick).trim()) ||
+      (primaryFix?.issue ? String(primaryFix.issue).trim() : "") ||
+      (plan.priority_callout ? String(plan.priority_callout).trim() : "");
+    const oneActionText = singleActionRaw
+      ? softReason(singleActionRaw, lang)
+      : tr
+        ? "Ölçülebilir etki içeren madde başlıkları yaz."
+        : "Rewrite bullets with measurable impact.";
+
+    const gaps = data.Gaps?.rejection_reasons || [];
+    const biggestRaw =
+      (data.Gaps?.biggest_gap && String(data.Gaps.biggest_gap).trim()) ||
+      (gaps[0]?.issue ? String(gaps[0].issue) : "");
+    const mainProblemFromGap = biggestRaw ? softReason(biggestRaw, lang) : "";
+    const oneLineReasonRaw = String(data.Decision?.reasoning || data.Recruiter?.reasoning || "")
+      .trim()
+      .split(/[.!?]/)[0]
+      ?.trim();
+    const mainProblemFromReason = oneLineReasonRaw ? softReason(oneLineReasonRaw, lang) : "";
+    const problem = mainProblemFromGap || mainProblemFromReason;
+
+    const gain = primaryFix
+      ? Math.max(1, Math.min(18, Math.round(Number(primaryFix.score_impact) || 6)))
+      : current != null && current < 72
+        ? Math.min(18, Math.max(5, Math.round((72 - current) / 2)))
+        : 10;
+    const target = current != null ? Math.min(100, Math.round(current + gain)) : null;
+
+    return {
+      problemLine: problem,
+      oneAction: oneActionText,
+      currentInt: current,
+      targetInt: target,
+      gainPts: gain,
+    };
+  }, [data, alignmentScore, lang]);
+
+  if (!data) return null;
+
+  const skills = (Array.isArray(missingSkills) ? missingSkills : []).slice(0, 5).map((x) => String(x));
+  const kws = (Array.isArray(topKeywords) ? topKeywords : []).slice(0, 6).map((x) => String(x));
+
+  const loopSteps = tr
+    ? [
+        { t: "CV maddelerini düzelt (ölçülebilir etki)", d: "Her maddeye sonuç + sayı ekle." },
+        { t: "Eksik anahtar kelimeleri ekle", d: "İlan dilini birebir yansıt." },
+        { t: "Tekrar analiz et", d: "Aynı CV + ilan ile yeniden çalıştır." },
+      ]
+    : [
+        { t: "Fix CV bullets", d: "Add outcomes + numbers per bullet." },
+        { t: "Add missing keywords", d: "Mirror the JD language." },
+        { t: "Re-analyze", d: "Re-run with the same CV + JD." },
+      ];
+
+  const fillPct = currentInt != null ? Math.min(100, Math.max(6, currentInt)) : 0;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35 }}
+      className="hf-next-move-panel hf-micro-lift"
+      style={{
+        marginTop: 22,
+        marginBottom: 8,
+        ...glassCardStyle({ padding: "24px 22px 22px" }),
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              background: "rgba(56,189,248,0.12)",
+              border: "1px solid rgba(56,189,248,0.22)",
+              display: "grid",
+              placeItems: "center",
+            }}
+          >
+            <TrendingUp size={20} color="#38bdf8" />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#64748b", textTransform: "uppercase" }}>
+              {tr ? "Sıradaki hamle" : "Your next move"}
+            </div>
+            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "18px", fontWeight: 800, color: "#f8fafc", marginTop: 2 }}>
+              {tr ? "Karar → aksiyon → tekrar analiz" : "Decision → action → re-run"}
+            </div>
+          </div>
+        </div>
+        {reanalysisResult ? (
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: "#6ee7b7",
+              padding: "6px 10px",
+              borderRadius: 999,
+              border: "1px solid rgba(52,211,153,0.35)",
+              background: "rgba(16,185,129,0.08)",
+            }}
+          >
+            {tr ? "Son düzeltme: " : "Last fix: "}
+            {reanalysisResult.before}→{reanalysisResult.after} ({reanalysisResult.delta >= 0 ? "+" : ""}
+            {reanalysisResult.delta})
+          </div>
+        ) : null}
+      </div>
+
+      {currentInt != null && targetInt != null ? (
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#cbd5e1" }}>
+              {tr ? "Profil gücü" : "Profile strength"}
+            </span>
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e8f0" }}>
+              {currentInt} → {targetInt}
+              <span style={{ marginLeft: 8, fontSize: 14, fontWeight: 700, color: "#4ade80" }}>+{gainPts}</span>
+            </span>
+          </div>
+          <div
+            style={{
+              height: 8,
+              borderRadius: 999,
+              background: "rgba(255,255,255,0.06)",
+              overflow: "hidden",
+              boxShadow: "inset 0 1px 2px rgba(0,0,0,0.35)",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${fillPct}%`,
+                borderRadius: 999,
+                background: "linear-gradient(90deg, #6366f1, #22d3ee)",
+                boxShadow: "0 0 24px rgba(99,102,241,0.45)",
+                transition: "width 0.5s ease",
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
+
+      <div style={{ display: "grid", gap: 12, marginBottom: 18 }}>
+        <div
+          style={{
+            padding: "12px 14px",
+            borderRadius: 12,
+            border: "1px solid rgba(251,113,133,0.25)",
+            background: "rgba(244,63,94,0.06)",
+          }}
+        >
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "#fb7185", textTransform: "uppercase", marginBottom: 6 }}>
+            {tr ? "Sorun" : "The problem"}
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 600, color: "#fecdd3", lineHeight: 1.5 }}>
+            {problemLine ||
+              (tr ? "Profilin, ilanın beklediği sinyalleri net göstermiyor." : "Your profile isn’t showing the signals this posting expects.")}
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: "12px 14px",
+            borderRadius: 12,
+            border: "1px solid rgba(251,191,36,0.22)",
+            background: "rgba(245,158,11,0.06)",
+          }}
+        >
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "#fbbf24", textTransform: "uppercase", marginBottom: 10 }}>
+            {tr ? "Boşluk" : "The gap"}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 6 }}>{tr ? "Eksik beceriler" : "Missing skills"}</div>
+              <div style={{ fontSize: 13, color: "#e2e8f0", lineHeight: 1.55 }}>
+                {skills.length ? skills.join(" · ") : tr ? "— listelenmedi" : "— none listed"}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 6 }}>{tr ? "Anahtar kelimeler" : "Keywords"}</div>
+              <div style={{ fontSize: 13, color: "#e2e8f0", lineHeight: 1.55 }}>
+                {kws.length ? kws.join(" · ") : tr ? "— listelenmedi" : "— none listed"}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 6 }}>{tr ? "Deneyim sinyali" : "Experience signal"}</div>
+              <div style={{ fontSize: 13, color: "#e2e8f0", lineHeight: 1.55 }}>
+                {problemLine
+                  ? tr
+                    ? "Ölçülebilir sonuç ve rol uyumu eksik görünüyor."
+                    : "Measurable outcomes + role fit read weak."
+                  : tr
+                    ? "İlanla hizalı kanıt satırı ekleyin."
+                    : "Add proof lines aligned to the JD."}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            padding: "12px 14px",
+            borderRadius: 12,
+            border: "1px solid rgba(74,222,128,0.28)",
+            background: "rgba(34,197,94,0.07)",
+          }}
+        >
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "#4ade80", textTransform: "uppercase", marginBottom: 6 }}>
+            {tr ? "Tek net aksiyon" : "One clear action"}
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#ecfccb", lineHeight: 1.45 }}>👉 {oneAction}</div>
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", color: "#64748b", textTransform: "uppercase", marginBottom: 10 }}>
+          {tr ? "Döngü" : "Feedback loop"}
+        </div>
+        <ol style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
+          {loopSteps.map((s, idx) => (
+            <li key={s.t} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <CheckCircle2 size={18} color="#64748b" style={{ marginTop: 2, flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0" }}>
+                  {idx + 1}. {s.t}
+                </div>
+                <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.5 }}>{s.d}</div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+        <button
+          type="button"
+          className="hf-cta-primary"
+          onClick={() => {
+            if (!isPro) {
+              onUpgrade();
+              return;
+            }
+            onFixCv();
+          }}
+          disabled={optimizing && isPro}
+          style={{
+            flex: "1 1 220px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "14px 20px",
+            borderRadius: 12,
+            border: "none",
+            cursor: optimizing && isPro ? "wait" : "pointer",
+            fontWeight: 700,
+            fontSize: 15,
+            fontFamily: "'DM Sans', sans-serif",
+            color: "#0f172a",
+            opacity: optimizing && isPro ? 0.85 : 1,
+          }}
+        >
+          {optimizing && isPro ? <Loader2 size={18} style={{ animation: "spin 0.8s linear infinite" }} /> : <Wand2 size={18} />}
+          {!isPro ? (tr ? "CV'mi düzelt — Pro" : "Fix my CV — Pro") : optimizing && isPro ? (tr ? "Optimize ediliyor..." : "Optimizing...") : tr ? "👉 CV'mi şimdi düzelt" : "👉 Fix my CV now"}
+        </button>
+        <button
+          type="button"
+          onClick={onReanalyze}
+          disabled={!String(optimizedCv || "").trim()}
+          className="hf-btn-secondary-ghost"
+          style={{
+            flex: "1 1 200px",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "14px 18px",
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,0.12)",
+            background: "rgba(255,255,255,0.04)",
+            color: "#e2e8f0",
+            fontWeight: 700,
+            fontSize: 14,
+            fontFamily: "'DM Sans', sans-serif",
+            cursor: !String(optimizedCv || "").trim() ? "not-allowed" : "pointer",
+            opacity: !String(optimizedCv || "").trim() ? 0.45 : 1,
+          }}
+        >
+          <RotateCcw size={16} />
+          {tr ? "Tekrar analiz et" : "Re-analyze"}
+        </button>
+      </div>
+    </motion.div>
   );
 }

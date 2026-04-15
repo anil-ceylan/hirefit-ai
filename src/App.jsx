@@ -3,7 +3,15 @@ import "./landing-ambient.css";
 import { parseActionPlan, enrichActionPlan, pickDoThisNextStep } from "../lib/analyze-v2/actionPlanNormalize.js";
 import supabase from "./supabaseClient";
 import PersonalizedRoadmapPage from "./PersonalizedRoadmapPage.jsx";
-import { TrustSection, ComparisonSection } from "./HireFitSections";
+import {
+  TrustSection,
+  ComparisonSection,
+  SocialProofSection,
+  HowItWorksSection,
+  DecisionEngineExplainedSection,
+  BeforeAfterSection,
+  YourNextMovePanel,
+} from "./HireFitSections";
 import { useNavigate, useLocation, Outlet, useOutletContext } from "react-router-dom";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -1087,12 +1095,12 @@ const HF_HERO_WORD_REVEAL_MS = 420;
 function HeroStaggeredHeadline({ lang }) {
   const line1 =
     lang === "TR"
-      ? "CV'n neden reddediliyor?".split(/\s+/).filter(Boolean)
-      : "Why does your CV get rejected?".split(/\s+/).filter(Boolean);
+      ? "Başvurmadan önce reddedilecek misin bil.".split(/\s+/).filter(Boolean)
+      : "Know if you'll get rejected — before you apply.".split(/\s+/).filter(Boolean);
   const line2 =
     lang === "TR"
-      ? "Artık bileceksin.".split(/\s+/).filter(Boolean)
-      : "Now you'll know.".split(/\s+/).filter(Boolean);
+      ? "Karar, skor değil. Net aksiyon.".split(/\s+/).filter(Boolean)
+      : "Decisions, not scores. Clear next steps.".split(/\s+/).filter(Boolean);
   const totalWords = line1.length + line2.length;
   const pulseDelayMs = (totalWords - 1) * HF_HERO_WORD_DELAY_MS + HF_HERO_WORD_REVEAL_MS;
 
@@ -5039,18 +5047,35 @@ function HeroSection({ navigate, lang }) {
             >
               <HeroStaggeredHeadline lang={lang} />
             </h1>
+            <p
+              className="hero-fade hf-hero-sub"
+              style={{
+                marginTop: 20,
+                marginBottom: 0,
+                maxWidth: 520,
+                fontSize: "clamp(16px, 1.8vw, 18px)",
+                lineHeight: 1.55,
+                fontWeight: 500,
+                color: "#cbd5e1",
+                animationDelay: "0.35s",
+              }}
+            >
+              {lang === "TR"
+                ? "CV'ni dakikalar içinde güçlendir; mülakat şansını artır — başvurmadan önce gerçek kararı gör."
+                : "Fix your CV in minutes and increase your interview chances — see the real decision before you apply."}
+            </p>
             <button
               type="button"
+              className="hf-cta-primary"
               onClick={() => navigate("/app")}
               style={{
-                marginTop: 24,
+                marginTop: 28,
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
                 alignSelf: "flex-start",
                 gap: 8,
-                padding: "15px 26px",
-                background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+                padding: "15px 28px",
                 border: "none",
                 borderRadius: 12,
                 cursor: "pointer",
@@ -5058,9 +5083,6 @@ function HeroSection({ navigate, lang }) {
                 fontWeight: 700,
                 fontSize: 15,
                 fontFamily: "'DM Sans', sans-serif",
-                boxShadow:
-                  "0 0 48px rgba(99,102,241,0.55), 0 0 96px rgba(56,189,248,0.2), inset 0 1px 0 rgba(255,255,255,0.18)",
-                transition: "transform 0.2s ease, box-shadow 0.2s ease",
               }}
             >
               {lang === "TR" ? "Kararını öğren →" : "Get your verdict →"}
@@ -5275,20 +5297,28 @@ function FeatureCards({ lang }) {
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(32px, 4vw, 52px)", fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 14, lineHeight: 1.1 }}>
             {lang === "TR" ? <>Kariyer hedefine ulaşmak için<br />ihtiyacın olan her şey</> : <>Every tool you need<br />to get hired</>}
           </h2>
-          <p style={{ color: "#64748b", fontSize: "16px", maxWidth: 480, margin: "0 auto" }}>
-            {lang === "TR" ? "Sadece bir ATS aracı değil — HireFit size neden reddedildiğinizi ve tam olarak nasıl düzelteceğinizi söyler." : "Not just another ATS checker — HireFit tells you why you're getting rejected and exactly how to fix it."}
+          <p style={{ color: "#a1b4cf", fontSize: "17px", maxWidth: 520, margin: "0 auto", lineHeight: 1.65 }}>
+            {lang === "TR"
+              ? "Tek bir skor değil — başvur / risk / vazgeç kararı, red nedenleri ve sıradaki tek hamle."
+              : "Not a single score — an apply / risk / pass decision, rejection reasons, and the one move that moves the needle."}
           </p>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 300px), 1fr))",
+            gap: 20,
+          }}
+        >
           {features.map(({ icon, tag, tagColor, tagBg, title, desc, accent, glow, border, stat }) => (
-            <div key={title} className="hf-elevated-card" style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 24, padding: 32, transition: "all 0.3s ease", position: "relative", overflow: "hidden" }}>
+            <div key={title} className="hf-elevated-card hf-micro-lift" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 24, padding: 32, transition: "transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease", position: "relative", overflow: "hidden" }}>
               <div style={{ position: "absolute", top: 0, right: 0, width: 200, height: 200, borderRadius: "50%", background: `radial-gradient(circle, ${glow}, transparent 70%)`, pointerEvents: "none" }} />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                 <div style={{ width: 52, height: 52, borderRadius: 16, background: "rgba(255,255,255,0.04)", border: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px" }}>{icon}</div>
                 <span style={{ padding: "4px 12px", borderRadius: 999, background: tagBg, color: tagColor, fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em" }}>{tag}</span>
               </div>
               <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 700, marginBottom: 10 }}>{title}</h3>
-              <p style={{ color: "#64748b", fontSize: "14px", lineHeight: 1.7, marginBottom: 20 }}>{desc}</p>
+              <p style={{ color: "#a1b4cf", fontSize: "14px", lineHeight: 1.75, marginBottom: 20 }}>{desc}</p>
               <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: accent, boxShadow: `0 0 8px ${accent}` }} />
                 <span style={{ fontSize: "12px", fontWeight: 600, color: accent }}>{stat}</span>
@@ -6495,6 +6525,7 @@ const msgInterval = setInterval(() => {
     generateLearningPlan,
     decisionImpactContext,
     reanalysisResult,
+    reanalysisBaseline,
     setError,
     scoreRunProgress,
     adminTargetEmail,
@@ -6557,10 +6588,14 @@ export function LandingPage() {
       <LandingPageAmbient />
       <div style={{ position: "relative", zIndex: 1 }}>
         <HeroSection navigate={navigate} lang={lang} />
+        <SocialProofSection lang={lang} />
+        <HowItWorksSection lang={lang} />
         <FeatureCards lang={lang} />
+        <DecisionEngineExplainedSection lang={lang} />
+        <BeforeAfterSection lang={lang} />
+        <PricingSection navigate={navigate} lang={lang} />
         <TrustSection lang={lang} />
         <ComparisonSection lang={lang} />
-        <PricingSection navigate={navigate} lang={lang} />
         <ProLiveSection navigate={navigate} lang={lang} />
         <Footer navigate={navigate} lang={lang} />
       </div>
@@ -7256,6 +7291,20 @@ export function AnalyzerPage() {
           optimizing={optimizing}
           cvText={cvText}
           jdText={jdText}
+        />
+        <YourNextMovePanel
+          lang={lang}
+          engineV2={engineV2}
+          missingSkills={missingSkills}
+          topKeywords={topKeywords}
+          alignmentScore={alignmentScore}
+          reanalysisResult={reanalysisResult}
+          optimizedCv={optimizedCv}
+          onFixCv={optimizeCv}
+          onReanalyze={reanalyzeAfterFix}
+          optimizing={optimizing}
+          isPro={isPro}
+          onUpgrade={openUpgrade}
         />
       </motion.div>
     )}
