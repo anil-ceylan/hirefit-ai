@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
@@ -167,84 +168,282 @@ function CareerNavigationMap({
   lang,
   steps,
   completed,
-  activeStepId,
+  selectedStepId,
   currentStepIndex,
   onSelectStep,
   onToggleStep,
+  compact = false,
 }) {
   const tr = lang === "TR";
-  const activeStep = steps.find((s) => s.id === activeStepId) || steps[0];
+  const [rippleNodeId, setRippleNodeId] = useState(null);
+  const nodeGap = 88;
+  const topOffset = 24;
+  const lineHeight = Math.max(0, (steps.length - 1) * nodeGap);
+  const indicatorY = topOffset + Math.max(0, currentStepIndex) * nodeGap;
+  const activeStep = steps.find((s) => s.id === selectedStepId) || steps[0];
 
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 320px) minmax(0, 1fr)", gap: 18 }}>
+  if (compact) {
+    return (
       <div
         style={{
-          position: "relative",
-          borderRadius: 14,
-          border: "1px solid rgba(255,255,255,0.08)",
-          background: "linear-gradient(180deg, rgba(15,23,42,0.55), rgba(15,23,42,0.32))",
-          padding: "14px 12px 14px 14px",
+          borderRadius: 16,
+          border: "1px solid rgba(255,255,255,0.1)",
+          background: "linear-gradient(180deg, rgba(15,23,42,0.52), rgba(15,23,42,0.28))",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          padding: "14px 12px",
         }}
       >
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            left: 26,
-            top: 26,
-            bottom: 26,
-            width: 2,
-            borderRadius: 2,
-            background: "linear-gradient(180deg, rgba(99,102,241,0.85), rgba(59,130,246,0.42))",
-          }}
-        />
-        <div style={{ display: "flex", flexDirection: "column", gap: 10, position: "relative", zIndex: 1 }}>
+        <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 6 }}>
           {steps.map((step, idx) => {
             const isCurrent = idx === currentStepIndex;
-            const isFuture = idx > currentStepIndex;
             const isDone = Boolean(completed[step.id]);
-            const isActive = step.id === activeStepId;
+            const isActive = step.id === selectedStepId;
             return (
               <button
                 key={step.id}
                 type="button"
                 onClick={() => onSelectStep(step.id)}
                 style={{
-                  width: "100%",
+                  minWidth: 150,
                   textAlign: "left",
-                  border: `1px solid ${isActive ? "rgba(129,140,248,0.58)" : "rgba(255,255,255,0.08)"}`,
                   borderRadius: 12,
-                  background: isActive ? "rgba(99,102,241,0.16)" : "rgba(255,255,255,0.02)",
-                  padding: "10px 10px 10px 42px",
-                  cursor: "pointer",
-                  opacity: isFuture ? 0.5 : 1,
-                  transition: "border-color .2s ease, background .2s ease, opacity .2s ease, transform .2s ease",
-                  transform: isActive ? "translateX(3px)" : "translateX(0)",
-                  position: "relative",
+                  border: `1px solid ${isActive ? "rgba(99,102,241,0.6)" : "rgba(255,255,255,0.1)"}`,
+                  background: isActive ? "rgba(99,102,241,0.16)" : "rgba(255,255,255,0.03)",
+                  padding: "10px 10px",
+                  color: "#e2e8f0",
+                  opacity: idx > currentStepIndex ? 0.6 : 1,
                 }}
               >
-                <div
+                <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 2 }}>
+                  {isDone ? "✓ " : ""}{step.label}
+                </div>
+                <div style={{ fontSize: 11, color: isCurrent ? "#93c5fd" : "#94a3b8" }}>
+                  {isCurrent ? (tr ? "Şu anki adım" : "Current step") : tr ? "Milestone" : "Milestone"}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={() => onToggleStep(activeStep.id)}
+          style={{
+            marginTop: 8,
+            width: "100%",
+            border: "none",
+            borderRadius: 10,
+            padding: "10px 12px",
+            fontSize: 12,
+            fontWeight: 700,
+            color: "#0f172a",
+            background: completed[activeStep.id]
+              ? "linear-gradient(135deg, #34d399, #22c55e)"
+              : "linear-gradient(135deg, #38bdf8, #6366f1 55%, #a855f7)",
+          }}
+        >
+          {completed[activeStep.id]
+            ? tr
+              ? "Tamamlandı (geri al)"
+              : "Completed (undo)"
+            : tr
+              ? "Adımı tamamla"
+              : "Complete step"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        borderRadius: 18,
+        border: "1px solid rgba(255,255,255,0.11)",
+        background: "linear-gradient(180deg, rgba(15,23,42,0.55), rgba(15,23,42,0.3))",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        padding: "22px 18px 18px",
+        minHeight: 520,
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
+        {tr ? "Career Navigator" : "Career Navigator"}
+      </div>
+
+      <div style={{ position: "relative", paddingLeft: 12, paddingRight: 6, minHeight: lineHeight + 80 }}>
+        <svg
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: 8,
+            top: topOffset,
+            width: 24,
+            height: lineHeight + 2,
+            overflow: "visible",
+          }}
+          viewBox={`0 0 24 ${lineHeight + 2}`}
+        >
+          <defs>
+            <linearGradient id="hfRouteGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#22d3ee" />
+              <stop offset="55%" stopColor="#6366f1" />
+              <stop offset="100%" stopColor="#a855f7" />
+            </linearGradient>
+          </defs>
+          <motion.path
+            d={`M 12 1 L 12 ${lineHeight + 1}`}
+            stroke="url(#hfRouteGrad)"
+            strokeWidth="3.2"
+            strokeLinecap="round"
+            fill="none"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 1.25, ease: "easeInOut" }}
+          />
+          <motion.path
+            d={`M 12 1 L 12 ${lineHeight + 1}`}
+            stroke="rgba(96,165,250,0.55)"
+            strokeWidth="8"
+            strokeLinecap="round"
+            fill="none"
+            style={{ filter: "blur(4px)" }}
+            animate={{ opacity: [0.35, 0.8, 0.35] }}
+            transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </svg>
+
+        <motion.div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: 13,
+            top: topOffset - 6,
+            width: 12,
+            height: 12,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(255,255,255,0.95) 10%, rgba(56,189,248,0.95) 55%, rgba(59,130,246,0.45) 100%)",
+            boxShadow: "0 0 18px rgba(56,189,248,0.9)",
+            pointerEvents: "none",
+          }}
+          animate={{ y: [0, lineHeight, 0] }}
+          transition={{ duration: 4.6, ease: "linear", repeat: Infinity }}
+        />
+
+        <motion.div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: 8,
+            width: 20,
+            height: 20,
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(255,255,255,1) 15%, rgba(129,140,248,0.9) 70%)",
+            boxShadow: "0 0 24px rgba(129,140,248,0.9), 0 0 0 1px rgba(255,255,255,0.5)",
+            pointerEvents: "none",
+            zIndex: 3,
+          }}
+          animate={{ y: indicatorY }}
+          transition={{ duration: 0.72, ease: "easeInOut" }}
+        />
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, position: "relative", zIndex: 2 }}>
+          {steps.map((step, idx) => {
+            const isCurrent = idx === currentStepIndex;
+            const isFuture = idx > currentStepIndex;
+            const isDone = Boolean(completed[step.id]);
+            const isActive = step.id === selectedStepId;
+            return (
+              <motion.button
+                key={step.id}
+                type="button"
+                onClick={() => {
+                  setRippleNodeId(step.id);
+                  onSelectStep(step.id);
+                }}
+                onAnimationComplete={() => {
+                  if (rippleNodeId === step.id) setRippleNodeId(null);
+                }}
+                whileHover={{ scale: 1.02, x: 4 }}
+                whileTap={{ scale: 0.985 }}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  border: `1px solid ${isActive ? "rgba(129,140,248,0.66)" : "rgba(255,255,255,0.08)"}`,
+                  borderRadius: 14,
+                  background: isActive ? "rgba(99,102,241,0.16)" : "rgba(255,255,255,0.02)",
+                  padding: "12px 12px 12px 44px",
+                  cursor: "pointer",
+                  opacity: isFuture ? 0.5 : isDone ? 0.72 : 1,
+                  position: "relative",
+                  overflow: "hidden",
+                  boxShadow: isActive ? "0 0 26px rgba(99,102,241,0.24)" : "none",
+                }}
+              >
+                {rippleNodeId === step.id ? (
+                  <motion.span
+                    aria-hidden
+                    initial={{ scale: 0.4, opacity: 0.45 }}
+                    animate={{ scale: 2.5, opacity: 0 }}
+                    transition={{ duration: 0.55, ease: "easeOut" }}
+                    style={{
+                      position: "absolute",
+                      left: 6,
+                      top: "50%",
+                      width: 26,
+                      height: 26,
+                      borderRadius: "50%",
+                      border: "1px solid rgba(129,140,248,0.55)",
+                      transform: "translateY(-50%)",
+                      pointerEvents: "none",
+                    }}
+                  />
+                ) : null}
+
+                <motion.div
+                  animate={isCurrent ? { scale: [1, 1.06, 1] } : { scale: 1 }}
+                  transition={{ duration: 1.4, repeat: isCurrent ? Infinity : 0, ease: "easeInOut" }}
                   style={{
                     position: "absolute",
-                    left: 4,
+                    left: 7,
                     top: "50%",
                     transform: "translateY(-50%)",
                     width: 22,
                     height: 22,
                     borderRadius: "50%",
-                    border: `2px solid ${isDone ? "#34d399" : isCurrent ? "#818cf8" : "rgba(148,163,184,0.6)"}`,
-                    color: isDone ? "#34d399" : isCurrent ? "#c4b5fd" : "#94a3b8",
-                    background: "rgba(15,23,42,0.95)",
+                    border: `2px solid ${isDone ? "#34d399" : isCurrent ? "#60a5fa" : "rgba(148,163,184,0.65)"}`,
+                    color: isDone ? "#34d399" : isCurrent ? "#dbeafe" : "#94a3b8",
+                    background: "rgba(15,23,42,0.96)",
                     display: "grid",
                     placeItems: "center",
                     fontSize: 11,
                     fontWeight: 800,
-                    boxShadow: isCurrent ? "0 0 0 4px rgba(99,102,241,0.12)" : "none",
+                    boxShadow: isCurrent ? "0 0 0 6px rgba(56,189,248,0.14), 0 0 24px rgba(56,189,248,0.5)" : "none",
                   }}
                 >
                   {isDone ? "✓" : idx + 1}
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9", marginBottom: 2 }}>{step.label}</div>
+                </motion.div>
+
+                {isCurrent ? (
+                  <motion.span
+                    aria-hidden
+                    style={{
+                      position: "absolute",
+                      left: 1,
+                      top: "50%",
+                      width: 34,
+                      height: 34,
+                      borderRadius: "50%",
+                      border: "1px solid rgba(125,211,252,0.7)",
+                      transform: "translateY(-50%)",
+                    }}
+                    animate={{ scale: [0.9, 1.25], opacity: [0.9, 0] }}
+                    transition={{ duration: 1.45, ease: "easeOut", repeat: Infinity }}
+                  />
+                ) : null}
+
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9", marginBottom: 3 }}>{step.label}</div>
                 <div style={{ fontSize: 12, color: "#94a3b8" }}>
                   {isDone
                     ? tr
@@ -258,89 +457,39 @@ function CareerNavigationMap({
                         ? "Sıradaki adım"
                         : "Upcoming"}
                 </div>
-              </button>
+              </motion.button>
             );
           })}
         </div>
       </div>
 
-      <div
+      <button
+        type="button"
+        onClick={() => onToggleStep(activeStep.id)}
         style={{
-          borderRadius: 14,
-          border: "1px solid rgba(129,140,248,0.22)",
-          background: "linear-gradient(165deg, rgba(99,102,241,0.1), rgba(15,23,42,0.5))",
-          padding: "16px 16px 14px",
+          marginTop: 14,
+          width: "100%",
+          border: "none",
+          borderRadius: 12,
+          padding: "12px 14px",
+          fontSize: 13,
+          fontWeight: 700,
+          color: "#0f172a",
+          background: completed[activeStep.id]
+            ? "linear-gradient(135deg, #34d399, #22c55e)"
+            : "linear-gradient(135deg, #38bdf8, #6366f1 55%, #a855f7)",
+          boxShadow: "0 8px 20px rgba(59,130,246,0.32)",
+          cursor: "pointer",
         }}
       >
-        <div style={{ fontSize: 12, color: "#a5b4fc", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-          {tr ? "Milestone detayları" : "Milestone details"}
-        </div>
-        <div style={{ fontSize: 20, fontWeight: 800, color: "#f8fafc", fontFamily: "'Syne', sans-serif", marginBottom: 12 }}>
-          {activeStep.label}
-        </div>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
-          <div style={{ borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(2,6,23,0.35)", padding: "10px 12px" }}>
-            <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
-              {tr ? "Süre" : "Time"}
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>{activeStep.timeRequired}</div>
-          </div>
-          <div style={{ borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(2,6,23,0.35)", padding: "10px 12px" }}>
-            <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
-              {tr ? "Beklenen etki" : "Expected impact"}
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#6ee7b7" }}>{activeStep.expectedImpact}</div>
-          </div>
-        </div>
-
-        <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
-          {tr ? "Ne yapmalı?" : "What to do"}
-        </div>
-        <div style={{ display: "grid", gap: 8 }}>
-          {activeStep.actions.map((line, i) => (
-            <div
-              key={`${activeStep.id}-act-${i}`}
-              style={{
-                borderRadius: 10,
-                border: "1px solid rgba(255,255,255,0.07)",
-                background: "rgba(255,255,255,0.02)",
-                padding: "9px 10px",
-                fontSize: 13,
-                color: "#cbd5e1",
-                lineHeight: 1.55,
-              }}
-            >
-              {line}
-            </div>
-          ))}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => onToggleStep(activeStep.id)}
-          style={{
-            marginTop: 14,
-            width: "100%",
-            border: "none",
-            borderRadius: 10,
-            padding: "11px 14px",
-            fontSize: 13,
-            fontWeight: 700,
-            color: "#0f172a",
-            background: completed[activeStep.id] ? "linear-gradient(135deg, #34d399, #22c55e)" : "linear-gradient(135deg, #818cf8, #3b82f6)",
-            cursor: "pointer",
-          }}
-        >
-          {completed[activeStep.id]
-            ? tr
-              ? "Tamamlandı olarak işaretli (geri al)"
-              : "Marked as completed (undo)"
-            : tr
-              ? "Bu adımı tamamlandı olarak işaretle"
-              : "Mark this step as completed"}
-        </button>
-      </div>
+        {completed[activeStep.id]
+          ? tr
+            ? "Tamamlandı olarak işaretli (geri al)"
+            : "Marked as completed (undo)"
+          : tr
+            ? "Bu adımı tamamlandı olarak işaretle"
+            : "Mark this step as completed"}
+      </button>
     </div>
   );
 }
@@ -401,6 +550,14 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
   const [completedSteps, setCompletedSteps] = useState(() => ({}));
   const [selectedStepId, setSelectedStepId] = useState("fix-cv");
   const detailsRef = useRef(null);
+  const [isDesktop, setIsDesktop] = useState(() => (typeof window === "undefined" ? true : window.innerWidth >= 1024));
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const onResize = () => setIsDesktop(window.innerWidth >= 1024);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   useEffect(() => {
     try {
@@ -437,7 +594,6 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
 
   const handleSelectStep = (id) => {
     setSelectedStepId(id);
-    detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
 
   const handleToggleStep = (id) => {
@@ -452,8 +608,13 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
     detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   };
 
+  const selectedStep = useMemo(
+    () => navSteps.find((s) => s.id === selectedStepId) || navSteps[0],
+    [navSteps, selectedStepId],
+  );
+
   return (
-    <div style={{ maxWidth: 1040, margin: "0 auto", padding: "40px 24px 48px" }}>
+    <div style={{ maxWidth: 1320, margin: "0 auto", padding: "40px 24px 48px" }}>
       <div style={{ marginBottom: 20 }}>
         <button onClick={() => navigate("/app")} style={{ marginBottom: 14, background: "none", border: "1px solid rgba(255,255,255,0.12)", color: "#94a3b8", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>
           {lang === "TR" ? "← Analize dön" : "← Back to analysis"}
@@ -463,25 +624,101 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
         </h1>
       </div>
 
-      <div style={blockStyle()}>
-        <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-          {lang === "TR" ? "Rol yönlendirmesi" : "Role redirection"}
-        </div>
-        <div style={{ fontSize: 14, color: "#e2e8f0", marginBottom: 10 }}>
-          {lang === "TR"
-            ? "Bu rol için güçlü bir eşleşme görünmüyor. Profiline göre daha güçlü olduğun roller:"
-            : "You are not a strong fit for this role. Based on your profile, you are a stronger fit for:"}
-        </div>
-        {roleRows.map((r, i) => (
-          <div key={`${r.role}-${i}`} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", marginBottom: 8, background: "rgba(15,23,42,0.45)" }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{r.role} ({Math.round(r.score)}%)</div>
-            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>{r.why || (lang === "TR" ? "Mevcut CV sinyalin bu role daha yakın." : "Your current CV signal aligns better with this role.")}</div>
-          </div>
-        ))}
-      </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isDesktop ? "minmax(0, 0.42fr) minmax(0, 0.58fr)" : "1fr",
+          gap: isDesktop ? 32 : 20,
+          alignItems: "start",
+        }}
+      >
+        <div ref={detailsRef} style={{ minWidth: 0 }}>
+          <div
+            style={{
+              ...blockStyle(),
+              border: "1px solid rgba(129,140,248,0.32)",
+              background: "linear-gradient(165deg, rgba(99,102,241,0.14), rgba(15,23,42,0.58))",
+              backdropFilter: "blur(18px)",
+              WebkitBackdropFilter: "blur(18px)",
+              padding: "22px",
+            }}
+          >
+            <div style={{ fontSize: 11, color: "#a5b4fc", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+              {t.bestPathForward}
+            </div>
+            <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 10 }}>
+              {lang === "TR"
+                ? "Sol panel içgörüleri, sağdaki rota düğümlerine göre canlı güncellenir."
+                : "This insight panel updates live based on the route nodes on the right."}
+            </div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={selectedStep.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.28, ease: "easeInOut" }}
+              >
+                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, color: "#f8fafc", fontWeight: 800, marginBottom: 8 }}>
+                  {selectedStep.label}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+                  <div style={{ borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(2,6,23,0.35)", padding: "10px 12px" }}>
+                    <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                      {tr ? "Süre" : "Time"}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>{selectedStep.timeRequired}</div>
+                  </div>
+                  <div style={{ borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(2,6,23,0.35)", padding: "10px 12px" }}>
+                    <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+                      {tr ? "Beklenen etki" : "Expected impact"}
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#6ee7b7" }}>{selectedStep.expectedImpact}</div>
+                  </div>
+                </div>
 
-      {isPro ? (
-        <>
+                <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+                  {tr ? "Ne yapmalı?" : "What to do"}
+                </div>
+                <div style={{ display: "grid", gap: 8 }}>
+                  {selectedStep.actions.map((line, i) => (
+                    <div
+                      key={`${selectedStep.id}-act-${i}`}
+                      style={{
+                        borderRadius: 10,
+                        border: "1px solid rgba(255,255,255,0.07)",
+                        background: "rgba(255,255,255,0.02)",
+                        padding: "9px 10px",
+                        fontSize: 13,
+                        color: "#cbd5e1",
+                        lineHeight: 1.55,
+                      }}
+                    >
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          <div style={blockStyle()}>
+            <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+              {lang === "TR" ? "Rol yönlendirmesi" : "Role redirection"}
+            </div>
+            <div style={{ fontSize: 14, color: "#e2e8f0", marginBottom: 10 }}>
+              {lang === "TR"
+                ? "Bu rol için güçlü bir eşleşme görünmüyor. Profiline göre daha güçlü olduğun roller:"
+                : "You are not a strong fit for this role. Based on your profile, you are a stronger fit for:"}
+            </div>
+            {roleRows.map((r, i) => (
+              <div key={`${r.role}-${i}`} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", marginBottom: 8, background: "rgba(15,23,42,0.45)" }}>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{r.role} ({Math.round(r.score)}%)</div>
+                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>{r.why || (lang === "TR" ? "Mevcut CV sinyalin bu role daha yakın." : "Your current CV signal aligns better with this role.")}</div>
+              </div>
+            ))}
+          </div>
+
           <div style={blockStyle()}>
             <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
               {lang === "TR" ? "Kariyer yolu" : "Career path"}
@@ -497,60 +734,58 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
             </div>
           </div>
 
-          <div style={blockStyle()}>
-            <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-              {t.bestProjectToFix}
+          {isPro ? (
+            <div style={blockStyle()}>
+              <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+                {t.bestProjectToFix}
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc", marginBottom: 10 }}>{project.title}</div>
+              <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 6 }}>{project.context}</div>
+              <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 6 }}>{project.dataSource}</div>
+              <div style={{ fontSize: 13, color: "#a7f3d0" }}>{project.outcome}</div>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc", marginBottom: 10 }}>{project.title}</div>
-            <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 6 }}>{project.context}</div>
-            <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 6 }}>{project.dataSource}</div>
-            <div style={{ fontSize: 13, color: "#a7f3d0" }}>{project.outcome}</div>
-          </div>
-        </>
-      ) : (
-        <div style={blockStyle()}>
-          <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-            {t.bestProjectToFix}
-          </div>
-          <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc" }}>{project.title}</div>
-          <LockedHint lang={lang} onUpgrade={openUpgrade} />
-        </div>
-      )}
+          ) : (
+            <div style={blockStyle()}>
+              <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+                {t.bestProjectToFix}
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc" }}>{project.title}</div>
+              <LockedHint lang={lang} onUpgrade={openUpgrade} />
+            </div>
+          )}
 
-      <div style={blockStyle()}>
-        <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-          {lang === "TR" ? "Kariyer Navigasyon Haritası" : "Career Navigation Map"}
+          {isPro ? (
+            <div style={blockStyle()}>
+              <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+                {lang === "TR" ? "Beklenen dönüşüm" : "Expected transformation"}
+              </div>
+              <div style={{ fontSize: 13, color: "#e2e8f0", marginBottom: 6 }}>
+                {lang === "TR" ? "Bu yolu uygularsan:" : "If you follow this path:"}
+              </div>
+              <div style={{ fontSize: 13, color: "#a7f3d0", marginBottom: 4 }}>→ {lang === "TR" ? `Fit skoru: ${Math.round(baseScore)} → ${projected}+` : `Fit score: ${Math.round(baseScore)} → ${projected}+`}</div>
+              <div style={{ fontSize: 13, color: "#a7f3d0" }}>→ {lang === "TR" ? "Mülakat olasılığı belirgin şekilde artar." : "Interview probability increases significantly."}</div>
+            </div>
+          ) : null}
         </div>
-        <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 12, lineHeight: 1.6 }}>
-          {tr
-            ? "Hedef role ilerleyişini rota gibi takip et: adımı seç, detayını aç, tamamla ve bir sonraki adıma ilerle."
-            : "Track your path to the target role like a route: open a step, complete it, and progress forward."}
-        </div>
-        <div ref={detailsRef}>
+
+        <div style={{ minWidth: 0 }}>
           <CareerNavigationMap
             lang={lang}
             steps={navSteps}
             completed={completedSteps}
-            activeStepId={selectedStepId}
+            selectedStepId={selectedStepId}
             currentStepIndex={currentStepIndex}
             onSelectStep={handleSelectStep}
             onToggleStep={handleToggleStep}
+            compact={!isDesktop}
           />
+          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 10, padding: "0 6px" }}>
+            {tr
+              ? "Düğüm seç: içgörü paneli güncellensin. Adımı tamamla: gösterge bir sonraki düğüme aksın."
+              : "Select a node to refresh insight. Complete step to move the indicator to the next milestone."}
+          </div>
         </div>
       </div>
-
-      {isPro ? (
-        <div style={blockStyle()}>
-          <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-            {lang === "TR" ? "Beklenen dönüşüm" : "Expected transformation"}
-          </div>
-          <div style={{ fontSize: 13, color: "#e2e8f0", marginBottom: 6 }}>
-            {lang === "TR" ? "Bu yolu uygularsan:" : "If you follow this path:"}
-          </div>
-          <div style={{ fontSize: 13, color: "#a7f3d0", marginBottom: 4 }}>→ {lang === "TR" ? `Fit skoru: ${Math.round(baseScore)} → ${projected}+` : `Fit score: ${Math.round(baseScore)} → ${projected}+`}</div>
-          <div style={{ fontSize: 13, color: "#a7f3d0" }}>→ {lang === "TR" ? "Mülakat olasılığı belirgin şekilde artar." : "Interview probability increases significantly."}</div>
-        </div>
-      ) : null}
     </div>
   );
 }
