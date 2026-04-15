@@ -4432,161 +4432,13 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
   }, []);
 
   useEffect(() => {
-    if (document.getElementById("navbar-styles-v2")) return;
-    const el = document.createElement("style");
-    el.id = "navbar-styles-v2";
-    el.textContent = `
-      @keyframes logoPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(99,102,241,0.35); } 50% { box-shadow: 0 0 0 10px rgba(99,102,241,0); } }
-      @keyframes navSlideIn { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
-      @keyframes gradientShift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
-      .hf-nav-root { animation: navSlideIn 0.45s ease both; }
-      .hf-logo-wrap { animation: logoPulse 3.2s ease-in-out infinite; }
-      .hf-logo-wrap:hover { animation: none; }
-      .hf-monogram { background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6, #22d3ee); background-size: 300% 300%; animation: gradientShift 5s ease infinite; }
-      .hf-nav-inner-row { position: relative; display: flex; align-items: center; flex-wrap: nowrap; height: 72px; min-height: 72px; box-sizing: border-box; }
-      .hf-nav-logo-cluster { position: relative; z-index: 2; flex-shrink: 0; }
-      .hf-nav-tabs-wrap { position: absolute; left: 50%; transform: translateX(-50%); z-index: 1; }
-      .hf-nav-right-cluster { position: relative; z-index: 2; margin-left: auto; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-      .hf-nav-sep { width: 1px; height: 28px; background: linear-gradient(180deg, transparent, rgba(255,255,255,0.14), transparent); flex-shrink: 0; opacity: 0.9; }
-      .hf-nav-pill-rail {
-        position: relative;
-        isolation: isolate;
-        background: linear-gradient(165deg, rgba(255,255,255,0.09) 0%, rgba(255,255,255,0.03) 100%);
-        border: 1px solid rgba(255,255,255,0.1);
-        box-shadow:
-          0 0 0 1px rgba(0,0,0,0.45) inset,
-          0 14px 48px rgba(0,0,0,0.38),
-          0 1px 0 rgba(255,255,255,0.06) inset;
-        backdrop-filter: blur(22px) saturate(1.35);
-        -webkit-backdrop-filter: blur(22px) saturate(1.35);
-      }
-      .hf-nav-tab {
-        position: relative;
-        z-index: 1;
-        padding: 8px 18px;
-        border-radius: 999px;
-        font-weight: 600;
-        font-size: 14px;
-        font-family: 'DM Sans', sans-serif;
-        border: none;
-        cursor: pointer;
-        color: #94a3b8;
-        background: transparent;
-        transition: color 0.22s ease, transform 0.2s ease, opacity 0.22s ease;
-        opacity: 0.92;
-      }
-      .hf-nav-tab:hover { color: #e2e8f0; opacity: 1; }
-      .hf-nav-tab--active {
-        color: #ffffff;
-        opacity: 1;
-        font-weight: 700;
-        letter-spacing: 0.02em;
-        text-shadow: 0 1px 14px rgba(0,0,0,0.35);
-      }
-      .hf-nav-tab:focus-visible {
-        outline: 2px solid rgba(96,165,250,0.55);
-        outline-offset: 2px;
-      }
-      .hf-nav-lang {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 14px;
-        border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.1);
-        background: linear-gradient(165deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
-        box-shadow: 0 0 0 1px rgba(0,0,0,0.35) inset, 0 8px 28px rgba(0,0,0,0.22);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        cursor: pointer;
-        font-family: 'DM Sans', sans-serif;
-        transition: border-color 0.25s ease, box-shadow 0.25s ease, transform 0.2s ease;
-      }
-      .hf-nav-lang:hover {
-        border-color: rgba(255,255,255,0.16);
-        box-shadow: 0 0 0 1px rgba(0,0,0,0.35) inset, 0 10px 32px rgba(0,0,0,0.28);
-        transform: translateY(-1px);
-      }
-      .hf-nav-lang--tr { border-color: rgba(248,113,113,0.28); }
-      .hf-nav-lang--en { border-color: rgba(147,197,253,0.28); }
-      .hf-nav-avatar {
-        width: 38px;
-        height: 38px;
-        border-radius: 50%;
-        flex-shrink: 0;
-        background: linear-gradient(145deg, #3b82f6, #6366f1 45%, #8b5cf6);
-        display: grid;
-        place-items: center;
-        font-size: 14px;
-        font-weight: 800;
-        color: white;
-        font-family: 'Syne', sans-serif;
-        box-shadow:
-          0 0 0 1px rgba(255,255,255,0.12) inset,
-          0 0 0 1px rgba(99,102,241,0.25),
-          0 10px 28px rgba(15,23,42,0.55),
-          0 0 28px rgba(99,102,241,0.35);
-      }
-      .hf-nav-signout.hf-btn-ghost {
-        border-radius: 999px;
-        border-color: rgba(255,255,255,0.1);
-        background: linear-gradient(165deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
-        box-shadow: 0 0 0 1px rgba(0,0,0,0.3) inset;
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-      }
-      .hf-nav-signout.hf-btn-ghost:hover {
-        border-color: rgba(255,255,255,0.18);
-        background: rgba(255,255,255,0.06);
-      }
-      @media (prefers-reduced-motion: reduce) {
-        .hf-nav-root { animation: none; }
-        .hf-logo-wrap { animation: none; }
-        .hf-monogram { animation: none; }
-        .hf-nav-lang:hover { transform: none; }
-      }
-      @media (max-width: 900px) {
-        .hf-nav-inner-row { flex-wrap: wrap; row-gap: 10px; align-items: center; padding-left: 16px !important; padding-right: 16px !important; height: auto !important; min-height: 72px !important; }
-        .hf-nav-logo-cluster { order: 1; }
-        .hf-nav-right-cluster { order: 2; margin-left: auto; }
-        .hf-nav-tabs-wrap { position: static; transform: none; order: 3; flex-basis: 100%; width: 100%; display: flex; justify-content: center; margin-top: 2px; }
-      }
-    `;
-    document.head.appendChild(el);
+    const stale = document.getElementById("navbar-styles-v2");
+    if (stale) stale.remove();
   }, []);
 
   return (
-    <nav
-      className="hf-nav-root"
-      style={{
-        width: "100%",
-        position: "sticky",
-        top: 0,
-        zIndex: 100,
-        maxWidth: "none",
-        overflowX: "hidden",
-        boxSizing: "border-box",
-        background: scrolled ? "rgba(5, 7, 15, 0.86)" : "rgba(5, 7, 15, 0.52)",
-        backdropFilter: "blur(32px) saturate(1.25)",
-        WebkitBackdropFilter: "blur(32px) saturate(1.25)",
-        borderBottom: scrolled ? "1px solid rgba(255,255,255,0.09)" : "1px solid rgba(255,255,255,0.04)",
-        boxShadow: scrolled ? "0 12px 40px rgba(0,0,0,0.35)" : "0 8px 32px rgba(0,0,0,0.12)",
-        transition: "background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease",
-      }}
-    >
-      <div
-        className="hf-nav-inner-row"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          width: "100%",
-          maxWidth: 1500,
-          margin: "0 auto",
-          padding: "0 clamp(16px, 4vw, 48px)",
-          boxSizing: "border-box",
-          height: "72px",
-        }}
-      >
+    <nav className="hf-nav-root" data-scrolled={scrolled ? "true" : "false"}>
+      <div className="hf-nav-inner-row">
         <div className="hf-nav-logo-cluster" style={{ display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }} onClick={() => navigate("/")}>
           <div className="hf-logo-wrap hf-monogram" style={{ width: 48, height: 48, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden", flexShrink: 0, boxShadow: "0 0 0 1px rgba(255,255,255,0.14) inset, 0 10px 28px rgba(15,23,42,0.45)", transform: hovered === "logo" ? "scale(1.06) rotate(-4deg)" : "scale(1)", transition: "transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s ease" }} onMouseEnter={() => setHovered("logo")} onMouseLeave={() => setHovered(null)}>
             <div style={{ position: "absolute", inset: 0, background: "linear-gradient(145deg, rgba(255,255,255,0.28) 0%, transparent 55%)", zIndex: 1 }} />
@@ -4597,16 +4449,7 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
             <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", lineHeight: 1, marginTop: 3, background: "linear-gradient(90deg, #60a5fa, #a78bfa, #22d3ee)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", opacity: 0.92 }}>AI Career Decision Engine</div>
           </div>
         </div>
-        <div
-          ref={navTabsRef}
-          className="hf-nav-tabs-wrap hf-nav-pill-rail"
-          style={{
-            display: "flex",
-            gap: 4,
-            padding: "5px",
-            borderRadius: 999,
-          }}
-        >
+        <div ref={navTabsRef} className="hf-nav-tabs-wrap hf-nav-pill-rail">
           <div
             style={{
               position: "absolute",
