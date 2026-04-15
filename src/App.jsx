@@ -12,8 +12,8 @@ import {
   Upload, Copy, Wand2, Target, Search, History, Trash2,
   CheckCircle2, ArrowRight, LogIn, LogOut, Download, Mail,
   Zap, Star, TrendingUp, Crown, Linkedin, Instagram, Link2, Workflow,
-  ChevronRight, Eye, Layers, ListChecks, KeyRound, LineChart,
-  Cpu, FileUp, Lock,
+  ChevronRight, ChevronDown, Eye, Layers, ListChecks, KeyRound, LineChart,
+  Cpu, FileUp, Lock, Check,
 } from "lucide-react";
 
 import * as pdfjsLib from "pdfjs-dist";
@@ -4375,6 +4375,47 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
   );
 }
 
+/** Navbar: display name from OAuth / Supabase metadata, else email. */
+function getNavAccountLines(user) {
+  if (!user) return { primary: "", secondary: "", full: "" };
+  const email = (user.email && String(user.email).trim()) || "";
+  const meta = user.user_metadata || {};
+  const raw =
+    meta.full_name ??
+    meta.name ??
+    meta.display_name ??
+    meta.preferred_username;
+  const name = typeof raw === "string" ? raw.trim() : "";
+  const full = email || name;
+  if (name && email && name.toLowerCase() !== email.toLowerCase()) {
+    return { primary: name, secondary: email, full: `${name} · ${email}` };
+  }
+  return { primary: email || name || "—", secondary: "", full: full };
+}
+
+function NavBarFlagEn({ w = 20, h = 14 }) {
+  return (
+    <svg width={w} height={h} viewBox="0 0 20 14" fill="none" aria-hidden>
+      <rect width="20" height="14" fill="#012169" />
+      <path d="M0,0 L20,14 M20,0 L0,14" stroke="white" strokeWidth="2.5" />
+      <path d="M0,0 L20,14 M20,0 L0,14" stroke="#C8102E" strokeWidth="1.5" />
+      <path d="M10,0 V14 M0,7 H20" stroke="white" strokeWidth="4" />
+      <path d="M10,0 V14 M0,7 H20" stroke="#C8102E" strokeWidth="2.5" />
+    </svg>
+  );
+}
+
+function NavBarFlagTr({ w = 20, h = 14 }) {
+  return (
+    <svg width={w} height={h} viewBox="0 0 20 14" fill="none" aria-hidden>
+      <rect width="20" height="14" fill="#E30A17" />
+      <circle cx="7.5" cy="7" r="3" fill="white" />
+      <circle cx="8.5" cy="7" r="2.3" fill="#E30A17" />
+      <polygon points="11,7 12.5,5.5 12.5,8.5" fill="white" />
+    </svg>
+  );
+}
+
 function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
   const t = translations[lang];
   const navTab = pathname === "/roadmap" ? "roadmap" : pathname === "/dashboard" ? "dashboard" : pathname === "/" ? "landing" : null;
@@ -4382,6 +4423,8 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
   const [hovered, setHovered] = useState(null);
   const [navLinkHover, setNavLinkHover] = useState(null);
   const [navLinkPressed, setNavLinkPressed] = useState(null);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const langMenuRef = useRef(null);
   const navTabsRef = useRef(null);
   const navButtonRefs = useRef([]);
   const [activeTabPosition, setActiveTabPosition] = useState({ left: 0, top: 0, width: 0, height: 0, visible: false });
@@ -4435,6 +4478,29 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
     const stale = document.getElementById("navbar-styles-v2");
     if (stale) stale.remove();
   }, []);
+
+  useEffect(() => {
+    if (!langMenuOpen) return;
+    const onDoc = (e) => {
+      if (langMenuRef.current && !langMenuRef.current.contains(e.target)) setLangMenuOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") setLangMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [langMenuOpen]);
+
+  useEffect(() => {
+    setLangMenuOpen(false);
+  }, [pathname]);
+
+  const account = useMemo(() => getNavAccountLines(user), [user]);
+  const avatarLetter = (user?.email?.[0] || account.primary?.[0] || "?").toUpperCase();
 
   return (
     <nav className="hf-nav-root" data-scrolled={scrolled ? "true" : "false"}>
@@ -4497,36 +4563,65 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
           })}
         </div>
         <div className="hf-nav-right-cluster">
-          <button
-            type="button"
-            className={lang === "TR" ? "hf-nav-lang hf-nav-lang--tr" : "hf-nav-lang hf-nav-lang--en"}
-            onClick={() => setLang(lang === "EN" ? "TR" : "EN")}
-          >
-            {lang === "EN" ? (
-              <svg width="20" height="14" viewBox="0 0 20 14" fill="none">
-                <rect width="20" height="14" fill="#E30A17"/>
-                <circle cx="7.5" cy="7" r="3" fill="white"/>
-                <circle cx="8.5" cy="7" r="2.3" fill="#E30A17"/>
-                <polygon points="11,7 12.5,5.5 12.5,8.5" fill="white"/>
-              </svg>
-            ) : (
-              <svg width="20" height="14" viewBox="0 0 20 14" fill="none">
-                <rect width="20" height="14" fill="#012169"/>
-                <path d="M0,0 L20,14 M20,0 L0,14" stroke="white" strokeWidth="2.5"/>
-                <path d="M0,0 L20,14 M20,0 L0,14" stroke="#C8102E" strokeWidth="1.5"/>
-                <path d="M10,0 V14 M0,7 H20" stroke="white" strokeWidth="4"/>
-                <path d="M10,0 V14 M0,7 H20" stroke="#C8102E" strokeWidth="2.5"/>
-              </svg>
-            )}
-            <span style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.04em", color: lang === "EN" ? "#fca5a5" : "#bfdbfe" }}>
-              {lang === "EN" ? "Türkçe" : "English"}
-            </span>
-          </button>
+          <div ref={langMenuRef} className="hf-nav-lang-wrap">
+            <button
+              type="button"
+              className={
+                langMenuOpen
+                  ? `hf-nav-lang hf-nav-lang--open ${lang === "TR" ? "hf-nav-lang--tr" : "hf-nav-lang--en"}`
+                  : `hf-nav-lang ${lang === "TR" ? "hf-nav-lang--tr" : "hf-nav-lang--en"}`
+              }
+              aria-expanded={langMenuOpen}
+              aria-haspopup="menu"
+              aria-label={lang === "TR" ? "Dil: Türkçe. Menüyü aç" : "Language: English. Open menu"}
+              onClick={() => setLangMenuOpen((o) => !o)}
+            >
+              {lang === "EN" ? <NavBarFlagEn /> : <NavBarFlagTr />}
+              <span className="hf-nav-lang-label">{lang === "EN" ? "English" : "Türkçe"}</span>
+              <ChevronDown className="hf-nav-lang-chevron" size={14} strokeWidth={2.25} aria-hidden />
+            </button>
+            {langMenuOpen ? (
+              <div className="hf-nav-lang-dropdown" role="menu" aria-label={lang === "TR" ? "Dil seçimi" : "Language"}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={`hf-nav-lang-option${lang === "EN" ? " hf-nav-lang-option--active" : ""}`}
+                  onClick={() => {
+                    setLang("EN");
+                    setLangMenuOpen(false);
+                  }}
+                >
+                  <span className="hf-nav-lang-option-flag"><NavBarFlagEn w={18} h={13} /></span>
+                  <span className="hf-nav-lang-option-text">English</span>
+                  {lang === "EN" ? <Check className="hf-nav-lang-option-check" size={14} strokeWidth={2.5} aria-hidden /> : <span className="hf-nav-lang-option-checkSpacer" aria-hidden />}
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className={`hf-nav-lang-option${lang === "TR" ? " hf-nav-lang-option--active" : ""}`}
+                  onClick={() => {
+                    setLang("TR");
+                    setLangMenuOpen(false);
+                  }}
+                >
+                  <span className="hf-nav-lang-option-flag"><NavBarFlagTr w={18} h={13} /></span>
+                  <span className="hf-nav-lang-option-text">Türkçe</span>
+                  {lang === "TR" ? <Check className="hf-nav-lang-option-check" size={14} strokeWidth={2.5} aria-hidden /> : <span className="hf-nav-lang-option-checkSpacer" aria-hidden />}
+                </button>
+              </div>
+            ) : null}
+          </div>
           <div className="hf-nav-sep" aria-hidden />
           {user ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <div className="hf-nav-avatar">
-                {user.email?.[0]?.toUpperCase()}
+            <div className="hf-nav-user-row">
+              <div className="hf-nav-user-cluster">
+                <div className="hf-nav-avatar" aria-hidden>
+                  {avatarLetter}
+                </div>
+                <div className="hf-nav-user-text" title={account.full || undefined}>
+                  <div className="hf-nav-user-primary">{account.primary || "—"}</div>
+                  {account.secondary ? <div className="hf-nav-user-secondary">{account.secondary}</div> : null}
+                </div>
               </div>
               <button type="button" className="hf-btn-ghost hf-nav-signout" onClick={logout} style={{ padding: "9px 18px", fontSize: "13px" }}><LogOut size={13} /> {t.signOut}</button>
             </div>
