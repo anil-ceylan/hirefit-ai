@@ -2159,7 +2159,6 @@ function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
 function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, jdText }) {
   const model = useMemo(() => buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }), [data, lang, score, t, cvText, jdText]);
   const roles = Array.isArray(model.roles) ? model.roles.slice(0, 3) : [];
-  const wrongRoleItems = [model.roleFitWhy?.[1], model.roleFitWhy?.[0]].map((x) => clampBullet(x || "", 115)).filter(hasMeaningfulText).slice(0, 3);
   const projectLines = [
     clampBullet(model.project?.why || "", 120),
     clampBullet(model.project?.steps?.[0] || "", 120),
@@ -2169,7 +2168,6 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
   const hasProject = hasMeaningfulText(model.project?.title);
   const hasTransformation = hasMeaningfulText(model.transformation?.fit) || hasMeaningfulText(model.transformation?.confidence);
   const hasRoles = roles.length > 0;
-  const hasWrongRole = wrongRoleItems.length > 0;
   const hasRoadmap = roadmapLines.length > 0 || hasMeaningfulText(model.careerPath);
   const cardStyle = {
     border: `1px solid ${RS.border}`,
@@ -2204,18 +2202,6 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
               </div>
             ))}
           </div>
-        </div>
-        ) : null}
-
-        {hasWrongRole ? (
-        <div style={cardStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 12 }}>
-            <AlertCircle size={16} color={RS.redDim} />
-            {t.bestPathWrongRoleTitle}
-          </div>
-          {wrongRoleItems.map((line, i) => (
-            <div key={`wrong-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: i < wrongRoleItems.length - 1 ? 6 : 0 }}>• {line}</div>
-          ))}
         </div>
         ) : null}
 
@@ -2304,84 +2290,130 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
     .filter(Boolean)
     .slice(0, 3);
   const summaryLine = clampBullet(String(data?.Decision?.reasoning || data?.Recruiter?.reasoning || ""), 110);
-  const whyItems = [clampBullet(mainProblem), summaryLine].filter(hasMeaningfulText).slice(0, 3);
+  const supportingWhyItems = reasons
+    .map((g) => clampBullet(humanizeUserFacingReason(g?.issue || "", lang), 95))
+    .filter((x) => hasMeaningfulText(x) && String(x).toLowerCase() !== String(mainProblem || "").toLowerCase());
+  const whyItems = [summaryLine, ...supportingWhyItems].filter(hasMeaningfulText).slice(0, 3);
   const showWhyCard = whyItems.length > 0;
   const showGapsCard = topGaps.length > 0 || moreGaps.length > 0;
   const showRoadmapCard = roadmapLines.length > 0;
+  const quickBestPath = clampBullet(bestPathLabel, 90);
+  const showQuickBestPathCard = hasMeaningfulText(quickBestPath);
+  const showQuickSection = showQuickBestPathCard;
   if (!showWhyCard && !showGapsCard && !showRoadmapCard) return null;
   const rowStyle = { marginBottom: 6, fontSize: 12, color: RS.textSecondary, lineHeight: 1.55 };
-  const summaryStyle = {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    fontSize: 13,
-    fontWeight: 700,
-    color: RS.textPrimary,
-    cursor: "pointer",
-    listStyle: "none",
+  const ExpandableDecisionCard = ({ icon, title, preview, children }) => {
+    const [open, setOpen] = useState(false);
+    return (
+      <div
+        style={{
+          border: `1px solid ${RS.border}`,
+          borderRadius: 12,
+          padding: "14px 14px 12px",
+          background: rsAlpha(RS.bgElevated, 0.65),
+          minHeight: 124,
+          cursor: "pointer",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          style={{
+            width: "100%",
+            border: "none",
+            background: "transparent",
+            padding: 0,
+            margin: 0,
+            color: RS.textPrimary,
+            cursor: "pointer",
+            textAlign: "left",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700 }}>
+              {icon}
+              {title}
+            </div>
+            <span
+              aria-hidden
+              style={{
+                fontSize: 16,
+                lineHeight: 1,
+                color: RS.textMuted,
+                transform: open ? "rotate(90deg)" : "rotate(0deg)",
+                transition: "transform 0.18s ease",
+              }}
+            >
+              ›
+            </span>
+          </div>
+          {!open && hasMeaningfulText(preview) ? (
+            <div style={{ marginTop: 7, fontSize: 12, color: RS.textMuted, lineHeight: 1.45 }}>{preview}</div>
+          ) : null}
+        </button>
+
+        {open ? (
+          <>
+            <div style={{ marginTop: 10, marginBottom: 10, height: 1, background: RS.borderSubtle }} />
+            <div>{children}</div>
+          </>
+        ) : null}
+      </div>
+    );
   };
 
   return (
     <div style={{ marginTop: 24 }}>
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, marginBottom: 10 }}>
-        {t.scanSectionLabel}
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 24, marginBottom: 24 }}>
-        <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", minHeight: 130 }}>
-          <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 4 }}>{t.scanCriticalGapTitle}</div>
-          <div style={{ fontSize: 12, color: RS.textPrimary, fontWeight: 700 }}>{clampBullet(mainProblem, 90)}</div>
-        </div>
-        <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", minHeight: 130 }}>
-          <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 4 }}>{t.scanOneMoveTitle}</div>
-          <div style={{ fontSize: 12, color: RS.textPrimary, fontWeight: 700 }}>{clampBullet(singleAction, 90)}</div>
-        </div>
-        <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", minHeight: 130 }}>
-          <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 4 }}>{t.scanBestPathTitle}</div>
-          <div style={{ fontSize: 12, color: RS.textPrimary, fontWeight: 700 }}>{clampBullet(bestPathLabel, 90)}</div>
-        </div>
-      </div>
+      {showQuickSection ? (
+        <>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, marginBottom: 10 }}>
+            {t.scanSectionLabel}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 24, marginBottom: 24 }}>
+            {showQuickBestPathCard ? (
+              <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", minHeight: 130 }}>
+                <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 4 }}>{t.scanBestPathTitle}</div>
+                <div style={{ fontSize: 12, color: RS.textPrimary, fontWeight: 700 }}>{quickBestPath}</div>
+              </div>
+            ) : null}
+          </div>
+        </>
+      ) : null}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 24 }}>
-      {showWhyCard ? <details style={{ border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", background: rsAlpha(RS.bgElevated, 0.65), minHeight: 170 }}>
-        <summary style={summaryStyle}>
-          <AlertCircle size={14} color={RS.redDim} />
-          {t.scanWhyRejectedTitle}
-        </summary>
-        <div style={{ marginTop: 8 }}>
+      {showWhyCard ? (
+        <ExpandableDecisionCard
+          icon={<AlertCircle size={14} color={RS.redDim} />}
+          title={t.scanWhyRejectedTitle}
+          preview={clampBullet(whyItems[0] || "", 96)}
+        >
           {whyItems.map((item, i) => <div key={`why-item-${i}`} style={rowStyle}>• {item}</div>)}
-        </div>
-      </details> : null}
+        </ExpandableDecisionCard>
+      ) : null}
 
-      {showGapsCard ? <details style={{ border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", background: rsAlpha(RS.bgElevated, 0.65), minHeight: 170 }}>
-        <summary style={summaryStyle}>
-          <ListChecks size={14} color={RS.amber} />
-          {t.scanAllGapsTitle}
-        </summary>
-        <div style={{ marginTop: 8 }}>
+      {showGapsCard ? (
+        <ExpandableDecisionCard
+          icon={<ListChecks size={14} color={RS.amber} />}
+          title={t.scanAllGapsTitle}
+          preview={clampBullet(humanizeUserFacingReason(topGaps[0]?.issue || moreGaps[0]?.issue || "", lang), 96)}
+        >
           {topGaps.map((g, i) => (
             <div key={`gap-${i}`} style={rowStyle}>
               • {clampBullet(humanizeUserFacingReason(g?.issue || "", lang), 95)} {g?.impact ? `— ${gapImpactLabel(g.impact, t)}` : ""}
             </div>
           ))}
-          {moreGaps.length ? (
-            <details style={{ marginTop: 8 }}>
-              <summary style={{ ...summaryStyle, fontSize: 12, color: RS.textMuted }}>{t.scanMoreGaps.replace("{n}", String(moreGaps.length))}</summary>
-              <div style={{ marginTop: 6 }}>
-                {moreGaps.map((g, i) => (
-                  <div key={`gap-more-${i}`} style={rowStyle}>• {clampBullet(humanizeUserFacingReason(g?.issue || "", lang), 95)}</div>
-                ))}
-              </div>
-            </details>
-          ) : null}
-        </div>
-      </details> : null}
+          {moreGaps.map((g, i) => (
+            <div key={`gap-more-${i}`} style={rowStyle}>• {clampBullet(humanizeUserFacingReason(g?.issue || "", lang), 95)}</div>
+          ))}
+        </ExpandableDecisionCard>
+      ) : null}
 
-      {showRoadmapCard ? <details style={{ border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", background: rsAlpha(RS.bgElevated, 0.65), minHeight: 170 }}>
-        <summary style={summaryStyle}>
-          <Layers size={14} color={RS.indigo} />
-          {t.scanFullRoadmapTitle}
-        </summary>
-        <div style={{ marginTop: 8 }}>
+      {showRoadmapCard ? (
+        <ExpandableDecisionCard
+          icon={<Layers size={14} color={RS.indigo} />}
+          title={t.scanFullRoadmapTitle}
+          preview={isPro ? clampBullet(roadmapLines[0] || "", 96) : clampBullet(t.scanRoadmapLocked, 96)}
+        >
           {isPro ? (
             roadmapLines.map((line, i) => (
               <div key={`rm-${i}`} style={rowStyle}>• {line}</div>
@@ -2398,8 +2430,8 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
               </button>
             </>
           )}
-        </div>
-      </details> : null}
+        </ExpandableDecisionCard>
+      ) : null}
       </div>
     </div>
   );
@@ -3892,6 +3924,39 @@ function extractJobTitleFromJd(jd) {
   return "";
 }
 
+function extractCompanyNameFromJd(jd) {
+  const text = String(jd || "").trim();
+  if (!text) return "";
+  const labeled = text.match(
+    /(?:^|\n)\s*(?:company|company\s*name|employer|organization|şirket|şirket\s*adı|firma)\s*[:：\-–]\s*(.+)/i
+  );
+  if (labeled) {
+    const c = labeled[1].trim().split(/\n|;|•|·/)[0].trim();
+    if (c.length >= 2 && c.length <= 80) return c;
+  }
+  const atInline = text.match(/\b(?:at|@)\s+([A-ZÇĞİÖŞÜ][\w&.,'’ -]{1,60})/);
+  if (atInline) {
+    const c = String(atInline[1] || "").trim().replace(/[.,;:]+$/, "");
+    if (c.length >= 2 && c.length <= 80) return c;
+  }
+  return "";
+}
+
+function extractCompanyNameFromAnalysis(v2, legacyData, jdText) {
+  const byV2 = String(v2?.CompanyIntel?.extracted?.company_name || v2?.Context?.company_name || "").trim();
+  if (byV2) return byV2;
+  const byLegacy = String(legacyData?.company_name || legacyData?.company?.name || "").trim();
+  if (byLegacy) return byLegacy;
+  return extractCompanyNameFromJd(jdText);
+}
+
+function jdPreviewTitle(jd, max = 40) {
+  const src = String(jd || "").replace(/\s+/g, " ").trim();
+  if (!src) return "";
+  const clipped = src.slice(0, max).trim();
+  return `${clipped}...`;
+}
+
 /** LinkedIn job URLs — server-side extraction is unreliable; users should paste the JD text. */
 function isLinkedInJobUrl(raw) {
   const s = String(raw || "").trim();
@@ -3906,12 +3971,16 @@ function isLinkedInJobUrl(raw) {
   }
 }
 
-function resolveSavedAnalysisRole(jdTitle, modelRole, lang) {
-  const j = String(jdTitle || "").trim();
-  if (j) return j.slice(0, 120);
-  const m = String(modelRole || "").trim();
-  if (m && !/^role$/i.test(m)) return m.slice(0, 120);
-  return lang === "TR" ? "İş ilanı" : "Job posting";
+function resolveSavedAnalysisRole(jdTitle, modelRole, lang, companyName = "", jdText = "", createdAt = new Date()) {
+  const company = String(companyName || "").trim();
+  const role = String(modelRole || "").trim() || String(jdTitle || "").trim();
+  if (company && role) return `${company.slice(0, 60)} · ${role.slice(0, 80)}`;
+  if (role && !/^role$/i.test(role)) return role.slice(0, 120);
+  const preview = jdPreviewTitle(jdText, 40);
+  if (preview) return preview;
+  const dt = createdAt ? new Date(createdAt) : new Date();
+  const dateLabel = Number.isNaN(dt.getTime()) ? new Date().toLocaleDateString() : dt.toLocaleDateString();
+  return `${lang === "TR" ? "Analiz" : "Analysis"} ${dateLabel}`;
 }
 
 function buildInterviewPrepFromV2(v2, lang) {
@@ -5840,7 +5909,32 @@ function HireFitLayout() {
       const { data, error: fetchError } = await supabase.from("analyses").select("*").eq("user_id", currentUser.id).order("created_at", { ascending: false }).limit(10);
       if (fetchError) return;
       const filtered = (data || []).filter(item => !clearedAt || new Date(item.created_at) > new Date(clearedAt));
-      setHistory(filtered.map((item) => ({ id: item.id, createdAt: new Date(item.created_at).toLocaleString(), role: item.role, score: item.alignment_score, cvText: item.cv_text, jdText: item.job_description, report: item.report })));
+      setHistory(
+        filtered.map((item) => {
+          const jobText = String(item.job_description || "");
+          const titleFromStored = String(item.role || "").trim();
+          const lookedLikeStructuredTitle = titleFromStored && titleFromStored.length <= 120 && !/\n/.test(titleFromStored);
+          const roleCandidate = lookedLikeStructuredTitle ? titleFromStored : extractJobTitleFromJd(jobText);
+          const companyCandidate = extractCompanyNameFromAnalysis(null, item, jobText);
+          const resolvedTitle = resolveSavedAnalysisRole(
+            extractJobTitleFromJd(jobText),
+            roleCandidate,
+            lang,
+            companyCandidate,
+            jobText,
+            item.created_at
+          );
+          return {
+            id: item.id,
+            createdAt: new Date(item.created_at).toLocaleString(),
+            role: resolvedTitle,
+            score: item.alignment_score,
+            cvText: item.cv_text,
+            jdText: item.job_description,
+            report: item.report,
+          };
+        })
+      );
     } catch (err) { console.error(err); }
   };
 
@@ -6009,7 +6103,15 @@ const msgInterval = setInterval(() => {
           !v2.RoleFit?.locked && v2.RoleFit?.best_role
             ? v2.RoleFit.best_role
             : v2.RoleFit?.role_fit?.[0]?.role || "";
-        const savedTitle = resolveSavedAnalysisRole(jdDerivedTitle, modelRole, lang);
+        const companyName = extractCompanyNameFromAnalysis(v2, null, jdText);
+        const savedTitle = resolveSavedAnalysisRole(
+          jdDerivedTitle,
+          modelRole,
+          lang,
+          companyName,
+          jdText,
+          new Date()
+        );
         setRoleType(savedTitle);
         setSeniority("");
         const atsMatchedSkills = (v2.ATS?.matched_skills ?? []).filter(Boolean);
@@ -6118,7 +6220,15 @@ const msgInterval = setInterval(() => {
         const legacyScore = Number(data.alignment_score) || 0;
         setAlignmentScore(data.alignment_score ?? null);
         setScoreRunProgress(computeScoreRunProgress(legacyScore));
-        const legacySavedTitle = resolveSavedAnalysisRole(jdDerivedTitle, data.role_type, lang);
+        const legacyCompanyName = extractCompanyNameFromAnalysis(null, data, jdText);
+        const legacySavedTitle = resolveSavedAnalysisRole(
+          jdDerivedTitle,
+          data.role_type,
+          lang,
+          legacyCompanyName,
+          jdText,
+          new Date()
+        );
         setRoleType(legacySavedTitle);
         setSeniority(data.seniority ?? "");
         setMatchedSkills(data.matched_skills ?? []);
@@ -6152,7 +6262,7 @@ const msgInterval = setInterval(() => {
         setEngineV2(safeV2);
         setAlignmentScore(fb.score);
         setScoreRunProgress(computeScoreRunProgress(fb.score));
-        setRoleType(resolveSavedAnalysisRole(jdDerivedTitle, "", lang));
+        setRoleType(resolveSavedAnalysisRole(jdDerivedTitle, "", lang, "", jdText, new Date()));
         setSeniority("");
         setMatchedSkills(safeV2.ATS?.matched_skills ?? []);
         setMissingSkills(safeV2.ATS?.missing_keywords ?? []);
@@ -6160,7 +6270,7 @@ const msgInterval = setInterval(() => {
         setResult(`HireFit Decision Engine\nVerdict: ${fb.verdict}\nAlignment: ${fb.score}\n\n${fb.summary}`);
         setAnalysisData({
           alignment_score: fb.score,
-          role_type: resolveSavedAnalysisRole(jdDerivedTitle, "", lang),
+          role_type: resolveSavedAnalysisRole(jdDerivedTitle, "", lang, "", jdText, new Date()),
           seniority: "",
           fit_summary: fb.summary,
           strengths: [lang === "TR" ? "Mevcut sinyallerden analiz tamamlandı" : "Analysis completed from available signals"],
