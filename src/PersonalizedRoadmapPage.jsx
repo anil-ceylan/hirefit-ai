@@ -174,6 +174,12 @@ function CareerNavigationMap({
   onToggleStep,
   pathLabel,
   onReanalyzeAnotherRole,
+  onStartApplying,
+  onTrackApplications,
+  onShowLiveRoles,
+  scoreBefore,
+  scoreAfter,
+  biggestFix,
   compact = false,
 }) {
   const tr = lang === "TR";
@@ -181,6 +187,7 @@ function CareerNavigationMap({
   const [recentlyCompletedId, setRecentlyCompletedId] = useState(null);
   const [rewardToast, setRewardToast] = useState(null);
   const [buttonBoost, setButtonBoost] = useState(false);
+  const [completionGateVisible, setCompletionGateVisible] = useState(false);
   const nodeGap = 88;
   const topOffset = 24;
   const lineHeight = Math.max(0, (steps.length - 1) * nodeGap);
@@ -211,6 +218,42 @@ function CareerNavigationMap({
       : "You are now ready to apply with a strong profile."
     : statusByStep[Math.min(currentStepIndex, statusByStep.length - 1)];
   const isExecutionPhase = activeStep.id === "apply";
+  const urgencyLine = tr
+    ? "Her beklediğin gün, daha güçlü sinyalle biri senden önce başvuruyor."
+    : "Every day you wait, someone else applies with a stronger signal.";
+  const altUrgencyLine = tr
+    ? "Fırsatlar zaman hassastır. Sinyalin tazeyken harekete geç."
+    : "Opportunities are time-sensitive. Act while your signal is fresh.";
+
+  const applyTargets = useMemo(() => {
+    const p = String(pathLabel || "").toLowerCase();
+    if (tr) {
+      if (p.includes("product")) {
+        return [
+          "Ürün odaklı startup ekipleri (analytics + product)",
+          "Büyüme aşamasındaki SaaS şirketlerinin ürün analitiği rolleri",
+          "Karar desteği ve deneme analizi yapan ekipler",
+        ];
+      }
+      return [
+        "Orta ölçekli SaaS şirketlerinin Data Analyst rolleri",
+        "Ürün odaklı startup ekipleri",
+        "Analitik işe alımı aktif şirketler",
+      ];
+    }
+    if (p.includes("product")) {
+      return [
+        "Product-focused startups with analytics-heavy teams",
+        "Growth-stage SaaS companies hiring product analysts",
+        "Teams running experimentation and decision analytics",
+      ];
+    }
+    return [
+      "Mid-size SaaS companies hiring Data Analysts",
+      "Product-focused startups",
+      "Companies actively hiring in analytics roles",
+    ];
+  }, [pathLabel, tr]);
 
   const rewardMessage = (points) => {
     const n = Number(points) || 0;
@@ -219,10 +262,15 @@ function CareerNavigationMap({
         ? "Top-tier aday sinyaline yaklaştın."
         : "You're now showing top-tier candidate signal.";
     }
-    if (n >= 10) {
+    if (n === 12) {
       return tr
         ? "Bu seviyede çoğu adaydan daha güçlüsün."
         : "You're now stronger than most applicants at this level.";
+    }
+    if (n >= 10) {
+      return tr
+        ? "Bu seviyede ortalamanın üzerindesin."
+        : "You're now stronger than average at this level.";
     }
     return tr
       ? "Aday havuzunun ortalamasının üstüne çıktın."
@@ -248,6 +296,30 @@ function CareerNavigationMap({
     const t = setTimeout(() => setRewardToast(null), 2000);
     return () => clearTimeout(t);
   }, [rewardToast]);
+
+  useEffect(() => {
+    if (!allComplete) {
+      setCompletionGateVisible(false);
+      return undefined;
+    }
+    setCompletionGateVisible(false);
+    const t = setTimeout(() => setCompletionGateVisible(true), 200);
+    return () => clearTimeout(t);
+  }, [allComplete]);
+
+  const launchShare = () => {
+    if (typeof window === "undefined") return;
+    const shareText = tr
+      ? `HireFit ile CV sinyalimi optimize ettim.\nSkor: ${Math.round(scoreBefore || 0)} → ${Math.round(scoreAfter || 0)}\nDüzelttiğim ana hata: ${biggestFix || "Ölçülebilir etki eksikliği"}\nHedef yol: ${pathLabel || "Veri Analisti → Ürün Yöneticisi"}`
+      : `I just optimized my CV with HireFit.\nScore: ${Math.round(scoreBefore || 0)} → ${Math.round(scoreAfter || 0)}\nBiggest mistake fixed: ${biggestFix || "No measurable impact"}\nRole path: ${pathLabel || "Data Analyst → Product Manager"}`;
+    const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://hirefit-ai.vercel.app")}&summary=${encodeURIComponent(shareText)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+  const handleStartApplying = typeof onStartApplying === "function" ? onStartApplying : () => onSelectStep("apply");
+  const handleTrackApplications = typeof onTrackApplications === "function" ? onTrackApplications : () => onSelectStep("apply");
+  const handleShowLiveRoles = typeof onShowLiveRoles === "function" ? onShowLiveRoles : () => onSelectStep("apply");
+  const handleReanalyzeAnotherRole =
+    typeof onReanalyzeAnotherRole === "function" ? onReanalyzeAnotherRole : () => onSelectStep(steps[0]?.id || "fix-cv");
 
   if (compact) {
     return (
@@ -468,63 +540,193 @@ function CareerNavigationMap({
         </AnimatePresence>
       </div>
 
-      {allComplete ? (
+      {allComplete && completionGateVisible ? (
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: [0.92, 1, 0.92], y: 0 }}
-          transition={{ duration: 2.4, ease: "easeInOut", repeat: Infinity }}
+          initial={{ opacity: 0, y: 8, scale: 0.985 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
           style={{
             marginBottom: 14,
-            borderRadius: 14,
-            border: "1px solid rgba(74,222,128,0.45)",
-            background: "linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.12))",
-            boxShadow: "0 0 18px rgba(34,197,94,0.25)",
-            padding: "12px 13px",
+            borderRadius: 16,
+            border: "1px solid rgba(74,222,128,0.48)",
+            background: "linear-gradient(135deg, rgba(34,197,94,0.18), rgba(59,130,246,0.12) 55%, rgba(16,185,129,0.12))",
+            boxShadow: "0 0 22px rgba(34,197,94,0.22)",
+            padding: "13px 14px",
           }}
         >
           <div style={{ fontSize: 14, fontWeight: 800, color: "#dcfce7" }}>
             {tr
-              ? "Artık güçlü bir profille başvurmaya hazırsın."
-              : "You are now ready to apply with a strong profile."}
+              ? "🚀 Hazırsın. Şimdi fark yarat."
+              : "🚀 You're Ready. Now Make It Count."}
           </div>
-          <div style={{ fontSize: 12, color: "#bbf7d0", marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: "#d1fae5", marginTop: 6 }}>
+            {tr ? "Çoğu kişi bu noktaya hiç gelmez. Sen geldin." : "Most people never reach this point. You did."}
+          </div>
+          <div style={{ fontSize: 12, color: "#bbf7d0", marginTop: 2 }}>
             {tr
-              ? "Kanıt ürettin, sinyalini güçlendirdin ve hedef rolünle hizalandın."
-              : "You’ve built proof, improved your signal, and aligned with your target role."}
+              ? "Artık çoğu adayda olmayan şeye sahipsin: sinyal."
+              : "You now have what most candidates don’t: signal."}
           </div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: "#bbf7d0", marginTop: 2 }}>
+            {tr
+              ? "Belirsizliği yapılandırılmış, işe alınabilir bir profile çevirdin."
+              : "You turned uncertainty into a structured, hireable signal."}
+          </div>
+
+          <div
+            style={{
+              marginTop: 10,
+              borderRadius: 10,
+              border: "1px solid rgba(250,204,21,0.32)",
+              background: "linear-gradient(90deg, rgba(250,204,21,0.16), rgba(251,191,36,0.08))",
+              padding: "8px 10px",
+              fontSize: 11.5,
+              color: "#fde68a",
+              fontWeight: 700,
+            }}
+          >
+            {Math.round(Date.now() / 1000) % 2 === 0 ? urgencyLine : altUrgencyLine}
+          </div>
+
+          <div style={{ marginTop: 10, borderRadius: 12, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(2,6,23,0.26)", padding: "10px 10px" }}>
+            <div style={{ fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", color: "#93c5fd", fontWeight: 800, marginBottom: 7 }}>
+              {tr ? "Launchpad" : "Launchpad"}
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <motion.button
+                type="button"
+                onClick={handleStartApplying}
+                animate={{ scale: [1, 1.02, 1] }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                style={{
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "9px 13px",
+                  background: "linear-gradient(135deg, #22d3ee, #6366f1 60%, #a855f7)",
+                  color: "#e0f2fe",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: "pointer",
+                  boxShadow: "0 0 20px rgba(99,102,241,0.32)",
+                }}
+              >
+                🔥 {tr ? "Başvurmaya başla →" : "Start Applying →"}
+              </motion.button>
+              <button
+                type="button"
+                onClick={handleTrackApplications}
+                style={{
+                  borderRadius: 10,
+                  padding: "9px 12px",
+                  background: "rgba(15,23,42,0.35)",
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  color: "#e2e8f0",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                ↻ {tr ? "Başvurularımı takip et" : "Track my applications"}
+              </button>
+              <button
+                type="button"
+                onClick={handleReanalyzeAnotherRole}
+                style={{
+                  borderRadius: 10,
+                  padding: "9px 12px",
+                  background: "rgba(15,23,42,0.3)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  color: "#cbd5e1",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {tr ? "Başka rolü tekrar analiz et" : "Re-analyze another role"}
+              </button>
+            </div>
+            <div style={{ fontSize: 11, color: "#cbd5e1", marginTop: 7 }}>
+              {tr ? "Önümüzdeki 24 saatte 3 role başvur." : "Apply to 3 roles in the next 24 hours."}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 10, borderRadius: 12, border: "1px solid rgba(59,130,246,0.28)", background: "rgba(30,58,138,0.16)", padding: "10px 10px" }}>
+            <div style={{ fontSize: 12, color: "#bfdbfe", fontWeight: 800, marginBottom: 6 }}>
+              {tr ? "Nereden başlamalısın?" : "Where should you apply first?"}
+            </div>
+            <div style={{ fontSize: 11.5, color: "#dbeafe", marginBottom: 6 }}>
+              {tr ? "Şununla başla:" : "Start with:"}
+            </div>
+            {applyTargets.map((x) => (
+              <div key={x} style={{ fontSize: 11.5, color: "#cbd5e1", lineHeight: 1.55 }}>
+                • {x}
+              </div>
+            ))}
             <button
               type="button"
-              onClick={() => onSelectStep("apply")}
+              onClick={handleShowLiveRoles}
               style={{
-                border: "none",
+                marginTop: 8,
+                border: "1px solid rgba(147,197,253,0.45)",
                 borderRadius: 9,
-                padding: "8px 12px",
-                background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                color: "#052e16",
+                background: "rgba(59,130,246,0.18)",
+                color: "#dbeafe",
                 fontSize: 12,
-                fontWeight: 800,
+                fontWeight: 700,
+                padding: "8px 10px",
                 cursor: "pointer",
               }}
             >
-              {tr ? "Başvurmaya başla →" : "Start applying →"}
+              → {tr ? "Canlı rolleri göster" : "Show me live roles"}
             </button>
+          </div>
+
+          <div style={{ marginTop: 10, borderRadius: 12, border: "1px solid rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.14)", padding: "10px 10px" }}>
+            <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 800 }}>
+              {tr ? "Paylaşım = strateji" : "Share loop = strategy"}
+            </div>
+            <div style={{ fontSize: 11.5, color: "#c7d2fe", marginTop: 5, lineHeight: 1.5 }}>
+              {tr
+                ? `"HireFit ile CV'mi optimize ettim" · Skor: ${Math.round(scoreBefore || 0)} → ${Math.round(scoreAfter || 0)} · Düzeltilen ana hata: ${biggestFix || "Ölçülebilir etki eksikliği"} · Yol: ${pathLabel || "Veri Analisti → Ürün Yöneticisi"}`
+                : `"I just optimized my CV with HireFit" · Score: ${Math.round(scoreBefore || 0)} → ${Math.round(scoreAfter || 0)} · Biggest mistake fixed: ${biggestFix || "No measurable impact"} · Path: ${pathLabel || "Data Analyst → Product Manager"}`}
+            </div>
+            <div style={{ fontSize: 11.5, color: "#e2e8f0", marginTop: 6 }}>
+              {tr ? "Kanıtını gösterenler daha fazla fırsat görür." : "People who show proof get more opportunities."}
+            </div>
             <button
               type="button"
-              onClick={onReanalyzeAnotherRole}
+              onClick={launchShare}
               style={{
+                marginTop: 8,
                 borderRadius: 9,
-                padding: "8px 12px",
-                background: "rgba(15,23,42,0.35)",
-                border: "1px solid rgba(255,255,255,0.2)",
+                border: "1px solid rgba(199,210,254,0.55)",
+                background: "rgba(99,102,241,0.22)",
                 color: "#e2e8f0",
                 fontSize: 12,
                 fontWeight: 700,
+                padding: "8px 10px",
                 cursor: "pointer",
               }}
             >
-              {tr ? "Başka rolü tekrar analiz et" : "Re-analyze another role"}
+              📤 {tr ? "LinkedIn'de paylaş" : "Share on LinkedIn"}
             </button>
+          </div>
+
+          <div style={{ marginTop: 10, borderRadius: 12, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(15,23,42,0.28)", padding: "10px 10px" }}>
+            <div style={{ fontSize: 12, color: "#f1f5f9", fontWeight: 800 }}>
+              {tr ? "Başvurduğunda geri gel." : "When you apply, come back."}
+            </div>
+            <div style={{ fontSize: 11.5, color: "#cbd5e1", marginTop: 4 }}>
+              {tr
+                ? "Sonuçlarını analiz eder, stratejini gerçek veriye göre iyileştiririz."
+                : "We'll analyze your results and improve your strategy."}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 12, color: "#a5b4fc", fontWeight: 800 }}>
+              {tr ? "Sıradaki hedef: Mülakatlar" : "Your next goal: Interviews"}
+            </div>
+            <div style={{ fontSize: 11.5, color: "#cbd5e1", marginTop: 3 }}>
+              {tr ? "Sıradaki yükseltme: Mülakatları geçmek" : "Next upgrade: Passing interviews"}
+            </div>
           </div>
         </motion.div>
       ) : null}
@@ -965,6 +1167,16 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
   const handleReanalyzeAnotherRole = () => {
     navigate("/app");
   };
+  const handleStartApplying = () => {
+    setSelectedStepId("apply");
+    navigate("/app");
+  };
+  const handleTrackApplications = () => {
+    navigate("/app");
+  };
+  const handleShowLiveRoles = () => {
+    navigate("/app");
+  };
 
   const selectedStep = useMemo(
     () => navSteps.find((s) => s.id === selectedStepId) || navSteps[0],
@@ -1137,6 +1349,12 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
             onToggleStep={handleToggleStep}
             pathLabel={path}
             onReanalyzeAnotherRole={handleReanalyzeAnotherRole}
+            onStartApplying={handleStartApplying}
+            onTrackApplications={handleTrackApplications}
+            onShowLiveRoles={handleShowLiveRoles}
+            scoreBefore={baseScore}
+            scoreAfter={projected}
+            biggestFix={biggestGap}
             compact={!isDesktop}
           />
           <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 10, padding: "0 6px" }}>
