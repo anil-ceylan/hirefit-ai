@@ -4441,7 +4441,9 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
   const [navLinkHover, setNavLinkHover] = useState(null);
   const [navLinkPressed, setNavLinkPressed] = useState(null);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const [langPopoverPos, setLangPopoverPos] = useState(null);
   const langMenuRef = useRef(null);
+  const langTriggerRef = useRef(null);
   const navTabsRef = useRef(null);
   const navButtonRefs = useRef([]);
   const [activeTabPosition, setActiveTabPosition] = useState({ left: 0, top: 0, width: 0, height: 0, visible: false });
@@ -4496,6 +4498,25 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
     if (stale) stale.remove();
   }, []);
 
+  const syncLangPopoverRect = useCallback(() => {
+    const el = langTriggerRef.current;
+    if (!el || !langMenuOpen) return;
+    const r = el.getBoundingClientRect();
+    const width = Math.max(r.width, 168);
+    let left = r.right - width;
+    const pad = 10;
+    left = Math.max(pad, Math.min(left, window.innerWidth - width - pad));
+    setLangPopoverPos({ top: r.bottom + 6, left, width });
+  }, [langMenuOpen]);
+
+  useLayoutEffect(() => {
+    if (!langMenuOpen) {
+      setLangPopoverPos(null);
+      return;
+    }
+    syncLangPopoverRect();
+  }, [langMenuOpen, lang, syncLangPopoverRect]);
+
   useEffect(() => {
     if (!langMenuOpen) return;
     const onDoc = (e) => {
@@ -4511,6 +4532,17 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
       document.removeEventListener("keydown", onKey);
     };
   }, [langMenuOpen]);
+
+  useEffect(() => {
+    if (!langMenuOpen) return;
+    const on = () => syncLangPopoverRect();
+    window.addEventListener("scroll", on, true);
+    window.addEventListener("resize", on);
+    return () => {
+      window.removeEventListener("scroll", on, true);
+      window.removeEventListener("resize", on);
+    };
+  }, [langMenuOpen, syncLangPopoverRect]);
 
   useEffect(() => {
     setLangMenuOpen(false);
@@ -4532,24 +4564,25 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
             <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", lineHeight: 1, marginTop: 3, background: "linear-gradient(90deg, #60a5fa, #a78bfa, #22d3ee)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", opacity: 0.92 }}>AI Career Decision Engine</div>
           </div>
         </div>
-        <div ref={navTabsRef} className="hf-nav-tabs-wrap hf-nav-pill-rail">
-          <div
-            style={{
-              position: "absolute",
-              top: activeTabPosition.top,
-              left: activeTabPosition.left,
-              width: activeTabPosition.width,
-              height: activeTabPosition.height || "100%",
-              borderRadius: 999,
-              background: "linear-gradient(145deg, rgba(99,102,241,0.95) 0%, rgba(59,130,246,0.88) 48%, rgba(56,189,248,0.35) 100%)",
-              transition: "left 0.32s ease, top 0.32s ease, width 0.32s ease, height 0.32s ease, opacity 0.25s ease",
-              boxShadow: "0 0 36px rgba(99,102,241,0.32), 0 0 0 1px rgba(255,255,255,0.12) inset, inset 0 1px 0 rgba(255,255,255,0.18)",
-              pointerEvents: "none",
-              zIndex: 0,
-              opacity: activeTabPosition.visible && activeTabPosition.width > 0 ? 1 : 0,
-            }}
-          />
-          {[{ label: t.home, path: "/", viewKey: "landing" }, { label: t.product, path: "/roadmap", viewKey: "roadmap" }, { label: t.dashboard, path: "/dashboard", viewKey: "dashboard" }].map(({ label, path, viewKey }, i) => {
+        <div className="hf-nav-tabs-center">
+          <div ref={navTabsRef} className="hf-nav-tabs-wrap hf-nav-pill-rail">
+            <div
+              style={{
+                position: "absolute",
+                top: activeTabPosition.top,
+                left: activeTabPosition.left,
+                width: activeTabPosition.width,
+                height: activeTabPosition.height || "100%",
+                borderRadius: 999,
+                background: "linear-gradient(145deg, rgba(99,102,241,0.95) 0%, rgba(59,130,246,0.88) 48%, rgba(56,189,248,0.35) 100%)",
+                transition: "left 0.32s ease, top 0.32s ease, width 0.32s ease, height 0.32s ease, opacity 0.25s ease",
+                boxShadow: "0 0 36px rgba(99,102,241,0.32), 0 0 0 1px rgba(255,255,255,0.12) inset, inset 0 1px 0 rgba(255,255,255,0.18)",
+                pointerEvents: "none",
+                zIndex: 0,
+                opacity: activeTabPosition.visible && activeTabPosition.width > 0 ? 1 : 0,
+              }}
+            />
+            {[{ label: t.home, path: "/", viewKey: "landing" }, { label: t.product, path: "/roadmap", viewKey: "roadmap" }, { label: t.dashboard, path: "/dashboard", viewKey: "dashboard" }].map(({ label, path, viewKey }, i) => {
             const isActive = navTab === viewKey;
             const isHovered = navLinkHover === viewKey;
             const isPressed = navLinkPressed === viewKey;
@@ -4578,13 +4611,12 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
               </button>
             );
           })}
+          </div>
         </div>
         <div className="hf-nav-right-cluster">
-          <div
-            ref={langMenuRef}
-            className={`hf-nav-lang-wrap${langMenuOpen ? " hf-nav-lang-wrap--open" : ""}`}
-          >
+          <div ref={langMenuRef} className="hf-nav-lang-wrap">
             <button
+              ref={langTriggerRef}
               type="button"
               id="hf-nav-lang-trigger"
               className={
@@ -4602,12 +4634,17 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
               <span className="hf-nav-lang-label">{lang === "EN" ? "English" : "Türkçe"}</span>
               <ChevronDown className="hf-nav-lang-chevron" size={14} strokeWidth={2.25} aria-hidden />
             </button>
-            {langMenuOpen ? (
+            {langMenuOpen && langPopoverPos ? (
               <div
                 id="hf-nav-lang-menu"
-                className="hf-nav-lang-menustack"
+                className="hf-nav-lang-popover"
                 role="menu"
                 aria-label={lang === "TR" ? "Dil seçimi" : "Language"}
+                style={{
+                  top: langPopoverPos.top,
+                  left: langPopoverPos.left,
+                  width: langPopoverPos.width,
+                }}
               >
                 <button
                   type="button"
