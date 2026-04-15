@@ -2275,7 +2275,7 @@ function clampBullet(text, max = 120) {
   return `${raw.slice(0, Math.max(40, max - 1)).trim()}...`;
 }
 
-function DecisionScanSections({ data, lang, t, isPro, onUpgrade, bestPathLabel }) {
+function DecisionScanSections({ data, lang, t, isPro, onUpgrade }) {
   const reasons = Array.isArray(data?.Gaps?.rejection_reasons) ? data.Gaps.rejection_reasons : [];
   const topGaps = reasons.slice(0, 3);
   const moreGaps = reasons.slice(3);
@@ -2291,7 +2291,13 @@ function DecisionScanSections({ data, lang, t, isPro, onUpgrade, bestPathLabel }
     .slice(0, 3);
   const showGapsCard = topGaps.length > 0 || moreGaps.length > 0;
   const showRoadmapCard = roadmapLines.length > 0;
-  const quickBestPath = clampBullet(bestPathLabel, 90);
+  const bestRolePathRaw =
+    (data?.RoleFit?.best_role && String(data.RoleFit.best_role).trim()) ||
+    (data?.RoleFit?.role_fit?.[0]?.role && String(data.RoleFit.role_fit[0].role).trim()) ||
+    "";
+  const quickBestPath = bestRolePathRaw
+    ? clampBullet(lang === "TR" ? `Önerilen rota: ${bestRolePathRaw}` : `Recommended path: ${bestRolePathRaw}`, 90)
+    : "";
   const norm = (v) => String(v || "").replace(/\s+/g, " ").trim().toLowerCase();
   const quickPathIsPlaceholder =
     !hasMeaningfulText(quickBestPath) ||
@@ -2661,7 +2667,6 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, c
           t={t}
           isPro={isPro}
           onUpgrade={onUpgrade}
-          bestPathLabel={t.bestPathForwardTitle}
         />
 
         <BestPathForwardBlock data={data} lang={lang} t={t} isPro={isPro} onUpgrade={onUpgrade} score={scoreNumeric ?? score} cvText={cvText} jdText={jdText} />
