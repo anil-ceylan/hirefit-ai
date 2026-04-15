@@ -810,7 +810,7 @@ export function YourNextMovePanel({
           <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.1em", color: "#4ade80", textTransform: "uppercase", marginBottom: 6 }}>
             {tr ? "Tek net aksiyon" : "One clear action"}
           </div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: "#ecfccb", lineHeight: 1.45 }}>👉 {oneAction}</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: "#ecfccb", lineHeight: 1.45 }}>→ {oneAction}</div>
         </div>
       </div>
 
@@ -863,7 +863,7 @@ export function YourNextMovePanel({
           }}
         >
           {optimizing && isPro ? <Loader2 size={18} style={{ animation: "spin 0.8s linear infinite" }} /> : <Wand2 size={18} />}
-          {!isPro ? (tr ? "CV'mi düzelt — Pro" : "Fix my CV — Pro") : optimizing && isPro ? (tr ? "Optimize ediliyor..." : "Optimizing...") : tr ? "👉 CV'mi şimdi düzelt" : "👉 Fix my CV now"}
+          {!isPro ? (tr ? "CV'mi düzelt — Pro" : "Fix my CV — Pro") : optimizing && isPro ? (tr ? "Optimize ediliyor..." : "Optimizing...") : tr ? "→ CV'mi şimdi düzelt" : "→ Fix my CV now"}
         </button>
         <button
           type="button"

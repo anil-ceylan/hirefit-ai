@@ -2275,7 +2275,7 @@ function clampBullet(text, max = 120) {
   return `${raw.slice(0, Math.max(40, max - 1)).trim()}...`;
 }
 
-function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro, onUpgrade, bestPathLabel }) {
+function DecisionScanSections({ data, lang, t, isPro, onUpgrade, bestPathLabel }) {
   const reasons = Array.isArray(data?.Gaps?.rejection_reasons) ? data.Gaps.rejection_reasons : [];
   const topGaps = reasons.slice(0, 3);
   const moreGaps = reasons.slice(3);
@@ -2289,18 +2289,17 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
     .map((f) => clampBullet(f?.issue || f?.steps?.[0] || "", 110))
     .filter(Boolean)
     .slice(0, 3);
-  const summaryLine = clampBullet(String(data?.Decision?.reasoning || data?.Recruiter?.reasoning || ""), 110);
-  const supportingWhyItems = reasons
-    .map((g) => clampBullet(humanizeUserFacingReason(g?.issue || "", lang), 95))
-    .filter((x) => hasMeaningfulText(x) && String(x).toLowerCase() !== String(mainProblem || "").toLowerCase());
-  const whyItems = [summaryLine, ...supportingWhyItems].filter(hasMeaningfulText).slice(0, 3);
-  const showWhyCard = whyItems.length > 0;
   const showGapsCard = topGaps.length > 0 || moreGaps.length > 0;
   const showRoadmapCard = roadmapLines.length > 0;
   const quickBestPath = clampBullet(bestPathLabel, 90);
-  const showQuickBestPathCard = hasMeaningfulText(quickBestPath);
+  const norm = (v) => String(v || "").replace(/\s+/g, " ").trim().toLowerCase();
+  const quickPathIsPlaceholder =
+    !hasMeaningfulText(quickBestPath) ||
+    norm(quickBestPath) === norm(t.bestPathForwardTitle) ||
+    norm(quickBestPath) === norm(t.scanBestPathTitle);
+  const showQuickBestPathCard = !quickPathIsPlaceholder;
   const showQuickSection = showQuickBestPathCard;
-  if (!showWhyCard && !showGapsCard && !showRoadmapCard) return null;
+  if (!showQuickSection && !showGapsCard && !showRoadmapCard) return null;
   const rowStyle = { marginBottom: 6, fontSize: 12, color: RS.textSecondary, lineHeight: 1.55 };
   const ExpandableDecisionCard = ({ icon, title, preview, children }) => {
     const [open, setOpen] = useState(false);
@@ -2381,16 +2380,6 @@ function DecisionScanSections({ data, lang, t, mainProblem, singleAction, isPro,
       ) : null}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 24 }}>
-      {showWhyCard ? (
-        <ExpandableDecisionCard
-          icon={<AlertCircle size={14} color={RS.redDim} />}
-          title={t.scanWhyRejectedTitle}
-          preview={clampBullet(whyItems[0] || "", 96)}
-        >
-          {whyItems.map((item, i) => <div key={`why-item-${i}`} style={rowStyle}>• {item}</div>)}
-        </ExpandableDecisionCard>
-      ) : null}
-
       {showGapsCard ? (
         <ExpandableDecisionCard
           icon={<ListChecks size={14} color={RS.amber} />}
@@ -2670,8 +2659,6 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, c
           data={data}
           lang={lang}
           t={t}
-          mainProblem={displayedMainProblem || fv.explanation}
-          singleAction={singleAction}
           isPro={isPro}
           onUpgrade={onUpgrade}
           bestPathLabel={t.bestPathForwardTitle}
@@ -2695,7 +2682,7 @@ const translations = {
     analyzeBtn: "Analyze My CV Free",
     viewDashboard: "View Dashboard",
     checkFit: "Check My Fit",
-    optimizeCV: "👉 Take action on your CV",
+    optimizeCV: "→ Take action on your CV",
     learningRoadmap: "Learning Roadmap",
     pasteCv: "Paste your CV text here...",
     pasteJd: "Paste the job description here...",
@@ -3064,7 +3051,7 @@ const translations = {
     analyzeBtn: "CV'mi Ücretsiz Analiz Et",
     viewDashboard: "Paneli Görüntüle",
     checkFit: "Uyumu Kontrol Et",
-    optimizeCV: "👉 CV'de harekete geç",
+    optimizeCV: "→ CV'de harekete geç",
     learningRoadmap: "Öğrenme Yol Haritası",
     pasteCv: "CV metninizi buraya yapıştırın...",
     pasteJd: "İş ilanını buraya yapıştırın...",
@@ -7493,7 +7480,7 @@ export function AnalyzerPage() {
           >
             {optimizing ? <><Loader2 size={14} />{t.optimizing}</> : (
               !isPro
-                ? <><Wand2 size={14} />{lang === "TR" ? "👉 Fix My CV — Pro ile aç" : "👉 Fix My CV — unlock with Pro"}</>
+                ? <><Wand2 size={14} />{lang === "TR" ? "→ Fix My CV — Pro ile aç" : "→ Fix My CV — unlock with Pro"}</>
                 : <><Wand2 size={14} />{t.optimizeCV}</>
             )}
           </button>
