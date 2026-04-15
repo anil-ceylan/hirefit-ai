@@ -429,133 +429,101 @@ export function HiringLogicQaSection({ lang }) {
     ? [
         {
           q: "HireFit CV’min eleneceğini nasıl biliyor?",
-          a: [
-            "CV’ni ilandaki gerçek işe alım sinyalleriyle karşılaştırır: araçlar, kapsam, seviye ve kanıt.",
-            "Sonra “yazım kalitesi” değil “eleme simülasyonu” çalıştırır.",
-            "Sinyal zayıfsa red riski yükselir.",
-          ],
+          a: "CV’ni ilandaki gerçek filtrelerle eşleştirir: araç, seviye, kapsam ve kanıt. Sonra recruiter ilk eleme davranışını simüle eder. Sinyal zayıfsa red riski yükselir.",
+          insight: "→ Red çoğu zaman yetenek sorunu değil, sinyal uyumsuzluğudur.",
+          share: "“Çoğu kişi yetersiz değil. Çoğu kişi yanlış sinyal veriyor.”",
         },
         {
           q: "Neden ölçülebilir sonuca bu kadar odaklanıyorsunuz?",
-          a: [
-            "Recruiter emek değil, etki arar.",
-            "\"Responsible for\" görünmez; \"maliyeti %18 düşürdüm\" görünür.",
-            "İlk elemede potansiyelden çok kanıt kazanır.",
-          ],
+          a: "Çünkü recruiter emek değil, etki görür. “Responsible for” görünmez; “maliyeti %18 düşürdüm” görünür. İlk elemede potansiyelden çok kanıt kazanır.",
+          insight: "→ Recruiter çabayı değil, sonucu işe alır.",
+          share: "“CV bir hikaye değil. Kanıt dokümanıdır.”",
         },
         {
           q: "HireFit neden bazen başvurma diyor?",
-          a: [
-            "Çünkü zamanlama da stratejidir.",
-            "Profil rol barının çok altındaysa hemen başvuru çoğunlukla sessiz red olur.",
-            "Önce kısa bir düzeltme, sonra başvuru daha yüksek dönüşüm verir.",
-          ],
+          a: "Çünkü zamanlama stratejidir. Profil rol barının çok altındaysa hemen başvuru genelde sessiz red olur. Önce düzeltme, sonra başvuru daha yüksek dönüşüm verir.",
+          insight: "→ Duygusal hız yerine stratejik gecikme daha çok dönüşüm getirir.",
+          share: "“Bazen en iyi başvuru, henüz göndermediğindir.”",
         },
         {
           q: "Neden sadece beceri değil, proje öneriyorsunuz?",
-          a: [
-            "CV’de beceri bir iddia, proje ise kanıttır.",
-            "Hiring ekipleri repo, dashboard, vaka çıktısı gibi görünür üretime güvenir.",
-            "Kararı değiştiren şey “biliyorum” değil “yaptım” sinyalidir.",
-          ],
+          a: "CV’de beceri bir iddia, proje kanıttır. Hiring ekipleri repo, dashboard ve vaka çıktısı gibi görünür üretime güvenir. Kararı değiştiren “biliyorum” değil, “yaptım” sinyalidir.",
+          insight: "→ Beceriler anlatır, projeler ispatlar.",
+          share: "“‘SQL biliyorum’ zayıf. ‘SQL ile bunu ürettim’ güçlü.”",
         },
         {
           q: "Bu sadece ATS anahtar kelime aracı değil mi?",
-          a: [
-            "Hayır. Anahtar kelime sadece ilk katman.",
-            "HireFit rol uyumu, deneyim derinliği, etki kalitesi ve güvenilirlik sinyallerini de okur.",
-            "ATS’yi geçmek mülakat için tek başına yetmez.",
-          ],
+          a: "Hayır. Anahtar kelime sadece ilk katman. HireFit rol uyumu, deneyim derinliği, etki kalitesi ve güvenilirlik sinyalini de okur. ATS’yi geçmek mülakat için tek başına yetmez.",
+          insight: "→ ATS’yi geçmek giriş bileti; recruiter filtresini geçmek sonuçtur.",
+          share: "“ATS görünürlük sağlar. Sinyal geri dönüşüm sağlar.”",
         },
         {
           q: "ChatGPT’den farkı ne?",
-          a: [
-            "Genel sohbet yerine başvuru öncesi karar verir.",
-            "Çıktısı net: risk, ana boşluk, ilk hamle.",
-            "Daha az laf, daha çok işe alım mantığı.",
-          ],
+          a: "Genel sohbet yerine başvuru öncesi karar üretir. Çıktı net: risk, ana boşluk, ilk hamle. Daha az genel öneri, daha çok işe alım paterni.",
+          insight: "→ Tavsiye ilginçtir, karar kullanışlıdır.",
+          share: "“Genel AI kulağa iyi geleni söyler. HireFit görüşme getirebilecek sinyali söyler.”",
         },
         {
           q: "Bu gerçekten şansımı artırır mı?",
-          a: [
-            "Evet, önerilen düzeltmeleri uygularsan.",
-            "CV’lerin çoğu saniyeler içinde taranır; zayıf sinyal hızla elenir.",
-            "Kanıt, hedefleme ve alaka arttığında görüşme olasılığı yükselir.",
-          ],
+          a: "Evet, önerilen düzeltmeleri uygularsan. CV’lerin çoğu saniyeler içinde taranır ve zayıf sinyal hızla elenir. Kanıt, hedefleme ve alaka arttığında görüşme ihtimali yükselir.",
+          insight: "→ Şans, sinyal kalitesi arttıkça artar.",
+          share: "“Görüşme ihtimali şansla değil, sinyal kalitesiyle yükselir.”",
         },
         {
-          q: "Neden cevaplar bu kadar direkt?",
-          a: [
-            "Çünkü hiring süreci direkt.",
-            "Recruiter uzun geri bildirim yazmaz; ilerler ya da eler.",
-            "Açık gerçek, geç gelen sessiz redden daha değerlidir.",
-          ],
+          q: "Recruiter neden bu kadar hızlı eliyor?",
+          a: "Çünkü ilk turda okumuyor, tarıyor. Saniyeler içinde rol uyumu ve kanıt arıyor. Net sinyal yoksa sıradaki adaya geçiyor.",
+          insight: "→ Çoğu CV yanlış okunmaz; hiç derin okunmaz.",
+          share: "“CV’ler çoğu zaman reddedilmez. Sadece atlanır.”",
         },
       ]
     : [
         {
           q: "How does HireFit know if my CV will be rejected?",
-          a: [
-            "It compares your CV against real hiring signals in the JD: tools, scope, level, and proof.",
-            "Then it runs a rejection simulation, not a writing critique.",
-            "If those signals are weak, rejection risk goes up.",
-          ],
+          a: "It matches your CV to real hiring filters in the JD: tools, scope, level, and proof. Then it simulates first-screen recruiter behavior. If signal is weak, rejection risk rises.",
+          insight: "→ Rejection is usually a signal mismatch, not a talent verdict.",
+          share: "\"Most people aren’t underqualified. They’re under-signaled.\"",
         },
         {
           q: "Why do you focus on measurable results?",
-          a: [
-            "Recruiters evaluate impact, not effort.",
-            "\"Responsible for\" gets ignored; \"increased X by 30%\" gets attention.",
-            "Proof beats potential in first-round screening.",
-          ],
+          a: "Because recruiters evaluate impact, not effort. “Responsible for” gets ignored; “increased X by 30%” gets noticed. Proof beats potential in first-round screening.",
+          insight: "→ Recruiters don’t hire effort. They hire evidence.",
+          share: "\"Your CV isn’t a story. It’s a proof document.\"",
         },
         {
           q: "Why does HireFit sometimes tell me NOT to apply?",
-          a: [
-            "Because timing is strategy.",
-            "If your profile is far below the hiring bar, applying now usually means silent rejection.",
-            "Fix first, then apply with a stronger conversion chance.",
-          ],
+          a: "Because timing is strategy. If your profile is far below the hiring bar, applying now usually means silent rejection. Fix first, then apply stronger.",
+          insight: "→ Strategic delay beats emotional apply-now.",
+          share: "\"Sometimes the smartest application is the one you don’t send yet.\"",
         },
         {
           q: "Why do you suggest projects instead of just skills?",
-          a: [
-            "Skills on a CV are claims; projects are evidence.",
-            "Hiring teams trust visible output: repo, dashboard, case, shipped work.",
-            "Decisions change when proof is concrete.",
-          ],
+          a: "Skills on a CV are claims; projects are receipts. Hiring teams trust visible output: repos, dashboards, case work, shipped proof. Concrete evidence changes decisions.",
+          insight: "→ Skills tell. Projects prove.",
+          share: "\"‘I know SQL’ is weak. ‘Here’s what I built with SQL’ wins.\"",
         },
         {
           q: "Isn’t this just an ATS keyword tool?",
-          a: [
-            "No. Keywords are only one layer.",
-            "HireFit also checks role fit, depth of experience, impact quality, and credibility signals.",
-            "Passing ATS alone doesn’t secure interviews.",
-          ],
+          a: "No. Keywords are one layer. HireFit also checks role fit, experience depth, impact quality, and credibility signals. Passing ATS alone does not secure interviews.",
+          insight: "→ Beating ATS is entry. Beating recruiter logic is outcome.",
+          share: "\"ATS gets you seen. Signal gets you called.\"",
         },
         {
           q: "How is this different from ChatGPT?",
-          a: [
-            "It is built for pre-apply decision logic, not general conversation.",
-            "Output is structured: risk, core gap, and first move.",
-            "Less generic advice, more recruiter pattern matching.",
-          ],
+          a: "ChatGPT gives broad advice. HireFit gives pre-apply decisions: risk, core gap, and first move. Less generic talk, more recruiter pattern logic.",
+          insight: "→ Advice is interesting. Decisions are useful.",
+          share: "\"General AI tells you what sounds good. Hiring AI tells you what gets through.\"",
         },
         {
           q: "Can this actually improve my chances?",
-          a: [
-            "Yes, if you execute the fixes.",
-            "Most CVs are filtered in seconds when signal quality is weak.",
-            "Better proof, targeting, and relevance increase interview odds.",
-          ],
+          a: "Yes, if you execute the fixes. Most CVs are filtered in seconds when signal quality is weak. Better proof, targeting, and relevance increase interview odds.",
+          insight: "→ Better CV signal creates better recruiter behavior.",
+          share: "\"Interview chances don’t jump by luck. They move by signal.\"",
         },
         {
-          q: "Why are the answers so direct?",
-          a: [
-            "Because hiring decisions are direct.",
-            "Recruiters scan fast; they don’t write long feedback.",
-            "Clear truth now is better than silent rejection later.",
-          ],
+          q: "Why do recruiters reject so fast?",
+          a: "They don’t fully read in first pass — they scan. They look for role match and proof in seconds. No clear signal means next candidate.",
+          insight: "→ Most CVs aren’t read wrong. They’re never read deeply.",
+          share: "\"Most CVs don’t get rejected. They get skipped.\"",
         },
       ];
 
@@ -563,12 +531,12 @@ export function HiringLogicQaSection({ lang }) {
     <section className="hf-section hf-section--qa" style={{ padding: "80px 0" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 42 }}>
-          <div style={pill}>{tr ? "Sıkı gerçekler" : "Hiring reality Q/A"}</div>
-          <h2 style={h2}>{tr ? "Bu araç neden güvenilir?" : "Why this is credible"}</h2>
+          <div style={pill}>{tr ? "Insight Engine" : "Insight Engine"}</div>
+          <h2 style={h2}>{tr ? "Recruiter gerçeği, net karar" : "Recruiter truth, clear decisions"}</h2>
           <p style={sub}>
             {tr
-              ? "Bu bölüm “SSS” değil. İşe alımın nasıl çalıştığını recruiter mantığıyla açıklar."
-              : "Not a generic FAQ. This explains hiring mechanics with recruiter-first logic."}
+              ? "Bu bir SSS değil. Ekran görüntüsü alınacak kadar net, paylaşılacak kadar güçlü işe alım içgörüleri."
+              : "Not a FAQ. Screenshot-worthy hiring truths designed for trust, persuasion, and sharing."}
           </p>
         </div>
 
@@ -604,10 +572,29 @@ export function HiringLogicQaSection({ lang }) {
                   {item.q}
                 </h3>
               </div>
-              <div style={{ color: "#cbd5e1", fontSize: 14, lineHeight: 1.6 }}>
-                {item.a.map((line) => (
-                  <div key={`${item.q}-${line}`}>{line}</div>
-                ))}
+              <div style={{ color: "#cbd5e1", fontSize: 14, lineHeight: 1.6, marginBottom: 12 }}>{item.a}</div>
+              <div
+                style={{
+                  borderRadius: 12,
+                  border: "1px solid rgba(16,185,129,0.22)",
+                  background: "linear-gradient(180deg, rgba(16,185,129,0.08), rgba(16,185,129,0.03))",
+                  padding: "10px 12px",
+                  marginBottom: 8,
+                }}
+              >
+                <div style={{ fontSize: 10, letterSpacing: "0.08em", fontWeight: 800, color: "#6ee7b7", marginBottom: 4 }}>INSIGHT</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#d1fae5", lineHeight: 1.45 }}>{item.insight}</div>
+              </div>
+              <div
+                style={{
+                  borderRadius: 12,
+                  border: "1px solid rgba(99,102,241,0.24)",
+                  background: "linear-gradient(180deg, rgba(99,102,241,0.09), rgba(99,102,241,0.03))",
+                  padding: "10px 12px",
+                }}
+              >
+                <div style={{ fontSize: 10, letterSpacing: "0.08em", fontWeight: 800, color: "#c7d2fe", marginBottom: 4 }}>{tr ? "SHARE" : "SHARE"}</div>
+                <div style={{ fontSize: 13, color: "#e2e8f0", lineHeight: 1.45 }}>{item.share}</div>
               </div>
             </div>
           ))}
