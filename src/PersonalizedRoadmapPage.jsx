@@ -173,6 +173,7 @@ function CareerNavigationMap({
   onSelectStep,
   onToggleStep,
   pathLabel,
+  onReanalyzeAnotherRole,
   compact = false,
 }) {
   const tr = lang === "TR";
@@ -190,6 +191,9 @@ function CareerNavigationMap({
   const progressPct = Math.round((completedCount / totalSteps) * 100);
   const allComplete = completedCount >= totalSteps;
   const stepIndexLabel = Math.min(currentStepIndex + 1, totalSteps);
+  const stepsCompletedText = tr
+    ? `${completedCount} / ${totalSteps} adım tamamlandı`
+    : `${completedCount} of ${totalSteps} steps completed`;
   const statusByStep = tr
     ? [
         "Temeli inşa ediyorsun...",
@@ -206,6 +210,38 @@ function CareerNavigationMap({
       ? "Artık güçlü bir profille başvurmaya hazırsın."
       : "You are now ready to apply with a strong profile."
     : statusByStep[Math.min(currentStepIndex, statusByStep.length - 1)];
+  const isExecutionPhase = activeStep.id === "apply";
+
+  const rewardMessage = (points) => {
+    const n = Number(points) || 0;
+    if (n >= 15) {
+      return tr
+        ? "Top-tier aday sinyaline yaklaştın."
+        : "You're now showing top-tier candidate signal.";
+    }
+    if (n >= 10) {
+      return tr
+        ? "Bu seviyede çoğu adaydan daha güçlüsün."
+        : "You're now stronger than most applicants at this level.";
+    }
+    return tr
+      ? "Aday havuzunun ortalamasının üstüne çıktın."
+      : "You're now stronger than average at this level.";
+  };
+
+  const triggerCompletionFeedback = (step) => {
+    const points = step?.rewardPoints || 10;
+    setButtonBoost(true);
+    setTimeout(() => setButtonBoost(false), 220);
+    setRecentlyCompletedId(step.id);
+    setRewardToast({
+      points,
+      text: rewardMessage(points),
+      done: tr ? "Adım tamamlandı ✔" : "Step completed ✔",
+      momentum: tr ? "Momentum arttı" : "Momentum increased",
+    });
+    setTimeout(() => setRecentlyCompletedId(null), 700);
+  };
 
   useEffect(() => {
     if (!rewardToast) return undefined;
@@ -236,7 +272,10 @@ function CareerNavigationMap({
                 : `Step ${stepIndexLabel} of ${totalSteps} — ${activeStep.label}`}
           </div>
           <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
-            {tr ? `İlerleme: %${progressPct}` : `Progress: ${progressPct}%`}
+            {tr ? `%${progressPct} tamamlandı` : `${progressPct}% complete`}
+          </div>
+          <div style={{ fontSize: 11, color: "#7dd3fc", marginTop: 2 }}>
+            {stepsCompletedText}
           </div>
           <div
             style={{
@@ -295,15 +334,8 @@ function CareerNavigationMap({
         <motion.button
           type="button"
           onClick={() => {
-            setButtonBoost(true);
-            setTimeout(() => setButtonBoost(false), 220);
             if (!completed[activeStep.id]) {
-              setRecentlyCompletedId(activeStep.id);
-              setRewardToast({
-                points: activeStep.rewardPoints || 10,
-                text: tr ? "Mülakat hazır profiline bir adım daha yaklaştın" : "You're now closer to interview-ready",
-              });
-              setTimeout(() => setRecentlyCompletedId(null), 700);
+              triggerCompletionFeedback(activeStep);
             }
             onToggleStep(activeStep.id);
           }}
@@ -353,6 +385,8 @@ function CareerNavigationMap({
                 +{rewardToast.points} {tr ? "Fit Skoru" : "Fit Score"} ↑
               </div>
               <div style={{ color: "#e2e8f0", fontSize: 12, marginTop: 3 }}>{rewardToast.text}</div>
+              <div style={{ color: "#a5f3fc", fontSize: 11, marginTop: 5 }}>{rewardToast.done}</div>
+              <div style={{ color: "#93c5fd", fontSize: 11 }}>{rewardToast.momentum}</div>
             </motion.div>
           ) : null}
         </AnimatePresence>
@@ -394,7 +428,10 @@ function CareerNavigationMap({
               : `Step ${stepIndexLabel} of ${totalSteps} — ${activeStep.label}`}
         </div>
         <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-          {tr ? `İlerleme: %${progressPct}` : `Progress: ${progressPct}%`}
+          {tr ? `%${progressPct} tamamlandı` : `${progressPct}% complete`}
+        </div>
+        <div style={{ fontSize: 11, color: "#7dd3fc", marginTop: 2 }}>
+          {stepsCompletedText}
         </div>
         <div
           style={{
@@ -430,6 +467,67 @@ function CareerNavigationMap({
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {allComplete ? (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: [0.92, 1, 0.92], y: 0 }}
+          transition={{ duration: 2.4, ease: "easeInOut", repeat: Infinity }}
+          style={{
+            marginBottom: 14,
+            borderRadius: 14,
+            border: "1px solid rgba(74,222,128,0.45)",
+            background: "linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.12))",
+            boxShadow: "0 0 18px rgba(34,197,94,0.25)",
+            padding: "12px 13px",
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 800, color: "#dcfce7" }}>
+            {tr
+              ? "Artık güçlü bir profille başvurmaya hazırsın."
+              : "You are now ready to apply with a strong profile."}
+          </div>
+          <div style={{ fontSize: 12, color: "#bbf7d0", marginTop: 4 }}>
+            {tr
+              ? "Kanıt ürettin, sinyalini güçlendirdin ve hedef rolünle hizalandın."
+              : "You’ve built proof, improved your signal, and aligned with your target role."}
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+            <button
+              type="button"
+              onClick={() => onSelectStep("apply")}
+              style={{
+                border: "none",
+                borderRadius: 9,
+                padding: "8px 12px",
+                background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                color: "#052e16",
+                fontSize: 12,
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              {tr ? "Başvurmaya başla →" : "Start applying →"}
+            </button>
+            <button
+              type="button"
+              onClick={onReanalyzeAnotherRole}
+              style={{
+                borderRadius: 9,
+                padding: "8px 12px",
+                background: "rgba(15,23,42,0.35)",
+                border: "1px solid rgba(255,255,255,0.2)",
+                color: "#e2e8f0",
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {tr ? "Başka rolü tekrar analiz et" : "Re-analyze another role"}
+            </button>
+          </div>
+        </motion.div>
+      ) : null}
 
       <div style={{ position: "relative", paddingLeft: 12, paddingRight: 6, minHeight: lineHeight + 80 }}>
         <svg
@@ -642,8 +740,8 @@ function CareerNavigationMap({
                         ? "Şu anki adım"
                         : "Current step"
                       : tr
-                        ? "Sıradaki adım"
-                        : "Upcoming"}
+                        ? "Milestone"
+                        : "Milestone"}
                 </div>
               </motion.button>
             );
@@ -654,15 +752,8 @@ function CareerNavigationMap({
       <motion.button
         type="button"
         onClick={() => {
-          setButtonBoost(true);
-          setTimeout(() => setButtonBoost(false), 220);
           if (!completed[activeStep.id]) {
-            setRecentlyCompletedId(activeStep.id);
-            setRewardToast({
-              points: activeStep.rewardPoints || 10,
-              text: tr ? "Mülakat hazır profiline bir adım daha yaklaştın" : "You're now closer to interview-ready",
-            });
-            setTimeout(() => setRecentlyCompletedId(null), 700);
+            triggerCompletionFeedback(activeStep);
           }
           onToggleStep(activeStep.id);
         }}
@@ -692,6 +783,33 @@ function CareerNavigationMap({
             : "Mark this step as completed"}
       </motion.button>
 
+      {isExecutionPhase ? (
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
+          style={{
+            marginTop: 10,
+            borderRadius: 12,
+            border: "1px solid rgba(99,102,241,0.35)",
+            background: "linear-gradient(135deg, rgba(59,130,246,0.14), rgba(99,102,241,0.14))",
+            padding: "10px 12px",
+          }}
+        >
+          <div style={{ fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", color: "#c7d2fe", fontWeight: 800 }}>
+            {tr ? "Execution phase" : "Execution phase"}
+          </div>
+          <div style={{ fontSize: 12, color: "#e2e8f0", marginTop: 4 }}>
+            {tr ? "Dönüşümün olduğu yer burası." : "This is where conversion happens."}
+          </div>
+          <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 7, lineHeight: 1.6 }}>
+            <div>• {tr ? "Sinyal uyumun olan rollere başvur" : "Apply only where you have signal fit"}</div>
+            <div>• {tr ? "Kalite > adet" : "Quality > quantity"}</div>
+            <div>• {tr ? "Her başvuru bilinçli olmalı" : "Each application should feel intentional"}</div>
+          </div>
+        </motion.div>
+      ) : null}
+
       <AnimatePresence>
         {rewardToast ? (
           <motion.div
@@ -718,6 +836,8 @@ function CareerNavigationMap({
               +{rewardToast.points} {tr ? "Fit Skoru" : "Fit Score"} ↑
             </div>
             <div style={{ color: "#e2e8f0", fontSize: 12, marginTop: 3 }}>{rewardToast.text}</div>
+            <div style={{ color: "#a5f3fc", fontSize: 11, marginTop: 5 }}>{rewardToast.done}</div>
+            <div style={{ color: "#93c5fd", fontSize: 11 }}>{rewardToast.momentum}</div>
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -840,6 +960,10 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
       return next;
     });
     detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+
+  const handleReanalyzeAnotherRole = () => {
+    navigate("/app");
   };
 
   const selectedStep = useMemo(
@@ -1012,6 +1136,7 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
             onSelectStep={handleSelectStep}
             onToggleStep={handleToggleStep}
             pathLabel={path}
+            onReanalyzeAnotherRole={handleReanalyzeAnotherRole}
             compact={!isDesktop}
           />
           <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 10, padding: "0 6px" }}>
