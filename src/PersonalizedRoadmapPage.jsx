@@ -554,6 +554,25 @@ function CareerNavigationMap({
             padding: "13px 14px",
           }}
         >
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              borderRadius: 999,
+              border: "1px solid rgba(74,222,128,0.45)",
+              background: "rgba(34,197,94,0.14)",
+              color: "#dcfce7",
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: "0.05em",
+              textTransform: "uppercase",
+              padding: "4px 10px",
+              marginBottom: 8,
+            }}
+          >
+            🏁 {tr ? "Mülakata Hazır" : "Interview Ready"}
+          </div>
           <div style={{ fontSize: 14, fontWeight: 800, color: "#dcfce7" }}>
             {tr
               ? "🚀 Hazırsın. Şimdi fark yarat."
@@ -677,8 +696,11 @@ function CareerNavigationMap({
                 cursor: "pointer",
               }}
             >
-              → {tr ? "Canlı rolleri göster" : "Show me live roles"}
+              {tr ? "Gerçek iş ilanlarını göster →" : "Show me real job openings →"}
             </button>
+            <div style={{ fontSize: 11, color: "#bfdbfe", marginTop: 6 }}>
+              {tr ? "Fazla düşünme. Buradan başla." : "Don’t overthink. Start here."}
+            </div>
           </div>
 
           <div style={{ marginTop: 10, borderRadius: 12, border: "1px solid rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.14)", padding: "10px 10px" }}>
@@ -754,7 +776,7 @@ function CareerNavigationMap({
           <motion.path
             d={`M 12 1 L 12 ${lineHeight + 1}`}
             stroke="url(#hfRouteGrad)"
-            strokeWidth="3.2"
+            strokeWidth="2"
             strokeLinecap="round"
             fill="none"
             initial={{ pathLength: 0 }}
@@ -763,12 +785,12 @@ function CareerNavigationMap({
           />
           <motion.path
             d={`M 12 1 L 12 ${lineHeight + 1}`}
-            stroke="rgba(96,165,250,0.55)"
+            stroke="rgba(80,150,255,0.3)"
             strokeWidth="8"
             strokeLinecap="round"
             fill="none"
-            style={{ filter: "blur(4px)" }}
-            animate={{ opacity: [0.35, 0.8, 0.35] }}
+            style={{ filter: "blur(2px)" }}
+            animate={{ opacity: [0.08, 0.14, 0.08] }}
             transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
           />
         </svg>
@@ -783,7 +805,7 @@ function CareerNavigationMap({
             height: 12,
             borderRadius: "50%",
             background: "radial-gradient(circle, rgba(255,255,255,0.95) 10%, rgba(56,189,248,0.95) 55%, rgba(59,130,246,0.45) 100%)",
-            boxShadow: "0 0 18px rgba(56,189,248,0.9)",
+            boxShadow: "0 0 8px rgba(80,150,255,0.3)",
             pointerEvents: "none",
           }}
           animate={{ y: [0, lineHeight, 0] }}
@@ -799,7 +821,7 @@ function CareerNavigationMap({
             height: 20,
             borderRadius: "50%",
             background: "radial-gradient(circle, rgba(255,255,255,1) 15%, rgba(129,140,248,0.9) 70%)",
-            boxShadow: "0 0 24px rgba(129,140,248,0.9), 0 0 0 1px rgba(255,255,255,0.5)",
+            boxShadow: "0 0 8px rgba(80,150,255,0.3), 0 0 0 1px rgba(255,255,255,0.35)",
             pointerEvents: "none",
             zIndex: 3,
           }}
@@ -837,7 +859,7 @@ function CareerNavigationMap({
                   opacity: isFuture ? 0.5 : isDone ? 0.72 : 1,
                   position: "relative",
                   overflow: "hidden",
-                  boxShadow: isActive ? "0 0 26px rgba(99,102,241,0.24)" : "none",
+                  boxShadow: isActive ? "0 0 14px rgba(99,102,241,0.18)" : "none",
                 }}
               >
                 {rippleNodeId === step.id ? (
@@ -861,8 +883,8 @@ function CareerNavigationMap({
                 ) : null}
 
                 <motion.div
-                  animate={isCurrent ? { scale: [1, 1.06, 1] } : { scale: 1 }}
-                  transition={{ duration: 1.4, repeat: isCurrent ? Infinity : 0, ease: "easeInOut" }}
+                  animate={isCurrent ? { scale: [1, 1.1, 1] } : { scale: 1 }}
+                  transition={{ duration: 1.5, repeat: isCurrent ? Infinity : 0, ease: "easeInOut" }}
                   style={{
                     position: "absolute",
                     left: 7,
@@ -878,7 +900,7 @@ function CareerNavigationMap({
                     placeItems: "center",
                     fontSize: 11,
                     fontWeight: 800,
-                    boxShadow: isCurrent ? "0 0 0 6px rgba(56,189,248,0.14), 0 0 24px rgba(56,189,248,0.5)" : "none",
+                    boxShadow: isCurrent ? "0 0 0 3px rgba(56,189,248,0.1), 0 0 10px rgba(56,189,248,0.22)" : "none",
                   }}
                 >
                   {isDone ? (
@@ -895,23 +917,6 @@ function CareerNavigationMap({
                   )}
                 </motion.div>
 
-                {isCurrent ? (
-                  <motion.span
-                    aria-hidden
-                    style={{
-                      position: "absolute",
-                      left: 1,
-                      top: "50%",
-                      width: 34,
-                      height: 34,
-                      borderRadius: "50%",
-                      border: "1px solid rgba(125,211,252,0.7)",
-                      transform: "translateY(-50%)",
-                    }}
-                    animate={{ scale: [0.9, 1.25], opacity: [0.9, 0] }}
-                    transition={{ duration: 1.45, ease: "easeOut", repeat: Infinity }}
-                  />
-                ) : null}
                 {recentlyCompletedId === step.id ? (
                   <motion.span
                     aria-hidden
@@ -1002,7 +1007,64 @@ function CareerNavigationMap({
             {tr ? "Execution phase" : "Execution phase"}
           </div>
           <div style={{ fontSize: 12, color: "#e2e8f0", marginTop: 4 }}>
-            {tr ? "Dönüşümün olduğu yer burası." : "This is where conversion happens."}
+            {tr ? "Adayların çoğu burada kaybeder." : "This is where most candidates fail."}
+          </div>
+          <div style={{ fontSize: 12, color: "#dbeafe", marginTop: 2, fontWeight: 700 }}>
+            {tr ? "Yürütme, başvuranı işe alınandan ayırır." : "Execution separates applicants from hires."}
+          </div>
+          <div
+            style={{
+              marginTop: 9,
+              borderRadius: 10,
+              border: "1px solid rgba(56,189,248,0.35)",
+              background: "linear-gradient(135deg, rgba(56,189,248,0.16), rgba(99,102,241,0.12))",
+              padding: "8px 10px",
+            }}
+          >
+            <div style={{ fontSize: 11, color: "#bfdbfe", fontWeight: 800, marginBottom: 5 }}>
+              {tr ? "Sonraki 24 saat" : "Next 24 hours"}
+            </div>
+            <div style={{ fontSize: 12, color: "#cbd5e1", lineHeight: 1.6 }}>
+              <div>→ {tr ? "3 ilgili role başvur" : "Apply to 3 relevant roles"}</div>
+              <div>→ {tr ? "Her başvuru için CV’ni hafifçe uyarlat" : "Slightly tailor your CV for each"}</div>
+              <div>→ {tr ? "Yanıtları takip et ve yinele" : "Track responses and iterate"}</div>
+            </div>
+          </div>
+          <div
+            style={{
+              marginTop: 9,
+              borderRadius: 10,
+              border: "1px solid rgba(147,197,253,0.35)",
+              background: "rgba(30,58,138,0.14)",
+              padding: "8px 10px",
+            }}
+          >
+            <div style={{ fontSize: 11, color: "#bfdbfe", fontWeight: 800, marginBottom: 5 }}>
+              {tr ? "Start here" : "Start here"}
+            </div>
+            {applyTargets.map((x) => (
+              <div key={`exec-${x}`} style={{ fontSize: 12, color: "#cbd5e1", lineHeight: 1.5 }}>→ {x}</div>
+            ))}
+            <button
+              type="button"
+              onClick={handleShowLiveRoles}
+              style={{
+                marginTop: 8,
+                border: "1px solid rgba(147,197,253,0.45)",
+                borderRadius: 9,
+                background: "rgba(59,130,246,0.2)",
+                color: "#dbeafe",
+                fontSize: 12,
+                fontWeight: 700,
+                padding: "8px 10px",
+                cursor: "pointer",
+              }}
+            >
+              {tr ? "Gerçek iş ilanlarını göster →" : "Show me real job openings →"}
+            </button>
+            <div style={{ fontSize: 11, color: "#bfdbfe", marginTop: 6 }}>
+              {tr ? "Fazla düşünme. Buradan başla." : "Don’t overthink. Start here."}
+            </div>
           </div>
           <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 7, lineHeight: 1.6 }}>
             <div>• {tr ? "Sinyal uyumun olan rollere başvur" : "Apply only where you have signal fit"}</div>
