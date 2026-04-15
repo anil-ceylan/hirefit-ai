@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
@@ -163,6 +163,188 @@ function LockedHint({ lang, onUpgrade }) {
   );
 }
 
+function CareerNavigationMap({
+  lang,
+  steps,
+  completed,
+  activeStepId,
+  currentStepIndex,
+  onSelectStep,
+  onToggleStep,
+}) {
+  const tr = lang === "TR";
+  const activeStep = steps.find((s) => s.id === activeStepId) || steps[0];
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 320px) minmax(0, 1fr)", gap: 18 }}>
+      <div
+        style={{
+          position: "relative",
+          borderRadius: 14,
+          border: "1px solid rgba(255,255,255,0.08)",
+          background: "linear-gradient(180deg, rgba(15,23,42,0.55), rgba(15,23,42,0.32))",
+          padding: "14px 12px 14px 14px",
+        }}
+      >
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: 26,
+            top: 26,
+            bottom: 26,
+            width: 2,
+            borderRadius: 2,
+            background: "linear-gradient(180deg, rgba(99,102,241,0.85), rgba(59,130,246,0.42))",
+          }}
+        />
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, position: "relative", zIndex: 1 }}>
+          {steps.map((step, idx) => {
+            const isCurrent = idx === currentStepIndex;
+            const isFuture = idx > currentStepIndex;
+            const isDone = Boolean(completed[step.id]);
+            const isActive = step.id === activeStepId;
+            return (
+              <button
+                key={step.id}
+                type="button"
+                onClick={() => onSelectStep(step.id)}
+                style={{
+                  width: "100%",
+                  textAlign: "left",
+                  border: `1px solid ${isActive ? "rgba(129,140,248,0.58)" : "rgba(255,255,255,0.08)"}`,
+                  borderRadius: 12,
+                  background: isActive ? "rgba(99,102,241,0.16)" : "rgba(255,255,255,0.02)",
+                  padding: "10px 10px 10px 42px",
+                  cursor: "pointer",
+                  opacity: isFuture ? 0.5 : 1,
+                  transition: "border-color .2s ease, background .2s ease, opacity .2s ease, transform .2s ease",
+                  transform: isActive ? "translateX(3px)" : "translateX(0)",
+                  position: "relative",
+                }}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    left: 4,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: 22,
+                    height: 22,
+                    borderRadius: "50%",
+                    border: `2px solid ${isDone ? "#34d399" : isCurrent ? "#818cf8" : "rgba(148,163,184,0.6)"}`,
+                    color: isDone ? "#34d399" : isCurrent ? "#c4b5fd" : "#94a3b8",
+                    background: "rgba(15,23,42,0.95)",
+                    display: "grid",
+                    placeItems: "center",
+                    fontSize: 11,
+                    fontWeight: 800,
+                    boxShadow: isCurrent ? "0 0 0 4px rgba(99,102,241,0.12)" : "none",
+                  }}
+                >
+                  {isDone ? "✓" : idx + 1}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#f1f5f9", marginBottom: 2 }}>{step.label}</div>
+                <div style={{ fontSize: 12, color: "#94a3b8" }}>
+                  {isDone
+                    ? tr
+                      ? "Tamamlandı"
+                      : "Completed"
+                    : isCurrent
+                      ? tr
+                        ? "Şu anki adım"
+                        : "Current step"
+                      : tr
+                        ? "Sıradaki adım"
+                        : "Upcoming"}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div
+        style={{
+          borderRadius: 14,
+          border: "1px solid rgba(129,140,248,0.22)",
+          background: "linear-gradient(165deg, rgba(99,102,241,0.1), rgba(15,23,42,0.5))",
+          padding: "16px 16px 14px",
+        }}
+      >
+        <div style={{ fontSize: 12, color: "#a5b4fc", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
+          {tr ? "Milestone detayları" : "Milestone details"}
+        </div>
+        <div style={{ fontSize: 20, fontWeight: 800, color: "#f8fafc", fontFamily: "'Syne', sans-serif", marginBottom: 12 }}>
+          {activeStep.label}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+          <div style={{ borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(2,6,23,0.35)", padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+              {tr ? "Süre" : "Time"}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>{activeStep.timeRequired}</div>
+          </div>
+          <div style={{ borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(2,6,23,0.35)", padding: "10px 12px" }}>
+            <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>
+              {tr ? "Beklenen etki" : "Expected impact"}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#6ee7b7" }}>{activeStep.expectedImpact}</div>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>
+          {tr ? "Ne yapmalı?" : "What to do"}
+        </div>
+        <div style={{ display: "grid", gap: 8 }}>
+          {activeStep.actions.map((line, i) => (
+            <div
+              key={`${activeStep.id}-act-${i}`}
+              style={{
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.07)",
+                background: "rgba(255,255,255,0.02)",
+                padding: "9px 10px",
+                fontSize: 13,
+                color: "#cbd5e1",
+                lineHeight: 1.55,
+              }}
+            >
+              {line}
+            </div>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onToggleStep(activeStep.id)}
+          style={{
+            marginTop: 14,
+            width: "100%",
+            border: "none",
+            borderRadius: 10,
+            padding: "11px 14px",
+            fontSize: 13,
+            fontWeight: 700,
+            color: "#0f172a",
+            background: completed[activeStep.id] ? "linear-gradient(135deg, #34d399, #22c55e)" : "linear-gradient(135deg, #818cf8, #3b82f6)",
+            cursor: "pointer",
+          }}
+        >
+          {completed[activeStep.id]
+            ? tr
+              ? "Tamamlandı olarak işaretli (geri al)"
+              : "Marked as completed (undo)"
+            : tr
+              ? "Bu adımı tamamlandı olarak işaretle"
+              : "Mark this step as completed"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, openUpgrade, analysisData, engineV2, cvText, jdText, alignmentScore }) {
   const roleRows = useMemo(
     () => detectRoleCandidates({ engineV2, analysisData, cvText, lang }),
@@ -185,6 +367,90 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
   const path = useMemo(() => bestPathForRole(topRole, lang), [topRole, lang]);
   const baseScore = Number.isFinite(Number(alignmentScore)) ? Number(alignmentScore) : Number(analysisData?.alignment_score || 45);
   const projected = clamp(Math.round(baseScore + 22), 0, 92);
+  const tr = lang === "TR";
+  const navSteps = useMemo(
+    () => [
+      {
+        id: "fix-cv",
+        label: "Fix CV",
+        actions: phases.p1.slice(0, 3),
+        timeRequired: tr ? "1-2 saat" : "1-2 hours",
+        expectedImpact: tr ? "+8-12 fit puanı" : "+8-12 fit points",
+      },
+      {
+        id: "build-project",
+        label: "Build Project",
+        actions: [project.title, project.context, ...phases.p2.slice(0, 2)],
+        timeRequired: tr ? "1-2 hafta" : "1-2 weeks",
+        expectedImpact: tr ? "+10-14 fit puanı" : "+10-14 fit points",
+      },
+      {
+        id: "apply",
+        label: "Apply",
+        actions: phases.p3.slice(0, 3),
+        timeRequired: tr ? "sürekli (haftalık sprint)" : "ongoing (weekly sprint)",
+        expectedImpact: tr ? "Daha yüksek mülakat oranı" : "Higher interview rate",
+      },
+    ],
+    [phases, project, tr],
+  );
+  const progressStorageKey = useMemo(
+    () => `hirefit-career-nav-map-v1:${toText(topRole).toLowerCase() || "default"}:${lang}`,
+    [topRole, lang],
+  );
+  const [completedSteps, setCompletedSteps] = useState(() => ({}));
+  const [selectedStepId, setSelectedStepId] = useState("fix-cv");
+  const detailsRef = useRef(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(progressStorageKey);
+      if (!raw) {
+        setCompletedSteps({});
+        return;
+      }
+      const parsed = JSON.parse(raw);
+      setCompletedSteps(typeof parsed === "object" && parsed ? parsed : {});
+    } catch {
+      setCompletedSteps({});
+    }
+  }, [progressStorageKey]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(progressStorageKey, JSON.stringify(completedSteps));
+    } catch {
+      // ignore localStorage failures
+    }
+  }, [completedSteps, progressStorageKey]);
+
+  const currentStepIndex = useMemo(() => {
+    const i = navSteps.findIndex((s) => !completedSteps[s.id]);
+    return i === -1 ? navSteps.length - 1 : i;
+  }, [navSteps, completedSteps]);
+
+  useEffect(() => {
+    if (!navSteps.some((s) => s.id === selectedStepId)) {
+      setSelectedStepId(navSteps[0]?.id || "fix-cv");
+    }
+  }, [navSteps, selectedStepId]);
+
+  const handleSelectStep = (id) => {
+    setSelectedStepId(id);
+    detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
+
+  const handleToggleStep = (id) => {
+    setCompletedSteps((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      const nextCurrentIndex = navSteps.findIndex((s) => !next[s.id]);
+      if (nextCurrentIndex >= 0) {
+        setSelectedStepId(navSteps[nextCurrentIndex].id);
+      }
+      return next;
+    });
+    detailsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
 
   return (
     <div style={{ maxWidth: 1040, margin: "0 auto", padding: "40px 24px 48px" }}>
@@ -253,22 +519,24 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
 
       <div style={blockStyle()}>
         <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-          {lang === "TR" ? "Execution roadmap" : "Execution roadmap"}
+          {lang === "TR" ? "Career Navigation Map" : "Career Navigation Map"}
         </div>
-        <div style={{ fontSize: 13, color: "#a5b4fc", marginBottom: 6 }}>{lang === "TR" ? "PHASE 1 — Immediate Fix (0–7 gün)" : "PHASE 1 — Immediate Fix (0–7 days)"}</div>
-        {phases.p1.map((x, i) => <div key={`p1-${i}`} style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 5 }}>→ {x}</div>)}
-
-        {isPro ? (
-          <>
-            <div style={{ fontSize: 13, color: "#a5b4fc", marginTop: 12, marginBottom: 6 }}>{lang === "TR" ? "PHASE 2 — Skill + Proof (2–4 hafta)" : "PHASE 2 — Skill + Proof (2–4 weeks)"}</div>
-            {phases.p2.map((x, i) => <div key={`p2-${i}`} style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 5 }}>→ {x}</div>)}
-
-            <div style={{ fontSize: 13, color: "#a5b4fc", marginTop: 12, marginBottom: 6 }}>{lang === "TR" ? "PHASE 3 — Application Strategy" : "PHASE 3 — Application Strategy"}</div>
-            {phases.p3.map((x, i) => <div key={`p3-${i}`} style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 5 }}>→ {x}</div>)}
-          </>
-        ) : (
-          <LockedHint lang={lang} onUpgrade={openUpgrade} />
-        )}
+        <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 12, lineHeight: 1.6 }}>
+          {tr
+            ? "Hedef role ilerleyişini rota gibi takip et: adımı seç, detayını aç, tamamla ve bir sonraki adıma ilerle."
+            : "Track your path to the target role like a route: open a step, complete it, and progress forward."}
+        </div>
+        <div ref={detailsRef}>
+          <CareerNavigationMap
+            lang={lang}
+            steps={navSteps}
+            completed={completedSteps}
+            activeStepId={selectedStepId}
+            currentStepIndex={currentStepIndex}
+            onSelectStep={handleSelectStep}
+            onToggleStep={handleToggleStep}
+          />
+        </div>
       </div>
 
       {isPro ? (
