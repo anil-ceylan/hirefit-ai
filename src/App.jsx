@@ -4442,6 +4442,17 @@ function NavBarFlagTr({ w = 20, h = 14 }) {
   );
 }
 
+function HireFitLogoMark({ size = 56, color = "#6366f1" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 220 220" fill="none" aria-hidden>
+      <path
+        d="M24 86h58l40 38 86-78-63 95h44l-96 79 25-40h-12l-37 27L24 86Z"
+        fill={color}
+      />
+    </svg>
+  );
+}
+
 function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
   const t = translations[lang];
   const navTab = pathname === "/roadmap" ? "roadmap" : pathname === "/dashboard" ? "dashboard" : pathname === "/" ? "landing" : null;
@@ -4568,13 +4579,23 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
     <nav className={`hf-nav-root${scrolled ? " scrolled" : ""}`} data-scrolled={scrolled ? "true" : "false"}>
       <div className="hf-nav-inner-row">
         <div className="hf-nav-logo-cluster" style={{ display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }} onClick={() => navigate("/")}>
-          <div className="hf-logo-wrap hf-monogram" style={{ width: 48, height: 48, borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", position: "relative", overflow: "hidden", flexShrink: 0, boxShadow: "0 0 0 1px rgba(255,255,255,0.14) inset, 0 10px 28px rgba(15,23,42,0.45)", transform: hovered === "logo" ? "scale(1.06) rotate(-4deg)" : "scale(1)", transition: "transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s ease" }} onMouseEnter={() => setHovered("logo")} onMouseLeave={() => setHovered(null)}>
-            <div style={{ position: "absolute", inset: 0, background: "linear-gradient(145deg, rgba(255,255,255,0.28) 0%, transparent 55%)", zIndex: 1 }} />
-            <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "18px", color: "white", letterSpacing: "-0.04em", position: "relative", zIndex: 2 }}>HF</span>
+          <div
+            className="hf-logo-wrap"
+            style={{
+              width: 56,
+              height: 56,
+              flexShrink: 0,
+              transform: hovered === "logo" ? "scale(1.05)" : "scale(1)",
+              transition: "transform 0.25s ease",
+            }}
+            onMouseEnter={() => setHovered("logo")}
+            onMouseLeave={() => setHovered(null)}
+          >
+            <HireFitLogoMark size={56} />
           </div>
           <div>
             <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "22px", letterSpacing: "-0.03em", lineHeight: 1.05, color: hovered === "logo" ? "#c4b5fd" : "#f8fafc", transition: "color 0.28s ease" }}>HireFit</div>
-            <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", lineHeight: 1, marginTop: 3, background: "linear-gradient(90deg, #60a5fa, #a78bfa, #22d3ee)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text", opacity: 0.92 }}>AI Career Decision Engine</div>
+            <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", lineHeight: 1, marginTop: 3, color: "#94a3b8", opacity: 0.95 }}>AI CAREER DECISION ENGINE</div>
           </div>
         </div>
         <div className="hf-nav-tabs-center">

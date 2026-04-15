@@ -382,17 +382,10 @@
 }
 
 .hf-logo-wrap {
-  animation: hfNavLogoPulse 3.2s ease-in-out infinite;
-}
-
-.hf-logo-wrap:hover {
-  animation: none;
-}
-
-.hf-monogram {
-  background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6, #22d3ee);
-  background-size: 300% 300%;
-  animation: hfNavGradientShift 5s ease infinite;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 12px 22px rgba(99, 102, 241, 0.2));
 }
 
 .hf-nav-inner-row {
@@ -734,14 +727,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .hf-nav-root {
-    animation: none;
-  }
-
-  .hf-logo-wrap {
-    animation: none;
-  }
-
-  .hf-monogram {
     animation: none;
   }
 
