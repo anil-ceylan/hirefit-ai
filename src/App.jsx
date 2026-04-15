@@ -304,6 +304,58 @@ function hasMeaningfulText(v) {
   return String(v || "").trim().length > 0;
 }
 
+function normalizeRoleLabel(rawRole, lang) {
+  const tr = String(lang || "").trim().toLowerCase() === "tr";
+  const fallback = tr ? "Analist" : "Analyst";
+  const raw = String(rawRole || "")
+    .replace(/[\u2022•]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!raw) return fallback;
+
+  const lower = raw.toLowerCase();
+  const roleMap = [
+    { key: /data\s+analyst|veri\s+analist/i, tr: "Veri Analisti", en: "Data Analyst" },
+    { key: /business\s+analyst|iş\s+analist/i, tr: "İş Analisti", en: "Business Analyst" },
+    { key: /product\s+analyst|ürün\s+analist/i, tr: "Ürün Analisti", en: "Product Analyst" },
+    { key: /operations?\s+analyst|operasyon\s+analist/i, tr: "Operasyon Analisti", en: "Operations Analyst" },
+    { key: /strategy\s+analyst|strateji\s+analist/i, tr: "Strateji Analisti", en: "Strategy Analyst" },
+    { key: /financial\s+analyst|finansal?\s+analist/i, tr: "Finans Analisti", en: "Financial Analyst" },
+    { key: /marketing\s+analyst|pazarlama\s+analist/i, tr: "Pazarlama Analisti", en: "Marketing Analyst" },
+    { key: /product\s+manager|ürün\s+yönetic/i, tr: "Ürün Yöneticisi", en: "Product Manager" },
+    { key: /project\s+manager|proje\s+yönetic/i, tr: "Proje Yöneticisi", en: "Project Manager" },
+  ];
+  const matched = roleMap.find((x) => x.key.test(lower));
+  if (matched) return tr ? matched.tr : matched.en;
+
+  // If model returns a sentence/ad copy instead of role title, force a clean fallback role.
+  const looksNoisy =
+    raw.length > 48 ||
+    /[:!?]|gateway|internship|apply|opportunit|discover|launch|program|summer/i.test(raw) ||
+    raw.split(" ").length > 6;
+  if (looksNoisy) return fallback;
+
+  return raw;
+}
+
+function dedupeTextList(lines) {
+  const seen = new Set();
+  const out = [];
+  for (const line of lines) {
+    const raw = String(line || "").trim();
+    if (!raw) continue;
+    const key = raw
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push(raw);
+  }
+  return out;
+}
+
 const HF_ANALYTICS_DEBOUNCE_MS = 900;
 const hfAnalyticsLastFire = new Map();
 
@@ -2088,7 +2140,7 @@ function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
   roleRows.sort((a, b) => Number(b?.score || 0) - Number(a?.score || 0));
 
   const roleCandidates = roleRows.slice(0, 3).map((r, idx) => {
-    const role = String(r?.role || "").trim() || `${lang === "TR" ? "Rol" : "Role"} ${idx + 1}`;
+    const role = normalizeRoleLabel(String(r?.role || "").trim(), lang) || `${lang === "TR" ? "Rol" : "Role"} ${idx + 1}`;
     const scoreNum = Math.max(40, Math.min(92, Math.round(Number(r?.score || 0))));
     const whySeed = strengths[idx] || matched[idx] || strengths[0] || matched[0] || bigGap;
     const why = whySeed
@@ -2118,7 +2170,7 @@ function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
     roleCandidates.push(next);
   }
 
-  const topRole = roleCandidates[0]?.role || (lang === "TR" ? "Analist" : "Analyst");
+  const topRole = normalizeRoleLabel(roleCandidates[0]?.role, lang);
   const topLower = topRole.toLowerCase();
   const careerPath =
     topLower.includes("data")
@@ -2177,7 +2229,7 @@ function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
       : "This path builds on your strengths while closing your key gaps.",
     project,
     phases: { immediate: phaseImmediate, strategic: phaseStrategic, application: phaseApplication },
-    roadmapTop3: [phaseImmediate[0], phaseStrategic[0], phaseApplication[0]].filter(Boolean).slice(0, 3),
+    roadmapTop3: dedupeTextList([phaseImmediate[0], phaseStrategic[0], phaseApplication[0]].filter(Boolean)).slice(0, 3),
     transformation: {
       fit: `${Math.round(base)} → ${Math.round(projected)}+`,
       confidence: lang === "TR" ? "Mülakat olasılığı belirgin şekilde artar." : "Interview probability increases significantly.",
@@ -2193,7 +2245,9 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
     clampBullet(model.project?.steps?.[0] || "", 120),
     clampBullet(`${model.project?.outcome || ""} ${model.project?.timeEstimate || ""}`, 120),
   ].filter(hasMeaningfulText).slice(0, 3);
-  const roadmapLines = Array.isArray(model.roadmapTop3) ? model.roadmapTop3.map((x) => clampBullet(x, 108)).filter(hasMeaningfulText).slice(0, 3) : [];
+  const roadmapLines = Array.isArray(model.roadmapTop3)
+    ? dedupeTextList(model.roadmapTop3.map((x) => clampBullet(x, 108)).filter(hasMeaningfulText)).slice(0, 3)
+    : [];
   const hasProject = hasMeaningfulText(model.project?.title);
   const hasTransformation = hasMeaningfulText(model.transformation?.fit) || hasMeaningfulText(model.transformation?.confidence);
   const hasRoles = roles.length > 0;
