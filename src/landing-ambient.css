@@ -363,7 +363,7 @@
   box-shadow:
     0 20px 56px rgba(0, 0, 0, 0.32),
     inset 0 1px 0 rgba(255, 255, 255, 0.07);
-  transform: translateZ(0);
+  /* no transform here — transform creates a containing block and breaks descendant position:fixed (viewport) */
 }
 
 .hf-nav-root::before {

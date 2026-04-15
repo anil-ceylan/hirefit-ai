@@ -6,6 +6,7 @@ import PersonalizedRoadmapPage from "./PersonalizedRoadmapPage.jsx";
 import { TrustSection, ComparisonSection } from "./HireFitSections";
 import { useNavigate, useLocation, Outlet, useOutletContext } from "react-router-dom";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Sparkles, FileText, Briefcase, AlertCircle, Loader2,
@@ -4443,6 +4444,7 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [langPopoverPos, setLangPopoverPos] = useState(null);
   const langMenuRef = useRef(null);
+  const langPopoverRef = useRef(null);
   const langTriggerRef = useRef(null);
   const navTabsRef = useRef(null);
   const navButtonRefs = useRef([]);
@@ -4520,7 +4522,9 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
   useEffect(() => {
     if (!langMenuOpen) return;
     const onDoc = (e) => {
-      if (langMenuRef.current && !langMenuRef.current.contains(e.target)) setLangMenuOpen(false);
+      const t = e.target;
+      if (langMenuRef.current?.contains(t) || langPopoverRef.current?.contains(t)) return;
+      setLangMenuOpen(false);
     };
     const onKey = (e) => {
       if (e.key === "Escape") setLangMenuOpen(false);
@@ -4634,46 +4638,50 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
               <span className="hf-nav-lang-label">{lang === "EN" ? "English" : "Türkçe"}</span>
               <ChevronDown className="hf-nav-lang-chevron" size={14} strokeWidth={2.25} aria-hidden />
             </button>
-            {langMenuOpen && langPopoverPos ? (
-              <div
-                id="hf-nav-lang-menu"
-                className="hf-nav-lang-popover"
-                role="menu"
-                aria-label={lang === "TR" ? "Dil seçimi" : "Language"}
-                style={{
-                  top: langPopoverPos.top,
-                  left: langPopoverPos.left,
-                  width: langPopoverPos.width,
-                }}
-              >
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`hf-nav-lang-option${lang === "EN" ? " hf-nav-lang-option--active" : ""}`}
-                  onClick={() => {
-                    setLang("EN");
-                    setLangMenuOpen(false);
+            {langMenuOpen && langPopoverPos
+              ? createPortal(
+                <div
+                  ref={langPopoverRef}
+                  id="hf-nav-lang-menu"
+                  className="hf-nav-lang-popover"
+                  role="menu"
+                  aria-label={lang === "TR" ? "Dil seçimi" : "Language"}
+                  style={{
+                    top: langPopoverPos.top,
+                    left: langPopoverPos.left,
+                    width: langPopoverPos.width,
                   }}
                 >
-                  <span className="hf-nav-lang-option-flag"><NavBarFlagEn w={18} h={13} /></span>
-                  <span className="hf-nav-lang-option-text">English</span>
-                  {lang === "EN" ? <Check className="hf-nav-lang-option-check" size={14} strokeWidth={2.5} aria-hidden /> : <span className="hf-nav-lang-option-checkSpacer" aria-hidden />}
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={`hf-nav-lang-option${lang === "TR" ? " hf-nav-lang-option--active" : ""}`}
-                  onClick={() => {
-                    setLang("TR");
-                    setLangMenuOpen(false);
-                  }}
-                >
-                  <span className="hf-nav-lang-option-flag"><NavBarFlagTr w={18} h={13} /></span>
-                  <span className="hf-nav-lang-option-text">Türkçe</span>
-                  {lang === "TR" ? <Check className="hf-nav-lang-option-check" size={14} strokeWidth={2.5} aria-hidden /> : <span className="hf-nav-lang-option-checkSpacer" aria-hidden />}
-                </button>
-              </div>
-            ) : null}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`hf-nav-lang-option${lang === "EN" ? " hf-nav-lang-option--active" : ""}`}
+                    onClick={() => {
+                      setLang("EN");
+                      setLangMenuOpen(false);
+                    }}
+                  >
+                    <span className="hf-nav-lang-option-flag"><NavBarFlagEn w={18} h={13} /></span>
+                    <span className="hf-nav-lang-option-text">English</span>
+                    {lang === "EN" ? <Check className="hf-nav-lang-option-check" size={14} strokeWidth={2.5} aria-hidden /> : <span className="hf-nav-lang-option-checkSpacer" aria-hidden />}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={`hf-nav-lang-option${lang === "TR" ? " hf-nav-lang-option--active" : ""}`}
+                    onClick={() => {
+                      setLang("TR");
+                      setLangMenuOpen(false);
+                    }}
+                  >
+                    <span className="hf-nav-lang-option-flag"><NavBarFlagTr w={18} h={13} /></span>
+                    <span className="hf-nav-lang-option-text">Türkçe</span>
+                    {lang === "TR" ? <Check className="hf-nav-lang-option-check" size={14} strokeWidth={2.5} aria-hidden /> : <span className="hf-nav-lang-option-checkSpacer" aria-hidden />}
+                  </button>
+                </div>,
+                document.body,
+              )
+              : null}
           </div>
           <div className="hf-nav-sep" aria-hidden />
           {user ? (
