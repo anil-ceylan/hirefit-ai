@@ -568,39 +568,54 @@
   opacity: 1;
 }
 
-.hf-nav-lang--open {
-  border-color: rgba(255, 255, 255, 0.22) !important;
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.38) inset,
-    0 12px 40px rgba(0, 0, 0, 0.32),
-    0 0 0 1px rgba(99, 102, 241, 0.25);
-}
-
+/* Dil: tek kapsül — aşağıya “uçan” panel yok; seçenekler aynı blok içinde alt alta */
 .hf-nav-lang-wrap {
-  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
   flex-shrink: 0;
   z-index: 5;
 }
 
-.hf-nav-lang-dropdown {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  width: max-content;
-  min-width: 100%;
-  padding: 6px;
+.hf-nav-lang-wrap:not(.hf-nav-lang-wrap--open) {
+  border-radius: 999px;
+}
+
+.hf-nav-lang-wrap--open {
   border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
   background:
     linear-gradient(165deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.03) 100%),
-    rgba(6, 10, 20, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+    rgba(6, 10, 20, 0.94);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.45) inset,
-    0 20px 50px rgba(0, 0, 0, 0.45),
-    0 0 48px rgba(99, 102, 241, 0.12);
+    0 16px 44px rgba(0, 0, 0, 0.38),
+    0 0 40px rgba(99, 102, 241, 0.1);
   backdrop-filter: blur(22px) saturate(1.35);
   -webkit-backdrop-filter: blur(22px) saturate(1.35);
-  z-index: 200;
+}
+
+.hf-nav-lang-wrap--open .hf-nav-lang-toggle {
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  width: 100%;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.hf-nav-lang-wrap--open .hf-nav-lang-toggle:hover {
+  transform: none;
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
+.hf-nav-lang-menustack {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 4px 6px;
+  gap: 2px;
+  min-width: 0;
 }
 
 .hf-nav-lang-option {
@@ -609,8 +624,8 @@
   gap: 10px;
   width: 100%;
   border: none;
-  border-radius: 10px;
-  padding: 10px 12px;
+  border-radius: 8px;
+  padding: 8px 10px;
   margin: 0;
   cursor: pointer;
   font-family: "DM Sans", sans-serif;

@@ -4375,7 +4375,15 @@ function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywor
   );
 }
 
-/** Navbar: display name from OAuth / Supabase metadata, else email. */
+/** First whitespace-delimited token (given name) for compact navbar display. */
+function navFirstGivenName(displayName) {
+  if (!displayName || typeof displayName !== "string") return "";
+  const t = displayName.trim();
+  if (!t) return "";
+  return t.split(/\s+/)[0] || t;
+}
+
+/** Navbar: first name (+ email line); tooltip keeps full name when available. */
 function getNavAccountLines(user) {
   if (!user) return { primary: "", secondary: "", full: "" };
   const email = (user.email && String(user.email).trim()) || "";
@@ -4386,11 +4394,20 @@ function getNavAccountLines(user) {
     meta.display_name ??
     meta.preferred_username;
   const name = typeof raw === "string" ? raw.trim() : "";
-  const full = email || name;
   if (name && email && name.toLowerCase() !== email.toLowerCase()) {
-    return { primary: name, secondary: email, full: `${name} · ${email}` };
+    return {
+      primary: navFirstGivenName(name) || name,
+      secondary: email,
+      full: `${name} — ${email}`,
+    };
   }
-  return { primary: email || name || "—", secondary: "", full: full };
+  if (email) {
+    return { primary: email, secondary: "", full: email };
+  }
+  if (name) {
+    return { primary: navFirstGivenName(name) || name, secondary: "", full: name };
+  }
+  return { primary: "—", secondary: "", full: "" };
 }
 
 function NavBarFlagEn({ w = 20, h = 14 }) {
@@ -4563,17 +4580,22 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
           })}
         </div>
         <div className="hf-nav-right-cluster">
-          <div ref={langMenuRef} className="hf-nav-lang-wrap">
+          <div
+            ref={langMenuRef}
+            className={`hf-nav-lang-wrap${langMenuOpen ? " hf-nav-lang-wrap--open" : ""}`}
+          >
             <button
               type="button"
+              id="hf-nav-lang-trigger"
               className={
                 langMenuOpen
-                  ? `hf-nav-lang hf-nav-lang--open ${lang === "TR" ? "hf-nav-lang--tr" : "hf-nav-lang--en"}`
-                  : `hf-nav-lang ${lang === "TR" ? "hf-nav-lang--tr" : "hf-nav-lang--en"}`
+                  ? `hf-nav-lang hf-nav-lang-toggle hf-nav-lang--open ${lang === "TR" ? "hf-nav-lang--tr" : "hf-nav-lang--en"}`
+                  : `hf-nav-lang hf-nav-lang-toggle ${lang === "TR" ? "hf-nav-lang--tr" : "hf-nav-lang--en"}`
               }
               aria-expanded={langMenuOpen}
               aria-haspopup="menu"
-              aria-label={lang === "TR" ? "Dil: Türkçe. Menüyü aç" : "Language: English. Open menu"}
+              aria-controls={langMenuOpen ? "hf-nav-lang-menu" : undefined}
+              aria-label={lang === "TR" ? "Dil: Türkçe. Seçenekleri göster" : "Language: English. Show options"}
               onClick={() => setLangMenuOpen((o) => !o)}
             >
               {lang === "EN" ? <NavBarFlagEn /> : <NavBarFlagTr />}
@@ -4581,7 +4603,12 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
               <ChevronDown className="hf-nav-lang-chevron" size={14} strokeWidth={2.25} aria-hidden />
             </button>
             {langMenuOpen ? (
-              <div className="hf-nav-lang-dropdown" role="menu" aria-label={lang === "TR" ? "Dil seçimi" : "Language"}>
+              <div
+                id="hf-nav-lang-menu"
+                className="hf-nav-lang-menustack"
+                role="menu"
+                aria-label={lang === "TR" ? "Dil seçimi" : "Language"}
+              >
                 <button
                   type="button"
                   role="menuitem"
