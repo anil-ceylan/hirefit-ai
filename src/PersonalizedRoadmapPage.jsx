@@ -459,7 +459,7 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
           {lang === "TR" ? "← Analize dön" : "← Back to analysis"}
         </button>
         <h1 style={{ margin: 0, fontFamily: "'Syne', sans-serif", fontSize: "clamp(28px,4vw,38px)", color: "#f8fafc", letterSpacing: "-0.02em" }}>
-          {lang === "TR" ? "Your best path forward" : "Your best path forward"}
+          {t.bestPathForward}
         </h1>
       </div>
 
@@ -499,7 +499,7 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
 
           <div style={blockStyle()}>
             <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-              {lang === "TR" ? "Best project for you" : "Best project for you"}
+              {t.bestProjectToFix}
             </div>
             <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc", marginBottom: 10 }}>{project.title}</div>
             <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 6 }}>{project.context}</div>
@@ -510,7 +510,7 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
       ) : (
         <div style={blockStyle()}>
           <div style={{ fontSize: 12, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-            {lang === "TR" ? "Best project for you" : "Best project for you"}
+            {t.bestProjectToFix}
           </div>
           <div style={{ fontSize: 16, fontWeight: 800, color: "#f8fafc" }}>{project.title}</div>
           <LockedHint lang={lang} onUpgrade={openUpgrade} />

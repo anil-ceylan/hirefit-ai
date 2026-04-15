@@ -21,7 +21,7 @@ import {
   Upload, Copy, Wand2, Target, Search, History, Trash2,
   CheckCircle2, ArrowRight, LogIn, LogOut, Download, Mail,
   Zap, Star, TrendingUp, Crown, Linkedin, Instagram, Link2, Workflow,
-  ChevronRight, ChevronDown, Eye, Layers, ListChecks, KeyRound, LineChart,
+  ChevronRight, ChevronDown, Eye, Layers, KeyRound, LineChart,
   Cpu, FileUp, Lock, Check,
 } from "lucide-react";
 
@@ -389,6 +389,9 @@ function getFallbackAnalysis(cvText, jobDescription, lang = "EN") {
 
 function buildFailSafeV2FromFallback(fb, cvText, jobDescription, lang) {
   const verdictRaw = fb.verdict === "Stop" ? "do_not_apply" : "apply_with_fixes";
+  const inferredRole =
+    extractJobTitleFromJd(jobDescription) ||
+    (lang === "TR" ? "Yakın eşleşen rol" : "Nearby fit role");
   const topKeywordSeed = String(jobDescription || "")
     .toLowerCase()
     .split(/[^a-z0-9+#.]+/i)
@@ -428,8 +431,8 @@ function buildFailSafeV2FromFallback(fb, cvText, jobDescription, lang) {
     },
     RoleFit: {
       locked: false,
-      best_role: lang === "TR" ? "Hedef rol (yakın eşleşme)" : "Target role (near match)",
-      role_fit: [{ role: lang === "TR" ? "Hedef rol" : "Target role", score: fb.score }],
+      best_role: inferredRole,
+      role_fit: [{ role: inferredRole, score: fb.score }],
     },
     Context: { sector: "general" },
     FailSafe: true,
@@ -2179,7 +2182,7 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
   return (
     <div style={{ marginTop: 24, padding: "24px", borderRadius: 16, border: `1px solid ${RS.borderSubtle}`, background: rsAlpha(RS.indigo, 0.05) }}>
       <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, marginBottom: 10 }}>
-        {t.bestPathForwardTitle}
+        {t.bestPathForward}
       </div>
       <div style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 10 }}>
         {t.bestPathSignalLine.replace("{bg}", model.background).replace("{track}", model.targetTrack)}
@@ -2211,7 +2214,7 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
             <div style={cardStyle}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 12 }}>
                 <Workflow size={16} color={RS.indigo} />
-                {t.bestProjectSectionTitle}
+                {t.bestProjectToFix}
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, color: RS.indigo, marginBottom: 8 }}>{model.project.title}</div>
               {projectLines.map((line, i) => (
@@ -2241,7 +2244,7 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
           </>
         ) : (
           hasProject ? <div style={{ ...cardStyle, minHeight: 140 }}>
-            <div style={{ fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 10 }}>{t.bestProjectSectionTitle}</div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 10 }}>{t.bestProjectToFix}</div>
             <div style={{ fontSize: 14, fontWeight: 700, color: RS.indigo, marginBottom: 10 }}>{model.project.title}</div>
             <div style={{ fontSize: 12, color: RS.textMuted, marginBottom: 10 }}>{t.bestPathFreeHint}</div>
             <button
@@ -2273,163 +2276,6 @@ function clampBullet(text, max = 120) {
   if (!raw) return "";
   if (raw.length <= max) return raw;
   return `${raw.slice(0, Math.max(40, max - 1)).trim()}...`;
-}
-
-function DecisionScanSections({ data, lang, t, isPro, onUpgrade }) {
-  const reasons = Array.isArray(data?.Gaps?.rejection_reasons) ? data.Gaps.rejection_reasons : [];
-  const topGaps = reasons.slice(0, 3);
-  const moreGaps = reasons.slice(3);
-  const roadmapFixes = enrichActionPlan(parseActionPlan(data?.Decision?.action_plan), {
-    lang: lang === "TR" ? "tr" : "en",
-    roleFit: data?.RoleFit,
-    gaps: data?.Gaps,
-    verdict: data?.Decision?.final_verdict,
-  })?.fixes || [];
-  const roadmapLines = roadmapFixes
-    .map((f) => clampBullet(f?.issue || f?.steps?.[0] || "", 110))
-    .filter(Boolean)
-    .slice(0, 3);
-  const showGapsCard = topGaps.length > 0 || moreGaps.length > 0;
-  const showRoadmapCard = roadmapLines.length > 0;
-  const bestRolePathRaw =
-    (data?.RoleFit?.best_role && String(data.RoleFit.best_role).trim()) ||
-    (data?.RoleFit?.role_fit?.[0]?.role && String(data.RoleFit.role_fit[0].role).trim()) ||
-    "";
-  const quickBestPath = bestRolePathRaw
-    ? clampBullet(lang === "TR" ? `Önerilen rota: ${bestRolePathRaw}` : `Recommended path: ${bestRolePathRaw}`, 90)
-    : "";
-  const norm = (v) => String(v || "").replace(/\s+/g, " ").trim().toLowerCase();
-  const quickPathIsPlaceholder =
-    !hasMeaningfulText(quickBestPath) ||
-    norm(quickBestPath) === norm(t.bestPathForwardTitle) ||
-    norm(quickBestPath) === norm(t.scanBestPathTitle);
-  const showQuickBestPathCard = !quickPathIsPlaceholder;
-  const showQuickSection = showQuickBestPathCard;
-  if (!showQuickSection && !showGapsCard && !showRoadmapCard) return null;
-  const rowStyle = { marginBottom: 6, fontSize: 12, color: RS.textSecondary, lineHeight: 1.55 };
-  const ExpandableDecisionCard = ({ icon, title, preview, children }) => {
-    const [open, setOpen] = useState(false);
-    return (
-      <div
-        style={{
-          border: `1px solid ${RS.border}`,
-          borderRadius: 12,
-          padding: "14px 14px 12px",
-          background: rsAlpha(RS.bgElevated, 0.65),
-          minHeight: 124,
-          cursor: "pointer",
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          style={{
-            width: "100%",
-            border: "none",
-            background: "transparent",
-            padding: 0,
-            margin: 0,
-            color: RS.textPrimary,
-            cursor: "pointer",
-            textAlign: "left",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 700 }}>
-              {icon}
-              {title}
-            </div>
-            <span
-              aria-hidden
-              style={{
-                fontSize: 16,
-                lineHeight: 1,
-                color: RS.textMuted,
-                transform: open ? "rotate(90deg)" : "rotate(0deg)",
-                transition: "transform 0.18s ease",
-              }}
-            >
-              ›
-            </span>
-          </div>
-          {!open && hasMeaningfulText(preview) ? (
-            <div style={{ marginTop: 7, fontSize: 12, color: RS.textMuted, lineHeight: 1.45 }}>{preview}</div>
-          ) : null}
-        </button>
-
-        {open ? (
-          <>
-            <div style={{ marginTop: 10, marginBottom: 10, height: 1, background: RS.borderSubtle }} />
-            <div>{children}</div>
-          </>
-        ) : null}
-      </div>
-    );
-  };
-
-  return (
-    <div style={{ marginTop: 24 }}>
-      {showQuickSection ? (
-        <>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, marginBottom: 10 }}>
-            {t.scanSectionLabel}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 24, marginBottom: 24 }}>
-            {showQuickBestPathCard ? (
-              <div style={{ background: RS.bgElevated, border: `1px solid ${RS.border}`, borderRadius: 12, padding: "24px", minHeight: 130 }}>
-                <div style={{ fontSize: 11, color: RS.textMuted, marginBottom: 4 }}>{t.scanBestPathTitle}</div>
-                <div style={{ fontSize: 12, color: RS.textPrimary, fontWeight: 700 }}>{quickBestPath}</div>
-              </div>
-            ) : null}
-          </div>
-        </>
-      ) : null}
-
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(420px, 1fr))", gap: 24 }}>
-      {showGapsCard ? (
-        <ExpandableDecisionCard
-          icon={<ListChecks size={14} color={RS.amber} />}
-          title={t.scanAllGapsTitle}
-          preview={clampBullet(humanizeUserFacingReason(topGaps[0]?.issue || moreGaps[0]?.issue || "", lang), 96)}
-        >
-          {topGaps.map((g, i) => (
-            <div key={`gap-${i}`} style={rowStyle}>
-              • {clampBullet(humanizeUserFacingReason(g?.issue || "", lang), 95)} {g?.impact ? `— ${gapImpactLabel(g.impact, t)}` : ""}
-            </div>
-          ))}
-          {moreGaps.map((g, i) => (
-            <div key={`gap-more-${i}`} style={rowStyle}>• {clampBullet(humanizeUserFacingReason(g?.issue || "", lang), 95)}</div>
-          ))}
-        </ExpandableDecisionCard>
-      ) : null}
-
-      {showRoadmapCard ? (
-        <ExpandableDecisionCard
-          icon={<Layers size={14} color={RS.indigo} />}
-          title={t.scanFullRoadmapTitle}
-          preview={isPro ? clampBullet(roadmapLines[0] || "", 96) : clampBullet(t.scanRoadmapLocked, 96)}
-        >
-          {isPro ? (
-            roadmapLines.map((line, i) => (
-              <div key={`rm-${i}`} style={rowStyle}>• {line}</div>
-            ))
-          ) : (
-            <>
-              <div style={rowStyle}>• {t.scanRoadmapLocked}</div>
-              <button
-                type="button"
-                onClick={onUpgrade}
-                style={{ marginTop: 6, border: "none", borderRadius: 8, background: RS.indigo, color: "#fff", padding: "8px 12px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
-              >
-                {t.focusPreviewUpgradeBtn}
-              </button>
-            </>
-          )}
-        </ExpandableDecisionCard>
-      ) : null}
-      </div>
-    </div>
-  );
 }
 
 function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, cvText, jdText }) {
@@ -2660,14 +2506,6 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, c
             </p>
           </div>
         ) : null}
-
-        <DecisionScanSections
-          data={data}
-          lang={lang}
-          t={t}
-          isPro={isPro}
-          onUpgrade={onUpgrade}
-        />
 
         <BestPathForwardBlock data={data} lang={lang} t={t} isPro={isPro} onUpgrade={onUpgrade} score={scoreNumeric ?? score} cvText={cvText} jdText={jdText} />
       </div>
@@ -2955,12 +2793,14 @@ const translations = {
     focusCtaSeeFull: "See exactly why you get rejected →",
     focusCtaApplyFix: "Apply this focus to my CV →",
     focusHiddenGapsTeaser: "There are {n} more gaps still affecting your score. See the full breakdown with Pro.",
-    bestPathForwardTitle: "Your best path forward",
+    bestPathForward: "YOUR BEST PATH FORWARD",
+    bestPathForwardTitle: "YOUR BEST PATH FORWARD",
     bestPathSignalLine: "Profile signal: {bg} → target track: {track}",
     bestPathRolesTitle: "Based on your profile, you are a stronger fit for:",
     bestPathWhyRolesTitle: "Why these roles fit",
     bestPathWrongRoleTitle: "Why this role is wrong",
     bestPathFreeHint: "Free preview shows roles and project title only. Unlock Pro for the full project breakdown and roadmap.",
+    bestProjectToFix: "Your best project to fix this",
     bestProjectSectionTitle: "Your best project to fix this",
     bestProjectWhyTitle: "Why this project",
     bestProjectWhatTitle: "What you will do",
@@ -3322,13 +3162,15 @@ const translations = {
     focusCtaSeeFull: "Neden elendiğini tam gör →",
     focusCtaApplyFix: "Bu odağı CV'me uygula →",
     focusHiddenGapsTeaser: "Skorunu etkileyen {n} boşluk daha var. Tüm dökümü Pro ile görebilirsin.",
-    bestPathForwardTitle: "Your best path forward",
+    bestPathForward: "En İyi Kariyer Yolun",
+    bestPathForwardTitle: "En İyi Kariyer Yolun",
     bestPathSignalLine: "Profil sinyali: {bg} → hedef hat: {track}",
     bestPathRolesTitle: "Profiline göre daha güçlü olduğun roller:",
     bestPathWhyRolesTitle: "Bu roller neden daha uygun",
     bestPathWrongRoleTitle: "Bu rol neden yanlış eşleşme",
     bestPathFreeHint: "Ücretsiz görünüm sadece roller ve proje başlığını gösterir. Tam proje dökümü ve yol haritası için Pro'yu aç.",
-    bestProjectSectionTitle: "Your best project to fix this",
+    bestProjectToFix: "Bunu Düzeltecek En İyi Proje",
+    bestProjectSectionTitle: "Bunu Düzeltecek En İyi Proje",
     bestProjectWhyTitle: "Bu proje neden en doğru seçim",
     bestProjectWhatTitle: "Ne yapacaksın",
     bestProjectOutcomeTitle: "Beklenen çıktı",
@@ -6376,7 +6218,7 @@ const msgInterval = setInterval(() => {
     }
     setRoadmapLoading(true); setError(""); setLearningPlan("");
     try {
-      const res = await fetch(`${HF_API_BASE}/roadmap`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ missingSkills, roleType, seniority }) });
+      const res = await fetch(`${HF_API_BASE}/roadmap`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ missingSkills, roleType, seniority, lang }) });
       const data = await res.json();
       setLearningPlan(data.roadmap || "");
     } catch {

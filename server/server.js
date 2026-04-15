@@ -13,7 +13,10 @@ import {
 } from "../lib/extractJobCompose.js";
 import { logPromptBeingSent } from "../lib/aiPromptLog.js";
 import { buildRecruiterSystemPrompt } from "../lib/recruiterSystemPrompt.js";
-import { normalizeAnalyzeLang } from "../lib/analyze-v2/lang.js";
+import {
+  normalizeAnalyzeLang,
+  requiredResponseLanguageDirective,
+} from "../lib/analyze-v2/lang.js";
 
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err.message, err.stack);
@@ -54,6 +57,10 @@ app.use((req, res, next) => {
 
 if (!process.env.GROQ_API_KEY) {
   console.error("❌ GROQ_API_KEY missing!");
+}
+
+function responseLanguageLabel(langNorm) {
+  return langNorm === "tr" ? "Turkish" : "English";
 }
 
 /** Railway (and similar) set PORT; health checks often need a simple 200. */
@@ -315,7 +322,7 @@ ${cvText}
 
 Job Description:
 ${jobDescription}
-${lang === "TR" ? "IMPORTANT: Return ALL text fields in Turkish language. Tüm metin alanlarını Türkçe yaz." : "Return all text fields in English."}
+${langNorm === "tr" ? "IMPORTANT: Return ALL text fields in Turkish language. Tüm metin alanlarını Türkçe yaz." : "Return all text fields in English."}
 Return ONLY valid JSON. No markdown, no explanation, no extra text.
 
 {
@@ -460,11 +467,17 @@ app.post("/optimize", async (req, res) => {
   if (!cvText || !jobDescription) return res.status(400).json({ error: "Missing CV or JD" });
 
   try {
+    const langNorm = normalizeAnalyzeLang(lang);
+    const languageDirective = requiredResponseLanguageDirective(langNorm);
     const optimizeGroqBody = {
       model: "llama-3.3-70b-versatile",
       max_tokens: 800,
       temperature: 0.35,
       messages: [
+        {
+          role: "system",
+          content: languageDirective,
+        },
         {
           role: "user",
           content: `You are a senior recruiter-turned-CV writer doing a "Fix My CV" pass for one specific job.
@@ -476,7 +489,8 @@ TASK — rewrite the ENTIRE CV for this job description:
 4) Keep structure readable (headers, bullets). Preserve truthful employment/education facts — improve phrasing and emphasis only.
 5) Return ONLY the rewritten CV body text. No preamble, no markdown fences.
 
-${lang === "TR" ? "Write the CV in Turkish." : "Write the CV in English."}
+${langNorm === "tr" ? "Write the CV in Turkish." : "Write the CV in English."}
+Respond entirely in ${responseLanguageLabel(langNorm)}.
 
 CV:
 ${cvText}
@@ -511,20 +525,27 @@ ${jobDescription}`,
 });
 
 app.post("/roadmap", async (req, res) => {
-  const { missingSkills, roleType, seniority } = req.body;
+  const { missingSkills, roleType, seniority, lang } = req.body;
   if (!missingSkills?.length) return res.status(400).json({ error: "No missing skills provided" });
 
   try {
+    const langNorm = normalizeAnalyzeLang(lang);
+    const languageDirective = requiredResponseLanguageDirective(langNorm);
     const roadmapGroqBody = {
       model: "llama-3.3-70b-versatile",
       max_tokens: 800,
       temperature: 0.4,
       messages: [
         {
+          role: "system",
+          content: languageDirective,
+        },
+        {
           role: "user",
           content: `Create a concise 30-day learning roadmap for someone targeting a ${seniority || "Junior"} ${roleType || "role"} who is missing these skills: ${missingSkills.join(", ")}.
 
-For each skill provide: week number, specific resource (course/book/project), and estimated hours. Be practical and specific. Return as plain text, no JSON.`,
+For each skill provide: week number, specific resource (course/book/project), and estimated hours. Be practical and specific. Return as plain text, no JSON.
+Respond entirely in ${responseLanguageLabel(langNorm)}.`,
         },
       ],
     };
@@ -553,12 +574,18 @@ app.post("/apply-fix", async (req, res) => {
   if (!cvText || !problem) return res.status(400).json({ error: "Missing data" });
 
   try {
+    const langNorm = normalizeAnalyzeLang(lang);
+    const languageDirective = requiredResponseLanguageDirective(langNorm);
     const applyFixGroqBody = {
       model: "llama-3.3-70b-versatile",
       max_tokens: 800,
       temperature: 0.3,
       response_format: { type: "json_object" },
       messages: [
+        {
+          role: "system",
+          content: languageDirective,
+        },
         {
           role: "user",
           content: `You are an expert CV writer.
@@ -570,7 +597,7 @@ Full CV:
 ${cvText}
 
 Find the specific section with this problem. Rewrite ONLY that part. Keep everything else the same.
-${lang === "TR" ? "Return in Turkish." : "Return in English."}
+${langNorm === "tr" ? "Return in Turkish." : "Return in English."}
 
 Return ONLY this JSON:
 {
@@ -633,11 +660,11 @@ ${jobDescription}
 ${targetRole ? `TARGET ROLE: ${targetRole}` : ""}
 DEADLINE: ${deadlineType}
 SECTOR: ${sector || "Auto-detect"}
-${lang === "TR" ? "Return ALL text in Turkish. No English words except JSON keys." : "Return in English."}
+${langNorm === "tr" ? "Return ALL text in Turkish. No English words except JSON keys." : "Return in English."}
 
 Return ONLY this JSON (no markdown):
 {
-  "decision": ${lang === "TR" ? '"Yüksek ihtimal" | "Orta ihtimal" | "Düşük ihtimal"' : '"High chance" | "Medium chance" | "Low chance"'},
+  "decision": ${langNorm === "tr" ? '"Yüksek ihtimal" | "Orta ihtimal" | "Düşük ihtimal"' : '"High chance" | "Medium chance" | "Low chance"'},
   "confidence": <number 0-100>,
   "fitScore": <number 0-100>,
   "improvedScore": <number 0-100>,
@@ -848,7 +875,7 @@ EXAMPLES:
 
 Rewrite ONLY these text fields. Keep all numbers, arrays structure, and non-text fields EXACTLY the same.
 DO NOT change logic. DO NOT add insights. ONLY rewrite tone.
-${lang === "TR" ? "Keep all text in Turkish." : "Keep all text in English."}
+${langNorm === "tr" ? "Keep all text in Turkish." : "Keep all text in English."}
 
 Input JSON:
 ${JSON.stringify({
