@@ -103,18 +103,6 @@ export function SocialProofSection({ lang }) {
               AI-powered
             </span>
           </div>
-          <p
-            style={{
-              margin: 0,
-              fontSize: "13px",
-              fontWeight: 700,
-              letterSpacing: "0.06em",
-              textTransform: "uppercase",
-              color: "#64748b",
-            }}
-          >
-            {tr ? "5.000+ profesyonele güvenildi (yer tutucu)" : "Trusted by 5,000+ professionals (placeholder)"}
-          </p>
         </div>
         <div
           style={{
