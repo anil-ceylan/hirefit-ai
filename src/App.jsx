@@ -5906,6 +5906,20 @@ function HireFitLayout() {
     return nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : 0;
   }, [history]);
 
+  const getApiAuthHeaders = useCallback(async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      throw new Error(lang === "TR" ? "Devam etmek için giriş yapın." : "Please sign in to continue.");
+    }
+    return {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    };
+  }, [lang]);
+
   const extractJobFromUrl = async () => {
     if (!jobUrl.trim()) { setError(lang === "TR" ? "Lütfen önce bir iş URL'si yapıştırın." : "Please paste a job URL first."); return; }
     if (isLinkedInJobUrl(jobUrl)) return;
@@ -5924,7 +5938,7 @@ function HireFitLayout() {
         try {
           const res = await fetch(endpoint, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: await getApiAuthHeaders(),
             body: JSON.stringify({ url: normalizedUrl }),
           });
           const data = await res.json().catch(() => ({}));
@@ -5999,7 +6013,7 @@ const msgInterval = setInterval(() => {
     try {
       const v2Res = await fetch(`${HF_API_BASE}/api/analyze-v2`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await getApiAuthHeaders(),
         body: JSON.stringify({
           cvText,
           jobDescription: jdText,
@@ -6108,7 +6122,7 @@ const msgInterval = setInterval(() => {
       try {
         const res = await fetch(`${HF_API_BASE}/analyze`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: await getApiAuthHeaders(),
           body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang }),
         });
         const data = await res.json();
@@ -6226,7 +6240,7 @@ const msgInterval = setInterval(() => {
       try {
         const decisionRes = await fetch(`${HF_API_BASE}/decision`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: await getApiAuthHeaders(),
           body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang, deadline, targetRole }),
         });
         const decisionResult = await decisionRes.json();
@@ -6246,7 +6260,7 @@ const msgInterval = setInterval(() => {
     try {
       const res = await fetch(`${HF_API_BASE}/apply-fix`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await getApiAuthHeaders(),
         body: JSON.stringify({ cvText, problem: fix.problem, fix: fix.fix, lang })
       });
       const data = await res.json();
@@ -6262,7 +6276,7 @@ const msgInterval = setInterval(() => {
     if (!cvText.trim() || !jdText.trim()) { setError(lang === "TR" ? "Lütfen önce hem CV'yi hem de iş ilanını yapıştırın." : "Please paste both the CV and JD first."); return; }
     setOptimizing(true); setError(""); setOptimizedCv("");
     try {
-      const res = await fetch(`${HF_API_BASE}/optimize`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang }) });
+      const res = await fetch(`${HF_API_BASE}/optimize`, { method: "POST", headers: await getApiAuthHeaders(), body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang }) });
       const data = await res.json();
       if (!res.ok) {
         const msg = data?.message || data?.error || t.cvOptimizeFailedTitle;
@@ -6302,7 +6316,7 @@ const msgInterval = setInterval(() => {
     }
     setRoadmapLoading(true); setError(""); setLearningPlan("");
     try {
-      const res = await fetch(`${HF_API_BASE}/roadmap`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ missingSkills, roleType, seniority, lang }) });
+      const res = await fetch(`${HF_API_BASE}/roadmap`, { method: "POST", headers: await getApiAuthHeaders(), body: JSON.stringify({ missingSkills, roleType, seniority, lang }) });
       const data = await res.json();
       setLearningPlan(data.roadmap || "");
     } catch {

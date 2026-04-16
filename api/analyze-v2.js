@@ -1,4 +1,5 @@
 import { runAnalyzeV2WithCompanyIntel } from "../lib/analyze-v2/withCompanyIntel.js";
+import { getUserFromRequest } from "../lib/auth/verifySupabaseJwt.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -7,6 +8,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    const auth = await getUserFromRequest(req);
+    if (!auth.ok) {
+      return res.status(auth.status).json({ error: auth.error });
+    }
+
     const body =
       typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
     const cvText = String(body.cvText ?? body.cv ?? "").trim();

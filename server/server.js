@@ -2,8 +2,10 @@ import "./loadEnv.js";
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
+import rateLimit from "express-rate-limit";
 import { runMultiAnalyze } from "../lib/analyze/index.js";
 import { runAnalyzeV2WithCompanyIntel } from "../lib/analyze-v2/withCompanyIntel.js";
+import { requireAuthExpress } from "../lib/auth/verifySupabaseJwt.js";
 import {
   EXTRACT_JOB_SYSTEM,
   buildExtractJobUserMessage,
@@ -68,12 +70,20 @@ function constrainedMessages(messages, lang) {
   return enforcePromptLanguageRules(messages, normalizeAnalyzeLang(lang));
 }
 
+const analysisRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many requests, please try again later" },
+});
+
 /** Railway (and similar) set PORT; health checks often need a simple 200. */
 app.get("/health", (_req, res) => {
   res.status(200).type("text/plain").send("ok");
 });
 
-app.post("/api/analyze", async (req, res) => {
+app.post("/api/analyze", requireAuthExpress, analysisRateLimiter, async (req, res) => {
   try {
     const { cvText, jobDescription, cv, jd } = req.body || {};
     const c = String(cvText ?? cv ?? "").trim();
@@ -98,7 +108,7 @@ app.post("/api/analyze", async (req, res) => {
   }
 });
 
-app.post("/api/analyze-v2", async (req, res) => {
+app.post("/api/analyze-v2", requireAuthExpress, analysisRateLimiter, async (req, res) => {
   try {
     const { cvText, jobDescription, cv, jd, isPro, sector, lang } = req.body || {};
     const c = String(cvText ?? cv ?? "").trim();
@@ -128,7 +138,7 @@ app.post("/api/analyze-v2", async (req, res) => {
   }
 });
 
-app.post("/api/extract-job", async (req, res) => {
+app.post("/api/extract-job", requireAuthExpress, async (req, res) => {
   try {
     const { url } = req.body || {};
     if (!url) {
@@ -294,7 +304,7 @@ function cleanAITone(obj) {
   return walk(obj);
 }
 
-app.post("/analyze", async (req, res) => {
+app.post("/analyze", requireAuthExpress, analysisRateLimiter, async (req, res) => {
   const { cvText, jobDescription, sector, lang } = req.body;
   console.log("SECTOR RECEIVED:", sector);
 
@@ -467,7 +477,7 @@ Use I/you for all narrative JSON fields (recruiter_simulation, fit_summary, reje
   }
 });
 
-app.post("/optimize", async (req, res) => {
+app.post("/optimize", requireAuthExpress, analysisRateLimiter, async (req, res) => {
   const { cvText, jobDescription, lang } = req.body;
   if (!cvText || !jobDescription) return res.status(400).json({ error: "Missing CV or JD" });
 
@@ -529,7 +539,11 @@ ${jobDescription}`,
   }
 });
 
-app.post("/roadmap", async (req, res) => {
+app.post("/api/optimize", requireAuthExpress, analysisRateLimiter, (_req, res) => {
+  return res.redirect(307, "/optimize");
+});
+
+app.post("/roadmap", requireAuthExpress, async (req, res) => {
   const { missingSkills, roleType, seniority, lang } = req.body;
   if (!missingSkills?.length) return res.status(400).json({ error: "No missing skills provided" });
 
@@ -574,7 +588,7 @@ Respond entirely in ${responseLanguageLabel(langNorm)}.`,
   }
 });
 
-app.post("/apply-fix", async (req, res) => {
+app.post("/apply-fix", requireAuthExpress, async (req, res) => {
   const { cvText, problem, fix, lang } = req.body;
   if (!cvText || !problem) return res.status(400).json({ error: "Missing data" });
 
@@ -633,7 +647,7 @@ Return ONLY this JSON:
   }
 });
 
-app.post("/decision", async (req, res) => {
+app.post("/decision", requireAuthExpress, analysisRateLimiter, async (req, res) => {
   const { cvText, jobDescription, sector, lang, deadline, targetRole } = req.body;
 
   if (!cvText || !jobDescription) {
@@ -955,6 +969,10 @@ return res.json(cleaned);
     console.error("💥 DECISION ERROR:", err);
     res.status(500).json({ error: "Decision analysis failed" });
   }
+});
+
+app.post("/api/decision", requireAuthExpress, analysisRateLimiter, (_req, res) => {
+  return res.redirect(307, "/decision");
 });
 
 const normalizeEmail = (email) => String(email || "").trim().toLowerCase();

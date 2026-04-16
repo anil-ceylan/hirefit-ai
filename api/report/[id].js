@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getUserFromRequest } from "../../lib/auth/verifySupabaseJwt.js";
 
 const supabase = createClient(
   process.env.VITE_SUPABASE_URL,
@@ -6,12 +7,18 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
+  const auth = await getUserFromRequest(req);
+  if (!auth.ok) {
+    return res.status(auth.status).json({ error: auth.error });
+  }
+
   const { id } = req.query;
 
   const { data } = await supabase
     .from("analyses")
     .select("role, alignment_score, missing_skills, seniority, created_at")
     .eq("id", id)
+    .eq("user_id", auth.user.id)
     .single();
 
   const appUrl = `https://hirefit-ai.vercel.app/report/${id}`;

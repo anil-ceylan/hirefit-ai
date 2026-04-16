@@ -7,6 +7,7 @@ import {
 } from "../lib/extractJobCompose.js";
 import { logPromptBeingSent } from "../lib/aiPromptLog.js";
 import { enforcePromptLanguageRules } from "../lib/analyze-v2/lang.js";
+import { getUserFromRequest } from "../lib/auth/verifySupabaseJwt.js";
 
 /** Groq output budget — must be ≥2000 so long postings are not cut off mid-generation */
 const EXTRACT_MAX_TOKENS = 8192;
@@ -17,6 +18,11 @@ export default async function handler(req, res) {
   }
 
   try {
+    const auth = await getUserFromRequest(req);
+    if (!auth.ok) {
+      return res.status(auth.status).json({ error: auth.error });
+    }
+
     const { url } = req.body || {};
 
     if (!url) {
