@@ -1136,7 +1136,7 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
     () => [
       {
         id: "fix-cv",
-        label: "Fix CV",
+        label: tr ? "CV Optimizasyonu" : "CV Optimization",
         actions: phases.p1.slice(0, 3),
         timeRequired: tr ? "1-2 saat" : "1-2 hours",
         expectedImpact: tr ? "+8-12 fit puanı" : "+8-12 fit points",

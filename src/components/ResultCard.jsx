@@ -41,7 +41,7 @@ export default function ResultCard({ data }) {
 
       {/* CTA */}
       <button className="w-full mt-2 bg-gradient-to-r from-blue-500 to-purple-500 py-3 rounded-xl font-medium hover:opacity-90">
-        Fix my CV now →
+        Start CV Optimization now →
       </button>
 
     </div>

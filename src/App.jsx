@@ -3070,7 +3070,7 @@ const translations = {
     analysisFailedTitle: "Analizi tamamlayamadık.",
     analysisFailedRecovery: "Bağlantınızı kontrol edin; CV ve iş ilanının yapıştırıldığından emin olun, ardından Uyumu Kontrol Et'e basın. VPN kullanıyorsanız kısa süre kapatıp deneyin.",
     cvOptimizeFailedTitle: "CV optimizasyonu tamamlanmadı.",
-    cvOptimizeFailedRecovery: "Birkaç saniye bekleyip CV'mi düzelt'i yeniden deneyin. Her iki alanda da yeterli metin olmalı.",
+    cvOptimizeFailedRecovery: "Birkaç saniye bekleyip CV Optimizasyonu'nu yeniden deneyin. Her iki alanda da yeterli metin olmalı.",
     roadmapFailedTitle: "Öğrenme yol haritası oluşturulamadı.",
     roadmapFailedRecovery: "Önce Uyumu Kontrol Et çalıştırıp eksik becerileri tespit edin, sonra yol haritasını tekrar açın.",
     roadmapNeedsSkillsTitle: "Önce analizden eksik beceri sinyali gerekiyor.",
@@ -5071,7 +5071,7 @@ function HeroSection({ navigate, lang }) {
             >
               {lang === "TR"
                 ? "CV'ni dakikalar içinde güçlendir; mülakat şansını artır — başvurmadan önce gerçek kararı gör."
-                : "Fix your CV in minutes and increase your interview chances — see the real decision before you apply."}
+                : "Complete CV Optimization in minutes and increase your interview chances — see the real decision before you apply."}
             </p>
             <button
               type="button"
@@ -6285,7 +6285,7 @@ const msgInterval = setInterval(() => {
 
   const reanalyzeAfterFix = async () => {
     if (!optimizedCv.trim()) {
-      setError(lang === "TR" ? "Önce CV'yi düzelt." : "Fix your CV first.");
+      setError(lang === "TR" ? "Önce CV Optimizasyonu yap." : "Complete CV Optimization first.");
       return;
     }
     if (alignmentScore != null) setReanalysisBaseline(alignmentScore);

@@ -822,12 +822,12 @@ export function YourNextMovePanel({
 
   const loopSteps = tr
     ? [
-        { t: "CV maddelerini düzelt (ölçülebilir etki)", d: "Her maddeye sonuç + sayı ekle." },
+        { t: "CV Optimizasyonu (ölçülebilir etki)", d: "Her maddeye sonuç + sayı ekle." },
         { t: "Eksik anahtar kelimeleri ekle", d: "İlan dilini birebir yansıt." },
         { t: "Tekrar analiz et", d: "Aynı CV + ilan ile yeniden çalıştır." },
       ]
     : [
-        { t: "Fix CV bullets", d: "Add outcomes + numbers per bullet." },
+        { t: "CV Optimization bullets", d: "Add outcomes + numbers per bullet." },
         { t: "Add missing keywords", d: "Mirror the JD language." },
         { t: "Re-analyze", d: "Re-run with the same CV + JD." },
       ];
@@ -1044,7 +1044,7 @@ export function YourNextMovePanel({
           }}
         >
           {optimizing && isPro ? <Loader2 size={18} style={{ animation: "spin 0.8s linear infinite" }} /> : <Wand2 size={18} />}
-          {!isPro ? (tr ? "CV'mi düzelt — Pro" : "Fix my CV — Pro") : optimizing && isPro ? (tr ? "Optimize ediliyor..." : "Optimizing...") : tr ? "→ CV'mi şimdi düzelt" : "→ Fix my CV now"}
+          {!isPro ? (tr ? "CV Optimizasyonu — Pro" : "CV Optimization — Pro") : optimizing && isPro ? (tr ? "Optimize ediliyor..." : "Optimizing...") : tr ? "→ CV Optimizasyonunu şimdi başlat" : "→ Start CV Optimization now"}
         </button>
         <button
           type="button"
