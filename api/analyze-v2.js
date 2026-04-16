@@ -40,7 +40,7 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error("[api/analyze-v2]", e);
     return res.status(500).json({
-      error: e?.message || "Analyze v2 failed",
+      error: "An error occurred. Please try again.",
     });
   }
 }

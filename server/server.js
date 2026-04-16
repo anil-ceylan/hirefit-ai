@@ -103,7 +103,7 @@ app.post("/api/analyze", requireAuthExpress, analysisRateLimiter, async (req, re
   } catch (e) {
     console.error("/api/analyze", e);
     return res.status(500).json({
-      error: e?.message || "Analysis failed",
+      error: "An error occurred. Please try again.",
     });
   }
 });
@@ -133,7 +133,7 @@ app.post("/api/analyze-v2", requireAuthExpress, analysisRateLimiter, async (req,
       cause: e?.cause,
     });
     return res.status(500).json({
-      error: e?.message || "Analyze v2 failed",
+      error: "An error occurred. Please try again.",
     });
   }
 });
@@ -1033,7 +1033,9 @@ app.post("/api/admin/pro-access", async (req, res) => {
       .from("user_plans")
       .upsert({ user_id: targetUser.id, plan }, { onConflict: "user_id" });
     if (upsertError) {
-      return res.status(500).json({ error: "Failed to update user plan", details: upsertError.message });
+      return res.status(500).json({
+        error: "An error occurred. Please try again.",
+      });
     }
 
     return res.json({
@@ -1043,7 +1045,9 @@ app.post("/api/admin/pro-access", async (req, res) => {
       adminGranted: grantPro,
     });
   } catch (e) {
-    return res.status(500).json({ error: "Admin access update failed", details: e?.message || "Unknown error" });
+    return res.status(500).json({
+      error: "An error occurred. Please try again.",
+    });
   }
 });
 
@@ -1111,7 +1115,9 @@ const lemonWebhookHandler = async (req, res) => {
       const { error } = await supabase.from("user_plans").upsert({ user_id: user.id, plan: targetPlan }, { onConflict: "user_id" });
       if (error) {
         console.error(`[lemon-webhook] Supabase update error (${targetPlan}):`, error.message);
-        return res.status(500).json({ error: "Supabase update failed", event: eventName, plan: targetPlan });
+        return res.status(500).json({
+          error: "An error occurred. Please try again.",
+        });
       } else {
         console.log(`[lemon-webhook] Supabase update success (${targetPlan}):`, userEmail);
         return res.json({ received: true, event: eventName, action: "updated", plan: targetPlan });
@@ -1122,7 +1128,9 @@ const lemonWebhookHandler = async (req, res) => {
     }
   } catch (e) {
     console.error("[lemon-webhook] Unexpected processing error:", e?.message || e);
-    return res.status(500).json({ error: "Webhook processing failed", event: eventName });
+    return res.status(500).json({
+      error: "An error occurred. Please try again.",
+    });
   }
 };
 

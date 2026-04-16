@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   } catch (e) {
     console.error("[api/analyze]", e);
     return res.status(500).json({
-      error: e?.message || "Analysis failed",
+      error: "An error occurred. Please try again.",
     });
   }
 }

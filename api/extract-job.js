@@ -124,8 +124,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ title, jobText });
   } catch (error) {
     return res.status(500).json({
-      error: "Server error while extracting job page",
-      details: error.message,
+      error: "An error occurred. Please try again.",
     });
   }
 }

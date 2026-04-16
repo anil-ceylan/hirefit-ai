@@ -6,6 +6,15 @@ const supabase = createClient(
   process.env.VITE_SUPABASE_ANON_KEY
 );
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export default async function handler(req, res) {
   const auth = await getUserFromRequest(req);
   if (!auth.ok) {
@@ -21,15 +30,23 @@ export default async function handler(req, res) {
     .eq("user_id", auth.user.id)
     .single();
 
-  const appUrl = `https://hirefit-ai.vercel.app/report/${id}`;
+  const rawAppUrl = `https://hirefit-ai.vercel.app/report/${id}`;
+  const appUrl = escapeHtml(rawAppUrl);
   const score = data?.alignment_score || 0;
-  const role = data?.role || "CV Analysis";
-  const verdict = score >= 80 ? "Strong Match" : score >= 60 ? "Moderate Match" : "Needs Work";
-  const missing = (data?.missing_skills || []).slice(0, 3).join(", ") || "None";
+  const role = escapeHtml(data?.role || "CV Analysis");
+  const verdict = escapeHtml(
+    score >= 80 ? "Strong Match" : score >= 60 ? "Moderate Match" : "Needs Work"
+  );
+  const missing = escapeHtml(
+    (data?.missing_skills || []).slice(0, 3).join(", ") || "None"
+  );
 
-  const title = `${role} — ${score}/100 ${verdict} | HireFit`;
-  const description = `ATS Score: ${score}/100 - ${verdict} - Missing: ${missing}. Analyzed with HireFit AI.`;
-  const image = `https://hirefit-ai.vercel.app/og-default.png`;
+  const title = escapeHtml(`${role} — ${score}/100 ${verdict} | HireFit`);
+  const description = escapeHtml(
+    `ATS Score: ${score}/100 - ${verdict} - Missing: ${missing}. Analyzed with HireFit AI.`
+  );
+  const image = escapeHtml("https://hirefit-ai.vercel.app/og-default.png");
+  const appUrlJs = JSON.stringify(rawAppUrl);
 
   res.setHeader("Content-Type", "text/html");
   res.send(`<!DOCTYPE html>
@@ -48,7 +65,7 @@ export default async function handler(req, res) {
   <meta http-equiv="refresh" content="0;url=${appUrl}" />
 </head>
 <body>
-  <script>window.location.href = "${appUrl}";</script>
+  <script>window.location.href = ${appUrlJs};</script>
   <p>Redirecting... <a href="${appUrl}">Click here</a></p>
 </body>
 </html>`);
