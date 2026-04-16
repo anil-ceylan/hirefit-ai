@@ -14,6 +14,7 @@ import {
 import { logPromptBeingSent } from "../lib/aiPromptLog.js";
 import { buildRecruiterSystemPrompt } from "../lib/recruiterSystemPrompt.js";
 import {
+  enforcePromptLanguageRules,
   normalizeAnalyzeLang,
   requiredResponseLanguageDirective,
 } from "../lib/analyze-v2/lang.js";
@@ -61,6 +62,10 @@ if (!process.env.GROQ_API_KEY) {
 
 function responseLanguageLabel(langNorm) {
   return langNorm === "tr" ? "Turkish" : "English";
+}
+
+function constrainedMessages(messages, lang) {
+  return enforcePromptLanguageRules(messages, normalizeAnalyzeLang(lang));
 }
 
 /** Railway (and similar) set PORT; health checks often need a simple 200. */
@@ -186,13 +191,13 @@ app.post("/api/extract-job", async (req, res) => {
           model: "llama-3.3-70b-versatile",
           max_tokens: EXTRACT_JOB_MAX_TOKENS,
           temperature: 0.1,
-          messages: [
+          messages: constrainedMessages([
             { role: "system", content: EXTRACT_JOB_SYSTEM },
             {
               role: "user",
               content: buildExtractJobUserMessage(visible),
             },
-          ],
+          ], "en"),
         };
         logPromptBeingSent(extractGroqBody.messages);
         const aiRes = await fetchWithTimeout(
@@ -395,7 +400,7 @@ Return ONLY valid JSON. No markdown, no explanation, no extra text.
   }
 }`;
 
-    const legacyAnalyzeMessages = [
+    const legacyAnalyzeMessages = constrainedMessages([
       {
         role: "system",
         content: `${buildRecruiterSystemPrompt(langNorm)}
@@ -403,7 +408,7 @@ Return ONLY valid JSON. No markdown, no explanation, no extra text.
 Use I/you for all narrative JSON fields (recruiter_simulation, fit_summary, rejection reasons, strengths, improvements, etc.).`,
       },
       { role: "user", content: legacyAnalyzeUserContent },
-    ];
+    ], langNorm);
     logPromptBeingSent(legacyAnalyzeMessages);
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -473,7 +478,7 @@ app.post("/optimize", async (req, res) => {
       model: "llama-3.3-70b-versatile",
       max_tokens: 800,
       temperature: 0.35,
-      messages: [
+      messages: constrainedMessages([
         {
           role: "system",
           content: languageDirective,
@@ -498,7 +503,7 @@ ${cvText}
 Job Description:
 ${jobDescription}`,
         },
-      ],
+      ], langNorm),
     };
     logPromptBeingSent(optimizeGroqBody.messages);
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -535,7 +540,7 @@ app.post("/roadmap", async (req, res) => {
       model: "llama-3.3-70b-versatile",
       max_tokens: 800,
       temperature: 0.4,
-      messages: [
+      messages: constrainedMessages([
         {
           role: "system",
           content: languageDirective,
@@ -547,7 +552,7 @@ app.post("/roadmap", async (req, res) => {
 For each skill provide: week number, specific resource (course/book/project), and estimated hours. Be practical and specific. Return as plain text, no JSON.
 Respond entirely in ${responseLanguageLabel(langNorm)}.`,
         },
-      ],
+      ], langNorm),
     };
     logPromptBeingSent(roadmapGroqBody.messages);
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -581,7 +586,7 @@ app.post("/apply-fix", async (req, res) => {
       max_tokens: 800,
       temperature: 0.3,
       response_format: { type: "json_object" },
-      messages: [
+      messages: constrainedMessages([
         {
           role: "system",
           content: languageDirective,
@@ -606,7 +611,7 @@ Return ONLY this JSON:
   "explanation": "1 sentence: what changed"
 }`,
         },
-      ],
+      ], langNorm),
     };
     logPromptBeingSent(applyFixGroqBody.messages);
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -697,7 +702,7 @@ Return ONLY this JSON (no markdown):
   }
 }`;
 
-    const decisionMessages = [
+    const decisionMessages = constrainedMessages([
       {
         role: "system",
         content: `${buildRecruiterSystemPrompt(langNorm)}
@@ -705,7 +710,7 @@ Return ONLY this JSON (no markdown):
 Apply this voice to summary, biggestMistake, topFixes, recruiterInsight, oneAction, aiSuspicion, and deadlinePlan text.`,
       },
       { role: "user", content: decisionUserContent },
-    ];
+    ], langNorm);
     logPromptBeingSent(decisionMessages);
 
     const gptResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -749,7 +754,7 @@ try {
     max_tokens: 800,
     temperature: 0.2,
     response_format: { type: "json_object" },
-    messages: [
+    messages: constrainedMessages([
       {
         role: "system",
         content: `${buildRecruiterSystemPrompt(langNorm)}
@@ -775,13 +780,13 @@ Rules:
 CV:
 ${cvText}`,
       },
-    ],
+    ], langNorm),
   };
   const gutGroqBody = {
     model: "llama-3.3-70b-versatile",
     max_tokens: 800,
     temperature: 0.3,
-    messages: [
+    messages: constrainedMessages([
       {
         role: "system",
         content: `${buildRecruiterSystemPrompt(langNorm)}
@@ -795,7 +800,7 @@ Reply with one short plain sentence only (not JSON). Max 10 words. I/you only.`,
 CV:
 ${cvText}`,
       },
-    ],
+    ], langNorm),
   };
   logPromptBeingSent(aiDetectGroqBody.messages);
   logPromptBeingSent(gutGroqBody.messages);
@@ -843,7 +848,7 @@ try {
     max_tokens: 800,
     temperature: 0.2,
     response_format: { type: "json_object" },
-    messages: [
+    messages: constrainedMessages([
       {
         role: "system",
         content: `${buildRecruiterSystemPrompt(langNorm)}
@@ -895,7 +900,7 @@ ${JSON.stringify({
 
 Return ONLY a JSON object with the same keys and rewritten values. No markdown.`,
       },
-    ],
+    ], langNorm),
   };
   logPromptBeingSent(toneGroqBody.messages);
   const toneResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {

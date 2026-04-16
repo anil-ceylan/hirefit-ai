@@ -6,6 +6,7 @@ import {
   stripHtmlToJobVisibleText,
 } from "../lib/extractJobCompose.js";
 import { logPromptBeingSent } from "../lib/aiPromptLog.js";
+import { enforcePromptLanguageRules } from "../lib/analyze-v2/lang.js";
 
 /** Groq output budget — must be ≥2000 so long postings are not cut off mid-generation */
 const EXTRACT_MAX_TOKENS = 8192;
@@ -75,13 +76,13 @@ export default async function handler(req, res) {
 
     if (key && visible.length > 120) {
       try {
-        const extractMessages = [
+        const extractMessages = enforcePromptLanguageRules([
           { role: "system", content: EXTRACT_JOB_SYSTEM },
           {
             role: "user",
             content: buildExtractJobUserMessage(visible),
           },
-        ];
+        ], "en");
         logPromptBeingSent(extractMessages);
         const aiRes = await fetchWithTimeout(
           "https://api.groq.com/openai/v1/chat/completions",

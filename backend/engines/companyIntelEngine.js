@@ -203,6 +203,7 @@ Rules:
     model: "llama-3.3-70b-versatile",
     temperature: 0.1,
     responseFormat: { type: "json_object" },
+    langNorm,
     messages: [
       {
         role: "system",

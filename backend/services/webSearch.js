@@ -86,6 +86,7 @@ async function summarizeInsights(prompt, lang) {
     model: "llama-3.3-70b-versatile",
     temperature: 0.2,
     responseFormat: { type: "json_object" },
+    langNorm: lang === "tr" ? "tr" : "en",
     messages: [
       {
         role: "system",
@@ -246,6 +247,7 @@ Use only evidence present in CV. JSON:
     model: "llama-3.3-70b-versatile",
     temperature: 0.15,
     responseFormat: { type: "json_object" },
+    langNorm: lang === "tr" ? "tr" : "en",
     messages: [
       {
         role: "system",
@@ -520,6 +522,7 @@ Max 2 preparation_steps.`;
     model: "llama-3.3-70b-versatile",
     temperature: 0.25,
     responseFormat: { type: "json_object" },
+    langNorm: lang === "tr" ? "tr" : "en",
     messages: [
       { role: "system", content: buildSystemPrompt(reportSystemBase, lang) },
       { role: "user", content: prompt },
