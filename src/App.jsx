@@ -6677,7 +6677,7 @@ export function TermsPage() {
           <p style={{ color: "#475569", marginBottom: 40, fontSize: 14 }}>{lang === "TR" ? "Son güncelleme: Nisan 2026" : "Last updated: April 2026"}</p>
           {(lang === "TR"
             ? [
-                ["1. Şartlara Onay", "HireFit'e erişerek veya kullanarak bu Şartlara bağlı kalmayı kabul edersiniz. HireFit, İstanbul, Türkiye'de ikamet eden bireysel geliştirici Muhammed Anıl Ceylan tarafından işletilmektedir."],
+                ["1. Şartlara Onay", "HireFit'e erişerek veya kullanarak bu Şartlara bağlı kalmayı kabul edersiniz. HireFit, İstanbul, Türkiye'de ikamet eden bireysel geliştirici Muhammet Anıl Ceylan tarafından işletilmektedir."],
                 ["2. Hizmetin Tanımı", "HireFit, yapay zekâ destekli bir CV analiz aracıdır. Kullanıcılar CV'lerini iş ilanlarıyla karşılaştırabilir, ATS puanları alabilir, beceri açıklarını tespit edebilir, optimize edilmiş CV önerileri oluşturabilir ve işe alım simülasyonu içgörülerine erişebilir."],
                 ["3. Hesaplar", "Doğru bilgi vermeniz, en az 18 yaşında olmanız ve hesabınızın güvenliğini sağlamanız gerekir. Kişi başına bir hesap."],
                 ["4. Abonelik ve Ödemeler", "Ücretsiz Plan: Ayda 2 CV analizi ücretsiz. Pro Plan: 7 günlük ücretsiz deneme ile ayda 9,99 USD. Koç Planı: 39 USD/ay. Ödemeler Lemon Squeezy üzerinden işlenir. Abonelikler iptal edilmedikçe otomatik yenilenir. İade talepleri ücret tahsilinden itibaren 7 gün içinde iletilmelidir."],
@@ -6690,7 +6690,7 @@ export function TermsPage() {
                 ["11. İletişim", "muhammetanilceylann@gmail.com — hirefit-ai.vercel.app"],
               ]
             : [
-                ["1. Agreement to Terms", "By accessing or using HireFit, you agree to be bound by these Terms. HireFit is operated by Muhammed Anıl Ceylan, an individual developer based in Istanbul, Türkiye."],
+                ["1. Agreement to Terms", "By accessing or using HireFit, you agree to be bound by these Terms. HireFit is operated by Muhammet Anıl Ceylan, an individual developer based in Istanbul, Türkiye."],
                 ["2. Description of Service", "HireFit is an AI-powered CV analysis tool. Users can compare their CV against job descriptions, receive ATS scores, identify skill gaps, generate optimized CV suggestions, and access recruiter simulation insights."],
                 ["3. Accounts", "You must provide accurate information, be at least 18 years old, and maintain the security of your account. One account per person."],
                 ["4. Subscription and Payments", "Free Plan: 2 CV analyses/month at no cost. Pro Plan: $9.99/month with 7-day free trial. Coach Plan: $39/month. Payments processed via Lemon Squeezy. Subscriptions renew automatically unless cancelled. Refund requests must be submitted within 7 days of charge."],
@@ -6721,7 +6721,7 @@ export function PrivacyPage() {
           <p style={{ color: "#475569", marginBottom: 40, fontSize: 14 }}>{lang === "TR" ? "Son güncelleme: Nisan 2026" : "Last updated: April 2026"}</p>
           {(lang === "TR"
             ? [
-                ["1. Biz Kimiz", "HireFit, İstanbul, Türkiye'de ikamet eden bireysel geliştirici Muhammed Anıl Ceylan tarafından işletilmektedir. İletişim: muhammetanilceylann@gmail.com"],
+                ["1. Biz Kimiz", "HireFit, İstanbul, Türkiye'de ikamet eden bireysel geliştirici Muhammet Anıl Ceylan tarafından işletilmektedir. İletişim: muhammetanilceylann@gmail.com"],
                 ["2. Topladığımız Veriler", "Hesap bilgileri (e-posta, Google OAuth ile ad), yüklediğiniz CV içeriği, iş ilanları, kullanım verileri ile cihaz ve oturum verileri. Ödeme ayrıntıları yalnızca Lemon Squeezy tarafından işlenir; kart bilgilerini hiçbir şekilde saklamıyoruz."],
                 ["3. Verilerinizi Nasıl Kullanıyoruz", "Hizmeti sunmak, yapay zekâ analizini yürütmek, hesabınızı ve aboneliğinizi yönetmek, işlemsel e-postalar göndermek ve dolandırıcılığı tespit etmek için. Verilerinizi satmıyoruz ve CV içeriğinizi yapay zekâ modellerini eğitmek için kullanmıyoruz."],
                 ["4. Veri Saklama", "Veritabanı: Supabase (AB'de barındırılmış). Kimlik doğrulama: Google OAuth ile Supabase Auth. Veriler hesabınız etkin olduğu sürece saklanır; dilediğiniz zaman silinmesini talep edebilirsiniz. Hesabınızı sildiğinizde kişisel verileriniz sistemden kalıcı olarak silinir veya anonim hale getirilir."],
@@ -6735,7 +6735,7 @@ export function PrivacyPage() {
                 ["12. Güven", "Verileriniz güvenli şekilde işlenir ve üçüncü kişilerle satılmaz."],
               ]
             : [
-                ["1. Who We Are", "HireFit is operated by Muhammed Anıl Ceylan, an individual developer based in Istanbul, Türkiye. Contact: muhammetanilceylann@gmail.com"],
+                ["1. Who We Are", "HireFit is operated by Muhammet Anıl Ceylan, an individual developer based in Istanbul, Türkiye. Contact: muhammetanilceylann@gmail.com"],
                 ["2. Data We Collect", "Account info (email, name via Google OAuth), CV content you upload, job descriptions, usage data, and device/session data. Payment details are handled entirely by Lemon Squeezy — we never store card information."],
                 ["3. How We Use Your Data", "To provide the Service, process AI analysis, manage your account and subscription, send transactional emails, and detect fraud. We do not sell your data or use your CV content to train AI models."],
                 ["4. Data Storage", "Database: Supabase (EU-hosted). Authentication: Supabase Auth with Google OAuth. Data is retained while your account is active. You may request deletion at any time. When you delete your account, your personal data is permanently deleted or anonymized in our systems."],
