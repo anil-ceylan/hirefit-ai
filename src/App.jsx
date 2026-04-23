@@ -108,65 +108,59 @@ function normalizeCareerConfidence(value) {
   return "medium";
 }
 
-function getCareerConfidenceMessage(confidence, lang) {
+function getCareerConfidenceMessage(confidence) {
   const c = normalizeCareerConfidence(confidence);
   if (c === "high") {
-    return lang === "TR"
-      ? "Bu alan büyük ihtimalle sana uygun."
-      : "This area is very likely a strong fit for you.";
+    return "Bu alan büyük ihtimalle sana uygun.";
   }
   if (c === "low") {
-    return lang === "TR"
-      ? "Bu alan tam net değil, istersen değiştirebilirsin."
-      : "This area is not fully clear yet, you can switch it.";
+    return "Bu alan tam net değil. İstersen değiştirebilirsin.";
   }
-  return lang === "TR"
-    ? "Bu alan sana kısmen uyuyor olabilir."
-    : "This area may be a partial fit for you.";
+  return "Bu alan sana kısmen uyuyor olabilir.";
 }
 
 function getCareerAreaCriteria(area, lang) {
   const a = String(area || "");
   const trMap = {
     "Veri & Analiz": [
-      "Veri okuma ve yorumlama gücü aranır",
-      "Analitik problem çözme sinyali beklenir",
-      "Ölçülebilir iş etkisi kritik",
+      "Veri okuma ve yorumlama",
+      "Analitik problem çözme",
+      "Ölçülebilir iş etkisi",
     ],
     "Ürün": [
-      "Kullanıcı problemi çözme netliği aranır",
-      "Önceliklendirme ve karar kalitesi ölçülür",
-      "Çıktının ürün etkisi görünür olmalı",
+      "Kullanıcı problemi çözme",
+      "Önceliklendirme ve karar kalitesi",
+      "Ürün etkisi",
     ],
     Yazılım: [
-      "Teknik derinlik ve uygulama kalitesi aranır",
-      "Gerçek üretim çıktısı ve sahiplenme beklenir",
-      "Performans ve ölçek etkisi önemlidir",
+      "Teknik derinlik",
+      "Gerçek üretim çıktısı",
+      "Performans ve ölçek etkisi",
     ],
     "İş / Operasyon": [
-      "Süreç iyileştirme önemli",
-      "Verimlilik ve organizasyon sinyali aranır",
-      "Ölçülebilir sonuçlar kritik",
+      "Süreç iyileştirme",
+      "Verimlilik",
+      "Ölçülebilir sonuçlar",
     ],
     Pazarlama: [
-      "Büyüme ve kanal hakimiyeti aranır",
-      "Mesaj-ürün uyumu ve dönüşüm etkisi beklenir",
-      "Kampanya çıktısı ölçülebilir olmalı",
+      "Büyüme ve kanal hakimiyeti",
+      "Mesaj-ürün uyumu",
+      "Ölçülebilir kampanya etkisi",
     ],
     Finans: [
-      "Finansal doğruluk ve disiplin aranır",
-      "Risk-fayda analizi sinyali beklenir",
-      "Rakamla kanıtlanan sonuçlar kritik",
+      "Finansal doğruluk",
+      "Risk-fayda analizi",
+      "Rakamla kanıtlanan sonuçlar",
     ],
     Tasarım: [
-      "Kullanıcı deneyimi kalitesi aranır",
-      "Problem çerçeveleme ve çözüm mantığı beklenir",
-      "Somut tasarım etkisi ölçülebilir olmalı",
+      "Kullanıcı deneyimi kalitesi",
+      "Problem çerçeveleme",
+      "Somut tasarım etkisi",
     ],
     Satış: [
-      "Gelir etkisi ve ikna gücü aranır",
-      "Pipeline yönetimi ve kapanış becerisi beklenir",
-      "Sonuçlar net metriklerle görünmelidir",
+      "Gelir etkisi",
+      "Pipeline yönetimi ve kapanış",
+      "Net metriklerle sonuç",
     ],
   };
   const enMap = {
@@ -1629,6 +1623,78 @@ function pickLeadSuggestion(engineV2, analysisData, lang) {
   return String(suggestion || "").trim();
 }
 
+function normalizeSingleHardReason(rawIssue, lang) {
+  const tr = lang === "TR";
+  const issue = String(rawIssue || "").trim();
+  const lo = issue.toLowerCase();
+  if (!issue) {
+    return tr ? "CV'inde ölçülebilir sonuç yok" : "Your CV shows no measurable outcomes";
+  }
+  if (lo.includes("ölç") || lo.includes("metric") || lo.includes("quant") || lo.includes("impact")) {
+    return tr ? "CV'inde ölçülebilir sonuç yok" : "Your CV shows no measurable outcomes";
+  }
+  if (lo.includes("eşleş") || lo.includes("match") || lo.includes("deneyim") || lo.includes("experience")) {
+    return tr ? "İlanla doğrudan eşleşen deneyim eksik" : "You lack directly matching experience";
+  }
+  if (lo.includes("anahtar") || lo.includes("keyword") || lo.includes("beceri") || lo.includes("skill")) {
+    return tr ? "Anahtar beceriler görünmüyor" : "Key skills are not visible";
+  }
+  return firstTwoSentences(issue);
+}
+
+function buildDecisionScreenCopy(score, reason, lang) {
+  const tr = lang === "TR";
+  const s = Math.round(Number(score) || 0);
+  if (s < 50) {
+    return {
+      title: tr ? "Büyük ihtimalle eleneceksin" : "You will likely be rejected",
+      subtext: tr
+        ? `${reason} ve bu ilanın eşiğinin altındasın.`
+        : `${reason} and you are below this role's threshold.`,
+      microEmotion: tr ? "Bu yüzden geri dönüş alamıyorsun." : "That is why you are not getting callbacks.",
+    };
+  }
+  if (s <= 70) {
+    return {
+      title: tr ? "Sınırdasın — risk altındasın" : "You are on the edge — at risk",
+      subtext: tr
+        ? `${reason}. Tek bir kritik boşluk seni eler.`
+        : `${reason}. One critical gap can eliminate you.`,
+      microEmotion: tr ? "Bu yüzden çoğu başvuru sessiz kalıyor." : "That is why most applications stay silent.",
+    };
+  }
+  return {
+    title: tr ? "Şansın var — ama garanti değil" : "You have a chance — not a guarantee",
+    subtext: tr
+      ? `${reason}. Kanıt net değilse geri dönüş yine düşer.`
+      : `${reason}. If proof is weak, response still drops.`,
+    microEmotion: tr ? "Bu yüzden güçlü adaylar arasında kaybolabilirsin." : "That is why you can still get lost among stronger candidates.",
+  };
+}
+
+function buildSingleActionFromReason(reason, lang) {
+  const tr = lang === "TR";
+  const lo = String(reason || "").toLowerCase();
+  if (lo.includes("ölç") || lo.includes("metric") || lo.includes("impact")) {
+    return tr
+      ? "CV'deki en kritik deneyimi tek cümlede, net sonuç rakamıyla yeniden yaz."
+      : "Rewrite your most critical experience in one line with a clear outcome metric.";
+  }
+  if (lo.includes("eşleş") || lo.includes("deneyim") || lo.includes("experience") || lo.includes("match")) {
+    return tr
+      ? "Bu ilana değil, profiline daha yakın role göre CV özetini yeniden konumlandır."
+      : "Reposition your CV summary for a role that matches your profile better.";
+  }
+  if (lo.includes("anahtar") || lo.includes("keyword") || lo.includes("beceri") || lo.includes("skill")) {
+    return tr
+      ? "İlanda geçen 3 kritik beceriyi CV'nin üst bölümünde açık ve görünür yaz."
+      : "Put the 3 critical skills from the JD clearly at the top of your CV.";
+  }
+  return tr
+    ? "En kritik boşluğu şimdi kapat: bu ilana özel tek bir güçlü kanıt satırı ekle."
+    : "Close the top gap now: add one strong proof line tailored to this role.";
+}
+
 function UnlockReportGateCard({
   lang,
   score,
@@ -1723,7 +1789,7 @@ function UnlockReportGateCard({
             }}
           >
             <div style={{ fontSize: 10, fontWeight: 800, color: "#86efac", letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 5 }}>
-              {tr ? "1 kısa öneri" : "1 short suggestion"}
+              {tr ? "1 net aksiyon" : "1 clear action"}
             </div>
             <div style={{ fontSize: 13, color: "#dcfce7", lineHeight: 1.5 }}>{suggestion}</div>
           </div>
@@ -4005,7 +4071,7 @@ function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fix
       {data.oneAction ? (
         <div style={{ padding: "24px 32px", background: RS.bgSurface }}>
           <div style={{ fontSize: 12, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: RS.textMuted, marginBottom: 10 }}>
-            {lang === "TR" ? "Önerilen aksiyon" : "Suggested action"}
+            {lang === "TR" ? "Şimdi ne yapmalısın?" : "What you should do now"}
           </div>
           <div style={{ fontSize: 15, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.45 }}>{data.oneAction}</div>
         </div>
@@ -7357,8 +7423,8 @@ export function AnalyzerPage() {
     careerConfidenceNorm === "low"
       ? fallbackArea
       : (detectedCareerArea || fallbackArea);
-  const confidenceMessage = getCareerConfidenceMessage(careerConfidenceNorm, lang);
-  const areaCriteria = getCareerAreaCriteria(closestAreaToShow, lang);
+  const confidenceMessage = getCareerConfidenceMessage(careerConfidenceNorm);
+  const areaCriteria = getCareerAreaCriteria(closestAreaToShow, "TR");
   const quickAreaOptions = [
     "Veri & Analiz",
     "Ürün",
@@ -7378,6 +7444,42 @@ export function AnalyzerPage() {
     return String(issue || "").trim();
   }, [engineV2, decisionData, analysisData]);
   const nextActionFixResult = fixResults?.[NEXT_ACTION_FIX_KEY] || null;
+  const decisionScore = Number.isFinite(Number(alignmentScore)) ? Math.round(Number(alignmentScore)) : null;
+  const hardReason = useMemo(
+    () => normalizeSingleHardReason(mainIssue || analysisData?.fit_summary || "", lang),
+    [mainIssue, analysisData, lang]
+  );
+  const decisionCopy = useMemo(
+    () => (decisionScore == null ? null : buildDecisionScreenCopy(decisionScore, hardReason, lang)),
+    [decisionScore, hardReason, lang]
+  );
+  const impactProjection = useMemo(() => {
+    if (decisionScore == null) return null;
+    const fromV2 = computeImpactProjection(
+      decisionScore,
+      {
+        gaps: Array.isArray(engineV2?.Gaps?.rejection_reasons) ? engineV2.Gaps.rejection_reasons : [],
+        missingKeywords: engineV2?.ATS?.missing_keywords || [],
+        missingSkills: engineV2?.ATS?.missing_skills || analysisData?.missing_skills || missingSkills || [],
+        improvements: engineV2?.Decision?.what_to_fix_first || analysisData?.improvements || [],
+        rejectionHigh: analysisData?.rejection_reasons?.high,
+        rejectionMedium: analysisData?.rejection_reasons?.medium,
+      },
+      lang
+    );
+    if (fromV2) return fromV2;
+    const fallbackDelta = Math.max(8, Math.min(20, decisionScore < 50 ? 18 : decisionScore <= 70 ? 12 : 8));
+    return {
+      current: decisionScore,
+      projected: Math.min(100, decisionScore + fallbackDelta),
+      delta: fallbackDelta,
+      narrative: lang === "TR" ? "Küçük bir değişiklik, büyük fark yaratır." : "Small change, big difference.",
+    };
+  }, [decisionScore, engineV2, analysisData, missingSkills, lang]);
+  const singleAction = useMemo(
+    () => buildSingleActionFromReason(hardReason, lang),
+    [hardReason, lang]
+  );
 
   useEffect(() => {
     if (!user?.email) return;
@@ -7747,21 +7849,19 @@ export function AnalyzerPage() {
         }}
       >
         <span style={{ fontSize: 10, transition: "transform 0.2s", display: "inline-block", transform: showAdvanced ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
-        {lang === "TR" ? "Analizi kendine göre ayarla" : "Tune the analysis to your direction"}
+        {"Analizi kendine göre ayarla"}
       </button>
       {showAdvanced && (
         <div style={{ padding: "18px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ borderRadius: 12, border: "1px solid rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.08)", padding: "12px 14px" }}>
             <div style={{ fontSize: 12, color: "#a5b4fc", fontWeight: 800, marginBottom: 6 }}>
-              {lang === "TR" ? "Sana en yakın alan (tahmini):" : "Closest area (estimated):"}
+              {"Sana en yakın alan (tahmini)"}
             </div>
             <div style={{ fontSize: 18, color: "#e2e8f0", fontWeight: 800, marginBottom: 6 }}>
-              {getCareerAreaLabel(closestAreaToShow, lang)}
+              {getCareerAreaLabel(closestAreaToShow, "TR")}
             </div>
             <div style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.5 }}>
-              {lang === "TR"
-                ? "Analiz bu alanın beklentilerine göre yapılacak."
-                : "The analysis will be run against the expectations of this area."}
+              {"Bu analiz, bu alanda senden beklenenlere göre yapılacak."}
             </div>
             <div style={{ fontSize: 13, color: careerConfidenceNorm === "low" ? "#fbbf24" : "#94a3b8", marginTop: 8, fontWeight: careerConfidenceNorm === "low" ? 700 : 500 }}>
               {confidenceMessage}
@@ -7777,7 +7877,7 @@ export function AnalyzerPage() {
             }}
           >
             <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>
-              {lang === "TR" ? "Farklı bir alana bakmak ister misin?" : "Want to check another area?"}
+              {"Farklı bir alana bakmak ister misin?"}
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {quickAreaOptions.map((a) => {
@@ -7799,7 +7899,7 @@ export function AnalyzerPage() {
                       fontFamily: "'DM Sans', sans-serif",
                     }}
                   >
-                    {getCareerAreaLabel(a, lang)}
+                    {getCareerAreaLabel(a, "TR")}
                   </button>
                 );
               })}
@@ -7808,10 +7908,10 @@ export function AnalyzerPage() {
 
           <div style={{ borderRadius: 12, border: "1px solid rgba(148,163,184,0.2)", background: "rgba(15,23,42,0.55)", padding: "12px 14px" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>
-              {lang === "TR" ? "Bu alanda senden ne beklenir?" : "What is expected from you in this area?"}
+              {"Bu alanda senden ne beklenir?"}
             </div>
             <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 8 }}>
-              {lang === "TR" ? "Analiz yapılırken özellikle şunlara bakılacak:" : "The analysis will focus especially on these points:"}
+              {"Analiz yapılırken özellikle şunlara bakılacak:"}
             </div>
             <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
               {areaCriteria.map((line) => (
@@ -7819,30 +7919,30 @@ export function AnalyzerPage() {
               ))}
             </ul>
             <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 10 }}>
-              {lang === "TR" ? "Analiz bu kriterlere göre yapılacak." : "The analysis will be run based on these criteria."}
+              {"Analiz bu kriterlere göre yapılacak."}
             </div>
           </div>
 
           <div>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>
-              {lang === "TR" ? "Bu ilana ne kadar hızlı başvurmalısın?" : "How quickly should you apply to this role?"}
+              {"Bu ilana ne kadar hızlı başvurmalısın?"}
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {[
                 {
                   value: "urgent",
-                  label: lang === "TR" ? "🔴 Hemen" : "🔴 Now",
-                  sub: lang === "TR" ? "rekabet yüksek" : "high competition",
+                  label: "🔴 Hemen",
+                  sub: "Rekabet yüksek",
                 },
                 {
                   value: "1_week",
-                  label: lang === "TR" ? "🟡 1 hafta" : "🟡 1 week",
-                  sub: lang === "TR" ? "dengeli" : "balanced",
+                  label: "🟡 1 hafta",
+                  sub: "Dengeli",
                 },
                 {
                   value: "1_month",
-                  label: lang === "TR" ? "🟢 1 ay" : "🟢 1 month",
-                  sub: lang === "TR" ? "daha az rekabet" : "lower competition",
+                  label: "🟢 1 ay",
+                  sub: "Daha az rekabet",
                 },
               ].map(({ value, label, sub }) => (
                 <button
@@ -7868,9 +7968,7 @@ export function AnalyzerPage() {
               ))}
             </div>
             <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 10 }}>
-              {lang === "TR"
-                ? "Doğru bir CV ile bu rekabette öne çıkabilirsin."
-                : "With the right CV signal, you can stand out in this competition."}
+              {"Doğru bir CV ile bu rekabette öne çıkabilirsin."}
             </div>
           </div>
         </div>
@@ -7906,17 +8004,17 @@ export function AnalyzerPage() {
       }}
     >
       <div style={{ fontSize: 13, fontWeight: 800, color: "#ddd6fe", marginBottom: 8 }}>
-        {lang === "TR" ? "Bu analiz sana şunu gösterecek:" : "This analysis will show you:"}
+        {"Bu analiz sana şunu gösterecek:"}
       </div>
       <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 5 }}>
         <li style={{ fontSize: 13, color: "#cbd5e1" }}>
-          {lang === "TR" ? "Bu ilana başvurmalı mısın" : "Should you apply to this role"}
+          {"Bu ilana başvurmalı mısın"}
         </li>
         <li style={{ fontSize: 13, color: "#cbd5e1" }}>
-          {lang === "TR" ? "Neden eleniyorsun" : "Why you get filtered out"}
+          {"Neden eleniyorsun"}
         </li>
         <li style={{ fontSize: 13, color: "#cbd5e1" }}>
-          {lang === "TR" ? "Ne yaparsan geçersin" : "What to change to pass"}
+          {"Ne yaparsan geçersin"}
         </li>
       </ul>
     </div>
@@ -7936,7 +8034,7 @@ export function AnalyzerPage() {
         opacity: loading ? 0.8 : 1,
       }}
     >
-      {loading ? <><Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} />{lang === "TR" ? "CV + İlan uyumu analiz ediliyor..." : "Analyzing CV + Job Match..."} {loadingMessage ? `• ${loadingMessage}` : ""}</> : <>{lang === "TR" ? "Başvurmadan önce sonucu gör" : "See the result before you apply"} <Sparkles size={16} /></>}
+      {loading ? <><Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} />{"CV + İlan uyumu analiz ediliyor..."} {loadingMessage ? `• ${loadingMessage}` : ""}</> : <>{"Başvurmadan önce sonucu gör"} <Sparkles size={16} /></>}
     </button>
     </div>
 
@@ -8039,6 +8137,103 @@ export function AnalyzerPage() {
         unlockError={unlockError}
         onUnlockSubmit={unlockFullReport}
       />
+    ) : null}
+    {(reportUnlocked || user) && hasOutput && !loading && decisionCopy && impactProjection ? (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.24 }}
+        style={{
+          marginBottom: 16,
+          padding: 18,
+          borderRadius: 14,
+          border: "1px solid rgba(99,102,241,0.24)",
+          background: "linear-gradient(180deg, rgba(15,23,42,0.92), rgba(2,6,23,0.96))",
+          display: "grid",
+          gap: 14,
+        }}
+      >
+        <div
+          style={{
+            borderRadius: 12,
+            border: "1px solid rgba(239,68,68,0.3)",
+            background: "rgba(239,68,68,0.08)",
+            padding: "12px 14px",
+          }}
+        >
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#fca5a5", marginBottom: 6 }}>
+            {"Karar"}
+          </div>
+          <div style={{ fontSize: 22, lineHeight: 1.2, fontWeight: 900, color: "#fee2e2", marginBottom: 6 }}>
+            {decisionCopy.title}
+          </div>
+          <div style={{ fontSize: 14, color: "#fecaca", lineHeight: 1.45, marginBottom: 4 }}>
+            {decisionCopy.subtext}
+          </div>
+          <div style={{ fontSize: 12, color: "#fda4af", fontWeight: 700 }}>
+            {decisionCopy.microEmotion}
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 800, marginBottom: 6 }}>
+            {"Seni eleyen asıl şey:"}
+          </div>
+          <div
+            style={{
+              fontSize: 15,
+              color: "#fee2e2",
+              fontWeight: 700,
+              borderRadius: 10,
+              border: "1px solid rgba(239,68,68,0.28)",
+              background: "rgba(239,68,68,0.08)",
+              padding: "10px 12px",
+            }}
+          >
+            {hardReason}
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 800, marginBottom: 6 }}>
+            {"Bu sorunu düzeltirsen:"}
+          </div>
+          <div
+            style={{
+              fontSize: 20,
+              color: "#bbf7d0",
+              fontWeight: 900,
+              letterSpacing: "-0.01em",
+              marginBottom: 4,
+            }}
+          >
+            {impactProjection.current} → {impactProjection.projected} (+{impactProjection.delta})
+          </div>
+          <div style={{ fontSize: 12, color: "#86efac", fontWeight: 700 }}>
+            {"Küçük bir değişiklik, büyük fark yaratır."}
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 800, marginBottom: 6 }}>
+            {"Şimdi ne yapmalısın?"}
+          </div>
+          <div
+            style={{
+              fontSize: 14,
+              color: "#cbd5e1",
+              lineHeight: 1.45,
+              borderRadius: 10,
+              border: "1px solid rgba(56,189,248,0.3)",
+              background: "rgba(56,189,248,0.07)",
+              padding: "10px 12px",
+              fontWeight: 700,
+            }}
+          >
+            {singleAction}
+          </div>
+        </div>
+      </motion.div>
     ) : null}
     {(reportUnlocked || user) ? (
     <AnimatePresence mode="wait">
