@@ -1762,7 +1762,10 @@ function UnlockReportGateCard({
             }}
           >
             <div style={{ fontSize: 14, fontWeight: 800, color: "#e0f2fe", marginBottom: 8 }}>
-              {"Updated. Now check your new result."}
+              {tr ? "Düzelttik. Şimdi tekrar bak." : "Updated. Now check again."}
+            </div>
+            <div style={{ fontSize: 12, color: "#bae6fd", lineHeight: 1.35, marginBottom: 8 }}>
+              {tr ? "Yeni CV ile skorun nasıl değiştiğini gör." : "See how your score changes with the updated CV."}
             </div>
             <button
               type="button"
@@ -1785,7 +1788,7 @@ function UnlockReportGateCard({
                 opacity: previewReanalyzing ? 0.8 : 1,
               }}
             >
-              {previewReanalyzing ? "Analyzing..." : "Re-analyze with improved CV"}
+              {previewReanalyzing ? (tr ? "Analiz ediliyor..." : "Analyzing...") : (tr ? "Yeni sonucu gör" : "See new result")}
             </button>
             {previewScoreDelta ? (
               <div style={{ marginTop: 8, fontSize: 12, color: "#bae6fd", fontWeight: 700 }}>
