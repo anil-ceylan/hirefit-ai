@@ -1606,6 +1606,10 @@ function UnlockReportGateCard({
   previewScoreDelta,
   onPreviewFix,
   onPreviewReanalyze,
+  isPro,
+  optimizing,
+  onOptimizeFullCv,
+  onUpgrade,
   unlockEmail,
   setUnlockEmail,
   unlockJobStatus,
@@ -1750,6 +1754,38 @@ function UnlockReportGateCard({
             }}
           >
             {previewFixBusy ? (tr ? "Düzeltiliyor..." : "Fixing...") : (tr ? "Benim için düzelt" : "Fix this for me")}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!isPro) {
+                onUpgrade?.();
+                return;
+              }
+              onOptimizeFullCv?.();
+            }}
+            disabled={optimizing}
+            style={{
+              marginTop: 8,
+              width: "100%",
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid rgba(212,175,55,0.35)",
+              background: "rgba(212,175,55,0.1)",
+              color: "#f5d97a",
+              fontSize: 13,
+              fontWeight: 800,
+              cursor: optimizing ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              opacity: optimizing ? 0.8 : 1,
+            }}
+          >
+            <Lock size={13} />
+            {"Tüm CV'ni bu role göre optimize et"}
+            <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: "0.06em", color: "#facc15" }}>PRO</span>
           </button>
         </div>
         {previewFixResult?.new ? (
@@ -8090,6 +8126,10 @@ export function AnalyzerPage() {
         previewScoreDelta={previewScoreDelta}
         onPreviewFix={applyPreviewFix}
         onPreviewReanalyze={rerunPreviewWithImprovedCv}
+        isPro={isPro}
+        optimizing={optimizing}
+        onOptimizeFullCv={optimizeCv}
+        onUpgrade={openUpgrade}
         unlockEmail={unlockEmail}
         setUnlockEmail={setUnlockEmail}
         unlockJobStatus={unlockJobStatus}
