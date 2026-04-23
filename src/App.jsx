@@ -391,6 +391,68 @@ function dedupeTextList(lines) {
   return out;
 }
 
+function buildRoleSuggestionsFromCv(cvText, lang = "TR") {
+  const tr = String(lang || "").toUpperCase() === "TR";
+  const text = String(cvText || "").toLowerCase();
+  const roleDefs = [
+    {
+      role: tr ? "Veri Analisti" : "Data Analyst",
+      patterns: [/sql\b/i, /python\b/i, /tableau|power\s?bi/i, /dashboard/i, /veri|data/i, /analiz|analysis/i],
+      reason: tr ? "Veri analizi ve raporlama sinyalleri bu rolle güçlü örtüşüyor." : "Data analysis and reporting signals align strongly with this role.",
+    },
+    {
+      role: tr ? "İş Analisti" : "Business Analyst",
+      patterns: [/iş\s?analiz|business\s?analyst/i, /süreç|process/i, /gereksinim|requirement/i, /paydaş|stakeholder/i, /rapor|report/i],
+      reason: tr ? "Süreç, paydaş ve iş analizi odaklı deneyim bu role yakın." : "Process, stakeholder, and business-analysis experience fits this role.",
+    },
+    {
+      role: tr ? "Ürün Analisti" : "Product Analyst",
+      patterns: [/ürün|product/i, /kpi|metric/i, /a\/b|ab\s?test/i, /funnel|dönüşüm|conversion/i, /kullanıcı|user/i],
+      reason: tr ? "Ürün metrikleri ve kullanıcı davranışı odaklı sinyal bu role uyuyor." : "Product metrics and user-behavior signals fit this role.",
+    },
+    {
+      role: tr ? "Ürün Yöneticisi" : "Product Manager",
+      patterns: [/product\s?manager|ürün\s?yönetic/i, /roadmap/i, /önceliklendirme|prioritization/i, /paydaş|stakeholder/i, /go-to-market|gtm/i],
+      reason: tr ? "Önceliklendirme ve ürün sahipliği sinyalleri bu role yakın." : "Prioritization and product ownership signals align with this role.",
+    },
+    {
+      role: tr ? "Yazılım Geliştirici" : "Software Developer",
+      patterns: [/react|node|javascript|typescript|java|c#|go|python/i, /api/i, /backend|frontend/i, /deploy|aws|docker/i, /yazılım|software/i],
+      reason: tr ? "Kod, sistem ve teslimat odaklı teknik sinyaller bu role uyuyor." : "Code, systems, and delivery-focused technical signals fit this role.",
+    },
+    {
+      role: tr ? "Pazarlama Uzmanı" : "Marketing Specialist",
+      patterns: [/pazarlama|marketing/i, /seo|sem/i, /kampanya|campaign/i, /ga4|google\sanalytics/i, /lead|growth/i],
+      reason: tr ? "Kampanya, büyüme ve performans pazarlaması sinyalleri bu role uygun." : "Campaign, growth, and performance marketing signals fit this role.",
+    },
+    {
+      role: tr ? "Finans Analisti" : "Financial Analyst",
+      patterns: [/finans|financial/i, /bütçe|budget/i, /forecast|tahmin/i, /p&l|karlılık|profit/i, /excel/i],
+      reason: tr ? "Finansal analiz ve planlama odaklı deneyim bu role yakın." : "Financial analysis and planning experience aligns with this role.",
+    },
+    {
+      role: tr ? "Operasyon Uzmanı" : "Operations Specialist",
+      patterns: [/operasyon|operations/i, /verimlilik|efficiency/i, /süreç|process/i, /koordinasyon|coordination/i, /lojistik|logistics/i],
+      reason: tr ? "Operasyon ve süreç iyileştirme sinyalleri bu role güçlü uyuyor." : "Operations and process-improvement signals strongly fit this role.",
+    },
+  ];
+
+  const scored = roleDefs.map((r, idx) => {
+    const hit = r.patterns.reduce((n, p) => n + (p.test(text) ? 1 : 0), 0);
+    const weighted = hit * 4 + (/\d+\s?%|\b(kpi|metric|sonuç|result)\b/i.test(text) ? 2 : 0);
+    const score = Math.max(60, Math.min(85, 60 + weighted + Math.max(0, 2 - idx)));
+    return { role: r.role, score, reason: r.reason, hit };
+  });
+
+  scored.sort((a, b) => (b.hit - a.hit) || (b.score - a.score));
+  const top = scored.slice(0, 3).map((x, i) => ({
+    role: x.role,
+    score: Math.max(60, Math.min(85, x.score - i)),
+    reason: x.reason,
+  }));
+  return top;
+}
+
 const HF_ANALYTICS_DEBOUNCE_MS = 900;
 const hfAnalyticsLastFire = new Map();
 
@@ -7664,15 +7726,8 @@ export function AnalyzerPage() {
   const previewScoreDelta = previewReanalyzePending ? null : reanalysisResult;
   const decisionScore = Number.isFinite(Number(alignmentScore)) ? Math.round(Number(alignmentScore)) : null;
   const roleSuggestions = useMemo(() => {
-    const fromAnalysis = Array.isArray(analysisData?.role_matches) ? analysisData.role_matches : [];
-    const cleaned = fromAnalysis
-      .map((r) => ({
-        role: String(r?.role || "").trim(),
-        score: Number(r?.match_score),
-      }))
-      .filter((r) => r.role);
-    return cleaned.slice(0, 5);
-  }, [analysisData]);
+    return buildRoleSuggestionsFromCv(cvText, lang);
+  }, [cvText, lang]);
   const hardReason = useMemo(
     () => normalizeSingleHardReason(mainIssue || analysisData?.fit_summary || "", lang),
     [mainIssue, analysisData, lang]
@@ -8450,8 +8505,13 @@ export function AnalyzerPage() {
           {roleSuggestions.length ? (
             <div style={{ display: "grid", gap: 8 }}>
               {roleSuggestions.map((r) => (
-                <div key={`${r.role}-${r.score}`} style={{ borderRadius: 10, border: "1px solid rgba(148,163,184,0.2)", background: "rgba(15,23,42,0.65)", padding: "8px 10px", fontSize: 13, color: "#e2e8f0", fontWeight: 700 }}>
-                  {`${r.role}${Number.isFinite(r.score) ? ` (${r.score})` : ""}`}
+                <div key={`${r.role}-${r.score}`} style={{ borderRadius: 10, border: "1px solid rgba(148,163,184,0.2)", background: "rgba(15,23,42,0.65)", padding: "8px 10px" }}>
+                  <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 800, marginBottom: 2 }}>
+                    {`${r.role} (${r.score}%)`}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4 }}>
+                    {r.reason}
+                  </div>
                 </div>
               ))}
             </div>
