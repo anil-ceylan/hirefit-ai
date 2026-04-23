@@ -7410,6 +7410,8 @@ export function AnalyzerPage() {
   const [unlockError, setUnlockError] = useState("");
   const [unlockRunKey, setUnlockRunKey] = useState("");
   const [careerAreaReanalyzePending, setCareerAreaReanalyzePending] = useState(false);
+  const [showMarketInsightsModal, setShowMarketInsightsModal] = useState(false);
+  const [showCareerSuggestionsModal, setShowCareerSuggestionsModal] = useState(false);
   const PREVIEW_FIX_KEY = "__preview_gate_fix__";
   const [previewFixResult, setPreviewFixResult] = useState(null);
   const [previewReanalyzePending, setPreviewReanalyzePending] = useState(false);
@@ -7451,6 +7453,16 @@ export function AnalyzerPage() {
   const previewFixBusy = applyingFix === PREVIEW_FIX_KEY;
   const previewScoreDelta = previewReanalyzePending ? null : reanalysisResult;
   const decisionScore = Number.isFinite(Number(alignmentScore)) ? Math.round(Number(alignmentScore)) : null;
+  const roleSuggestions = useMemo(() => {
+    const fromAnalysis = Array.isArray(analysisData?.role_matches) ? analysisData.role_matches : [];
+    const cleaned = fromAnalysis
+      .map((r) => ({
+        role: String(r?.role || "").trim(),
+        score: Number(r?.match_score),
+      }))
+      .filter((r) => r.role);
+    return cleaned.slice(0, 5);
+  }, [analysisData]);
   const hardReason = useMemo(
     () => normalizeSingleHardReason(mainIssue || analysisData?.fit_summary || "", lang),
     [mainIssue, analysisData, lang]
@@ -8183,6 +8195,136 @@ export function AnalyzerPage() {
           </div>
         </div>
       </motion.div>
+    ) : null}
+    {(reportUnlocked || user) && hasOutput && !loading ? (
+      <div
+        style={{
+          marginBottom: 16,
+          padding: 14,
+          borderRadius: 14,
+          border: "1px solid rgba(148,163,184,0.2)",
+          background: "rgba(15,23,42,0.72)",
+        }}
+      >
+        <div style={{ fontSize: 13, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
+          {"Sonraki adımın"}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+          <button
+            type="button"
+            onClick={() => {
+              if (!isPro) {
+                openUpgrade();
+                return;
+              }
+              optimizeCv();
+            }}
+            disabled={optimizing}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid rgba(99,102,241,0.32)",
+              background: "rgba(99,102,241,0.12)",
+              color: "#ddd6fe",
+              fontSize: 12,
+              fontWeight: 800,
+              cursor: optimizing ? "not-allowed" : "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+              opacity: optimizing ? 0.8 : 1,
+            }}
+          >
+            {"Bu CV'yi bu role göre tamamen yeniden yaz"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowMarketInsightsModal(true)}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid rgba(99,102,241,0.32)",
+              background: "rgba(99,102,241,0.12)",
+              color: "#ddd6fe",
+              fontSize: 12,
+              fontWeight: 800,
+              cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            {"Bu rol piyasada ne kadar değerli?"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowCareerSuggestionsModal(true)}
+            style={{
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid rgba(99,102,241,0.32)",
+              background: "rgba(99,102,241,0.12)",
+              color: "#ddd6fe",
+              fontSize: 12,
+              fontWeight: 800,
+              cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            {"Bana daha uygun rolleri göster"}
+          </button>
+        </div>
+      </div>
+    ) : null}
+    {showMarketInsightsModal ? (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.76)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
+        <div style={{ width: "min(560px, 96vw)", borderRadius: 14, border: "1px solid rgba(99,102,241,0.3)", background: "linear-gradient(160deg,#0b1220,#05070f)", padding: 18 }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
+            {lang === "TR" ? "Piyasa içgörüsü" : "Market insights"}
+          </div>
+          {analysisData?.salary_insight ? (
+            <div style={{ fontSize: 14, color: "#cbd5e1", lineHeight: 1.5 }}>
+              {`${analysisData.salary_insight.currency === "TRY" ? "₺" : analysisData.salary_insight.currency === "USD" ? "$" : "€"}${(analysisData.salary_insight.range_min || 0).toLocaleString()} - ${(analysisData.salary_insight.range_max || 0).toLocaleString()}`}
+            </div>
+          ) : (
+            <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.5 }}>
+              {lang === "TR" ? "Bu analizde piyasa verisi bulunamadı." : "No market data found for this analysis."}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowMarketInsightsModal(false)}
+            style={{ marginTop: 14, width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.25)", background: "transparent", color: "#cbd5e1", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+          >
+            {lang === "TR" ? "Kapat" : "Close"}
+          </button>
+        </div>
+      </div>
+    ) : null}
+    {showCareerSuggestionsModal ? (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.76)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
+        <div style={{ width: "min(560px, 96vw)", borderRadius: 14, border: "1px solid rgba(99,102,241,0.3)", background: "linear-gradient(160deg,#0b1220,#05070f)", padding: 18 }}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
+            {lang === "TR" ? "Sana daha uygun roller" : "Roles that fit you better"}
+          </div>
+          {roleSuggestions.length ? (
+            <div style={{ display: "grid", gap: 8 }}>
+              {roleSuggestions.map((r) => (
+                <div key={`${r.role}-${r.score}`} style={{ borderRadius: 10, border: "1px solid rgba(148,163,184,0.2)", background: "rgba(15,23,42,0.65)", padding: "8px 10px", fontSize: 13, color: "#e2e8f0", fontWeight: 700 }}>
+                  {`${r.role}${Number.isFinite(r.score) ? ` (${r.score})` : ""}`}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.5 }}>
+              {lang === "TR" ? "Bu analizde rol önerisi bulunamadı." : "No role suggestions found in this analysis."}
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowCareerSuggestionsModal(false)}
+            style={{ marginTop: 14, width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.25)", background: "transparent", color: "#cbd5e1", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+          >
+            {lang === "TR" ? "Kapat" : "Close"}
+          </button>
+        </div>
+      </div>
     ) : null}
     {(reportUnlocked || user) ? (
     <AnimatePresence mode="wait">
