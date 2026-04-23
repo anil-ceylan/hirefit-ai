@@ -441,7 +441,7 @@ function getFallbackAnalysis(cvText, jobDescription, lang = "EN") {
 
   const verdict = score < 55 ? "Stop" : "Improve";
   const keyGap = !hasMetrics
-    ? (tr ? "Ölçülebilir etki görünmüyor" : "No measurable impact")
+    ? (tr ? "Ölçülebilir etki görünmüyor" : "Your CV doesn't show real results.")
     : visibleTools.length === 0
       ? (tr ? "Görünür araç seti sinyali yok" : "No visible tools stack")
       : mismatch
@@ -452,7 +452,7 @@ function getFallbackAnalysis(cvText, jobDescription, lang = "EN") {
     ? [
         tr
           ? "Açık önce/sonra etkisiyle 2 ölçülebilir sonuç maddesi ekle."
-          : "Add 2 quantified outcome bullets with clear before/after impact.",
+          : "Turn your tasks into results.",
         tr
           ? "En güçlü projeni ilandaki araç dilini kullanarak hedef role bağla."
           : "Map your strongest project to the target role using the job's tool language.",
@@ -1528,10 +1528,10 @@ function normalizeSingleHardReason(rawIssue, lang) {
   const issue = String(rawIssue || "").trim();
   const lo = issue.toLowerCase();
   if (!issue) {
-    return tr ? "CV'inde ölçülebilir sonuç yok" : "Your CV shows no measurable outcomes";
+    return tr ? "CV'inde ölçülebilir sonuç yok" : "Your CV doesn't show real results";
   }
   if (lo.includes("ölç") || lo.includes("metric") || lo.includes("quant") || lo.includes("impact")) {
-    return tr ? "CV'inde ölçülebilir sonuç yok" : "Your CV shows no measurable outcomes";
+    return tr ? "CV'inde ölçülebilir sonuç yok" : "Your CV doesn't show real results";
   }
   if (lo.includes("eşleş") || lo.includes("match") || lo.includes("deneyim") || lo.includes("experience")) {
     return tr ? "İlanla doğrudan eşleşen deneyim eksik" : "You lack directly matching experience";
@@ -1547,7 +1547,7 @@ function buildDecisionScreenCopy(score, reason, lang) {
   const s = Math.round(Number(score) || 0);
   if (s < 50) {
     return {
-      title: tr ? "Büyük ihtimalle eleneceksin" : "You will likely be rejected",
+      title: tr ? "Büyük ihtimalle eleneceksin" : "You'll get rejected",
       subtext: tr
         ? `${reason} ve bu ilanın eşiğinin altındasın.`
         : `${reason} and you are below this role's threshold.`,
@@ -1609,17 +1609,36 @@ function UnlockReportGateCard({
   onUnlockSubmit,
 }) {
   const tr = lang === "TR";
+  const unlockEmailRef = useRef(null);
   const scoreNow = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
   const verdictText =
     scoreNow < 50
-      ? (tr ? "Büyük ihtimalle eleneceksin." : "You will likely be rejected.")
+      ? (tr ? "Büyük ihtimalle eleneceksin." : "You'll get rejected.")
       : scoreNow <= 70
         ? (tr ? "Sınırdasın — risk altındasın." : "You're on the edge — at risk.")
         : (tr ? "Şansın var — ama garanti değil." : "You have a chance — not guaranteed.");
-  const topReason = String(insight || "").trim() || (tr ? "CV'inde ölçülebilir sonuç yok." : "No measurable outcomes in your CV.");
+  const reasonRaw = String(insight || "").trim();
+  const reasonNorm = reasonRaw.toLowerCase();
+  const topReason = reasonRaw
+    ? ((reasonNorm.includes("measurable impact")
+      || reasonNorm.includes("no measurable")
+      || reasonNorm.includes("ölçülebilir")
+      || reasonNorm.includes("impact"))
+      ? (tr ? "CV'inde ölçülebilir sonuç yok." : "Your CV doesn't show real results.")
+      : reasonRaw)
+    : (tr ? "CV'inde ölçülebilir sonuç yok." : "Your CV doesn't show real results.");
   const impactDelta = scoreNow < 50 ? 18 : scoreNow <= 70 ? 12 : 8;
   const scoreAfterFix = Math.min(100, scoreNow + impactDelta);
-  const actionLine = String(suggestion || "").trim() || (tr ? "Yaptığın işleri sayı ve sonuçla yaz." : "Write your work with numbers and outcomes.");
+  const actionRaw = String(suggestion || "").trim();
+  const actionNorm = actionRaw.toLowerCase();
+  const actionLine = actionRaw
+    ? ((actionNorm.includes("quantified outcome bullets")
+      || actionNorm.includes("before/after impact")
+      || actionNorm.includes("measurable")
+      || actionNorm.includes("metric"))
+      ? (tr ? "Yaptığın işleri sayı ve sonuçla yaz." : "Turn your tasks into results.")
+      : actionRaw)
+    : (tr ? "Yaptığın işleri sayı ve sonuçla yaz." : "Turn your tasks into results.");
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -1646,7 +1665,7 @@ function UnlockReportGateCard({
             {verdictText}
           </div>
           <div style={{ fontSize: 13, color: "#fecaca", lineHeight: 1.45 }}>
-            {tr ? "Bu başvuru şu haliyle güçlü görünmüyor." : "This application does not look strong in its current form."}
+            {tr ? "Bu başvuru şu haliyle güçlü görünmüyor." : "This CV won't pass screening."}
           </div>
         </div>
 
@@ -1699,6 +1718,35 @@ function UnlockReportGateCard({
           <div style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.45, fontWeight: 700 }}>
             {actionLine}
           </div>
+          <div style={{ marginTop: 4, fontSize: 12, color: "#94a3b8", lineHeight: 1.35 }}>
+            {tr ? "Örnek: X'i %Y artırdım" : "Example: Increased X by %Y"}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              unlockEmailRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+              unlockEmailRef.current?.focus();
+            }}
+            style={{
+              marginTop: 10,
+              width: "100%",
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "none",
+              background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 800,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              boxShadow: "0 8px 24px rgba(99,102,241,0.3)",
+            }}
+          >
+            {tr ? "Benim için düzelt" : "Fix this for me"}
+          </button>
         </div>
       </div>
 
@@ -1721,6 +1769,7 @@ function UnlockReportGateCard({
         <form onSubmit={onUnlockSubmit} style={{ display: "grid", gap: 10 }}>
           <input
             type="email"
+            ref={unlockEmailRef}
             required
             value={unlockEmail}
             onChange={(e) => setUnlockEmail(e.target.value)}
@@ -1800,7 +1849,7 @@ function UnlockReportGateCard({
             ) : (
               <>
                 <Lock size={14} />
-                {tr ? "Tam neden elendiğini gör" : "See exactly why you're rejected"}
+                {tr ? "Tam neden elendiğini gör" : "See what's actually killing your application"}
               </>
             )}
           </button>
@@ -5336,8 +5385,8 @@ function HeroSection({ navigate, lang }) {
       decisionColor: "#f87171",
       decisionBg: "rgba(239,68,68,0.08)",
       decisionBorder: "rgba(239,68,68,0.2)",
-      mistake: "No measurable impact. Every bullet says 'responsible for'.",
-      fix: "Replace with numbers. 'Grew email list by 40% in 3 months.'",
+      mistake: "Your CV doesn't show real results.",
+      fix: "Turn your tasks into results. Example: Increased X by %Y.",
       insight: "This CV looks like everyone else's. Nothing stands out in 7 seconds.",
     },
     TR: {
