@@ -1609,6 +1609,17 @@ function UnlockReportGateCard({
   onUnlockSubmit,
 }) {
   const tr = lang === "TR";
+  const scoreNow = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
+  const verdictText =
+    scoreNow < 50
+      ? (tr ? "Büyük ihtimalle eleneceksin." : "You will likely be rejected.")
+      : scoreNow <= 70
+        ? (tr ? "Sınırdasın — risk altındasın." : "You're on the edge — at risk.")
+        : (tr ? "Şansın var — ama garanti değil." : "You have a chance — not guaranteed.");
+  const topReason = String(insight || "").trim() || (tr ? "CV'inde ölçülebilir sonuç yok." : "No measurable outcomes in your CV.");
+  const impactDelta = scoreNow < 50 ? 18 : scoreNow <= 70 ? 12 : 8;
+  const scoreAfterFix = Math.min(100, scoreNow + impactDelta);
+  const actionLine = String(suggestion || "").trim() || (tr ? "Yaptığın işleri sayı ve sonuçla yaz." : "Write your work with numbers and outcomes.");
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -1622,76 +1633,71 @@ function UnlockReportGateCard({
         overflow: "hidden",
       }}
     >
-      <div style={{ padding: "18px 18px 12px" }}>
+      <div style={{ padding: "18px 18px 12px", display: "grid", gap: 10 }}>
         <div
           style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "4px 10px",
-            borderRadius: 999,
-            border: "1px solid rgba(99,102,241,0.35)",
-            background: "rgba(99,102,241,0.12)",
-            fontSize: 10,
-            fontWeight: 800,
-            color: "#c4b5fd",
-            letterSpacing: "0.08em",
-            textTransform: "uppercase",
-            marginBottom: 12,
+            borderRadius: 12,
+            border: "1px solid rgba(239,68,68,0.32)",
+            background: "rgba(239,68,68,0.1)",
+            padding: "12px 13px",
           }}
         >
-          <Lock size={11} />
-          {tr ? "Önizleme" : "Preview"}
+          <div style={{ fontSize: 25, fontWeight: 900, color: "#fee2e2", lineHeight: 1.15, marginBottom: 6 }}>
+            {verdictText}
+          </div>
+          <div style={{ fontSize: 13, color: "#fecaca", lineHeight: 1.45 }}>
+            {tr ? "Bu başvuru şu haliyle güçlü görünmüyor." : "This application does not look strong in its current form."}
+          </div>
         </div>
-        <div style={{ display: "grid", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "end", justifyContent: "space-between", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>
-                {tr ? "Alignment skoru" : "Alignment score"}
-              </div>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#e2e8f0", lineHeight: 1 }}>
-                {score}%
-              </div>
-            </div>
-            <div
-              style={{
-                fontSize: 11,
-                color: "#cbd5e1",
-                borderRadius: 999,
-                border: "1px solid rgba(148,163,184,0.2)",
-                background: "rgba(148,163,184,0.08)",
-                padding: "6px 10px",
-                fontWeight: 700,
-              }}
-            >
-              {tr ? "Kısmi sonuç" : "Partial result"}
-            </div>
+
+        <div
+          style={{
+            borderRadius: 12,
+            border: "1px solid rgba(239,68,68,0.25)",
+            background: "rgba(239,68,68,0.08)",
+            padding: "12px 13px",
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 800, color: "#fca5a5", marginBottom: 5 }}>
+            {tr ? "Seni eleyen asıl şey:" : "The main reason you get rejected:"}
           </div>
-          <div
-            style={{
-              borderRadius: 12,
-              border: "1px solid rgba(239,68,68,0.25)",
-              background: "rgba(239,68,68,0.08)",
-              padding: "12px 13px",
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#fca5a5", letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 5 }}>
-              {tr ? "1 kritik içgörü" : "1 key insight"}
-            </div>
-            <div style={{ fontSize: 13, color: "#fee2e2", lineHeight: 1.5 }}>{insight}</div>
+          <div style={{ fontSize: 14, color: "#fee2e2", lineHeight: 1.45, fontWeight: 700 }}>
+            {topReason}
           </div>
-          <div
-            style={{
-              borderRadius: 12,
-              border: "1px solid rgba(16,185,129,0.25)",
-              background: "rgba(16,185,129,0.08)",
-              padding: "12px 13px",
-            }}
-          >
-            <div style={{ fontSize: 10, fontWeight: 800, color: "#86efac", letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 5 }}>
-              {tr ? "1 net aksiyon" : "1 clear action"}
-            </div>
-            <div style={{ fontSize: 13, color: "#dcfce7", lineHeight: 1.5 }}>{suggestion}</div>
+        </div>
+
+        <div
+          style={{
+            borderRadius: 12,
+            border: "1px solid rgba(16,185,129,0.25)",
+            background: "rgba(16,185,129,0.08)",
+            padding: "12px 13px",
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 800, color: "#86efac", marginBottom: 5 }}>
+            {tr ? "Bunu düzeltirsen:" : "If you fix this:"}
+          </div>
+          <div style={{ fontSize: 18, color: "#dcfce7", lineHeight: 1.2, fontWeight: 900, marginBottom: 4 }}>
+            {`${scoreNow} → ${scoreAfterFix} (+${impactDelta}${tr ? " puan" : " pts"})`}
+          </div>
+          <div style={{ fontSize: 12, color: "#bbf7d0", lineHeight: 1.35 }}>
+            {tr ? "Küçük değişiklik, büyük fark yaratır." : "Small change, big difference."}
+          </div>
+        </div>
+
+        <div
+          style={{
+            borderRadius: 12,
+            border: "1px solid rgba(148,163,184,0.2)",
+            background: "rgba(148,163,184,0.08)",
+            padding: "12px 13px",
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 800, color: "#cbd5e1", marginBottom: 5 }}>
+            {tr ? "Şimdi ne yapmalısın?" : "What should you do now?"}
+          </div>
+          <div style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.45, fontWeight: 700 }}>
+            {actionLine}
           </div>
         </div>
       </div>
@@ -1794,7 +1800,7 @@ function UnlockReportGateCard({
             ) : (
               <>
                 <Lock size={14} />
-                {tr ? "Tam Raporu Aç" : "Unlock Full Report"}
+                {tr ? "Tam neden elendiğini gör" : "See exactly why you're rejected"}
               </>
             )}
           </button>
