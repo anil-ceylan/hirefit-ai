@@ -1928,6 +1928,9 @@ function UnlockReportGateCard({
                   <div style={{ marginTop: 4, fontSize: 11, color: "#94a3b8", opacity: 0.9 }}>
                     {"Devam edersen daha da yükseltebilirsin."}
                   </div>
+                  <div style={{ marginTop: 2, fontSize: 10, color: "#94a3b8", opacity: 0.62 }}>
+                    {"Yarın tekrar kontrol et — yeni ilanlarla fark görebilirsin."}
+                  </div>
                 </div>
               ) : null}
               {previewScoreDelta ? (
