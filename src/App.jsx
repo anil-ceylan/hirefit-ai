@@ -1709,7 +1709,7 @@ function UnlockReportGateCard({
             {`${scoreNow} → ${scoreAfterFix} (+${impactDelta}${tr ? " puan" : " pts"})`}
           </div>
           <div style={{ fontSize: 12, color: "#bbf7d0", lineHeight: 1.35 }}>
-            {tr ? "Bu düzeltme olmadan elenmeye devam edeceksin." : "Without this fix, you'll keep getting rejected."}
+            {"Bu haliyle her başvuruda elenmeye devam edersin."}
           </div>
         </div>
 
@@ -1753,7 +1753,7 @@ function UnlockReportGateCard({
               opacity: previewFixBusy ? 0.8 : 1,
             }}
           >
-            {previewFixBusy ? (tr ? "Düzeltiliyor..." : "Fixing...") : (tr ? "Benim için düzelt" : "Fix this for me")}
+            {previewFixBusy ? (tr ? "Düzeltiliyor..." : "Fixing...") : "Bu hatayı düzelt"}
           </button>
           <button
             type="button"
