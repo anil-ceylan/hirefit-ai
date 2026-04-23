@@ -21,6 +21,7 @@ export default async function handler(req, res) {
     ).trim();
     const isPro = Boolean(body.isPro);
     const sector = body.sector;
+    const careerArea = body.careerArea;
     const lang = body.lang;
 
     if (!cvText || !jobDescription) {
@@ -34,6 +35,7 @@ export default async function handler(req, res) {
       jobDescription,
       isPro,
       sector,
+      careerArea,
       lang,
     });
     return res.status(200).json(payload);

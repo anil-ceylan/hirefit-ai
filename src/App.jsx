@@ -73,6 +73,41 @@ const HF_SECTOR_VALUES = [
   "Product Design / UX",
 ];
 
+const CAREER_AREA_VALUES = [
+  "Veri & Analiz",
+  "Yazılım",
+  "Ürün",
+  "Pazarlama",
+  "Finans",
+  "İş / Operasyon",
+  "Tasarım",
+  "Satış",
+];
+
+const CAREER_AREA_FALLBACK = "İş / Operasyon";
+
+function getCareerAreaLabel(area, lang) {
+  const a = String(area || "").trim();
+  const labels = {
+    "Veri & Analiz": lang === "TR" ? "Veri & Analiz" : "Data & Analytics",
+    Yazılım: lang === "TR" ? "Yazılım" : "Software",
+    "Ürün": lang === "TR" ? "Ürün" : "Product",
+    Pazarlama: lang === "TR" ? "Pazarlama" : "Marketing",
+    Finans: lang === "TR" ? "Finans" : "Finance",
+    "İş / Operasyon": lang === "TR" ? "İş / Operasyon" : "Business / Operations",
+    Tasarım: lang === "TR" ? "Tasarım" : "Design",
+    Satış: lang === "TR" ? "Satış" : "Sales",
+  };
+  return labels[a] || (lang === "TR" ? "İş / Operasyon" : "Business / Operations");
+}
+
+function normalizeCareerConfidence(value) {
+  const v = String(value || "").toLowerCase();
+  if (v.includes("high") || v.includes("yüksek")) return "high";
+  if (v.includes("low") || v.includes("düşük") || v.includes("dusuk")) return "low";
+  return "medium";
+}
+
 const SECTOR_CHIP_THEME = {
   "Auto-detect": { dot: "#a78bfa", ring: "rgba(167,139,250,0.7)", bg: "rgba(167,139,250,0.16)" },
   "Tech / Startup": { dot: "#38bdf8", ring: "rgba(56,189,248,0.7)", bg: "rgba(56,189,248,0.14)" },
@@ -1460,6 +1495,240 @@ function AnalysisThinkingOverlay({ lang, loading }) {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+function pickLeadInsight(engineV2, analysisData, lang) {
+  const tr = lang === "TR";
+  const insight =
+    engineV2?.Gaps?.biggest_gap ||
+    engineV2?.Gaps?.rejection_reasons?.[0]?.issue ||
+    analysisData?.rejection_reasons?.high?.[0] ||
+    analysisData?.fit_summary ||
+    (tr
+      ? "CV sinyalin rol beklentisine göre zayıf kalıyor."
+      : "Your CV signal is weaker than the role expectation.");
+  return String(insight || "").trim();
+}
+
+function pickLeadSuggestion(engineV2, analysisData, lang) {
+  const tr = lang === "TR";
+  const suggestion =
+    engineV2?.Decision?.what_to_fix_first?.[0] ||
+    analysisData?.improvements?.[0] ||
+    analysisData?.missing_skills?.[0] ||
+    (tr
+      ? "Her ana deneyime ölçülebilir etki ekle."
+      : "Add measurable impact to each core experience.");
+  return String(suggestion || "").trim();
+}
+
+function UnlockReportGateCard({
+  lang,
+  score,
+  insight,
+  suggestion,
+  unlockEmail,
+  setUnlockEmail,
+  unlockJobStatus,
+  setUnlockJobStatus,
+  unlockSubmitting,
+  unlockError,
+  onUnlockSubmit,
+}) {
+  const tr = lang === "TR";
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.24 }}
+      style={{
+        marginBottom: 16,
+        borderRadius: 16,
+        border: "1px solid rgba(148,163,184,0.2)",
+        background: "linear-gradient(180deg, rgba(15,23,42,0.88), rgba(2,6,23,0.96))",
+        overflow: "hidden",
+      }}
+    >
+      <div style={{ padding: "18px 18px 12px" }}>
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "4px 10px",
+            borderRadius: 999,
+            border: "1px solid rgba(99,102,241,0.35)",
+            background: "rgba(99,102,241,0.12)",
+            fontSize: 10,
+            fontWeight: 800,
+            color: "#c4b5fd",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            marginBottom: 12,
+          }}
+        >
+          <Lock size={11} />
+          {tr ? "Önizleme" : "Preview"}
+        </div>
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "end", justifyContent: "space-between", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 6 }}>
+                {tr ? "Alignment skoru" : "Alignment score"}
+              </div>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 34, fontWeight: 800, color: "#e2e8f0", lineHeight: 1 }}>
+                {score}%
+              </div>
+            </div>
+            <div
+              style={{
+                fontSize: 11,
+                color: "#cbd5e1",
+                borderRadius: 999,
+                border: "1px solid rgba(148,163,184,0.2)",
+                background: "rgba(148,163,184,0.08)",
+                padding: "6px 10px",
+                fontWeight: 700,
+              }}
+            >
+              {tr ? "Kısmi sonuç" : "Partial result"}
+            </div>
+          </div>
+          <div
+            style={{
+              borderRadius: 12,
+              border: "1px solid rgba(239,68,68,0.25)",
+              background: "rgba(239,68,68,0.08)",
+              padding: "12px 13px",
+            }}
+          >
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#fca5a5", letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 5 }}>
+              {tr ? "1 kritik içgörü" : "1 key insight"}
+            </div>
+            <div style={{ fontSize: 13, color: "#fee2e2", lineHeight: 1.5 }}>{insight}</div>
+          </div>
+          <div
+            style={{
+              borderRadius: 12,
+              border: "1px solid rgba(16,185,129,0.25)",
+              background: "rgba(16,185,129,0.08)",
+              padding: "12px 13px",
+            }}
+          >
+            <div style={{ fontSize: 10, fontWeight: 800, color: "#86efac", letterSpacing: "0.09em", textTransform: "uppercase", marginBottom: 5 }}>
+              {tr ? "1 kısa öneri" : "1 short suggestion"}
+            </div>
+            <div style={{ fontSize: 13, color: "#dcfce7", lineHeight: 1.5 }}>{suggestion}</div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          borderTop: "1px solid rgba(148,163,184,0.16)",
+          background: "linear-gradient(180deg, rgba(15,23,42,0.72), rgba(2,6,23,0.96))",
+          padding: 18,
+        }}
+      >
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, color: "#f8fafc", marginBottom: 6 }}>
+          {tr ? "Tam ret kırılımını gör" : "See your full rejection breakdown"}
+        </div>
+        <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 14 }}>
+          {tr
+            ? "Tam nedenleri, eksik anahtar kelimeleri ve düzeltme adımlarını aç."
+            : "Get exact reasons, missing keywords, and how to fix them."}
+        </div>
+
+        <form onSubmit={onUnlockSubmit} style={{ display: "grid", gap: 10 }}>
+          <input
+            type="email"
+            required
+            value={unlockEmail}
+            onChange={(e) => setUnlockEmail(e.target.value)}
+            placeholder={tr ? "E-posta" : "Email"}
+            style={{
+              width: "100%",
+              padding: "11px 12px",
+              borderRadius: 10,
+              border: "1px solid rgba(148,163,184,0.24)",
+              background: "rgba(15,23,42,0.75)",
+              color: "#e2e8f0",
+              fontSize: 13,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          />
+          <select
+            value={unlockJobStatus}
+            onChange={(e) => setUnlockJobStatus(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "11px 12px",
+              borderRadius: 10,
+              border: "1px solid rgba(148,163,184,0.24)",
+              background: "rgba(15,23,42,0.75)",
+              color: "#e2e8f0",
+              fontSize: 13,
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            <option value="Student">{tr ? "Öğrenci" : "Student"}</option>
+            <option value="Job Seeker">{tr ? "İş Arayan" : "Job Seeker"}</option>
+            <option value="Employed">{tr ? "Çalışan" : "Employed"}</option>
+            <option value="Career Switcher">{tr ? "Kariyer Değiştiriyor" : "Career Switcher"}</option>
+          </select>
+          {unlockError ? (
+            <div
+              style={{
+                fontSize: 12,
+                color: "#fca5a5",
+                borderRadius: 8,
+                border: "1px solid rgba(239,68,68,0.22)",
+                background: "rgba(239,68,68,0.08)",
+                padding: "8px 10px",
+              }}
+            >
+              {unlockError}
+            </div>
+          ) : null}
+          <button
+            type="submit"
+            disabled={unlockSubmitting}
+            style={{
+              marginTop: 2,
+              width: "100%",
+              padding: "12px 14px",
+              borderRadius: 10,
+              border: "none",
+              background: unlockSubmitting
+                ? "rgba(99,102,241,0.4)"
+                : "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 800,
+              cursor: unlockSubmitting ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              boxShadow: unlockSubmitting ? "none" : "0 8px 24px rgba(99,102,241,0.35)",
+            }}
+          >
+            {unlockSubmitting ? (
+              <>
+                <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} />
+                {tr ? "Açılıyor..." : "Unlocking..."}
+              </>
+            ) : (
+              <>
+                <Lock size={14} />
+                {tr ? "Tam Raporu Aç" : "Unlock Full Report"}
+              </>
+            )}
+          </button>
+        </form>
+      </div>
+    </motion.div>
   );
 }
 
@@ -5653,6 +5922,10 @@ function HireFitLayout() {
   const [analysisData, setAnalysisData] = useState(null);
   const [sector, setSector] = useState("Auto-detect");
   const [lastDetectedSector, setLastDetectedSector] = useState("");
+  const [detectedCareerArea, setDetectedCareerArea] = useState("");
+  const [detectedCareerAreaConfidence, setDetectedCareerAreaConfidence] = useState("medium");
+  const [detectedCareerAreaReason, setDetectedCareerAreaReason] = useState("");
+  const [careerAreaOverride, setCareerAreaOverride] = useState("");
   const [lang, setLang] = useState("EN");
   const [showPaywall, setShowPaywall] = useState(false);
   /** Logged-in users: row from user_plans (analysis_count, last_reset_at, plan). */
@@ -5698,6 +5971,7 @@ function HireFitLayout() {
     decisionLoading ||
     (alignmentScore !== null && analysisData)
   );
+  const effectiveCareerArea = careerAreaOverride || detectedCareerArea || "";
 
   const decisionImpactContext = useMemo(() => {
     if (!analysisData) return null;
@@ -5906,18 +6180,19 @@ function HireFitLayout() {
     return nums.length ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : 0;
   }, [history]);
 
-  const getApiAuthHeaders = useCallback(async () => {
+  const getApiAuthHeaders = useCallback(async ({ requireSession = true } = {}) => {
     const {
       data: { session },
     } = await supabase.auth.getSession();
     const accessToken = session?.access_token;
-    if (!accessToken) {
+    if (!accessToken && requireSession) {
       throw new Error(lang === "TR" ? "Devam etmek için giriş yapın." : "Please sign in to continue.");
     }
-    return {
+    const headers = {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
     };
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+    return headers;
   }, [lang]);
 
   const extractJobFromUrl = async () => {
@@ -5938,7 +6213,7 @@ function HireFitLayout() {
         try {
           const res = await fetch(endpoint, {
             method: "POST",
-            headers: await getApiAuthHeaders(),
+            headers: await getApiAuthHeaders({ requireSession: false }),
             body: JSON.stringify({ url: normalizedUrl }),
           });
           const data = await res.json().catch(() => ({}));
@@ -6013,11 +6288,12 @@ const msgInterval = setInterval(() => {
     try {
       const v2Res = await fetch(`${HF_API_BASE}/api/analyze-v2`, {
         method: "POST",
-        headers: await getApiAuthHeaders(),
+        headers: await getApiAuthHeaders({ requireSession: false }),
         body: JSON.stringify({
           cvText,
           jobDescription: jdText,
           sector,
+          careerArea: effectiveCareerArea || undefined,
           lang: lang === "TR" ? "tr" : "en",
           isPro: hasProAccess,
         }),
@@ -6028,6 +6304,19 @@ const msgInterval = setInterval(() => {
         v2Ok = true;
         setEngineV2(v2);
         setLastDetectedSector(v2.Context?.sector || v2.detected_sector || "");
+        const areaFromPayload =
+          v2?.Context?.career_area ||
+          v2?.selected_career_area ||
+          v2?.detected_career_area ||
+          "";
+        const confidenceFromPayload = normalizeCareerConfidence(
+          v2?.Context?.career_area_confidence || v2?.career_area_confidence || "medium"
+        );
+        const reasonFromPayload =
+          v2?.Context?.career_area_reason || v2?.career_area_reason || "";
+        setDetectedCareerArea(areaFromPayload || CAREER_AREA_FALLBACK);
+        setDetectedCareerAreaConfidence(confidenceFromPayload);
+        setDetectedCareerAreaReason(String(reasonFromPayload || ""));
         const fs = Number(v2["Final Alignment Score"]) || getFallbackAnalysis(cvText, jdText, lang).score;
         setAlignmentScore(fs);
         setScoreRunProgress(computeScoreRunProgress(fs));
@@ -6122,8 +6411,8 @@ const msgInterval = setInterval(() => {
       try {
         const res = await fetch(`${HF_API_BASE}/analyze`, {
           method: "POST",
-          headers: await getApiAuthHeaders(),
-          body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang }),
+          headers: await getApiAuthHeaders({ requireSession: false }),
+          body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang, careerArea: effectiveCareerArea || undefined }),
         });
         const data = await res.json();
         const fbLegacy = getFallbackAnalysis(cvText, jdText, lang);
@@ -6149,6 +6438,13 @@ const msgInterval = setInterval(() => {
           safeLegacyV2.Recruiter.reasoning = String(data.fit_summary);
         }
         setEngineV2(safeLegacyV2);
+        setDetectedCareerArea(effectiveCareerArea || CAREER_AREA_FALLBACK);
+        setDetectedCareerAreaConfidence("medium");
+        setDetectedCareerAreaReason(
+          lang === "TR"
+            ? "Alan, CV ve ilan sinyallerine göre en yakın eşleşme olarak belirlendi."
+            : "Area was set to the nearest match from CV and JD signals."
+        );
         const legacyScore = Number(data.alignment_score) || 0;
         setAlignmentScore(data.alignment_score ?? null);
         setScoreRunProgress(computeScoreRunProgress(legacyScore));
@@ -6192,6 +6488,13 @@ const msgInterval = setInterval(() => {
         const fb = getFallbackAnalysis(cvText, jdText, lang);
         const safeV2 = buildFailSafeV2FromFallback(fb, cvText, jdText, lang);
         setEngineV2(safeV2);
+        setDetectedCareerArea(effectiveCareerArea || CAREER_AREA_FALLBACK);
+        setDetectedCareerAreaConfidence("low");
+        setDetectedCareerAreaReason(
+          lang === "TR"
+            ? "Güven düşük olduğu için varsayılan alan kullanıldı."
+            : "Low-confidence fallback area was applied."
+        );
         setAlignmentScore(fb.score);
         setScoreRunProgress(computeScoreRunProgress(fb.score));
         setRoleType(resolveSavedAnalysisRole(jdDerivedTitle, "", lang, "", jdText, new Date()));
@@ -6240,7 +6543,7 @@ const msgInterval = setInterval(() => {
       try {
         const decisionRes = await fetch(`${HF_API_BASE}/decision`, {
           method: "POST",
-          headers: await getApiAuthHeaders(),
+          headers: await getApiAuthHeaders({ requireSession: false }),
           body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang, deadline, targetRole }),
         });
         const decisionResult = await decisionRes.json();
@@ -6430,6 +6733,10 @@ const msgInterval = setInterval(() => {
     setShowAnonSavePrompt(false);
     setCvText(""); setJdText(""); setResult(""); setAnalysisData(null);
     setAlignmentScore(null); setHistory([]); setOptimizedCv(""); setLearningPlan("");
+    setDetectedCareerArea("");
+    setDetectedCareerAreaConfidence("medium");
+    setDetectedCareerAreaReason("");
+    setCareerAreaOverride("");
     setDecisionData(null); setFixResults({}); setEngineV2(null); setReanalysisBaseline(null); setReanalysisResult(null); setShowSharePrompt(false);
     navigate("/");
   };
@@ -6516,6 +6823,7 @@ const msgInterval = setInterval(() => {
     isAdminUser,
     plan,
     waitlist,
+    setWaitlist,
     history,
     loadHistoryItem,
     clearHistory,
@@ -6558,6 +6866,11 @@ const msgInterval = setInterval(() => {
     setSector,
     sectorLabels,
     sectorValues,
+    detectedCareerArea,
+    detectedCareerAreaConfidence,
+    detectedCareerAreaReason,
+    careerAreaOverride,
+    setCareerAreaOverride,
     deadline,
     setDeadline,
     userPlanRow,
@@ -6897,14 +7210,110 @@ export function AnalyzerPage() {
     handlePdfUpload, onCvDrop, cvText, setCvText, setActiveInput, cvSectionsOk, jdLoaded, jdDragOver, setJdDragOver, onJdDrop,
     jdText, setJdText, jobUrl, setJobUrl, jobUrlIsLinkedIn, extractingJob, extractJobFromUrl, jdTxtInputRef, handleJdTextFile,
     showAdvanced, setShowAdvanced, lastDetectedSector, sector, setSector, sectorLabels, sectorValues,
+    detectedCareerArea, detectedCareerAreaConfidence, detectedCareerAreaReason, careerAreaOverride, setCareerAreaOverride,
     deadline, setDeadline, isPro, user, userPlanRow, analyze, loading, loadingMessage, error, hasOutput,
     engineV2, alignmentScore, decisionData, decisionLoading, openUpgrade, optimizeCv, optimizing,
     handleSharePrompt, fixResults, applyingFix, applyFix, showAnonSavePrompt, setShowAnonSavePrompt,
-    analysisData, matchedSkills, missingSkills, topKeywords, result, optimizedCv, learningPlan,
+    analysisData, matchedSkills, missingSkills, topKeywords, result, optimizedCv, learningPlan, roleType,
     downloadText, reanalyzeAfterFix, roadmapLoading, generateLearningPlan, decisionImpactContext,
-    reanalysisResult, history, clearHistory, loadHistoryItem, scoreRunProgress,
+    reanalysisResult, history, clearHistory, loadHistoryItem, scoreRunProgress, setWaitlist,
   } = useOutletContext();
   const safeUiError = useMemo(() => sanitizeUserErrorMessage(error, lang), [error, lang]);
+  const [reportUnlocked, setReportUnlocked] = useState(Boolean(user));
+  const [unlockEmail, setUnlockEmail] = useState(user?.email || "");
+  const [unlockJobStatus, setUnlockJobStatus] = useState("Job Seeker");
+  const [unlockSubmitting, setUnlockSubmitting] = useState(false);
+  const [unlockError, setUnlockError] = useState("");
+  const [unlockRunKey, setUnlockRunKey] = useState("");
+  const [careerAreaReanalyzePending, setCareerAreaReanalyzePending] = useState(false);
+  const partialScore = Math.max(0, Math.min(100, Math.round(Number(alignmentScore) || 0)));
+  const partialInsight = useMemo(
+    () => pickLeadInsight(engineV2, analysisData, lang),
+    [engineV2, analysisData, lang]
+  );
+  const partialSuggestion = useMemo(
+    () => pickLeadSuggestion(engineV2, analysisData, lang),
+    [engineV2, analysisData, lang]
+  );
+  const shouldShowUnlockGate = hasOutput && !loading && !user && !reportUnlocked;
+  const careerConfidenceNorm = normalizeCareerConfidence(detectedCareerAreaConfidence);
+  const fallbackArea = CAREER_AREA_FALLBACK;
+  const closestAreaToShow =
+    careerConfidenceNorm === "low"
+      ? fallbackArea
+      : (detectedCareerArea || fallbackArea);
+  const confidenceLabel =
+    careerConfidenceNorm === "high"
+      ? (lang === "TR" ? "Yüksek" : "High")
+      : careerConfidenceNorm === "low"
+        ? (lang === "TR" ? "Düşük" : "Low")
+        : (lang === "TR" ? "Orta" : "Medium");
+
+  useEffect(() => {
+    if (!user?.email) return;
+    setUnlockEmail(user.email);
+  }, [user]);
+
+  useEffect(() => {
+    if (!hasOutput || loading) return;
+    const runKey = analysisExecutionFingerprint(cvText, jdText, alignmentScore);
+    if (!runKey || runKey === unlockRunKey) return;
+    setUnlockRunKey(runKey);
+    setUnlockError("");
+    setUnlockJobStatus("Job Seeker");
+    setReportUnlocked(Boolean(user));
+    if (user?.email) setUnlockEmail(user.email);
+  }, [hasOutput, loading, cvText, jdText, alignmentScore, unlockRunKey, user]);
+
+  const unlockFullReport = async (e) => {
+    e.preventDefault();
+    const emailNorm = String(unlockEmail || "").trim().toLowerCase();
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNorm);
+    if (!emailOk) {
+      setUnlockError(lang === "TR" ? "Geçerli bir e-posta gir." : "Enter a valid email.");
+      return;
+    }
+    setUnlockSubmitting(true);
+    setUnlockError("");
+    try {
+      const runKey = analysisExecutionFingerprint(cvText, jdText, alignmentScore) || `${Date.now()}`;
+      const leadPayload = {
+        id: `lead_${runKey}`,
+        capturedAt: new Date().toISOString(),
+        email: emailNorm,
+        jobStatus: unlockJobStatus,
+        analysis: {
+          score: partialScore,
+          insight: partialInsight,
+          suggestion: partialSuggestion,
+          role: roleType || analysisData?.role_type || "",
+        },
+      };
+      setWaitlist((prev) => {
+        const cleanPrev = Array.isArray(prev) ? prev : [];
+        const deduped = cleanPrev.filter((x) => x?.id !== leadPayload.id && x?.email !== emailNorm);
+        return [leadPayload, ...deduped].slice(0, 1000);
+      });
+      setReportUnlocked(true);
+      setShowAnonSavePrompt(false);
+    } catch {
+      setUnlockError(lang === "TR" ? "Şu an açılamadı. Tekrar dene." : "Could not unlock right now. Try again.");
+    } finally {
+      setUnlockSubmitting(false);
+    }
+  };
+  useEffect(() => {
+    if (!careerAreaReanalyzePending) return;
+    if (loading || !hasOutput || !cvText.trim() || !jdText.trim()) return;
+    setCareerAreaReanalyzePending(false);
+    analyze();
+  }, [careerAreaReanalyzePending, loading, hasOutput, cvText, jdText, analyze, careerAreaOverride]);
+
+  const handleCareerAreaChange = async (nextArea) => {
+    setCareerAreaOverride(nextArea);
+    if (!hasOutput || loading || !cvText.trim() || !jdText.trim()) return;
+    setCareerAreaReanalyzePending(true);
+  };
   return (
   <div className="hf-analyzer-page" style={{ maxWidth: 1320, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
     <AnalysisThinkingOverlay lang={lang} loading={loading} />
@@ -7207,6 +7616,64 @@ export function AnalyzerPage() {
         </select>
       </div>
       <div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+          {lang === "TR" ? "Sana en yakın alan" : "Closest area for you"}
+        </div>
+        <div
+          style={{
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: "1px solid rgba(167,139,250,0.28)",
+            background: "rgba(99,102,241,0.08)",
+            marginBottom: 10,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <strong style={{ color: "#ddd6fe", fontSize: 13 }}>
+              {getCareerAreaLabel(closestAreaToShow, lang)}
+            </strong>
+            <span style={{ fontSize: 11, color: "#c4b5fd", fontWeight: 700 }}>
+              {lang === "TR" ? "Güven" : "Confidence"}: {confidenceLabel}
+            </span>
+          </div>
+          {careerConfidenceNorm === "low" ? (
+            <div style={{ fontSize: 12, color: "#fbbf24", marginTop: 6 }}>
+              {lang === "TR"
+                ? `Güven düşük. Fallback alan: ${getCareerAreaLabel(fallbackArea, lang)}.`
+                : `Confidence is low. Fallback area: ${getCareerAreaLabel(fallbackArea, lang)}.`}
+            </div>
+          ) : null}
+          {detectedCareerAreaReason ? (
+            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 6, lineHeight: 1.45 }}>
+              {detectedCareerAreaReason}
+            </div>
+          ) : null}
+        </div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+          {lang === "TR" ? "Alanı değiştir (yeniden analiz)" : "Override area (re-run analysis)"}
+        </div>
+        <select
+          value={careerAreaOverride}
+          onChange={(e) => handleCareerAreaChange(e.target.value)}
+          style={{
+            width: "100%",
+            maxWidth: 360,
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: "1px solid rgba(255,255,255,0.1)",
+            background: "rgba(0,0,0,0.35)",
+            color: "#e2e8f0",
+            fontSize: 13,
+            fontFamily: "'DM Sans', sans-serif",
+          }}
+        >
+          <option value="">{lang === "TR" ? "Otomatik (önerilen)" : "Auto (recommended)"}</option>
+          {CAREER_AREA_VALUES.map((a) => (
+            <option key={a} value={a}>{getCareerAreaLabel(a, lang)}</option>
+          ))}
+        </select>
+      </div>
+      <div>
         <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>{lang === "TR" ? "Başvuru Süresi" : "Deadline"}</div>
         <div style={{ display: "flex", gap: 6 }}>
           {[
@@ -7260,6 +7727,31 @@ export function AnalyzerPage() {
       {loading ? <><Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} />{lang === "TR" ? "CV + İlan uyumu analiz ediliyor..." : "Analyzing CV + Job Match..."} {loadingMessage ? `• ${loadingMessage}` : ""}</> : <>{t.checkFit} <Sparkles size={16} /></>}
     </button>
     </div>
+    {hasOutput ? (
+      <div
+        style={{
+          marginTop: 10,
+          marginBottom: 14,
+          padding: "10px 12px",
+          borderRadius: 10,
+          border: "1px solid rgba(99,102,241,0.28)",
+          background: "rgba(99,102,241,0.08)",
+        }}
+      >
+        <div style={{ fontSize: 11, color: "#a5b4fc", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
+          {lang === "TR" ? "Sana en yakın alan" : "Closest area for you"}
+        </div>
+        <div style={{ fontSize: 14, color: "#e2e8f0", fontWeight: 700 }}>
+          {getCareerAreaLabel(closestAreaToShow, lang)}
+        </div>
+        <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>
+          {lang === "TR" ? "Güven" : "Confidence"}: {confidenceLabel}
+          {careerConfidenceNorm === "low"
+            ? ` • ${lang === "TR" ? `Fallback: ${getCareerAreaLabel(fallbackArea, lang)}` : `Fallback: ${getCareerAreaLabel(fallbackArea, lang)}`}`
+            : ""}
+        </div>
+      </div>
+    ) : null}
 
     {/* ERROR */}
     {safeUiError && (
@@ -7292,7 +7784,7 @@ export function AnalyzerPage() {
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.35 }}
     >
-    {showAnonSavePrompt && !user && (
+    {showAnonSavePrompt && !user && reportUnlocked && (
       <div
         style={{
           marginBottom: 14,
@@ -7346,6 +7838,22 @@ export function AnalyzerPage() {
         </div>
       </div>
     )}
+    {shouldShowUnlockGate ? (
+      <UnlockReportGateCard
+        lang={lang}
+        score={partialScore}
+        insight={partialInsight}
+        suggestion={partialSuggestion}
+        unlockEmail={unlockEmail}
+        setUnlockEmail={setUnlockEmail}
+        unlockJobStatus={unlockJobStatus}
+        setUnlockJobStatus={setUnlockJobStatus}
+        unlockSubmitting={unlockSubmitting}
+        unlockError={unlockError}
+        onUnlockSubmit={unlockFullReport}
+      />
+    ) : null}
+    {(reportUnlocked || user) ? (
     <AnimatePresence mode="wait">
     {engineV2 && (
       <motion.div key="engineV2" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.28 }}>
@@ -7392,6 +7900,7 @@ export function AnalyzerPage() {
       </motion.div>
     )}
     </AnimatePresence>
+    ) : null}
 
     {!engineV2 && alignmentScore !== null && analysisData && (
       <>

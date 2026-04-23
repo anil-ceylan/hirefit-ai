@@ -110,7 +110,7 @@ app.post("/api/analyze", requireAuthExpress, analysisRateLimiter, async (req, re
 
 app.post("/api/analyze-v2", requireAuthExpress, analysisRateLimiter, async (req, res) => {
   try {
-    const { cvText, jobDescription, cv, jd, isPro, sector, lang } = req.body || {};
+    const { cvText, jobDescription, cv, jd, isPro, sector, careerArea, lang } = req.body || {};
     const c = String(cvText ?? cv ?? "").trim();
     const j = String(jobDescription ?? jd ?? "").trim();
     if (!c || !j) {
@@ -123,6 +123,7 @@ app.post("/api/analyze-v2", requireAuthExpress, analysisRateLimiter, async (req,
       jobDescription: j,
       isPro: Boolean(isPro),
       sector,
+      careerArea,
       lang,
     });
     return res.status(200).json(payload);
