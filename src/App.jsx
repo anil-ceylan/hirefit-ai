@@ -453,6 +453,27 @@ function buildRoleSuggestionsFromCv(cvText, lang = "TR") {
   return top;
 }
 
+function buildRoleContextJobDescription(role, lang = "TR") {
+  const tr = String(lang || "").toUpperCase() === "TR";
+  const r = String(role || "").trim() || (tr ? "İş Analisti" : "Business Analyst");
+  if (tr) {
+    return [
+      `${r} rolü için hedef profil:`,
+      "- Ölçülebilir iş çıktısı üretir",
+      "- Süreçleri iyileştirir ve net etki gösterir",
+      "- Araç ve yöntem bilgisini somut örneklerle kanıtlar",
+      "- Paydaşlarla net iletişim kurar ve sonuç odaklı çalışır",
+    ].join("\n");
+  }
+  return [
+    `Target profile for ${r}:`,
+    "- Produces measurable business outcomes",
+    "- Improves processes and shows clear impact",
+    "- Demonstrates tools and methods with concrete examples",
+    "- Communicates clearly with stakeholders and executes with ownership",
+  ].join("\n");
+}
+
 const HF_ANALYTICS_DEBOUNCE_MS = 900;
 const hfAnalyticsLastFire = new Map();
 
@@ -6685,8 +6706,12 @@ function HireFitLayout() {
     finally { setExtractingJob(false); }
   };
 
-  const analyze = async () => {
-    if (!cvText.trim() || !jdText.trim()) { setError(lang === "TR" ? "Lütfen hem CV'yi hem de iş ilanını yapıştırın." : "Please paste both the CV and the Job Description."); return; }
+  const analyze = async (opts = {}) => {
+    const roleOverride = String(opts?.targetRoleOverride || "").trim();
+    const jdOverride = String(opts?.jobDescriptionOverride || "").trim();
+    const effectiveJd = jdOverride || String(jdText || "").trim();
+    const activeTargetRole = roleOverride || String(targetRole || "").trim();
+    if (!cvText.trim() || !effectiveJd) { setError(lang === "TR" ? "Lütfen hem CV'yi hem de iş ilanını yapıştırın." : "Please paste both the CV and the Job Description."); return; }
 
     if (user?.id) {
       const row = await syncUserPlanForUser(user.id);
@@ -6731,14 +6756,14 @@ const msgInterval = setInterval(() => {
 
     let v2Ok = false;
     let creditConsumed = false;
-    const jdDerivedTitle = extractJobTitleFromJd(jdText);
+    const jdDerivedTitle = extractJobTitleFromJd(effectiveJd);
     try {
       const v2Res = await fetch(`${HF_API_BASE}/api/analyze-v2`, {
         method: "POST",
         headers: await getApiAuthHeaders({ requireSession: false }),
         body: JSON.stringify({
           cvText,
-          jobDescription: jdText,
+          jobDescription: effectiveJd,
           sector,
           careerArea: effectiveCareerArea || undefined,
           lang: lang === "TR" ? "tr" : "en",
@@ -6747,7 +6772,7 @@ const msgInterval = setInterval(() => {
       });
       if (v2Res.ok) {
         const v2Raw = await v2Res.json();
-        const v2 = ensureFailSafeV2(v2Raw, cvText, jdText, lang);
+        const v2 = ensureFailSafeV2(v2Raw, cvText, effectiveJd, lang);
         v2Ok = true;
         setEngineV2(v2);
         setLastDetectedSector(v2.Context?.sector || v2.detected_sector || "");
@@ -6764,20 +6789,20 @@ const msgInterval = setInterval(() => {
         setDetectedCareerArea(areaFromPayload || CAREER_AREA_FALLBACK);
         setDetectedCareerAreaConfidence(confidenceFromPayload);
         setDetectedCareerAreaReason(String(reasonFromPayload || ""));
-        const fs = Number(v2["Final Alignment Score"]) || getFallbackAnalysis(cvText, jdText, lang).score;
+        const fs = Number(v2["Final Alignment Score"]) || getFallbackAnalysis(cvText, effectiveJd, lang).score;
         setAlignmentScore(fs);
         setScoreRunProgress(computeScoreRunProgress(fs));
         const modelRole =
           !v2.RoleFit?.locked && v2.RoleFit?.best_role
             ? v2.RoleFit.best_role
             : v2.RoleFit?.role_fit?.[0]?.role || "";
-        const companyName = extractCompanyNameFromAnalysis(v2, null, jdText);
+        const companyName = extractCompanyNameFromAnalysis(v2, null, effectiveJd);
         const savedTitle = resolveSavedAnalysisRole(
           jdDerivedTitle,
           modelRole,
           lang,
           companyName,
-          jdText,
+          effectiveJd,
           new Date()
         );
         setRoleType(savedTitle);
@@ -6859,10 +6884,10 @@ const msgInterval = setInterval(() => {
         const res = await fetch(`${HF_API_BASE}/analyze`, {
           method: "POST",
           headers: await getApiAuthHeaders({ requireSession: false }),
-          body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang, careerArea: effectiveCareerArea || undefined }),
+          body: JSON.stringify({ cvText, jobDescription: effectiveJd, sector, lang, careerArea: effectiveCareerArea || undefined }),
         });
         const data = await res.json();
-        const fbLegacy = getFallbackAnalysis(cvText, jdText, lang);
+        const fbLegacy = getFallbackAnalysis(cvText, effectiveJd, lang);
         const safeLegacyV2 = buildFailSafeV2FromFallback(
           { ...fbLegacy, score: Number(data.alignment_score) || fbLegacy.score },
           cvText,
@@ -6932,8 +6957,8 @@ const msgInterval = setInterval(() => {
         creditConsumed = true;
       } catch (err) {
         console.error(err);
-        const fb = getFallbackAnalysis(cvText, jdText, lang);
-        const safeV2 = buildFailSafeV2FromFallback(fb, cvText, jdText, lang);
+        const fb = getFallbackAnalysis(cvText, effectiveJd, lang);
+        const safeV2 = buildFailSafeV2FromFallback(fb, cvText, effectiveJd, lang);
         setEngineV2(safeV2);
         setDetectedCareerArea(effectiveCareerArea || CAREER_AREA_FALLBACK);
         setDetectedCareerAreaConfidence("low");
@@ -6991,7 +7016,7 @@ const msgInterval = setInterval(() => {
         const decisionRes = await fetch(`${HF_API_BASE}/decision`, {
           method: "POST",
           headers: await getApiAuthHeaders({ requireSession: false }),
-          body: JSON.stringify({ cvText, jobDescription: jdText, sector, lang, deadline, targetRole }),
+          body: JSON.stringify({ cvText, jobDescription: effectiveJd, sector, lang, deadline, targetRole: activeTargetRole }),
         });
         const decisionResult = await decisionRes.json();
         setDecisionData(decisionResult);
@@ -7831,6 +7856,15 @@ export function AnalyzerPage() {
     if (!hasOutput || loading || !cvText.trim() || !jdText.trim()) return;
     setCareerAreaReanalyzePending(true);
   };
+  const runRoleSuggestionAnalysis = async (role) => {
+    const roleName = String(role || "").trim();
+    if (!roleName || !cvText.trim()) return;
+    const syntheticJd = buildRoleContextJobDescription(roleName, lang);
+    setTargetRole(roleName);
+    setJdText(syntheticJd);
+    if (alignmentScore != null) setReanalysisBaseline(alignmentScore);
+    await analyze({ targetRoleOverride: roleName, jobDescriptionOverride: syntheticJd });
+  };
   const applyPreviewFix = async () => {
     const oldLine = String(partialInsight || "").trim();
     const newLine = String(partialSuggestion || "").trim() || oldLine;
@@ -8470,6 +8504,60 @@ export function AnalyzerPage() {
           </div>
         </div>
       </motion.div>
+    ) : null}
+    {(reportUnlocked || user) && hasOutput && !loading && roleSuggestions.length ? (
+      <div
+        style={{
+          marginBottom: 16,
+          padding: 14,
+          borderRadius: 14,
+          border: "1px solid rgba(148,163,184,0.2)",
+          background: "rgba(15,23,42,0.72)",
+        }}
+      >
+        <div style={{ fontSize: 16, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
+          {"Sana daha uygun roller"}
+        </div>
+        <div style={{ display: "grid", gap: 8 }}>
+          {roleSuggestions.map((r) => (
+            <div
+              key={`${r.role}-${r.score}`}
+              style={{
+                borderRadius: 10,
+                border: "1px solid rgba(148,163,184,0.2)",
+                background: "rgba(15,23,42,0.6)",
+                padding: "10px 11px",
+              }}
+            >
+              <div style={{ fontSize: 14, color: "#e2e8f0", fontWeight: 800, marginBottom: 2 }}>
+                {`${r.role} — %${r.score}`}
+              </div>
+              <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, marginBottom: 8 }}>
+                {r.reason}
+              </div>
+              <button
+                type="button"
+                onClick={() => runRoleSuggestionAnalysis(r.role)}
+                disabled={loading}
+                style={{
+                  width: "100%",
+                  padding: "9px 11px",
+                  borderRadius: 9,
+                  border: "1px solid rgba(99,102,241,0.35)",
+                  background: "rgba(99,102,241,0.14)",
+                  color: "#ddd6fe",
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: loading ? "not-allowed" : "pointer",
+                  fontFamily: "'DM Sans', sans-serif",
+                }}
+              >
+                {"Bu role göre analiz yap"}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
     ) : null}
     {showMarketInsightsModal ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.76)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
