@@ -445,12 +445,29 @@ function buildRoleSuggestionsFromCv(cvText, lang = "TR") {
   });
 
   scored.sort((a, b) => (b.hit - a.hit) || (b.score - a.score));
-  const top = scored.slice(0, 3).map((x, i) => ({
+  const betterRoles = scored.slice(0, 3).map((x, i) => ({
     role: x.role,
     score: Math.max(60, Math.min(85, x.score - i)),
     reason: x.reason,
   }));
-  return top;
+  const hasMetrics = /\d+\s?%|\b(kpi|metric|sonuç|result)\b/i.test(text);
+  const hasClearRoleSignal = scored[0]?.hit >= 2;
+  const currentDirectionProblem = hasClearRoleSignal
+    ? (hasMetrics
+      ? (tr
+        ? "Mevcut yönün dağınık; CV bir role net odak vermiyor."
+        : "Your current direction is scattered; the CV does not show one clear role focus.")
+      : (tr
+        ? "Mevcut yönün zayıf; CV görev yazıyor ama sonuç kanıtı vermiyor."
+        : "Your current direction is weak; the CV lists tasks but not proof of outcomes."))
+    : (tr
+      ? "Mevcut yönün zayıf; CV sinyalleri hedef role net bağlanmıyor."
+      : "Your current direction is weak; CV signals do not connect to a clear target role.");
+
+  return {
+    current_direction_problem: currentDirectionProblem,
+    better_roles: betterRoles,
+  };
 }
 
 function buildRoleContextJobDescription(role, lang = "TR") {
@@ -7750,9 +7767,10 @@ export function AnalyzerPage() {
   const previewFixBusy = applyingFix === PREVIEW_FIX_KEY;
   const previewScoreDelta = previewReanalyzePending ? null : reanalysisResult;
   const decisionScore = Number.isFinite(Number(alignmentScore)) ? Math.round(Number(alignmentScore)) : null;
-  const roleSuggestions = useMemo(() => {
+  const roleRedirection = useMemo(() => {
     return buildRoleSuggestionsFromCv(cvText, lang);
   }, [cvText, lang]);
+  const roleSuggestions = roleRedirection?.better_roles || [];
   const hardReason = useMemo(
     () => normalizeSingleHardReason(mainIssue || analysisData?.fit_summary || "", lang),
     [mainIssue, analysisData, lang]
@@ -8518,6 +8536,9 @@ export function AnalyzerPage() {
         <div style={{ fontSize: 16, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
           {"Sana daha uygun roller"}
         </div>
+        <div style={{ fontSize: 12, color: "#fca5a5", marginBottom: 10, fontWeight: 700 }}>
+          {roleRedirection?.current_direction_problem || ""}
+        </div>
         <div style={{ display: "grid", gap: 8 }}>
           {roleSuggestions.map((r) => (
             <div
@@ -8590,6 +8611,11 @@ export function AnalyzerPage() {
           <div style={{ fontSize: 18, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
             {lang === "TR" ? "Sana daha uygun roller" : "Roles that fit you better"}
           </div>
+          {roleRedirection?.current_direction_problem ? (
+            <div style={{ fontSize: 13, color: "#fca5a5", lineHeight: 1.45, marginBottom: 10, fontWeight: 700 }}>
+              {roleRedirection.current_direction_problem}
+            </div>
+          ) : null}
           {roleSuggestions.length ? (
             <div style={{ display: "grid", gap: 8 }}>
               {roleSuggestions.map((r) => (
