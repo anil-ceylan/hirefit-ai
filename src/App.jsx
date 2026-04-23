@@ -1600,6 +1600,12 @@ function UnlockReportGateCard({
   score,
   insight,
   suggestion,
+  previewFixResult,
+  previewFixBusy,
+  previewReanalyzing,
+  previewScoreDelta,
+  onPreviewFix,
+  onPreviewReanalyze,
   unlockEmail,
   setUnlockEmail,
   unlockJobStatus,
@@ -1609,7 +1615,6 @@ function UnlockReportGateCard({
   onUnlockSubmit,
 }) {
   const tr = lang === "TR";
-  const unlockEmailRef = useRef(null);
   const scoreNow = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
   const verdictText =
     scoreNow < 50
@@ -1700,7 +1705,7 @@ function UnlockReportGateCard({
             {`${scoreNow} → ${scoreAfterFix} (+${impactDelta}${tr ? " puan" : " pts"})`}
           </div>
           <div style={{ fontSize: 12, color: "#bbf7d0", lineHeight: 1.35 }}>
-            {tr ? "Küçük değişiklik, büyük fark yaratır." : "Small change, big difference."}
+            {tr ? "Bu düzeltme olmadan elenmeye devam edeceksin." : "Without this fix, you'll keep getting rejected."}
           </div>
         </div>
 
@@ -1723,10 +1728,8 @@ function UnlockReportGateCard({
           </div>
           <button
             type="button"
-            onClick={() => {
-              unlockEmailRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-              unlockEmailRef.current?.focus();
-            }}
+            onClick={onPreviewFix}
+            disabled={previewFixBusy}
             style={{
               marginTop: 10,
               width: "100%",
@@ -1737,17 +1740,60 @@ function UnlockReportGateCard({
               color: "#fff",
               fontSize: 13,
               fontWeight: 800,
-              cursor: "pointer",
+              cursor: previewFixBusy ? "not-allowed" : "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               gap: 8,
               boxShadow: "0 8px 24px rgba(99,102,241,0.3)",
+              opacity: previewFixBusy ? 0.8 : 1,
             }}
           >
-            {tr ? "Benim için düzelt" : "Fix this for me"}
+            {previewFixBusy ? (tr ? "Düzeltiliyor..." : "Fixing...") : (tr ? "Benim için düzelt" : "Fix this for me")}
           </button>
         </div>
+        {previewFixResult?.new ? (
+          <div
+            style={{
+              borderRadius: 12,
+              border: "1px solid rgba(56,189,248,0.3)",
+              background: "rgba(56,189,248,0.08)",
+              padding: "12px 13px",
+            }}
+          >
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#e0f2fe", marginBottom: 8 }}>
+              {"Updated. Now check your new result."}
+            </div>
+            <button
+              type="button"
+              onClick={onPreviewReanalyze}
+              disabled={previewReanalyzing}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "none",
+                background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: previewReanalyzing ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                opacity: previewReanalyzing ? 0.8 : 1,
+              }}
+            >
+              {previewReanalyzing ? "Analyzing..." : "Re-analyze with improved CV"}
+            </button>
+            {previewScoreDelta ? (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#bae6fd", fontWeight: 700 }}>
+                {`${previewScoreDelta.before} → ${previewScoreDelta.after} (${previewScoreDelta.delta >= 0 ? "+" : ""}${previewScoreDelta.delta})`}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div
@@ -1769,7 +1815,6 @@ function UnlockReportGateCard({
         <form onSubmit={onUnlockSubmit} style={{ display: "grid", gap: 10 }}>
           <input
             type="email"
-            ref={unlockEmailRef}
             required
             value={unlockEmail}
             onChange={(e) => setUnlockEmail(e.target.value)}
@@ -7362,6 +7407,9 @@ export function AnalyzerPage() {
   const [unlockError, setUnlockError] = useState("");
   const [unlockRunKey, setUnlockRunKey] = useState("");
   const [careerAreaReanalyzePending, setCareerAreaReanalyzePending] = useState(false);
+  const PREVIEW_FIX_KEY = "__preview_gate_fix__";
+  const [previewFixResult, setPreviewFixResult] = useState(null);
+  const [previewReanalyzePending, setPreviewReanalyzePending] = useState(false);
   const partialScore = Math.max(0, Math.min(100, Math.round(Number(alignmentScore) || 0)));
   const partialInsight = useMemo(
     () => pickLeadInsight(engineV2, analysisData, lang),
@@ -7397,6 +7445,8 @@ export function AnalyzerPage() {
     return String(issue || "").trim();
   }, [engineV2, decisionData, analysisData]);
   const nextActionFixResult = fixResults?.[NEXT_ACTION_FIX_KEY] || null;
+  const previewFixBusy = applyingFix === PREVIEW_FIX_KEY;
+  const previewScoreDelta = previewReanalyzePending ? null : reanalysisResult;
   const decisionScore = Number.isFinite(Number(alignmentScore)) ? Math.round(Number(alignmentScore)) : null;
   const hardReason = useMemo(
     () => normalizeSingleHardReason(mainIssue || analysisData?.fit_summary || "", lang),
@@ -7446,6 +7496,8 @@ export function AnalyzerPage() {
     setUnlockRunKey(runKey);
     setUnlockError("");
     setUnlockJobStatus("Job Seeker");
+    setPreviewFixResult(null);
+    setPreviewReanalyzePending(false);
     setReportUnlocked(Boolean(user));
     if (user?.email) setUnlockEmail(user.email);
   }, [hasOutput, loading, cvText, jdText, alignmentScore, unlockRunKey, user]);
@@ -7498,6 +7550,36 @@ export function AnalyzerPage() {
     setCareerAreaOverride(nextArea);
     if (!hasOutput || loading || !cvText.trim() || !jdText.trim()) return;
     setCareerAreaReanalyzePending(true);
+  };
+  const applyPreviewFix = async () => {
+    const oldLine = String(partialInsight || "").trim();
+    const newLine = String(partialSuggestion || "").trim() || oldLine;
+    if (!oldLine || !newLine) return;
+    setApplyingFix(PREVIEW_FIX_KEY);
+    try {
+      setPreviewFixResult({ old: oldLine, new: newLine });
+    } finally {
+      setApplyingFix(null);
+    }
+  };
+  const rerunPreviewWithImprovedCv = async () => {
+    if (!previewFixResult?.new) return;
+    const currentCv = String(cvText || "");
+    let updatedCv = currentCv;
+    const oldLine = String(previewFixResult.old || "").trim();
+    const newLine = String(previewFixResult.new || "").trim();
+    if (oldLine && currentCv.includes(oldLine)) {
+      updatedCv = currentCv.replace(oldLine, newLine);
+    } else if (!currentCv.includes(newLine)) {
+      updatedCv = `${currentCv.trim()}\n• ${newLine}`.trim();
+    }
+    if (updatedCv !== currentCv) setCvText(updatedCv);
+    if (alignmentScore != null) {
+      setReanalysisBaseline(alignmentScore);
+    }
+    setPreviewReanalyzePending(true);
+    await analyze();
+    setPreviewReanalyzePending(false);
   };
   const runNextActionFix = async () => {
     if (!mainIssue) return;
@@ -7987,6 +8069,12 @@ export function AnalyzerPage() {
         score={partialScore}
         insight={partialInsight}
         suggestion={partialSuggestion}
+        previewFixResult={previewFixResult}
+        previewFixBusy={previewFixBusy}
+        previewReanalyzing={previewReanalyzePending || loading}
+        previewScoreDelta={previewScoreDelta}
+        onPreviewFix={applyPreviewFix}
+        onPreviewReanalyze={rerunPreviewWithImprovedCv}
         unlockEmail={unlockEmail}
         setUnlockEmail={setUnlockEmail}
         unlockJobStatus={unlockJobStatus}
