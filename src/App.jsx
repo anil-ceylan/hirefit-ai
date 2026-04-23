@@ -7017,6 +7017,7 @@ const msgInterval = setInterval(() => {
     decisionImpactContext,
     reanalysisResult,
     reanalysisBaseline,
+    setReanalysisBaseline,
     setError,
     scoreRunProgress,
     adminTargetEmail,
@@ -7330,7 +7331,7 @@ export function AnalyzerPage() {
     handleSharePrompt, fixResults, applyingFix, applyFix, showAnonSavePrompt, setShowAnonSavePrompt,
     analysisData, matchedSkills, missingSkills, topKeywords, result, optimizedCv, learningPlan, roleType,
     downloadText, reanalyzeAfterFix, roadmapLoading, generateLearningPlan, decisionImpactContext,
-    reanalysisResult, history, clearHistory, loadHistoryItem, scoreRunProgress, setWaitlist,
+    reanalysisResult, history, clearHistory, loadHistoryItem, scoreRunProgress, setWaitlist, setReanalysisBaseline,
   } = useOutletContext();
   const safeUiError = useMemo(() => sanitizeUserErrorMessage(error, lang), [error, lang]);
   const [reportUnlocked, setReportUnlocked] = useState(Boolean(user));
@@ -7366,6 +7367,17 @@ export function AnalyzerPage() {
     "Pazarlama",
     "Finans",
   ];
+  const NEXT_ACTION_FIX_KEY = "__next_action_fix__";
+  const mainIssue = useMemo(() => {
+    const issue =
+      engineV2?.Gaps?.biggest_gap ||
+      decisionData?.biggestMistake ||
+      analysisData?.rejection_reasons?.high?.[0] ||
+      analysisData?.fit_summary ||
+      "";
+    return String(issue || "").trim();
+  }, [engineV2, decisionData, analysisData]);
+  const nextActionFixResult = fixResults?.[NEXT_ACTION_FIX_KEY] || null;
 
   useEffect(() => {
     if (!user?.email) return;
@@ -7431,6 +7443,25 @@ export function AnalyzerPage() {
     setCareerAreaOverride(nextArea);
     if (!hasOutput || loading || !cvText.trim() || !jdText.trim()) return;
     setCareerAreaReanalyzePending(true);
+  };
+  const runNextActionFix = async () => {
+    if (!mainIssue) return;
+    await applyFix(
+      {
+        problem: mainIssue,
+        fix:
+          lang === "TR"
+            ? "Tek cümlede güçlü, ölçülebilir ve profesyonel şekilde yeniden yaz."
+            : "Rewrite as one strong, measurable, professional sentence.",
+      },
+      NEXT_ACTION_FIX_KEY
+    );
+  };
+  const rerunAfterNextAction = async () => {
+    if (alignmentScore != null) {
+      setReanalysisBaseline(alignmentScore);
+    }
+    await analyze();
   };
   return (
   <div className="hf-analyzer-page" style={{ maxWidth: 1320, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
@@ -8092,6 +8123,143 @@ export function AnalyzerPage() {
         ) : null}
       </>
     )}
+    {(reportUnlocked || user) && hasOutput && !loading ? (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.24 }}
+        style={{
+          marginTop: 16,
+          padding: "18px",
+          borderRadius: 14,
+          border: "1px solid rgba(99,102,241,0.22)",
+          background: "linear-gradient(180deg, rgba(15,23,42,0.88), rgba(2,6,23,0.95))",
+        }}
+      >
+        <div style={{ fontSize: 11, color: "#a5b4fc", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
+          {lang === "TR" ? "Sıradaki hamle" : "Next action"}
+        </div>
+        <div style={{ fontSize: 14, color: "#cbd5e1", marginBottom: 6 }}>
+          {lang === "TR" ? "Profilindeki en büyük problem:" : "Biggest problem in your profile:"}
+        </div>
+        <div
+          style={{
+            fontSize: 15,
+            color: "#fee2e2",
+            fontWeight: 700,
+            borderRadius: 10,
+            border: "1px solid rgba(239,68,68,0.3)",
+            background: "rgba(239,68,68,0.08)",
+            padding: "10px 12px",
+            marginBottom: 10,
+          }}
+        >
+          {mainIssue || (lang === "TR" ? "Net bir risk sinyali çıkarılamadı." : "No clear risk signal extracted yet.")}
+        </div>
+        <div style={{ fontSize: 13, color: "#fca5a5", marginBottom: 14 }}>
+          {lang === "TR"
+            ? "Bunu düzeltmeden başvurmak → yüksek elenme riski"
+            : "Applying before fixing this → high rejection risk"}
+        </div>
+        <button
+          onClick={runNextActionFix}
+          disabled={applyingFix === NEXT_ACTION_FIX_KEY || !mainIssue}
+          style={{
+            width: "100%",
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: "none",
+            background:
+              applyingFix === NEXT_ACTION_FIX_KEY
+                ? "rgba(99,102,241,0.35)"
+                : "linear-gradient(135deg, #6366f1, #8b5cf6)",
+            color: "#fff",
+            fontSize: 14,
+            fontWeight: 800,
+            cursor:
+              applyingFix === NEXT_ACTION_FIX_KEY || !mainIssue ? "not-allowed" : "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            marginBottom: nextActionFixResult?.new ? 14 : 0,
+          }}
+        >
+          {applyingFix === NEXT_ACTION_FIX_KEY ? (
+            <>
+              <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} />
+              {lang === "TR" ? "Düzeltiliyor..." : "Fixing..."}
+            </>
+          ) : (
+            <>
+              <Wand2 size={14} />
+              {lang === "TR" ? "Benim için düzelt" : "Fix this for me"}
+            </>
+          )}
+        </button>
+
+        {nextActionFixResult?.new ? (
+          <div style={{ marginTop: 2 }}>
+            <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 6 }}>
+              {lang === "TR" ? "Şu an CV’n bunu söylüyor:" : "Your CV currently says:"}
+            </div>
+            <div style={{ fontSize: 13, color: "#cbd5e1", borderRadius: 10, border: "1px solid rgba(148,163,184,0.2)", background: "rgba(15,23,42,0.65)", padding: "10px 12px", marginBottom: 10 }}>
+              {nextActionFixResult.old || nextActionFixResult.original_section || mainIssue}
+            </div>
+            <div style={{ fontSize: 12, color: "#86efac", marginBottom: 6 }}>
+              {lang === "TR" ? "Recruiter’ın görmek istediği hali:" : "What recruiters expect to see:"}
+            </div>
+            <div style={{ fontSize: 13, color: "#dcfce7", borderRadius: 10, border: "1px solid rgba(16,185,129,0.28)", background: "rgba(16,185,129,0.08)", padding: "10px 12px", marginBottom: 8 }}>
+              {nextActionFixResult.new || nextActionFixResult.rewritten_section}
+            </div>
+            <div style={{ fontSize: 13, color: "#bbf7d0", fontWeight: 700, marginBottom: 10 }}>
+              {lang === "TR" ? "Bu versiyon daha güçlü." : "This version is stronger."}
+            </div>
+            <div style={{ fontSize: 13, color: "#a7f3d0", marginBottom: 4 }}>
+              {lang === "TR" ? "Bu değişiklik profil gücünü artırır." : "This change improves profile strength."}
+            </div>
+            <div style={{ fontSize: 12, color: "#6ee7b7", marginBottom: 12 }}>
+              {lang === "TR" ? "+6 ila +10 puan etkileyebilir" : "Can improve by +6 to +10 points"}
+            </div>
+            <button
+              onClick={rerunAfterNextAction}
+              disabled={loading}
+              style={{
+                width: "100%",
+                padding: "11px 14px",
+                borderRadius: 10,
+                border: "1px solid rgba(56,189,248,0.35)",
+                background: "rgba(56,189,248,0.08)",
+                color: "#67e8f9",
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: loading ? "not-allowed" : "pointer",
+              }}
+            >
+              {lang === "TR" ? "CV’yi güncelledim, tekrar analiz et" : "I updated my CV, run analysis again"}
+            </button>
+            {reanalysisResult ? (
+              <div
+                style={{
+                  marginTop: 12,
+                  borderRadius: 10,
+                  border: "1px solid rgba(74,222,128,0.25)",
+                  background: "rgba(74,222,128,0.08)",
+                  padding: "10px 12px",
+                }}
+              >
+                <div style={{ fontSize: 11, color: "#86efac", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
+                  {lang === "TR" ? "Değişim" : "Change"}
+                </div>
+                <div style={{ fontSize: 14, color: "#d1fae5", fontWeight: 700 }}>
+                  {reanalysisResult.before} → {reanalysisResult.after} ({reanalysisResult.delta >= 0 ? "+" : ""}{reanalysisResult.delta})
+                </div>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </motion.div>
+    ) : null}
     </motion.div>
 
     {/* HISTORY — compact, en altta */}
