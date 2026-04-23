@@ -8473,10 +8473,10 @@ export function AnalyzerPage() {
           }}
         >
           <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 800, marginBottom: 8 }}>
-            {"Karar anı."}
+            {"Şimdi karar ver."}
           </div>
           <div style={{ fontSize: 11, color: "#94a3b8", opacity: 0.8, marginBottom: 10 }}>
-            {"Bu seçim sonucu doğrudan etkiler."}
+            {"Bu seçim sonucu belirler."}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
             <button
@@ -8497,7 +8497,7 @@ export function AnalyzerPage() {
               }}
             >
               <div style={{ fontSize: 13, color: "#ecfdf5", fontWeight: 900, marginBottom: 3 }}>
-                {"Daha güçlü olduğun role geç"}
+                {"Daha doğru role geç"}
               </div>
               <div style={{ fontSize: 11, color: "rgba(236,253,245,0.9)", lineHeight: 1.35 }}>
                 {"Daha yüksek geri dönüş ihtimali"}
@@ -8585,6 +8585,9 @@ export function AnalyzerPage() {
           </div>
           <div style={{ marginTop: 4, fontSize: 11, color: "#94a3b8", opacity: 0.78 }}>
             {"Örn: %X artırdım, X sürede tamamladım"}
+          </div>
+          <div style={{ marginTop: 3, fontSize: 11, color: "#fca5a5", opacity: 0.9 }}>
+            {"Bunu düzeltmeden başvurmaya devam edersen zaman kaybedersin."}
           </div>
         </div>
       </motion.div>
