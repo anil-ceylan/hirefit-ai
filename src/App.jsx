@@ -1784,9 +1784,11 @@ function UnlockReportGateCard({
             }}
           >
             <Lock size={13} />
-            {"Tüm CV'ni bu role göre optimize et"}
-            <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: "0.06em", color: "#facc15" }}>PRO</span>
+            {"Bu role göre kusursuz bir CV oluştur"}
           </button>
+          <div style={{ marginTop: 4, fontSize: 11, color: "#facc15", opacity: 0.82 }}>
+            {"ATS + recruiter optimize"}
+          </div>
         </div>
         {previewFixResult?.new ? (
           <div
