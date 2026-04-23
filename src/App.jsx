@@ -7726,6 +7726,8 @@ export function AnalyzerPage() {
   const [careerAreaReanalyzePending, setCareerAreaReanalyzePending] = useState(false);
   const [showMarketInsightsModal, setShowMarketInsightsModal] = useState(false);
   const [showCareerSuggestionsModal, setShowCareerSuggestionsModal] = useState(false);
+  const [decisionLockChoice, setDecisionLockChoice] = useState(null);
+  const roleSuggestionsRef = useRef(null);
   const PREVIEW_FIX_KEY = "__preview_gate_fix__";
   const [previewFixResult, setPreviewFixResult] = useState(null);
   const [previewReanalyzePending, setPreviewReanalyzePending] = useState(false);
@@ -7821,6 +7823,7 @@ export function AnalyzerPage() {
     setUnlockJobStatus("Job Seeker");
     setPreviewFixResult(null);
     setPreviewReanalyzePending(false);
+    setDecisionLockChoice(null);
     setReportUnlocked(Boolean(user));
     if (user?.email) setUnlockEmail(user.email);
   }, [hasOutput, loading, cvText, jdText, alignmentScore, unlockRunKey, user]);
@@ -8459,7 +8462,59 @@ export function AnalyzerPage() {
             {decisionCopy.microEmotion}
           </div>
         </div>
+        <div>
+          <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 800, marginBottom: 8 }}>
+            {"Karar ver:"}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => setDecisionLockChoice("continue")}
+              style={{
+                width: "100%",
+                borderRadius: 10,
+                border: decisionLockChoice === "continue" ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(239,68,68,0.28)",
+                background: decisionLockChoice === "continue" ? "rgba(239,68,68,0.16)" : "rgba(239,68,68,0.08)",
+                padding: "10px 10px",
+                textAlign: "left",
+                cursor: "pointer",
+              }}
+            >
+              <div style={{ fontSize: 13, color: "#fee2e2", fontWeight: 800, marginBottom: 3 }}>
+                {"Bu role devam et"}
+              </div>
+              <div style={{ fontSize: 11, color: "#fca5a5", lineHeight: 1.35 }}>
+                {"Riskli — elenme ihtimali yüksek"}
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDecisionLockChoice("switch");
+                roleSuggestionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              style={{
+                width: "100%",
+                borderRadius: 10,
+                border: decisionLockChoice === "switch" ? "1px solid rgba(16,185,129,0.5)" : "1px solid rgba(16,185,129,0.28)",
+                background: decisionLockChoice === "switch" ? "rgba(16,185,129,0.16)" : "rgba(16,185,129,0.08)",
+                padding: "10px 10px",
+                textAlign: "left",
+                cursor: "pointer",
+              }}
+            >
+              <div style={{ fontSize: 13, color: "#dcfce7", fontWeight: 800, marginBottom: 3 }}>
+                {"Daha doğru role geç"}
+              </div>
+              <div style={{ fontSize: 11, color: "#86efac", lineHeight: 1.35 }}>
+                {"Daha yüksek geri dönüş şansı"}
+              </div>
+            </button>
+          </div>
+        </div>
 
+        {decisionLockChoice ? (
+          <>
         <div>
           <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 800, marginBottom: 6 }}>
             {"Seni eleyen asıl şey:"}
@@ -8521,10 +8576,13 @@ export function AnalyzerPage() {
             {singleAction}
           </div>
         </div>
+          </>
+        ) : null}
       </motion.div>
     ) : null}
     {(reportUnlocked || user) && hasOutput && !loading && roleSuggestions.length ? (
       <div
+        ref={roleSuggestionsRef}
         style={{
           marginBottom: 16,
           padding: 14,
@@ -8534,10 +8592,10 @@ export function AnalyzerPage() {
         }}
       >
         <div style={{ fontSize: 16, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
-          {"Sana daha uygun roller"}
+          {"Yanlış role başvuruyor olabilirsin"}
         </div>
         <div style={{ fontSize: 12, color: "#fca5a5", marginBottom: 10, fontWeight: 700 }}>
-          {roleRedirection?.current_direction_problem || ""}
+          {"Profilin bu role tam uymuyor"}
         </div>
         <div style={{ display: "grid", gap: 8 }}>
           {roleSuggestions.map((r) => (
@@ -8573,7 +8631,7 @@ export function AnalyzerPage() {
                   fontFamily: "'DM Sans', sans-serif",
                 }}
               >
-                {"Bu role göre analiz yap"}
+                {"Bu role geç ve tekrar dene"}
               </button>
             </div>
           ))}
@@ -8609,13 +8667,11 @@ export function AnalyzerPage() {
       <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.76)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
         <div style={{ width: "min(560px, 96vw)", borderRadius: 14, border: "1px solid rgba(99,102,241,0.3)", background: "linear-gradient(160deg,#0b1220,#05070f)", padding: 18 }}>
           <div style={{ fontSize: 18, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
-            {lang === "TR" ? "Sana daha uygun roller" : "Roles that fit you better"}
+            {lang === "TR" ? "Yanlış role başvuruyor olabilirsin" : "You may be applying to the wrong role"}
           </div>
-          {roleRedirection?.current_direction_problem ? (
-            <div style={{ fontSize: 13, color: "#fca5a5", lineHeight: 1.45, marginBottom: 10, fontWeight: 700 }}>
-              {roleRedirection.current_direction_problem}
-            </div>
-          ) : null}
+          <div style={{ fontSize: 13, color: "#fca5a5", lineHeight: 1.45, marginBottom: 10, fontWeight: 700 }}>
+            {lang === "TR" ? "Profilin bu role tam uymuyor" : "Your profile does not fully match this role"}
+          </div>
           {roleSuggestions.length ? (
             <div style={{ display: "grid", gap: 8 }}>
               {roleSuggestions.map((r) => (
@@ -8643,260 +8699,6 @@ export function AnalyzerPage() {
           </button>
         </div>
       </div>
-    ) : null}
-    {(reportUnlocked || user) ? (
-    <AnimatePresence mode="wait">
-    {engineV2 && (
-      <motion.div key="engineV2" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.28 }}>
-        <CareerEngineCard
-          data={engineV2}
-          lang={lang}
-          isPro={isPro}
-          onUpgrade={openUpgrade}
-          onFixCv={optimizeCv}
-          optimizing={optimizing}
-          cvText={cvText}
-          jdText={jdText}
-        />
-        <YourNextMovePanel
-          lang={lang}
-          engineV2={engineV2}
-          missingSkills={missingSkills}
-          topKeywords={topKeywords}
-          alignmentScore={alignmentScore}
-          reanalysisResult={reanalysisResult}
-          optimizedCv={optimizedCv}
-          onFixCv={optimizeCv}
-          onReanalyze={reanalyzeAfterFix}
-          optimizing={optimizing}
-          isPro={isPro}
-          onUpgrade={openUpgrade}
-        />
-      </motion.div>
-    )}
-    {!engineV2 && (decisionData || decisionLoading) && (
-      <motion.div key="decision" initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} transition={{ duration: 0.28 }}>
-        <DecisionCard
-          data={decisionData}
-          loading={decisionLoading}
-          lang={lang}
-          isPro={isPro}
-          onApplyFix={applyFix}
-          applyingFix={applyingFix}
-          fixResults={fixResults}
-          onUpgrade={openUpgrade}
-          alignmentScore={alignmentScore}
-          impactContext={decisionImpactContext}
-        />
-      </motion.div>
-    )}
-    </AnimatePresence>
-    ) : null}
-
-    {!engineV2 && alignmentScore !== null && analysisData && (
-      <>
-        <DashboardResults
-          data={analysisData}
-          score={alignmentScore}
-          matchedSkills={matchedSkills}
-          missingSkills={missingSkills}
-          topKeywords={topKeywords}
-          result={result}
-          optimizedCv={optimizedCv}
-          learningPlan={learningPlan}
-          downloadText={downloadText}
-          lang={lang}
-          navigate={navigate}
-          isPro={isPro}
-          onUpgrade={openUpgrade}
-          roleFitLocked={!!engineV2?.RoleFit?.locked}
-          useV2Engine={!!engineV2}
-        />
-
-        {/* SECONDARY ACTIONS — sadece analiz sonrası */}
-        <div style={{ display: "flex", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
-          <button
-            onClick={() => {
-              if (!isPro) {
-                openUpgrade();
-                return;
-              }
-              optimizeCv();
-            }}
-            disabled={optimizing}
-            style={{ flex: 1, minWidth: 160, padding: "12px 20px", borderRadius: 10, border: "1px solid rgba(34,211,238,0.25)", background: "rgba(34,211,238,0.06)", color: "#22d3ee", fontSize: 14, fontWeight: 600, cursor: optimizing ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: optimizing ? 0.7 : 1 }}
-          >
-            {optimizing ? <><Loader2 size={14} />{t.optimizing}</> : (
-              !isPro
-                ? <><Wand2 size={14} />{lang === "TR" ? "→ Fix My CV — Pro ile aç" : "→ Fix My CV — unlock with Pro"}</>
-                : <><Wand2 size={14} />{t.optimizeCV}</>
-            )}
-          </button>
-          <button
-            onClick={generateLearningPlan}
-            disabled={roadmapLoading}
-            style={{ flex: 1, minWidth: 160, padding: "12px 20px", borderRadius: 10, border: "1px solid rgba(16,185,129,0.25)", background: "rgba(16,185,129,0.06)", color: "#10b981", fontSize: 14, fontWeight: 600, cursor: roadmapLoading ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: roadmapLoading ? 0.7 : 1 }}
-          >
-            {roadmapLoading ? <><Loader2 size={14} />{t.building}</> : <><Target size={14} />{t.learningRoadmap}</>}
-          </button>
-          {optimizedCv ? (
-            <button
-              onClick={reanalyzeAfterFix}
-              disabled={loading}
-              style={{ flex: 1, minWidth: 220, padding: "12px 20px", borderRadius: 10, border: "1px solid rgba(250,204,21,0.35)", background: "rgba(250,204,21,0.1)", color: "#fde68a", fontSize: 14, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, opacity: loading ? 0.7 : 1 }}
-            >
-              <ArrowRight size={14} /> {lang === "TR" ? "Düzeltme sonrası tekrar analiz et" : "Re-analyze after fix"}
-            </button>
-          ) : null}
-        </div>
-        {reanalysisResult ? (
-          <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 12, border: "1px solid rgba(74,222,128,0.28)", background: "linear-gradient(135deg, rgba(74,222,128,0.1), rgba(56,189,248,0.08))", color: "#d1fae5" }}>
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.12em", marginBottom: 6 }}>{lang === "TR" ? "FIX → RE-RUN SONUCU" : "FIX → RE-RUN RESULT"}</div>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>
-              {lang === "TR"
-                ? `Önce: ${reanalysisResult.before}  |  Sonra: ${reanalysisResult.after}  (${reanalysisResult.delta >= 0 ? "+" : ""}${reanalysisResult.delta})`
-                : `Before: ${reanalysisResult.before}  |  After: ${reanalysisResult.after}  (${reanalysisResult.delta >= 0 ? "+" : ""}${reanalysisResult.delta})`}
-            </div>
-          </div>
-        ) : null}
-      </>
-    )}
-    {(reportUnlocked || user) && hasOutput && !loading ? (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.24 }}
-        style={{
-          marginTop: 16,
-          padding: "18px",
-          borderRadius: 14,
-          border: "1px solid rgba(99,102,241,0.22)",
-          background: "linear-gradient(180deg, rgba(15,23,42,0.88), rgba(2,6,23,0.95))",
-        }}
-      >
-        <div style={{ fontSize: 11, color: "#a5b4fc", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>
-          {lang === "TR" ? "Sıradaki hamle" : "Next action"}
-        </div>
-        <div style={{ fontSize: 14, color: "#cbd5e1", marginBottom: 6 }}>
-          {lang === "TR" ? "Profilindeki en büyük problem:" : "Biggest problem in your profile:"}
-        </div>
-        <div
-          style={{
-            fontSize: 15,
-            color: "#fee2e2",
-            fontWeight: 700,
-            borderRadius: 10,
-            border: "1px solid rgba(239,68,68,0.3)",
-            background: "rgba(239,68,68,0.08)",
-            padding: "10px 12px",
-            marginBottom: 10,
-          }}
-        >
-          {mainIssue || (lang === "TR" ? "Net bir risk sinyali çıkarılamadı." : "No clear risk signal extracted yet.")}
-        </div>
-        <div style={{ fontSize: 13, color: "#fca5a5", marginBottom: 14 }}>
-          {lang === "TR"
-            ? "Bunu düzeltmeden başvurmak → yüksek elenme riski"
-            : "Applying before fixing this → high rejection risk"}
-        </div>
-        <button
-          onClick={runNextActionFix}
-          disabled={applyingFix === NEXT_ACTION_FIX_KEY || !mainIssue}
-          style={{
-            width: "100%",
-            padding: "12px 14px",
-            borderRadius: 10,
-            border: "none",
-            background:
-              applyingFix === NEXT_ACTION_FIX_KEY
-                ? "rgba(99,102,241,0.35)"
-                : "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            color: "#fff",
-            fontSize: 14,
-            fontWeight: 800,
-            cursor:
-              applyingFix === NEXT_ACTION_FIX_KEY || !mainIssue ? "not-allowed" : "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-            marginBottom: nextActionFixResult?.new ? 14 : 0,
-          }}
-        >
-          {applyingFix === NEXT_ACTION_FIX_KEY ? (
-            <>
-              <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} />
-              {lang === "TR" ? "Düzeltiliyor..." : "Fixing..."}
-            </>
-          ) : (
-            <>
-              <Wand2 size={14} />
-              {lang === "TR" ? "Benim için düzelt" : "Fix this for me"}
-            </>
-          )}
-        </button>
-
-        {nextActionFixResult?.new ? (
-          <div style={{ marginTop: 2 }}>
-            <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 6 }}>
-              {lang === "TR" ? "Şu an CV’n bunu söylüyor:" : "Your CV currently says:"}
-            </div>
-            <div style={{ fontSize: 13, color: "#cbd5e1", borderRadius: 10, border: "1px solid rgba(148,163,184,0.2)", background: "rgba(15,23,42,0.65)", padding: "10px 12px", marginBottom: 10 }}>
-              {nextActionFixResult.old || nextActionFixResult.original_section || mainIssue}
-            </div>
-            <div style={{ fontSize: 12, color: "#86efac", marginBottom: 6 }}>
-              {lang === "TR" ? "Recruiter’ın görmek istediği hali:" : "What recruiters expect to see:"}
-            </div>
-            <div style={{ fontSize: 13, color: "#dcfce7", borderRadius: 10, border: "1px solid rgba(16,185,129,0.28)", background: "rgba(16,185,129,0.08)", padding: "10px 12px", marginBottom: 8 }}>
-              {nextActionFixResult.new || nextActionFixResult.rewritten_section}
-            </div>
-            <div style={{ fontSize: 13, color: "#bbf7d0", fontWeight: 700, marginBottom: 10 }}>
-              {lang === "TR" ? "Bu versiyon daha güçlü." : "This version is stronger."}
-            </div>
-            <div style={{ fontSize: 13, color: "#a7f3d0", marginBottom: 4 }}>
-              {lang === "TR" ? "Bu değişiklik profil gücünü artırır." : "This change improves profile strength."}
-            </div>
-            <div style={{ fontSize: 12, color: "#6ee7b7", marginBottom: 12 }}>
-              {lang === "TR" ? "+6 ila +10 puan etkileyebilir" : "Can improve by +6 to +10 points"}
-            </div>
-            <button
-              onClick={rerunAfterNextAction}
-              disabled={loading}
-              style={{
-                width: "100%",
-                padding: "11px 14px",
-                borderRadius: 10,
-                border: "1px solid rgba(56,189,248,0.35)",
-                background: "rgba(56,189,248,0.08)",
-                color: "#67e8f9",
-                fontSize: 13,
-                fontWeight: 800,
-                cursor: loading ? "not-allowed" : "pointer",
-              }}
-            >
-              {lang === "TR" ? "CV’yi güncelledim, tekrar analiz et" : "I updated my CV, run analysis again"}
-            </button>
-            {reanalysisResult ? (
-              <div
-                style={{
-                  marginTop: 12,
-                  borderRadius: 10,
-                  border: "1px solid rgba(74,222,128,0.25)",
-                  background: "rgba(74,222,128,0.08)",
-                  padding: "10px 12px",
-                }}
-              >
-                <div style={{ fontSize: 11, color: "#86efac", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
-                  {lang === "TR" ? "Değişim" : "Change"}
-                </div>
-                <div style={{ fontSize: 14, color: "#d1fae5", fontWeight: 700 }}>
-                  {reanalysisResult.before} → {reanalysisResult.after} ({reanalysisResult.delta >= 0 ? "+" : ""}{reanalysisResult.delta})
-                </div>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
-      </motion.div>
     ) : null}
     </motion.div>
 
