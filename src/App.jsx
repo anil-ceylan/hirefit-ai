@@ -1610,6 +1610,8 @@ function UnlockReportGateCard({
   optimizing,
   onOptimizeFullCv,
   onUpgrade,
+  onOpenRoleSuggestions,
+  onOpenMarketInsights,
   unlockEmail,
   setUnlockEmail,
   unlockJobStatus,
@@ -1899,6 +1901,74 @@ function UnlockReportGateCard({
               {previewScoreDelta ? (
                 <div style={{ marginTop: 8, fontSize: 12, color: "#bae6fd", fontWeight: 700 }}>
                   {`${previewScoreDelta.before} → ${previewScoreDelta.after} (${previewScoreDelta.delta >= 0 ? "+" : ""}${previewScoreDelta.delta})`}
+                </div>
+              ) : null}
+              {previewScoreDelta ? (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: "#e2e8f0", marginBottom: 8 }}>
+                    {"Sonraki adımın"}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isPro) {
+                          onUpgrade?.();
+                          return;
+                        }
+                        onOptimizeFullCv?.();
+                      }}
+                      disabled={optimizing}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(99,102,241,0.32)",
+                        background: "rgba(99,102,241,0.12)",
+                        color: "#ddd6fe",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        cursor: optimizing ? "not-allowed" : "pointer",
+                        fontFamily: "'DM Sans', sans-serif",
+                        opacity: optimizing ? 0.8 : 1,
+                      }}
+                    >
+                      {"Bu CV'yi bu role göre tamamen yeniden yaz"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onOpenRoleSuggestions}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(99,102,241,0.32)",
+                        background: "rgba(99,102,241,0.12)",
+                        color: "#ddd6fe",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        fontFamily: "'DM Sans', sans-serif",
+                      }}
+                    >
+                      {"Bana daha uygun rolleri göster"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={onOpenMarketInsights}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(99,102,241,0.32)",
+                        background: "rgba(99,102,241,0.12)",
+                        color: "#ddd6fe",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        fontFamily: "'DM Sans', sans-serif",
+                      }}
+                    >
+                      {"Bu rol piyasada ne kadar güçlü?"}
+                    </button>
+                  </div>
                 </div>
               ) : null}
             </motion.div>
@@ -8202,6 +8272,8 @@ export function AnalyzerPage() {
         optimizing={optimizing}
         onOptimizeFullCv={optimizeCv}
         onUpgrade={openUpgrade}
+        onOpenRoleSuggestions={() => setShowCareerSuggestionsModal(true)}
+        onOpenMarketInsights={() => setShowMarketInsightsModal(true)}
         unlockEmail={unlockEmail}
         setUnlockEmail={setUnlockEmail}
         unlockJobStatus={unlockJobStatus}
@@ -8310,82 +8382,6 @@ export function AnalyzerPage() {
           </div>
         </div>
       </motion.div>
-    ) : null}
-    {(reportUnlocked || user) && hasOutput && !loading ? (
-      <div
-        style={{
-          marginBottom: 16,
-          padding: 14,
-          borderRadius: 14,
-          border: "1px solid rgba(148,163,184,0.2)",
-          background: "rgba(15,23,42,0.72)",
-        }}
-      >
-        <div style={{ fontSize: 13, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
-          {"Sonraki adımın"}
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
-          <button
-            type="button"
-            onClick={() => {
-              if (!isPro) {
-                openUpgrade();
-                return;
-              }
-              optimizeCv();
-            }}
-            disabled={optimizing}
-            style={{
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "1px solid rgba(99,102,241,0.32)",
-              background: "rgba(99,102,241,0.12)",
-              color: "#ddd6fe",
-              fontSize: 12,
-              fontWeight: 800,
-              cursor: optimizing ? "not-allowed" : "pointer",
-              fontFamily: "'DM Sans', sans-serif",
-              opacity: optimizing ? 0.8 : 1,
-            }}
-          >
-            {"Bu CV'yi bu role göre tamamen yeniden yaz"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowMarketInsightsModal(true)}
-            style={{
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "1px solid rgba(99,102,241,0.32)",
-              background: "rgba(99,102,241,0.12)",
-              color: "#ddd6fe",
-              fontSize: 12,
-              fontWeight: 800,
-              cursor: "pointer",
-              fontFamily: "'DM Sans', sans-serif",
-            }}
-          >
-            {"Bu rol piyasada ne kadar değerli?"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowCareerSuggestionsModal(true)}
-            style={{
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "1px solid rgba(99,102,241,0.32)",
-              background: "rgba(99,102,241,0.12)",
-              color: "#ddd6fe",
-              fontSize: 12,
-              fontWeight: 800,
-              cursor: "pointer",
-              fontFamily: "'DM Sans', sans-serif",
-            }}
-          >
-            {"Bana daha uygun rolleri göster"}
-          </button>
-        </div>
-      </div>
     ) : null}
     {showMarketInsightsModal ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.76)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
