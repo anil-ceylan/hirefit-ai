@@ -1648,9 +1648,9 @@ function UnlockReportGateCard({
       || actionNorm.includes("before/after impact")
       || actionNorm.includes("measurable")
       || actionNorm.includes("metric"))
-      ? (tr ? "Yaptığın işleri sayı ve sonuçla yaz." : "Turn your tasks into results.")
+      ? "Görev yazmayı bırak, sonuç yaz."
       : actionRaw)
-    : (tr ? "Yaptığın işleri sayı ve sonuçla yaz." : "Turn your tasks into results.");
+    : "Görev yazmayı bırak, sonuç yaz.";
   const transformOld = String(previewFixResult?.old || "Your CV doesn't show real results").trim();
   const transformNew = String(previewFixResult?.new || "Increased efficiency by 23% across operations").trim();
 
@@ -1738,13 +1738,16 @@ function UnlockReportGateCard({
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 800, color: "#cbd5e1", marginBottom: 5 }}>
-            {tr ? "Şimdi ne yapmalısın?" : "What should you do now?"}
+            {"Şimdi ne yapmalısın?"}
           </div>
           <div style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.45, fontWeight: 700 }}>
             {actionLine}
           </div>
+          <div style={{ marginTop: 4, fontSize: 11, color: "#94a3b8", opacity: 0.8 }}>
+            {"Recruiter sonuç görmek ister."}
+          </div>
           <div style={{ marginTop: 4, fontSize: 12, color: "#94a3b8", lineHeight: 1.35 }}>
-            {tr ? "Örnek: X'i %Y artırdım" : "Example: Increased X by %Y"}
+            {"Örn: Satış sürecini optimize ederek dönüşümü %18 artırdım"}
           </div>
           <button
             type="button"
@@ -1803,7 +1806,7 @@ function UnlockReportGateCard({
             {"Bu role göre kusursuz bir CV oluştur"}
           </button>
           <div style={{ marginTop: 4, fontSize: 11, color: "#facc15", opacity: 0.82 }}>
-            {"ATS + recruiter optimize"}
+            {"ATS + recruiter beklentilerine göre optimize edilir"}
           </div>
         </div>
         <AnimatePresence initial={false}>
@@ -1929,7 +1932,7 @@ function UnlockReportGateCard({
                     {"Devam edersen daha da yükseltebilirsin."}
                   </div>
                   <div style={{ marginTop: 2, fontSize: 10, color: "#94a3b8", opacity: 0.62 }}>
-                    {"Yarın tekrar kontrol et — yeni ilanlarla fark görebilirsin."}
+                    {"Yarın tekrar dene — aynı CV ile daha iyi sonuç yakalayabilirsin."}
                   </div>
                 </div>
               ) : null}
