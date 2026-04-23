@@ -8213,6 +8213,9 @@ export function AnalyzerPage() {
           <div style={{ fontSize: 12, color: "#86efac", fontWeight: 700 }}>
             {"Küçük bir değişiklik, büyük fark yaratır."}
           </div>
+          <div style={{ marginTop: 3, fontSize: 11, color: "#94a3b8", opacity: 0.72 }}>
+            {"Recruiter beklentilerine göre hesaplandı."}
+          </div>
         </div>
 
         <div>
