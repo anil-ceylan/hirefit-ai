@@ -1800,10 +1800,10 @@ function UnlockReportGateCard({
             }}
           >
             <div style={{ fontSize: 14, fontWeight: 800, color: "#e0f2fe", marginBottom: 8 }}>
-              {tr ? "Düzeltildi. Şimdi farkı gör." : "Updated. Now see the difference."}
+              {tr ? "Bu değişiklik seni ileri taşıyacak" : "This change will move you forward"}
             </div>
             <div style={{ fontSize: 12, color: "#bae6fd", lineHeight: 1.35, marginBottom: 8 }}>
-              {tr ? "Yeni CV ile skorunun nasıl değiştiğini kontrol et." : "Check how your score changes with the updated CV."}
+              {tr ? "Ama ne kadar? Hemen görelim." : "But by how much? Let's see now."}
             </div>
             <button
               type="button"
