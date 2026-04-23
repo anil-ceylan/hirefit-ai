@@ -7756,7 +7756,7 @@ export function AnalyzerPage() {
               {`Sana en yakın alan: ${getCareerAreaLabel(closestAreaToShow, "TR")}`}
             </div>
             <div style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.5 }}>
-              {"Bu analiz seni bu alandaki beklentilere göre değerlendirecek."}
+              {"Bu analiz seni bu alandaki gerçek beklentilere göre değerlendirecek."}
             </div>
           </div>
 
@@ -7831,10 +7831,13 @@ export function AnalyzerPage() {
         opacity: loading ? 0.8 : 1,
       }}
     >
-      {loading ? <><Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} />{"CV + İlan uyumu analiz ediliyor..."} {loadingMessage ? `• ${loadingMessage}` : ""}</> : <>{"Bu ilana başvurmak mantıklı mı, öğren"} <Sparkles size={16} /></>}
+      {loading ? <><Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} />{"CV + İlan uyumu analiz ediliyor..."} {loadingMessage ? `• ${loadingMessage}` : ""}</> : <>{"Bu ilana başvurmak mantıklı mı, şimdi öğren"} <Sparkles size={16} /></>}
     </button>
     <div style={{ marginTop: 8, textAlign: "center", fontSize: 11, color: "#94a3b8", opacity: 0.65 }}>
       {"2 analiz ücretsiz."}
+    </div>
+    <div style={{ marginTop: 4, textAlign: "center", fontSize: 10, color: "#94a3b8", opacity: 0.46 }}>
+      {"Çoğu kişi neden elendiğini bilmiyor."}
     </div>
     </div>
 
