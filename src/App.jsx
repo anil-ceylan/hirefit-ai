@@ -1725,7 +1725,7 @@ function UnlockReportGateCard({
             {`${scoreNow} → ${scoreAfterFix} (+${impactDelta}${tr ? " puan" : " pts"})`}
           </div>
           <div style={{ fontSize: 12, color: "#bbf7d0", lineHeight: 1.35 }}>
-            {"Bu haliyle her başvuruda elenmeye devam edersin."}
+            {"In this state, you will keep getting rejected."}
           </div>
         </div>
 
@@ -1738,7 +1738,7 @@ function UnlockReportGateCard({
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 800, color: "#cbd5e1", marginBottom: 5 }}>
-            {"Şimdi ne yapmalısın?"}
+            {"What should you do now?"}
           </div>
           <div style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.45, fontWeight: 700 }}>
             {actionLine}
@@ -1772,7 +1772,7 @@ function UnlockReportGateCard({
               opacity: previewFixBusy ? 0.8 : 1,
             }}
           >
-            {previewFixBusy ? (tr ? "Düzeltiliyor..." : "Fixing...") : "Bu hatayı düzelt"}
+            {previewFixBusy ? (tr ? "Düzeltiliyor..." : "Fixing...") : "Fix this issue"}
           </button>
           <button
             type="button"
@@ -1803,10 +1803,10 @@ function UnlockReportGateCard({
             }}
           >
             <Lock size={13} />
-            {"Bu role göre kusursuz bir CV oluştur"}
+            {"Create a perfect CV for this role"}
           </button>
           <div style={{ marginTop: 4, fontSize: 11, color: "#facc15", opacity: 0.82 }}>
-            {"ATS + recruiter beklentilerine göre optimize edilir"}
+            {"Optimized for ATS and recruiter expectations"}
           </div>
         </div>
         <AnimatePresence initial={false}>
