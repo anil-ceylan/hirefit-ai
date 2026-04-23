@@ -108,106 +108,6 @@ function normalizeCareerConfidence(value) {
   return "medium";
 }
 
-function getCareerConfidenceMessage(confidence) {
-  const c = normalizeCareerConfidence(confidence);
-  if (c === "high") {
-    return "Bu alan büyük ihtimalle sana uygun.";
-  }
-  if (c === "low") {
-    return "Bu alan tam net değil. İstersen değiştirebilirsin.";
-  }
-  return "Bu alan sana kısmen uyuyor olabilir.";
-}
-
-function getCareerAreaCriteria(area, lang) {
-  const a = String(area || "");
-  const trMap = {
-    "Veri & Analiz": [
-      "Veri okuma ve yorumlama",
-      "Analitik problem çözme",
-      "Ölçülebilir iş etkisi",
-    ],
-    "Ürün": [
-      "Kullanıcı problemi çözme",
-      "Önceliklendirme ve karar kalitesi",
-      "Ürün etkisi",
-    ],
-    Yazılım: [
-      "Teknik derinlik",
-      "Gerçek üretim çıktısı",
-      "Performans ve ölçek etkisi",
-    ],
-    "İş / Operasyon": [
-      "Süreç iyileştirme",
-      "Verimlilik",
-      "Ölçülebilir sonuçlar",
-    ],
-    Pazarlama: [
-      "Büyüme ve kanal hakimiyeti",
-      "Mesaj-ürün uyumu",
-      "Ölçülebilir kampanya etkisi",
-    ],
-    Finans: [
-      "Finansal doğruluk",
-      "Risk-fayda analizi",
-      "Rakamla kanıtlanan sonuçlar",
-    ],
-    Tasarım: [
-      "Kullanıcı deneyimi kalitesi",
-      "Problem çerçeveleme",
-      "Somut tasarım etkisi",
-    ],
-    Satış: [
-      "Gelir etkisi",
-      "Pipeline yönetimi ve kapanış",
-      "Net metriklerle sonuç",
-    ],
-  };
-  const enMap = {
-    "Veri & Analiz": [
-      "Strong data interpretation is expected",
-      "Analytical problem-solving signal is required",
-      "Measurable business impact is critical",
-    ],
-    "Ürün": [
-      "User-problem clarity is expected",
-      "Prioritization and decision quality are evaluated",
-      "Product impact must be visible",
-    ],
-    Yazılım: [
-      "Technical depth and implementation quality matter",
-      "Real shipped output and ownership are expected",
-      "Performance and scale impact are important",
-    ],
-    "İş / Operasyon": [
-      "Process improvement is important",
-      "Efficiency and operational clarity are expected",
-      "Measurable outcomes are critical",
-    ],
-    Pazarlama: [
-      "Growth and channel ownership are expected",
-      "Message-product fit and conversion impact are evaluated",
-      "Campaign outcomes should be measurable",
-    ],
-    Finans: [
-      "Financial rigor and accuracy are expected",
-      "Risk-reward judgment is evaluated",
-      "Results must be backed by numbers",
-    ],
-    Tasarım: [
-      "UX quality is expected",
-      "Problem framing and solution logic are evaluated",
-      "Design impact should be measurable",
-    ],
-    Satış: [
-      "Revenue impact and persuasion strength are expected",
-      "Pipeline control and closing ability are evaluated",
-      "Results should be backed by clear metrics",
-    ],
-  };
-  return (lang === "TR" ? trMap[a] : enMap[a]) || (lang === "TR" ? trMap["İş / Operasyon"] : enMap["İş / Operasyon"]);
-}
-
 const SECTOR_CHIP_THEME = {
   "Auto-detect": { dot: "#a78bfa", ring: "rgba(167,139,250,0.7)", bg: "rgba(167,139,250,0.16)" },
   "Tech / Startup": { dot: "#38bdf8", ring: "rgba(56,189,248,0.7)", bg: "rgba(56,189,248,0.14)" },
@@ -7392,7 +7292,7 @@ export function AnalyzerPage() {
     jdText, setJdText, jobUrl, setJobUrl, jobUrlIsLinkedIn, extractingJob, extractJobFromUrl, jdTxtInputRef, handleJdTextFile,
     showAdvanced, setShowAdvanced, lastDetectedSector, sector, setSector, sectorLabels, sectorValues,
     detectedCareerArea, detectedCareerAreaConfidence, detectedCareerAreaReason, careerAreaOverride, setCareerAreaOverride,
-    deadline, setDeadline, isPro, user, userPlanRow, analyze, loading, loadingMessage, error, hasOutput,
+    isPro, user, userPlanRow, analyze, loading, loadingMessage, error, hasOutput,
     engineV2, alignmentScore, decisionData, decisionLoading, openUpgrade, optimizeCv, optimizing,
     handleSharePrompt, fixResults, applyingFix, applyFix, showAnonSavePrompt, setShowAnonSavePrompt,
     analysisData, matchedSkills, missingSkills, topKeywords, result, optimizedCv, learningPlan, roleType,
@@ -7423,8 +7323,6 @@ export function AnalyzerPage() {
     careerConfidenceNorm === "low"
       ? fallbackArea
       : (detectedCareerArea || fallbackArea);
-  const confidenceMessage = getCareerConfidenceMessage(careerConfidenceNorm);
-  const areaCriteria = getCareerAreaCriteria(closestAreaToShow, "TR");
   const quickAreaOptions = [
     "Veri & Analiz",
     "Ürün",
@@ -7854,17 +7752,11 @@ export function AnalyzerPage() {
       {showAdvanced && (
         <div style={{ padding: "18px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ borderRadius: 12, border: "1px solid rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.08)", padding: "12px 14px" }}>
-            <div style={{ fontSize: 12, color: "#a5b4fc", fontWeight: 800, marginBottom: 6 }}>
-              {"Sana en yakın alan (tahmini)"}
-            </div>
-            <div style={{ fontSize: 18, color: "#e2e8f0", fontWeight: 800, marginBottom: 6 }}>
-              {getCareerAreaLabel(closestAreaToShow, "TR")}
+            <div style={{ fontSize: 16, color: "#e2e8f0", fontWeight: 800, marginBottom: 6 }}>
+              {`Sana en yakın alan: ${getCareerAreaLabel(closestAreaToShow, "TR")}`}
             </div>
             <div style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.5 }}>
-              {"Bu analiz, bu alanda senden beklenenlere göre yapılacak."}
-            </div>
-            <div style={{ fontSize: 13, color: careerConfidenceNorm === "low" ? "#fbbf24" : "#94a3b8", marginTop: 8, fontWeight: careerConfidenceNorm === "low" ? 700 : 500 }}>
-              {confidenceMessage}
+              {"Bu analiz seni bu alandaki beklentilere göre değerlendirecek."}
             </div>
           </div>
 
@@ -7876,9 +7768,6 @@ export function AnalyzerPage() {
               padding: "12px 14px",
             }}
           >
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>
-              {"Farklı bir alana bakmak ister misin?"}
-            </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {quickAreaOptions.map((a) => {
                 const active = (careerAreaOverride || closestAreaToShow) === a;
@@ -7905,72 +7794,6 @@ export function AnalyzerPage() {
               })}
             </div>
           </div>
-
-          <div style={{ borderRadius: 12, border: "1px solid rgba(148,163,184,0.2)", background: "rgba(15,23,42,0.55)", padding: "12px 14px" }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>
-              {"Bu alanda senden ne beklenir?"}
-            </div>
-            <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 8 }}>
-              {"Analiz yapılırken özellikle şunlara bakılacak:"}
-            </div>
-            <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
-              {areaCriteria.map((line) => (
-                <li key={line} style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.45 }}>{line}</li>
-              ))}
-            </ul>
-            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 10 }}>
-              {"Analiz bu kriterlere göre yapılacak."}
-            </div>
-          </div>
-
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>
-              {"Bu ilana ne kadar hızlı başvurmalısın?"}
-            </div>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {[
-                {
-                  value: "urgent",
-                  label: "🔴 Hemen",
-                  sub: "Rekabet yüksek",
-                },
-                {
-                  value: "1_week",
-                  label: "🟡 1 hafta",
-                  sub: "Dengeli",
-                },
-                {
-                  value: "1_month",
-                  label: "🟢 1 ay",
-                  sub: "Daha az rekabet",
-                },
-              ].map(({ value, label, sub }) => (
-                <button
-                  key={value}
-                  onClick={() => setDeadline(value)}
-                  style={{
-                    minWidth: 136,
-                    textAlign: "left",
-                    padding: "8px 10px",
-                    borderRadius: 10,
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    fontFamily: "'DM Sans', sans-serif",
-                    background: deadline === value ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)",
-                    border: `1px solid ${deadline === value ? "rgba(99,102,241,0.55)" : "rgba(255,255,255,0.09)"}`,
-                    color: deadline === value ? "#ddd6fe" : "#e2e8f0",
-                  }}
-                >
-                  <div>{label}</div>
-                  <div style={{ fontSize: 11, color: deadline === value ? "#c4b5fd" : "#94a3b8", fontWeight: 600, marginTop: 2 }}>{sub}</div>
-                </button>
-              ))}
-            </div>
-            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 10 }}>
-              {"Doğru bir CV ile bu rekabette öne çıkabilirsin."}
-            </div>
-          </div>
         </div>
       )}
     </div>
@@ -7992,32 +7815,6 @@ export function AnalyzerPage() {
         </div>
       );
     })()}
-
-    {/* PRE-ANALYSIS VALUE BLOCK */}
-    <div
-      style={{
-        marginBottom: 14,
-        padding: "12px 14px",
-        borderRadius: 12,
-        border: "1px solid rgba(99,102,241,0.22)",
-        background: "rgba(99,102,241,0.08)",
-      }}
-    >
-      <div style={{ fontSize: 13, fontWeight: 800, color: "#ddd6fe", marginBottom: 8 }}>
-        {"Bu analiz sana şunu gösterecek:"}
-      </div>
-      <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 5 }}>
-        <li style={{ fontSize: 13, color: "#cbd5e1" }}>
-          {"Bu ilana başvurmalı mısın"}
-        </li>
-        <li style={{ fontSize: 13, color: "#cbd5e1" }}>
-          {"Neden eleniyorsun"}
-        </li>
-        <li style={{ fontSize: 13, color: "#cbd5e1" }}>
-          {"Ne yaparsan geçersin"}
-        </li>
-      </ul>
-    </div>
 
     {/* PRIMARY CTA */}
     <div className="hf-analyzer-analyze-wrap">
