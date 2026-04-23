@@ -8473,10 +8473,10 @@ export function AnalyzerPage() {
           }}
         >
           <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 800, marginBottom: 8 }}>
-            {"Gerçekçi ol:"}
+            {"Karar anı."}
           </div>
           <div style={{ fontSize: 11, color: "#94a3b8", opacity: 0.8, marginBottom: 10 }}>
-            {"Bu karar sonucu doğrudan etkiler."}
+            {"Bu seçim sonucu doğrudan etkiler."}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
             <button
@@ -8581,7 +8581,7 @@ export function AnalyzerPage() {
               fontWeight: 700,
             }}
           >
-            {"CV’ne 1 güçlü sonuç cümlesi ekle."}
+            {"CV’ne şu formatta 1 cümle ekle: 'X sürecini iyileştirerek %Y sonuç elde ettim.'"}
           </div>
           <div style={{ marginTop: 4, fontSize: 11, color: "#94a3b8", opacity: 0.78 }}>
             {"Örn: %X artırdım, X sürede tamamladım"}
@@ -8601,10 +8601,10 @@ export function AnalyzerPage() {
         }}
       >
         <div style={{ fontSize: 16, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
-          {"Yanlış role başvuruyor olabilirsin"}
+          {"Yanlış role başvuruyorsun."}
         </div>
         <div style={{ fontSize: 12, color: "#fca5a5", marginBottom: 10, fontWeight: 700 }}>
-          {"Profilin bu role tam uymuyor"}
+          {"Profilin bu role uymuyor."}
         </div>
         <div style={{ display: "grid", gap: 8 }}>
           {roleSuggestions.map((r) => (
