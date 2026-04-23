@@ -1904,6 +1904,33 @@ function UnlockReportGateCard({
                 </div>
               ) : null}
               {previewScoreDelta ? (
+                <div
+                  style={{
+                    marginTop: 10,
+                    borderRadius: 10,
+                    border: "1px solid rgba(148,163,184,0.22)",
+                    background: "rgba(15,23,42,0.55)",
+                    padding: "9px 10px",
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 800, color: "#e2e8f0", marginBottom: 6 }}>
+                    {"İlerlemen"}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#cbd5e1", lineHeight: 1.45 }}>
+                    {`İlk skor: ${previewScoreDelta.before}`}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#cbd5e1", lineHeight: 1.45 }}>
+                    {`Şu an: ${previewScoreDelta.after}`}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#86efac", fontWeight: 700, lineHeight: 1.45 }}>
+                    {`Toplam gelişim: ${previewScoreDelta.delta >= 0 ? "+" : ""}${previewScoreDelta.delta}`}
+                  </div>
+                  <div style={{ marginTop: 4, fontSize: 11, color: "#94a3b8", opacity: 0.9 }}>
+                    {"Devam edersen daha da yükseltebilirsin."}
+                  </div>
+                </div>
+              ) : null}
+              {previewScoreDelta ? (
                 <div style={{ marginTop: 12 }}>
                   <div style={{ fontSize: 13, fontWeight: 800, color: "#e2e8f0", marginBottom: 8 }}>
                     {"Sonraki adımın"}
