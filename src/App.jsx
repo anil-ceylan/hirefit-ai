@@ -8462,31 +8462,23 @@ export function AnalyzerPage() {
             {decisionCopy.microEmotion}
           </div>
         </div>
-        <div>
+        <div
+          style={{
+            marginTop: 6,
+            marginBottom: 6,
+            borderRadius: 12,
+            border: "1px solid rgba(99,102,241,0.35)",
+            background: "linear-gradient(180deg, rgba(30,41,59,0.92), rgba(15,23,42,0.95))",
+            padding: "14px 12px",
+          }}
+        >
           <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 800, marginBottom: 8 }}>
-            {"Karar ver:"}
+            {"Gerçekçi ol:"}
+          </div>
+          <div style={{ fontSize: 11, color: "#94a3b8", opacity: 0.8, marginBottom: 10 }}>
+            {"Bu karar sonucu doğrudan etkiler."}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => setDecisionLockChoice("continue")}
-              style={{
-                width: "100%",
-                borderRadius: 10,
-                border: decisionLockChoice === "continue" ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(239,68,68,0.28)",
-                background: decisionLockChoice === "continue" ? "rgba(239,68,68,0.16)" : "rgba(239,68,68,0.08)",
-                padding: "10px 10px",
-                textAlign: "left",
-                cursor: "pointer",
-              }}
-            >
-              <div style={{ fontSize: 13, color: "#fee2e2", fontWeight: 800, marginBottom: 3 }}>
-                {"Bu role devam et"}
-              </div>
-              <div style={{ fontSize: 11, color: "#fca5a5", lineHeight: 1.35 }}>
-                {"Riskli — elenme ihtimali yüksek"}
-              </div>
-            </button>
             <button
               type="button"
               onClick={() => {
@@ -8496,25 +8488,44 @@ export function AnalyzerPage() {
               style={{
                 width: "100%",
                 borderRadius: 10,
-                border: decisionLockChoice === "switch" ? "1px solid rgba(16,185,129,0.5)" : "1px solid rgba(16,185,129,0.28)",
-                background: decisionLockChoice === "switch" ? "rgba(16,185,129,0.16)" : "rgba(16,185,129,0.08)",
-                padding: "10px 10px",
+                border: decisionLockChoice === "switch" ? "1px solid rgba(16,185,129,0.6)" : "1px solid rgba(16,185,129,0.4)",
+                background: decisionLockChoice === "switch" ? "linear-gradient(135deg, #10b981, #059669)" : "rgba(16,185,129,0.9)",
+                padding: "12px 11px",
+                textAlign: "left",
+                cursor: "pointer",
+                boxShadow: "0 10px 24px rgba(16,185,129,0.25)",
+              }}
+            >
+              <div style={{ fontSize: 13, color: "#ecfdf5", fontWeight: 900, marginBottom: 3 }}>
+                {"Daha güçlü olduğun role geç"}
+              </div>
+              <div style={{ fontSize: 11, color: "rgba(236,253,245,0.9)", lineHeight: 1.35 }}>
+                {"Daha yüksek geri dönüş ihtimali"}
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDecisionLockChoice("continue")}
+              style={{
+                width: "100%",
+                borderRadius: 10,
+                border: decisionLockChoice === "continue" ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(148,163,184,0.35)",
+                background: "rgba(15,23,42,0.28)",
+                padding: "12px 11px",
                 textAlign: "left",
                 cursor: "pointer",
               }}
             >
-              <div style={{ fontSize: 13, color: "#dcfce7", fontWeight: 800, marginBottom: 3 }}>
-                {"Daha doğru role geç"}
+              <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 800, marginBottom: 3 }}>
+                {"Bu role devam et"}
               </div>
-              <div style={{ fontSize: 11, color: "#86efac", lineHeight: 1.35 }}>
-                {"Daha yüksek geri dönüş şansı"}
+              <div style={{ fontSize: 11, color: "#fca5a5", lineHeight: 1.35 }}>
+                {"Yüksek elenme riski"}
               </div>
             </button>
           </div>
         </div>
 
-        {decisionLockChoice ? (
-          <>
         <div>
           <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 800, marginBottom: 6 }}>
             {"Seni eleyen asıl şey:"}
@@ -8550,16 +8561,13 @@ export function AnalyzerPage() {
             {impactProjection.current} → {impactProjection.projected} (+{impactProjection.delta})
           </div>
           <div style={{ fontSize: 12, color: "#86efac", fontWeight: 700 }}>
-            {"Küçük bir değişiklik, büyük fark yaratır."}
-          </div>
-          <div style={{ marginTop: 3, fontSize: 11, color: "#94a3b8", opacity: 0.72 }}>
             {"Recruiter beklentilerine göre hesaplandı."}
           </div>
         </div>
 
         <div>
           <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 800, marginBottom: 6 }}>
-            {"Şimdi ne yapmalısın?"}
+            {"İlk hamleni yap:"}
           </div>
           <div
             style={{
@@ -8573,11 +8581,12 @@ export function AnalyzerPage() {
               fontWeight: 700,
             }}
           >
-            {singleAction}
+            {"CV’ne 1 güçlü sonuç cümlesi ekle."}
+          </div>
+          <div style={{ marginTop: 4, fontSize: 11, color: "#94a3b8", opacity: 0.78 }}>
+            {"Örn: %X artırdım, X sürede tamamladım"}
           </div>
         </div>
-          </>
-        ) : null}
       </motion.div>
     ) : null}
     {(reportUnlocked || user) && hasOutput && !loading && roleSuggestions.length ? (
