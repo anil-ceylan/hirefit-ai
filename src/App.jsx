@@ -1619,6 +1619,7 @@ function UnlockReportGateCard({
   onUnlockSubmit,
 }) {
   const tr = lang === "TR";
+  const [showFixConfirmation, setShowFixConfirmation] = useState(false);
   const scoreNow = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
   const verdictText =
     scoreNow < 50
@@ -1648,6 +1649,19 @@ function UnlockReportGateCard({
       ? (tr ? "Yaptığın işleri sayı ve sonuçla yaz." : "Turn your tasks into results.")
       : actionRaw)
     : (tr ? "Yaptığın işleri sayı ve sonuçla yaz." : "Turn your tasks into results.");
+  const transformOld = String(previewFixResult?.old || "Your CV doesn't show real results").trim();
+  const transformNew = String(previewFixResult?.new || "Increased efficiency by 23% across operations").trim();
+
+  useEffect(() => {
+    if (!previewFixResult?.new) {
+      setShowFixConfirmation(false);
+      return;
+    }
+    setShowFixConfirmation(false);
+    const id = window.setTimeout(() => setShowFixConfirmation(true), 1200);
+    return () => window.clearTimeout(id);
+  }, [previewFixResult?.new]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -1790,51 +1804,106 @@ function UnlockReportGateCard({
             {"ATS + recruiter optimize"}
           </div>
         </div>
-        {previewFixResult?.new ? (
-          <div
-            style={{
-              borderRadius: 12,
-              border: "1px solid rgba(56,189,248,0.3)",
-              background: "rgba(56,189,248,0.08)",
-              padding: "12px 13px",
-            }}
-          >
-            <div style={{ fontSize: 14, fontWeight: 800, color: "#e0f2fe", marginBottom: 8 }}>
-              {tr ? "Bu değişiklik seni ileri taşıyacak" : "This change will move you forward"}
-            </div>
-            <div style={{ fontSize: 12, color: "#bae6fd", lineHeight: 1.35, marginBottom: 8 }}>
-              {tr ? "Ama ne kadar? Hemen görelim." : "But by how much? Let's see now."}
-            </div>
-            <button
-              type="button"
-              onClick={onPreviewReanalyze}
-              disabled={previewReanalyzing}
+        <AnimatePresence initial={false}>
+          {previewFixBusy ? (
+            <motion.div
+              key="fix-loading"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.22 }}
               style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: 10,
-                border: "none",
-                background: "linear-gradient(135deg, #3b82f6, #6366f1)",
-                color: "#fff",
-                fontSize: 13,
-                fontWeight: 800,
-                cursor: previewReanalyzing ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                opacity: previewReanalyzing ? 0.8 : 1,
+                borderRadius: 12,
+                border: "1px solid rgba(56,189,248,0.3)",
+                background: "rgba(56,189,248,0.08)",
+                padding: "12px 13px",
               }}
             >
-              {previewReanalyzing ? (tr ? "Analiz ediliyor..." : "Analyzing...") : (tr ? "Yeni sonucu gör" : "See new result")}
-            </button>
-            {previewScoreDelta ? (
-              <div style={{ marginTop: 8, fontSize: 12, color: "#bae6fd", fontWeight: 700 }}>
-                {`${previewScoreDelta.before} → ${previewScoreDelta.after} (${previewScoreDelta.delta >= 0 ? "+" : ""}${previewScoreDelta.delta})`}
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#e0f2fe" }}>
+                {"CV'in yeniden yazılıyor..."}
               </div>
-            ) : null}
-          </div>
-        ) : null}
+            </motion.div>
+          ) : null}
+          {previewFixResult?.new && !showFixConfirmation ? (
+            <motion.div
+              key="fix-transform"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.24 }}
+              style={{
+                borderRadius: 12,
+                border: "1px solid rgba(56,189,248,0.3)",
+                background: "rgba(56,189,248,0.08)",
+                padding: "12px 13px",
+              }}
+            >
+              <div style={{ fontSize: 12, color: "#bae6fd", marginBottom: 6 }}>
+                {`Old: "${transformOld}"`}
+              </div>
+              <motion.div
+                animate={{ x: [0, 6, 0], opacity: [0.7, 1, 0.7] }}
+                transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                style={{ fontSize: 16, color: "#7dd3fc", fontWeight: 800, marginBottom: 6 }}
+              >
+                {"→"}
+              </motion.div>
+              <div style={{ fontSize: 12, color: "#dcfce7", fontWeight: 700 }}>
+                {`New: "${transformNew}"`}
+              </div>
+            </motion.div>
+          ) : null}
+          {previewFixResult?.new && showFixConfirmation ? (
+            <motion.div
+              key="fix-confirm"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.24 }}
+              style={{
+                borderRadius: 12,
+                border: "1px solid rgba(56,189,248,0.3)",
+                background: "rgba(56,189,248,0.08)",
+                padding: "12px 13px",
+              }}
+            >
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#e0f2fe", marginBottom: 8 }}>
+                {"Düzeltildi."}
+              </div>
+              <div style={{ fontSize: 12, color: "#bae6fd", lineHeight: 1.35, marginBottom: 8 }}>
+                {"Artık recruiter'ın görmek istediği şekilde yazıldı."}
+              </div>
+              <button
+                type="button"
+                onClick={onPreviewReanalyze}
+                disabled={previewReanalyzing}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "linear-gradient(135deg, #3b82f6, #6366f1)",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  cursor: previewReanalyzing ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  opacity: previewReanalyzing ? 0.8 : 1,
+                }}
+              >
+                {previewReanalyzing ? (tr ? "Analiz ediliyor..." : "Analyzing...") : (tr ? "Yeni sonucu gör" : "See new result")}
+              </button>
+              {previewScoreDelta ? (
+                <div style={{ marginTop: 8, fontSize: 12, color: "#bae6fd", fontWeight: 700 }}>
+                  {`${previewScoreDelta.before} → ${previewScoreDelta.after} (${previewScoreDelta.delta >= 0 ? "+" : ""}${previewScoreDelta.delta})`}
+                </div>
+              ) : null}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
 
       <div
@@ -7610,6 +7679,7 @@ export function AnalyzerPage() {
     if (!oldLine || !newLine) return;
     setApplyingFix(PREVIEW_FIX_KEY);
     try {
+      await new Promise((resolve) => setTimeout(resolve, 850));
       setPreviewFixResult({ old: oldLine, new: newLine });
     } finally {
       setApplyingFix(null);
