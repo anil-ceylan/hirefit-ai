@@ -7753,15 +7753,15 @@ export function AnalyzerPage() {
         <div style={{ padding: "18px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ borderRadius: 12, border: "1px solid rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.08)", padding: "12px 14px" }}>
             <div style={{ fontSize: 12, color: "#a5b4fc", fontWeight: 800, marginBottom: 6 }}>
-              {lang === "TR" ? "Sana en yakın alan:" : "Closest area for you:"}
+              {lang === "TR" ? "Sana en yakın alan (tahmini):" : "Closest area (estimated):"}
             </div>
             <div style={{ fontSize: 18, color: "#e2e8f0", fontWeight: 800, marginBottom: 6 }}>
               {getCareerAreaLabel(closestAreaToShow, lang)}
             </div>
             <div style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.5 }}>
               {lang === "TR"
-                ? "Bu analiz bu alanın beklentilerine göre yapıldı."
-                : "This analysis is shaped by the expectations of this area."}
+                ? "Analiz bu alanın beklentilerine göre yapılacak."
+                : "The analysis will be run against the expectations of this area."}
             </div>
             <div style={{ fontSize: 13, color: careerConfidenceNorm === "low" ? "#fbbf24" : "#94a3b8", marginTop: 8, fontWeight: careerConfidenceNorm === "low" ? 700 : 500 }}>
               {confidenceMessage}
@@ -7808,7 +7808,10 @@ export function AnalyzerPage() {
 
           <div style={{ borderRadius: 12, border: "1px solid rgba(148,163,184,0.2)", background: "rgba(15,23,42,0.55)", padding: "12px 14px" }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>
-              {lang === "TR" ? "Bu alan sonucu nasıl etkiledi?" : "How did this area shape your result?"}
+              {lang === "TR" ? "Bu alanda senden ne beklenir?" : "What is expected from you in this area?"}
+            </div>
+            <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 8 }}>
+              {lang === "TR" ? "Analiz yapılırken özellikle şunlara bakılacak:" : "The analysis will focus especially on these points:"}
             </div>
             <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
               {areaCriteria.map((line) => (
@@ -7816,7 +7819,7 @@ export function AnalyzerPage() {
               ))}
             </ul>
             <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 10 }}>
-              {lang === "TR" ? "Analiz bu kriterlere göre yapıldı." : "The analysis was run against these criteria."}
+              {lang === "TR" ? "Analiz bu kriterlere göre yapılacak." : "The analysis will be run based on these criteria."}
             </div>
           </div>
 
@@ -7864,6 +7867,11 @@ export function AnalyzerPage() {
                 </button>
               ))}
             </div>
+            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 10 }}>
+              {lang === "TR"
+                ? "Doğru bir CV ile bu rekabette öne çıkabilirsin."
+                : "With the right CV signal, you can stand out in this competition."}
+            </div>
           </div>
         </div>
       )}
@@ -7886,6 +7894,32 @@ export function AnalyzerPage() {
         </div>
       );
     })()}
+
+    {/* PRE-ANALYSIS VALUE BLOCK */}
+    <div
+      style={{
+        marginBottom: 14,
+        padding: "12px 14px",
+        borderRadius: 12,
+        border: "1px solid rgba(99,102,241,0.22)",
+        background: "rgba(99,102,241,0.08)",
+      }}
+    >
+      <div style={{ fontSize: 13, fontWeight: 800, color: "#ddd6fe", marginBottom: 8 }}>
+        {lang === "TR" ? "Bu analiz sana şunu gösterecek:" : "This analysis will show you:"}
+      </div>
+      <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 5 }}>
+        <li style={{ fontSize: 13, color: "#cbd5e1" }}>
+          {lang === "TR" ? "Bu ilana başvurmalı mısın" : "Should you apply to this role"}
+        </li>
+        <li style={{ fontSize: 13, color: "#cbd5e1" }}>
+          {lang === "TR" ? "Neden eleniyorsun" : "Why you get filtered out"}
+        </li>
+        <li style={{ fontSize: 13, color: "#cbd5e1" }}>
+          {lang === "TR" ? "Ne yaparsan geçersin" : "What to change to pass"}
+        </li>
+      </ul>
+    </div>
 
     {/* PRIMARY CTA */}
     <div className="hf-analyzer-analyze-wrap">
