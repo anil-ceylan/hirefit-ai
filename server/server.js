@@ -590,16 +590,30 @@ Respond entirely in ${responseLanguageLabel(langNorm)}.`,
 });
 
 app.post("/apply-fix", requireAuthExpress, async (req, res) => {
-  const { cvText, problem, fix, lang } = req.body;
-  if (!cvText || !problem) return res.status(400).json({ error: "Missing data" });
+  const {
+    cvText,
+    problem,
+    fix,
+    lang,
+    weak_bullet,
+    career_area,
+    careerArea,
+    job_description,
+    jobDescription,
+    sector,
+  } = req.body || {};
+  const weakBullet = String(weak_bullet || problem || "").trim();
+  const careerAreaValue = String(career_area || careerArea || sector || "İş / Operasyon").trim();
+  const jobDescriptionValue = String(job_description || jobDescription || "").trim();
+  if (!weakBullet) return res.status(400).json({ error: "Missing weak bullet data" });
 
   try {
     const langNorm = normalizeAnalyzeLang(lang);
     const languageDirective = requiredResponseLanguageDirective(langNorm);
     const applyFixGroqBody = {
       model: "llama-3.3-70b-versatile",
-      max_tokens: 800,
-      temperature: 0.3,
+      max_tokens: 420,
+      temperature: 0.2,
       response_format: { type: "json_object" },
       messages: constrainedMessages([
         {
@@ -608,22 +622,47 @@ app.post("/apply-fix", requireAuthExpress, async (req, res) => {
         },
         {
           role: "user",
-          content: `You are an expert CV writer.
+          content: `Görevin:
 
-Problem in this CV: "${problem}"
-Fix to apply: "${fix}"
+Adayın CV’sindeki zayıf noktayı al ve bunu güçlü, ölçülebilir ve profesyonel bir şekilde yeniden yaz.
 
-Full CV:
-${cvText}
+Kurallar:
+- Sadece TEK çıktıyı düzelt
+- İnsan gibi yaz, yapay dil kullanma
+- Genel konuşma yok
+- Ölçülebilir etki ekle (mümkünse)
+- Güçlü fiiller kullan (artırdı, geliştirdi, optimize etti gibi)
+- Kopyalanabilir olsun
 
-Find the specific section with this problem. Rewrite ONLY that part. Keep everything else the same.
-${langNorm === "tr" ? "Return in Turkish." : "Return in English."}
+Girdi:
 
-Return ONLY this JSON:
+Zayıf ifade:
+${weakBullet}
+
+Alan:
+${careerAreaValue}
+
+İş ilanı:
+${jobDescriptionValue || "N/A"}
+
+Ek bağlam (yalnızca gerektiğinde):
+${cvText ? cvText.slice(0, 2000) : ""}
+${fix ? `\nÖnerilen düzeltme yönü: ${fix}` : ""}
+
+Çıktı formatı:
+
+Eski:
+${weakBullet}
+
+Yeni:
+[tek cümle, güçlü ve ölçülebilir]
+
+${langNorm === "tr" ? "Türkçe yaz." : "Write in English."}
+
+Return ONLY valid JSON:
 {
-  "original_section": "exact original text from CV",
-  "rewritten_section": "improved version",
-  "explanation": "1 sentence: what changed"
+  "old": "${weakBullet.replace(/"/g, '\\"')}",
+  "new": "<single strong measurable sentence>"
 }`,
         },
       ], langNorm),
@@ -641,7 +680,21 @@ Return ONLY this JSON:
     const data = await response.json();
     const content = data?.choices?.[0]?.message?.content;
     const parsed = extractJSON(content);
-    res.json(parsed || { error: "Could not parse response" });
+    if (!parsed || !parsed.new) {
+      return res.json({ error: "Could not parse response" });
+    }
+    const oldText = String(parsed.old || weakBullet).trim() || weakBullet;
+    const newText = String(parsed.new || "").trim();
+    return res.json({
+      old: oldText,
+      new: newText,
+      original_section: oldText,
+      rewritten_section: newText,
+      explanation:
+        langNorm === "tr"
+          ? "Zayıf ifade ölçülebilir ve güçlü bir cümleye dönüştürüldü."
+          : "The weak bullet was rewritten into a stronger measurable line.",
+    });
   } catch (err) {
     console.error("💥 APPLY-FIX ERROR:", err);
     res.status(500).json({ error: "Apply fix failed" });

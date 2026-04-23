@@ -108,6 +108,112 @@ function normalizeCareerConfidence(value) {
   return "medium";
 }
 
+function getCareerConfidenceMessage(confidence, lang) {
+  const c = normalizeCareerConfidence(confidence);
+  if (c === "high") {
+    return lang === "TR"
+      ? "Bu alan büyük ihtimalle sana uygun."
+      : "This area is very likely a strong fit for you.";
+  }
+  if (c === "low") {
+    return lang === "TR"
+      ? "Bu alan tam net değil, istersen değiştirebilirsin."
+      : "This area is not fully clear yet, you can switch it.";
+  }
+  return lang === "TR"
+    ? "Bu alan sana kısmen uyuyor olabilir."
+    : "This area may be a partial fit for you.";
+}
+
+function getCareerAreaCriteria(area, lang) {
+  const a = String(area || "");
+  const trMap = {
+    "Veri & Analiz": [
+      "Veri okuma ve yorumlama gücü aranır",
+      "Analitik problem çözme sinyali beklenir",
+      "Ölçülebilir iş etkisi kritik",
+    ],
+    "Ürün": [
+      "Kullanıcı problemi çözme netliği aranır",
+      "Önceliklendirme ve karar kalitesi ölçülür",
+      "Çıktının ürün etkisi görünür olmalı",
+    ],
+    Yazılım: [
+      "Teknik derinlik ve uygulama kalitesi aranır",
+      "Gerçek üretim çıktısı ve sahiplenme beklenir",
+      "Performans ve ölçek etkisi önemlidir",
+    ],
+    "İş / Operasyon": [
+      "Süreç iyileştirme önemli",
+      "Verimlilik ve organizasyon sinyali aranır",
+      "Ölçülebilir sonuçlar kritik",
+    ],
+    Pazarlama: [
+      "Büyüme ve kanal hakimiyeti aranır",
+      "Mesaj-ürün uyumu ve dönüşüm etkisi beklenir",
+      "Kampanya çıktısı ölçülebilir olmalı",
+    ],
+    Finans: [
+      "Finansal doğruluk ve disiplin aranır",
+      "Risk-fayda analizi sinyali beklenir",
+      "Rakamla kanıtlanan sonuçlar kritik",
+    ],
+    Tasarım: [
+      "Kullanıcı deneyimi kalitesi aranır",
+      "Problem çerçeveleme ve çözüm mantığı beklenir",
+      "Somut tasarım etkisi ölçülebilir olmalı",
+    ],
+    Satış: [
+      "Gelir etkisi ve ikna gücü aranır",
+      "Pipeline yönetimi ve kapanış becerisi beklenir",
+      "Sonuçlar net metriklerle görünmelidir",
+    ],
+  };
+  const enMap = {
+    "Veri & Analiz": [
+      "Strong data interpretation is expected",
+      "Analytical problem-solving signal is required",
+      "Measurable business impact is critical",
+    ],
+    "Ürün": [
+      "User-problem clarity is expected",
+      "Prioritization and decision quality are evaluated",
+      "Product impact must be visible",
+    ],
+    Yazılım: [
+      "Technical depth and implementation quality matter",
+      "Real shipped output and ownership are expected",
+      "Performance and scale impact are important",
+    ],
+    "İş / Operasyon": [
+      "Process improvement is important",
+      "Efficiency and operational clarity are expected",
+      "Measurable outcomes are critical",
+    ],
+    Pazarlama: [
+      "Growth and channel ownership are expected",
+      "Message-product fit and conversion impact are evaluated",
+      "Campaign outcomes should be measurable",
+    ],
+    Finans: [
+      "Financial rigor and accuracy are expected",
+      "Risk-reward judgment is evaluated",
+      "Results must be backed by numbers",
+    ],
+    Tasarım: [
+      "UX quality is expected",
+      "Problem framing and solution logic are evaluated",
+      "Design impact should be measurable",
+    ],
+    Satış: [
+      "Revenue impact and persuasion strength are expected",
+      "Pipeline control and closing ability are evaluated",
+      "Results should be backed by clear metrics",
+    ],
+  };
+  return (lang === "TR" ? trMap[a] : enMap[a]) || (lang === "TR" ? trMap["İş / Operasyon"] : enMap["İş / Operasyon"]);
+}
+
 const SECTOR_CHIP_THEME = {
   "Auto-detect": { dot: "#a78bfa", ring: "rgba(167,139,250,0.7)", bg: "rgba(167,139,250,0.16)" },
   "Tech / Startup": { dot: "#38bdf8", ring: "rgba(56,189,248,0.7)", bg: "rgba(56,189,248,0.14)" },
@@ -6564,7 +6670,15 @@ const msgInterval = setInterval(() => {
       const res = await fetch(`${HF_API_BASE}/apply-fix`, {
         method: "POST",
         headers: await getApiAuthHeaders(),
-        body: JSON.stringify({ cvText, problem: fix.problem, fix: fix.fix, lang })
+        body: JSON.stringify({
+          cvText,
+          problem: fix.problem,
+          weak_bullet: fix.problem,
+          fix: fix.fix,
+          career_area: effectiveCareerArea || "İş / Operasyon",
+          job_description: jdText,
+          lang,
+        }),
       });
       const data = await res.json();
       setFixResults(prev => ({ ...prev, [index]: data }));
@@ -7242,12 +7356,16 @@ export function AnalyzerPage() {
     careerConfidenceNorm === "low"
       ? fallbackArea
       : (detectedCareerArea || fallbackArea);
-  const confidenceLabel =
-    careerConfidenceNorm === "high"
-      ? (lang === "TR" ? "Yüksek" : "High")
-      : careerConfidenceNorm === "low"
-        ? (lang === "TR" ? "Düşük" : "Low")
-        : (lang === "TR" ? "Orta" : "Medium");
+  const confidenceMessage = getCareerConfidenceMessage(careerConfidenceNorm, lang);
+  const areaCriteria = getCareerAreaCriteria(closestAreaToShow, lang);
+  const quickAreaOptions = [
+    "Veri & Analiz",
+    "Ürün",
+    "Yazılım",
+    "İş / Operasyon",
+    "Pazarlama",
+    "Finans",
+  ];
 
   useEffect(() => {
     if (!user?.email) return;
@@ -7578,118 +7696,147 @@ export function AnalyzerPage() {
       {(loading || (cvLoaded && jdLoaded)) ? <span className="hf-data-bridge__pulse hf-data-bridge__pulse--trail" /> : null}
     </div>
 
-    {/* ADVANCED OPTIONS */}
+    {/* DECISION SUPPORT SETTINGS */}
     <div style={{ marginBottom: 24 }}>
-  <button
-    onClick={() => setShowAdvanced(v => !v)}
-    style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#475569", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontWeight: 600, padding: 0, marginBottom: showAdvanced ? 16 : 0 }}
-  >
-    <span style={{ fontSize: 10, transition: "transform 0.2s", display: "inline-block", transform: showAdvanced ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
-    {lang === "TR" ? "Gelişmiş seçenekler" : "Advanced options"}
-  </button>
-  {showAdvanced && (
-    <div style={{ padding: "16px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, display: "flex", flexDirection: "column", gap: 14 }}>
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>{t.detectedSectorLabel}</div>
-        <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 10 }}>
-          {lastDetectedSector ? <strong style={{ color: "#d4af37" }}>{getSectorDisplayLabel(lastDetectedSector, lang)}</strong> : "—"}
-        </div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>{t.sectorOverrideHint}</div>
-        <select
-          value={sector}
-          onChange={(e) => setSector(e.target.value)}
-          style={{
-            width: "100%",
-            maxWidth: 360,
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.1)",
-            background: "rgba(0,0,0,0.35)",
-            color: "#e2e8f0",
-            fontSize: 13,
-            fontFamily: "'DM Sans', sans-serif",
-          }}
-        >
-          {sectorValues.map((s, idx) => (
-            <option key={s} value={s}>{sectorLabels[idx]}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-          {lang === "TR" ? "Sana en yakın alan" : "Closest area for you"}
-        </div>
-        <div
-          style={{
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid rgba(167,139,250,0.28)",
-            background: "rgba(99,102,241,0.08)",
-            marginBottom: 10,
-          }}
-        >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
-            <strong style={{ color: "#ddd6fe", fontSize: 13 }}>
+      <button
+        onClick={() => setShowAdvanced((v) => !v)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "none",
+          border: "none",
+          color: "#94a3b8",
+          fontSize: 13,
+          cursor: "pointer",
+          fontFamily: "'DM Sans', sans-serif",
+          fontWeight: 700,
+          padding: 0,
+          marginBottom: showAdvanced ? 16 : 0,
+        }}
+      >
+        <span style={{ fontSize: 10, transition: "transform 0.2s", display: "inline-block", transform: showAdvanced ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+        {lang === "TR" ? "Analizi kendine göre ayarla" : "Tune the analysis to your direction"}
+      </button>
+      {showAdvanced && (
+        <div style={{ padding: "18px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ borderRadius: 12, border: "1px solid rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.08)", padding: "12px 14px" }}>
+            <div style={{ fontSize: 12, color: "#a5b4fc", fontWeight: 800, marginBottom: 6 }}>
+              {lang === "TR" ? "Sana en yakın alan:" : "Closest area for you:"}
+            </div>
+            <div style={{ fontSize: 18, color: "#e2e8f0", fontWeight: 800, marginBottom: 6 }}>
               {getCareerAreaLabel(closestAreaToShow, lang)}
-            </strong>
-            <span style={{ fontSize: 11, color: "#c4b5fd", fontWeight: 700 }}>
-              {lang === "TR" ? "Güven" : "Confidence"}: {confidenceLabel}
-            </span>
-          </div>
-          {careerConfidenceNorm === "low" ? (
-            <div style={{ fontSize: 12, color: "#fbbf24", marginTop: 6 }}>
+            </div>
+            <div style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.5 }}>
               {lang === "TR"
-                ? `Güven düşük. Fallback alan: ${getCareerAreaLabel(fallbackArea, lang)}.`
-                : `Confidence is low. Fallback area: ${getCareerAreaLabel(fallbackArea, lang)}.`}
+                ? "Bu analiz bu alanın beklentilerine göre yapıldı."
+                : "This analysis is shaped by the expectations of this area."}
             </div>
-          ) : null}
-          {detectedCareerAreaReason ? (
-            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 6, lineHeight: 1.45 }}>
-              {detectedCareerAreaReason}
+            <div style={{ fontSize: 13, color: careerConfidenceNorm === "low" ? "#fbbf24" : "#94a3b8", marginTop: 8, fontWeight: careerConfidenceNorm === "low" ? 700 : 500 }}>
+              {confidenceMessage}
             </div>
-          ) : null}
+          </div>
+
+          <div
+            style={{
+              borderRadius: 12,
+              border: `1px solid ${careerConfidenceNorm === "low" ? "rgba(251,191,36,0.35)" : "rgba(148,163,184,0.2)"}`,
+              background: careerConfidenceNorm === "low" ? "rgba(251,191,36,0.08)" : "rgba(148,163,184,0.06)",
+              padding: "12px 14px",
+            }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>
+              {lang === "TR" ? "Farklı bir alana bakmak ister misin?" : "Want to check another area?"}
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {quickAreaOptions.map((a) => {
+                const active = (careerAreaOverride || closestAreaToShow) === a;
+                return (
+                  <button
+                    key={a}
+                    onClick={() => handleCareerAreaChange(a)}
+                    disabled={loading}
+                    style={{
+                      padding: "8px 12px",
+                      borderRadius: 999,
+                      border: `1px solid ${active ? "rgba(129,140,248,0.65)" : "rgba(148,163,184,0.3)"}`,
+                      background: active ? "rgba(99,102,241,0.2)" : "rgba(15,23,42,0.65)",
+                      color: active ? "#ddd6fe" : "#cbd5e1",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: loading ? "not-allowed" : "pointer",
+                      fontFamily: "'DM Sans', sans-serif",
+                    }}
+                  >
+                    {getCareerAreaLabel(a, lang)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ borderRadius: 12, border: "1px solid rgba(148,163,184,0.2)", background: "rgba(15,23,42,0.55)", padding: "12px 14px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>
+              {lang === "TR" ? "Bu alan sonucu nasıl etkiledi?" : "How did this area shape your result?"}
+            </div>
+            <ul style={{ margin: 0, paddingLeft: 18, display: "grid", gap: 6 }}>
+              {areaCriteria.map((line) => (
+                <li key={line} style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.45 }}>{line}</li>
+              ))}
+            </ul>
+            <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 10 }}>
+              {lang === "TR" ? "Analiz bu kriterlere göre yapıldı." : "The analysis was run against these criteria."}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>
+              {lang === "TR" ? "Bu ilana ne kadar hızlı başvurmalısın?" : "How quickly should you apply to this role?"}
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {[
+                {
+                  value: "urgent",
+                  label: lang === "TR" ? "🔴 Hemen" : "🔴 Now",
+                  sub: lang === "TR" ? "rekabet yüksek" : "high competition",
+                },
+                {
+                  value: "1_week",
+                  label: lang === "TR" ? "🟡 1 hafta" : "🟡 1 week",
+                  sub: lang === "TR" ? "dengeli" : "balanced",
+                },
+                {
+                  value: "1_month",
+                  label: lang === "TR" ? "🟢 1 ay" : "🟢 1 month",
+                  sub: lang === "TR" ? "daha az rekabet" : "lower competition",
+                },
+              ].map(({ value, label, sub }) => (
+                <button
+                  key={value}
+                  onClick={() => setDeadline(value)}
+                  style={{
+                    minWidth: 136,
+                    textAlign: "left",
+                    padding: "8px 10px",
+                    borderRadius: 10,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: "'DM Sans', sans-serif",
+                    background: deadline === value ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)",
+                    border: `1px solid ${deadline === value ? "rgba(99,102,241,0.55)" : "rgba(255,255,255,0.09)"}`,
+                    color: deadline === value ? "#ddd6fe" : "#e2e8f0",
+                  }}
+                >
+                  <div>{label}</div>
+                  <div style={{ fontSize: 11, color: deadline === value ? "#c4b5fd" : "#94a3b8", fontWeight: 600, marginTop: 2 }}>{sub}</div>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-          {lang === "TR" ? "Alanı değiştir (yeniden analiz)" : "Override area (re-run analysis)"}
-        </div>
-        <select
-          value={careerAreaOverride}
-          onChange={(e) => handleCareerAreaChange(e.target.value)}
-          style={{
-            width: "100%",
-            maxWidth: 360,
-            padding: "10px 12px",
-            borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.1)",
-            background: "rgba(0,0,0,0.35)",
-            color: "#e2e8f0",
-            fontSize: 13,
-            fontFamily: "'DM Sans', sans-serif",
-          }}
-        >
-          <option value="">{lang === "TR" ? "Otomatik (önerilen)" : "Auto (recommended)"}</option>
-          {CAREER_AREA_VALUES.map((a) => (
-            <option key={a} value={a}>{getCareerAreaLabel(a, lang)}</option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 8, letterSpacing: "0.06em", textTransform: "uppercase" }}>{lang === "TR" ? "Başvuru Süresi" : "Deadline"}</div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {[
-            { value: "urgent", label: lang === "TR" ? "🔴 Acil" : "🔴 Urgent" },
-            { value: "1_week", label: lang === "TR" ? "🟡 1 Hafta" : "🟡 1 Week" },
-            { value: "1_month", label: lang === "TR" ? "🟢 1 Ay" : "🟢 1 Month" },
-          ].map(({ value, label }) => (
-            <button key={value} onClick={() => setDeadline(value)} style={{ padding: "5px 12px", borderRadius: 999, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", background: deadline === value ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.03)", border: `1px solid ${deadline === value ? "rgba(99,102,241,0.5)" : "rgba(255,255,255,0.07)"}`, color: deadline === value ? "#a78bfa" : "#475569" }}>
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
-  )}
-</div>  
 
     {/* FREE LIMIT WARNING */}
     {!isPro && (() => {
@@ -7724,34 +7871,9 @@ export function AnalyzerPage() {
         opacity: loading ? 0.8 : 1,
       }}
     >
-      {loading ? <><Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} />{lang === "TR" ? "CV + İlan uyumu analiz ediliyor..." : "Analyzing CV + Job Match..."} {loadingMessage ? `• ${loadingMessage}` : ""}</> : <>{t.checkFit} <Sparkles size={16} /></>}
+      {loading ? <><Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} />{lang === "TR" ? "CV + İlan uyumu analiz ediliyor..." : "Analyzing CV + Job Match..."} {loadingMessage ? `• ${loadingMessage}` : ""}</> : <>{lang === "TR" ? "Başvurmadan önce sonucu gör" : "See the result before you apply"} <Sparkles size={16} /></>}
     </button>
     </div>
-    {hasOutput ? (
-      <div
-        style={{
-          marginTop: 10,
-          marginBottom: 14,
-          padding: "10px 12px",
-          borderRadius: 10,
-          border: "1px solid rgba(99,102,241,0.28)",
-          background: "rgba(99,102,241,0.08)",
-        }}
-      >
-        <div style={{ fontSize: 11, color: "#a5b4fc", fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>
-          {lang === "TR" ? "Sana en yakın alan" : "Closest area for you"}
-        </div>
-        <div style={{ fontSize: 14, color: "#e2e8f0", fontWeight: 700 }}>
-          {getCareerAreaLabel(closestAreaToShow, lang)}
-        </div>
-        <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>
-          {lang === "TR" ? "Güven" : "Confidence"}: {confidenceLabel}
-          {careerConfidenceNorm === "low"
-            ? ` • ${lang === "TR" ? `Fallback: ${getCareerAreaLabel(fallbackArea, lang)}` : `Fallback: ${getCareerAreaLabel(fallbackArea, lang)}`}`
-            : ""}
-        </div>
-      </div>
-    ) : null}
 
     {/* ERROR */}
     {safeUiError && (
