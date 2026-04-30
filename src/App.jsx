@@ -8181,19 +8181,32 @@ export function AnalyzerPage() {
           {aiRecognitionLine ? (
             <div
               style={{
-                marginBottom: 10,
-                padding: "9px 11px",
-                borderRadius: 10,
-                border: "1px solid rgba(148,163,184,0.28)",
-                background: "rgba(148,163,184,0.08)",
-                fontSize: 13,
-                color: "#dbeafe",
-                lineHeight: 1.5,
-                fontWeight: 500,
-                fontStyle: "italic",
+                marginBottom: 6,
+                padding: "10px 12px",
+                borderRadius: 12,
+                border: "1px solid rgba(148,163,184,0.3)",
+                background: "rgba(148,163,184,0.1)",
+                fontSize: 18,
+                color: "#e2e8f0",
+                lineHeight: 1.45,
+                fontWeight: 700,
+                textAlign: "center",
               }}
             >
               {aiRecognitionLine}
+            </div>
+          ) : null}
+          {aiRecognitionLine ? (
+            <div
+              style={{
+                marginBottom: 10,
+                fontSize: 11,
+                color: "#94a3b8",
+                opacity: 0.85,
+                textAlign: "center",
+              }}
+            >
+              {"Bunu çoğu kişi fark etmiyor"}
             </div>
           ) : null}
           <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 800, marginBottom: 6 }}>
@@ -8229,6 +8242,25 @@ export function AnalyzerPage() {
 
         <div
           style={{
+            borderRadius: 12,
+            border: "1px solid rgba(239,68,68,0.3)",
+            background: "rgba(239,68,68,0.08)",
+            padding: "12px 14px",
+          }}
+        >
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#fca5a5", marginBottom: 6 }}>
+            {"Karar"}
+          </div>
+          <div style={{ fontSize: 22, lineHeight: 1.2, fontWeight: 900, color: "#fee2e2", marginBottom: 6 }}>
+            {aiDecisionText || mapDecisionLabel(engineV2?.Decision?.final_verdict, lang)}
+          </div>
+          <div style={{ fontSize: 14, color: "#fecaca", lineHeight: 1.45, marginBottom: 4 }}>
+            {aiRecruiterView || firstTwoSentences(primaryReason)}
+          </div>
+        </div>
+
+        <div
+          style={{
             borderRadius: 10,
             border: "1px solid rgba(16,185,129,0.28)",
             background: "rgba(16,185,129,0.08)",
@@ -8244,25 +8276,6 @@ export function AnalyzerPage() {
             }}
           >
             {impactProjection.current} → {impactProjection.projected} (+{impactProjection.delta})
-          </div>
-        </div>
-
-        <div
-          style={{
-            borderRadius: 12,
-            border: "1px solid rgba(239,68,68,0.3)",
-            background: "rgba(239,68,68,0.08)",
-            padding: "12px 14px",
-          }}
-        >
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#fca5a5", marginBottom: 6 }}>
-            {"Karar"}
-          </div>
-          <div style={{ fontSize: 22, lineHeight: 1.2, fontWeight: 900, color: "#fee2e2", marginBottom: 6 }}>
-            {aiDecisionText || mapDecisionLabel(engineV2?.Decision?.final_verdict, lang)}
-          </div>
-          <div style={{ fontSize: 14, color: "#fecaca", lineHeight: 1.45, marginBottom: 4 }}>
-            {aiRecruiterView || firstTwoSentences(primaryReason)}
           </div>
         </div>
 
