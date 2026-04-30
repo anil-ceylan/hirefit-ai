@@ -1598,47 +1598,6 @@ function pickLeadSuggestion(engineV2, analysisData, lang) {
   return String(suggestion || "").trim();
 }
 
-function normalizeSingleHardReason(rawIssue, lang) {
-  const issue = String(rawIssue || "").trim();
-  const lo = issue.toLowerCase();
-  if (!issue) {
-    return "CV’inde yaptığın işleri anlatıyorsun ama sonuçlarını göstermiyorsun. Bu recruiter için 'katkı yok' anlamına gelir.";
-  }
-  if (lo.includes("ölç") || lo.includes("metric") || lo.includes("quant") || lo.includes("impact")) {
-    return "CV’inde yaptığın işleri anlatıyorsun ama sonuçlarını göstermiyorsun. Bu recruiter için 'katkı yok' anlamına gelir.";
-  }
-  if (lo.includes("eşleş") || lo.includes("match") || lo.includes("deneyim") || lo.includes("experience")) {
-    return "İlanla doğrudan eşleşen deneyim eksik";
-  }
-  if (lo.includes("anahtar") || lo.includes("keyword") || lo.includes("beceri") || lo.includes("skill")) {
-    return "Anahtar beceriler görünmüyor";
-  }
-  return firstTwoSentences(issue);
-}
-
-function buildDecisionScreenCopy(score, reason, lang) {
-  const s = Math.round(Number(score) || 0);
-  if (s < 50) {
-    return {
-      title: "Bu CV ile bu role başvurursan büyük ihtimalle elenirsin.",
-      subtext: "Çünkü bu rolün aradığı kritik sinyaller sende görünmüyor.",
-      microEmotion: reason,
-    };
-  }
-  if (s <= 70) {
-    return {
-      title: "Sınırdasın — risk altındasın",
-      subtext: `${reason}. Tek bir kritik boşluk seni eler.`,
-      microEmotion: "Bu yüzden çoğu başvuru sessiz kalıyor.",
-    };
-  }
-  return {
-    title: "Şansın var — ama garanti değil",
-    subtext: `${reason}. Kanıt net değilse geri dönüş yine düşer.`,
-    microEmotion: "Bu yüzden güçlü adaylar arasında kaybolabilirsin.",
-  };
-}
-
 function buildSingleActionFromReason(reason, lang) {
   const lo = String(reason || "").toLowerCase();
   if (lo.includes("ölç") || lo.includes("metric") || lo.includes("impact")) {
@@ -6803,118 +6762,14 @@ const msgInterval = setInterval(() => {
     }
 
     if (!v2Ok) {
-      console.warn("[analyze] fallback path active: /analyze");
-      try {
-        const res = await fetch(`${HF_API_BASE}/analyze`, {
-          method: "POST",
-          headers: await getApiAuthHeaders({ requireSession: false }),
-          body: JSON.stringify({ cvText, jobDescription: effectiveJd, sector, lang, careerArea: effectiveCareerArea || undefined }),
-        });
-        const data = await res.json();
-        console.log("[analyze] legacy fallback response ok");
-        const fbLegacy = getFallbackAnalysis(cvText, effectiveJd, lang);
-        const safeLegacyV2 = buildFailSafeV2FromFallback(
-          { ...fbLegacy, score: Number(data.alignment_score) || fbLegacy.score },
-          cvText,
-          jdText,
-          lang,
-        );
-        if (Array.isArray(data?.improvements) && data.improvements.length) {
-          safeLegacyV2.Decision.what_to_fix_first = data.improvements.slice(0, 3);
-          safeLegacyV2.Decision.action_plan = data.improvements.slice(0, 3).join("\n");
-        }
-        if (Array.isArray(data?.missing_skills) && data.missing_skills.length) {
-          safeLegacyV2.ATS.missing_keywords = data.missing_skills.slice(0, 8);
-          safeLegacyV2.ATS.top_keywords = data.missing_skills.slice(0, 4);
-        }
-        if (Array.isArray(data?.matched_skills) && data.matched_skills.length) {
-          safeLegacyV2.ATS.matched_skills = data.matched_skills.slice(0, 6);
-        }
-        if (data?.fit_summary) {
-          safeLegacyV2.Decision.reasoning = String(data.fit_summary);
-          safeLegacyV2.Recruiter.reasoning = String(data.fit_summary);
-        }
-        setEngineV2(safeLegacyV2);
-        setDetectedCareerArea(effectiveCareerArea || CAREER_AREA_FALLBACK);
-        setDetectedCareerAreaConfidence("medium");
-        setDetectedCareerAreaReason(
-          lang === "TR"
-            ? "Alan, CV ve ilan sinyallerine göre en yakın eşleşme olarak belirlendi."
-            : "Area was set to the nearest match from CV and JD signals."
-        );
-        const legacyScore = Number(data.alignment_score) || 0;
-        setAlignmentScore(data.alignment_score ?? null);
-        setScoreRunProgress(computeScoreRunProgress(legacyScore));
-        const legacyCompanyName = extractCompanyNameFromAnalysis(null, data, jdText);
-        const legacySavedTitle = resolveSavedAnalysisRole(
-          jdDerivedTitle,
-          data.role_type,
-          lang,
-          legacyCompanyName,
-          jdText,
-          new Date()
-        );
-        setRoleType(legacySavedTitle);
-        setSeniority(data.seniority ?? "");
-        setMatchedSkills(data.matched_skills ?? []);
-        setMissingSkills(data.missing_skills ?? []);
-        setTopKeywords(data.top_keywords ?? []);
-        const reportText = `Fit Summary:\n${data.fit_summary ?? ""}\n\nStrengths:\n${(data.strengths ?? []).map((s) => `- ${s}`).join("\n")}\n\nImprovement Suggestions:\n${(data.improvements ?? []).map((s) => `- ${s}`).join("\n")}\n\nWhy You Might Get Rejected:\nHIGH: ${(data.rejection_reasons?.high ?? []).join(", ") || "None"}\nMEDIUM: ${(data.rejection_reasons?.medium ?? []).join(", ") || "None"}`.trim();
-        setResult(reportText);
-        setAnalysisData({ ...data, role_type: legacySavedTitle });
-        const newEntry = { score: data.alignment_score ?? 0, role: legacySavedTitle, date: new Date().toLocaleDateString() };
-        setScoreHistory((prev) => [newEntry, ...prev].slice(0, 10));
-        await supabase.from("analyses").insert({
-          role: legacySavedTitle,
-          alignment_score: data.alignment_score ?? 0,
-          cv_text: cvText,
-          job_description: jdText,
-          report: reportText,
-          matched_skills: data.matched_skills ?? [],
-          missing_skills: data.missing_skills ?? [],
-          top_keywords: data.top_keywords ?? [],
-          rejection_reasons: data.rejection_reasons ?? {},
-          seniority: data.seniority ?? "",
-          user_id: user?.id ?? null,
-        });
-        await fetchAnalyses();
-        setShowSharePrompt(true);
-        creditConsumed = true;
-      } catch (err) {
-        console.error(err);
-        const fb = getFallbackAnalysis(cvText, effectiveJd, lang);
-        const safeV2 = buildFailSafeV2FromFallback(fb, cvText, effectiveJd, lang);
-        setEngineV2(safeV2);
-        setDetectedCareerArea(effectiveCareerArea || CAREER_AREA_FALLBACK);
-        setDetectedCareerAreaConfidence("low");
-        setDetectedCareerAreaReason(
-          lang === "TR"
-            ? "Güven düşük olduğu için varsayılan alan kullanıldı."
-            : "Low-confidence fallback area was applied."
-        );
-        setAlignmentScore(fb.score);
-        setScoreRunProgress(computeScoreRunProgress(fb.score));
-        setRoleType(resolveSavedAnalysisRole(jdDerivedTitle, "", lang, "", jdText, new Date()));
-        setSeniority("");
-        setMatchedSkills(safeV2.ATS?.matched_skills ?? []);
-        setMissingSkills(safeV2.ATS?.missing_keywords ?? []);
-        setTopKeywords(safeV2.ATS?.top_keywords ?? []);
-        setResult(String(fb.summary || "").trim());
-        setAnalysisData({
-          alignment_score: fb.score,
-          role_type: resolveSavedAnalysisRole(jdDerivedTitle, "", lang, "", jdText, new Date()),
-          seniority: "",
-          fit_summary: fb.summary,
-          strengths: [lang === "TR" ? "Mevcut sinyallerden analiz tamamlandı" : "Analysis completed from available signals"],
-          improvements: fb.fixes,
-          matched_skills: safeV2.ATS?.matched_skills ?? [],
-          missing_skills: safeV2.ATS?.missing_keywords ?? [],
-          top_keywords: safeV2.ATS?.top_keywords ?? [],
-          rejection_reasons: { high: [fb.keyGap], medium: [], low: [] },
-        });
-        setError("");
-        setShowSharePrompt(true);
-      }
+      console.error("[analyze] v2 pipeline failed; legacy Groq fallback disabled");
+      setError(lang === "TR"
+        ? "Analiz tamamlanamadı. Lütfen tekrar dene."
+        : "Analysis failed. Please try again.");
+      clearInterval(msgInterval);
+      setLoadingMessage("");
+      setLoading(false);
+      return;
     }
 
     clearInterval(msgInterval);
@@ -6935,24 +6790,7 @@ const msgInterval = setInterval(() => {
       }
     }
 
-    if (!v2Ok) {
-      setDecisionLoading(true);
-      try {
-        const decisionRes = await fetch(`${HF_API_BASE}/decision`, {
-          method: "POST",
-          headers: await getApiAuthHeaders({ requireSession: false }),
-          body: JSON.stringify({ cvText, jobDescription: effectiveJd, sector, lang, deadline, targetRole: activeTargetRole }),
-        });
-        const decisionResult = await decisionRes.json();
-        setDecisionData(decisionResult);
-      } catch (err) {
-        console.error("Decision engine failed:", err);
-      } finally {
-        setDecisionLoading(false);
-      }
-    } else {
-      setDecisionLoading(false);
-    }
+    setDecisionLoading(false);
   };
 
   const applyFix = async (fix, index) => {
@@ -7682,25 +7520,22 @@ export function AnalyzerPage() {
     const fromModel = Array.isArray(engineV2?.Output?.role_suggestions) ? engineV2.Output.role_suggestions : [];
     if (fromModel.length) {
       return {
-        current_direction_problem: "Bu rol için sinyalin zayıf kalıyor.",
+        current_direction_problem: String(engineV2?.Output?.recruiter_view || "").trim(),
         better_roles: fromModel.slice(0, 3),
       };
     }
     return buildRoleSuggestionsFromCv(cvText, lang);
   }, [cvText, lang, engineV2]);
   const roleSuggestions = roleRedirection?.better_roles || [];
-  const hardReason = useMemo(
-    () =>
-      normalizeSingleHardReason(
-        engineV2?.Output?.reasons?.[0] || mainIssue || analysisData?.fit_summary || "",
-        lang
-      ),
-    [engineV2, mainIssue, analysisData, lang]
-  );
-  const decisionCopy = useMemo(
-    () => (decisionScore == null ? null : buildDecisionScreenCopy(decisionScore, hardReason, lang)),
-    [decisionScore, hardReason, lang]
-  );
+  const aiDecisionText = String(engineV2?.Output?.decision || "").trim();
+  const aiRecruiterView = String(engineV2?.Output?.recruiter_view || "").trim();
+  const aiReasons = Array.isArray(engineV2?.Output?.reasons)
+    ? engineV2.Output.reasons.map((x) => String(x || "").trim()).filter(Boolean)
+    : [];
+  const aiFixes = Array.isArray(engineV2?.Output?.fixes)
+    ? engineV2.Output.fixes.map((x) => String(x || "").trim()).filter(Boolean)
+    : [];
+  const primaryReason = aiReasons[0] || String(mainIssue || analysisData?.fit_summary || "").trim();
   const impactProjection = useMemo(() => {
     if (decisionScore == null) return null;
     const fromV2 = computeImpactProjection(
@@ -7724,10 +7559,9 @@ export function AnalyzerPage() {
       narrative: lang === "TR" ? "Küçük bir değişiklik, büyük fark yaratır." : "Small change, big difference.",
     };
   }, [decisionScore, engineV2, analysisData, missingSkills, lang]);
-  const singleAction = useMemo(
-    () => buildSingleActionFromReason(hardReason, lang),
-    [hardReason, lang]
-  );
+  const singleAction = aiFixes[0]
+    || String(engineV2?.Decision?.what_to_fix_first?.[0] || analysisData?.improvements?.[0] || "").trim()
+    || buildSingleActionFromReason(primaryReason, lang);
 
   useEffect(() => {
     if (!user?.email) return;
@@ -8319,7 +8153,7 @@ export function AnalyzerPage() {
         </div>
       </div>
     )}
-    {hasOutput && !loading && decisionCopy && impactProjection ? (
+    {hasOutput && !loading && impactProjection ? (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -8346,13 +8180,10 @@ export function AnalyzerPage() {
             {"Karar"}
           </div>
           <div style={{ fontSize: 22, lineHeight: 1.2, fontWeight: 900, color: "#fee2e2", marginBottom: 6 }}>
-            {decisionCopy.title}
+            {aiDecisionText || mapDecisionLabel(engineV2?.Decision?.final_verdict, lang)}
           </div>
           <div style={{ fontSize: 14, color: "#fecaca", lineHeight: 1.45, marginBottom: 4 }}>
-            {decisionCopy.subtext}
-          </div>
-          <div style={{ fontSize: 12, color: "#fda4af", fontWeight: 700 }}>
-            {decisionCopy.microEmotion}
+            {aiRecruiterView || firstTwoSentences(primaryReason)}
           </div>
         </div>
         <div
@@ -8434,7 +8265,7 @@ export function AnalyzerPage() {
               padding: "10px 12px",
             }}
           >
-            {hardReason}
+            {primaryReason}
           </div>
         </div>
 
@@ -8539,18 +8370,6 @@ export function AnalyzerPage() {
               </div>
               <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, marginBottom: 8 }}>
                 {r.reason}
-                <div style={{ marginTop: 6, color: "#cbd5e1" }}>
-                  {"Bu role geçersen:"}
-                </div>
-                <div style={{ marginTop: 3 }}>
-                  {"- CV’n bu role daha doğal oturuyor"}
-                </div>
-                <div>
-                  {"- Recruiter seni daha hızlı anlar"}
-                </div>
-                <div>
-                  {"- Geri dönüş ihtimalin artar"}
-                </div>
               </div>
               <button
                 type="button"
