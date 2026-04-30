@@ -1203,7 +1203,7 @@ const lemonWebhookHandler = async (req, res) => {
 app.post("/api/webhook", express.raw({ type: "application/json" }), lemonWebhookHandler);
 app.post("/webhook", express.raw({ type: "application/json" }), lemonWebhookHandler);
 
-const PORT = Number(process.env.PORT || 3000);
+const PORT = 3000;
 
 try {
   const server = app.listen(PORT, "0.0.0.0", () => {
