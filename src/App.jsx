@@ -6677,6 +6677,7 @@ const msgInterval = setInterval(() => {
     let creditConsumed = false;
     const jdDerivedTitle = extractJobTitleFromJd(effectiveJd);
     try {
+      console.log("[analyze] v2 request start");
       const v2Res = await fetch(`${HF_API_BASE}/api/analyze-v2`, {
         method: "POST",
         headers: await getApiAuthHeaders({ requireSession: false }),
@@ -6690,6 +6691,7 @@ const msgInterval = setInterval(() => {
         }),
       });
       if (v2Res.ok) {
+        console.log("[analyze] v2 response ok");
         const v2Raw = await v2Res.json();
         const v2 = ensureFailSafeV2(v2Raw, cvText, effectiveJd, lang);
         v2Ok = true;
@@ -6797,10 +6799,11 @@ const msgInterval = setInterval(() => {
         creditConsumed = true;
       }
     } catch (e) {
-      console.error("analyze-v2", e);
+      console.error("[analyze] v2 failed, fallback will run", e);
     }
 
     if (!v2Ok) {
+      console.warn("[analyze] fallback path active: /analyze");
       try {
         const res = await fetch(`${HF_API_BASE}/analyze`, {
           method: "POST",
@@ -6808,6 +6811,7 @@ const msgInterval = setInterval(() => {
           body: JSON.stringify({ cvText, jobDescription: effectiveJd, sector, lang, careerArea: effectiveCareerArea || undefined }),
         });
         const data = await res.json();
+        console.log("[analyze] legacy fallback response ok");
         const fbLegacy = getFallbackAnalysis(cvText, effectiveJd, lang);
         const safeLegacyV2 = buildFailSafeV2FromFallback(
           { ...fbLegacy, score: Number(data.alignment_score) || fbLegacy.score },
