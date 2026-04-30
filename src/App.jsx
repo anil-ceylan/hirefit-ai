@@ -1602,10 +1602,10 @@ function normalizeSingleHardReason(rawIssue, lang) {
   const issue = String(rawIssue || "").trim();
   const lo = issue.toLowerCase();
   if (!issue) {
-    return "CV’n gerçek sonuçlar göstermiyor";
+    return "CV’inde yaptığın işleri anlatıyorsun ama sonuçlarını göstermiyorsun. Bu recruiter için 'katkı yok' anlamına gelir.";
   }
   if (lo.includes("ölç") || lo.includes("metric") || lo.includes("quant") || lo.includes("impact")) {
-    return "CV’n gerçek sonuçlar göstermiyor";
+    return "CV’inde yaptığın işleri anlatıyorsun ama sonuçlarını göstermiyorsun. Bu recruiter için 'katkı yok' anlamına gelir.";
   }
   if (lo.includes("eşleş") || lo.includes("match") || lo.includes("deneyim") || lo.includes("experience")) {
     return "İlanla doğrudan eşleşen deneyim eksik";
@@ -1620,9 +1620,9 @@ function buildDecisionScreenCopy(score, reason, lang) {
   const s = Math.round(Number(score) || 0);
   if (s < 50) {
     return {
-      title: "Büyük ihtimalle eleneceksin",
-      subtext: `${reason} ve bu ilanın eşiğinin altındasın.`,
-      microEmotion: "Bu yüzden geri dönüş alamıyorsun.",
+      title: "Bu CV ile bu role başvurursan büyük ihtimalle elenirsin.",
+      subtext: "Çünkü bu rolün aradığı kritik sinyaller sende görünmüyor.",
+      microEmotion: reason,
     };
   }
   if (s <= 70) {
@@ -6691,7 +6691,6 @@ const msgInterval = setInterval(() => {
       });
       if (v2Res.ok) {
         const v2Raw = await v2Res.json();
-        console.log("[analyze-v2] parsed json:", v2Raw);
         const v2 = ensureFailSafeV2(v2Raw, cvText, effectiveJd, lang);
         v2Ok = true;
         setEngineV2(v2);
@@ -6735,9 +6734,10 @@ const msgInterval = setInterval(() => {
         const high = reasons.filter((r) => r.impact === "high").map((r) => r.issue);
         const med = reasons.filter((r) => r.impact === "medium").map((r) => r.issue);
         const low = reasons.filter((r) => r.impact === "low").map((r) => r.issue);
-        const reportText = `HireFit Decision Engine\nVerdict: ${mapDecisionLabel(v2.Decision?.final_verdict, lang)}\nAlignment: ${fs}\n\n${v2.Decision?.reasoning || ""}`.trim();
+        const outputDecision = String(v2?.Output?.decision || v2.Decision?.reasoning || "").trim();
+        const outputReasons = Array.isArray(v2?.Output?.reasons) ? v2.Output.reasons.filter(Boolean) : [];
+        const reportText = [outputDecision, ...outputReasons.map((r) => `- ${r}`)].filter(Boolean).join("\n");
         setResult(reportText);
-        console.log("[analyze-v2] setResult(reportText):", reportText);
         const roleMatchesFromV2 =
           !v2.RoleFit?.locked && Array.isArray(v2.RoleFit?.role_fit) && v2.RoleFit.role_fit.length
             ? v2.RoleFit.role_fit.map((r) => ({
@@ -6776,11 +6776,6 @@ const msgInterval = setInterval(() => {
           interview_prep: hasProAccess ? buildInterviewPrepFromV2(v2, lang) : [],
           confidence_score: confNum,
         });
-        console.log("[analyze-v2] setAnalysisData:", {
-          alignment_score: fs,
-          role_type: savedTitle,
-          has_rejection_reasons: Boolean(high.length || med.length || low.length),
-        });
         setScoreHistory((prev) =>
           [{ score: fs, role: savedTitle, date: new Date().toLocaleDateString() }, ...prev].slice(0, 10)
         );
@@ -6813,7 +6808,6 @@ const msgInterval = setInterval(() => {
           body: JSON.stringify({ cvText, jobDescription: effectiveJd, sector, lang, careerArea: effectiveCareerArea || undefined }),
         });
         const data = await res.json();
-        console.log("[analyze-legacy] parsed json:", data);
         const fbLegacy = getFallbackAnalysis(cvText, effectiveJd, lang);
         const safeLegacyV2 = buildFailSafeV2FromFallback(
           { ...fbLegacy, score: Number(data.alignment_score) || fbLegacy.score },
@@ -6864,7 +6858,6 @@ const msgInterval = setInterval(() => {
         const reportText = `Fit Summary:\n${data.fit_summary ?? ""}\n\nStrengths:\n${(data.strengths ?? []).map((s) => `- ${s}`).join("\n")}\n\nImprovement Suggestions:\n${(data.improvements ?? []).map((s) => `- ${s}`).join("\n")}\n\nWhy You Might Get Rejected:\nHIGH: ${(data.rejection_reasons?.high ?? []).join(", ") || "None"}\nMEDIUM: ${(data.rejection_reasons?.medium ?? []).join(", ") || "None"}`.trim();
         setResult(reportText);
         setAnalysisData({ ...data, role_type: legacySavedTitle });
-        console.log("[analyze-legacy] setResult/report + setAnalysisData done");
         const newEntry = { score: data.alignment_score ?? 0, role: legacySavedTitle, date: new Date().toLocaleDateString() };
         setScoreHistory((prev) => [newEntry, ...prev].slice(0, 10));
         await supabase.from("analyses").insert({
@@ -6902,7 +6895,7 @@ const msgInterval = setInterval(() => {
         setMatchedSkills(safeV2.ATS?.matched_skills ?? []);
         setMissingSkills(safeV2.ATS?.missing_keywords ?? []);
         setTopKeywords(safeV2.ATS?.top_keywords ?? []);
-        setResult(`HireFit Decision Engine\nVerdict: ${fb.verdict}\nAlignment: ${fb.score}\n\n${fb.summary}`);
+        setResult(String(fb.summary || "").trim());
         setAnalysisData({
           alignment_score: fb.score,
           role_type: resolveSavedAnalysisRole(jdDerivedTitle, "", lang, "", jdText, new Date()),
@@ -7682,12 +7675,23 @@ export function AnalyzerPage() {
   const previewScoreDelta = previewReanalyzePending ? null : reanalysisResult;
   const decisionScore = Number.isFinite(Number(alignmentScore)) ? Math.round(Number(alignmentScore)) : null;
   const roleRedirection = useMemo(() => {
+    const fromModel = Array.isArray(engineV2?.Output?.role_suggestions) ? engineV2.Output.role_suggestions : [];
+    if (fromModel.length) {
+      return {
+        current_direction_problem: "Bu rol için sinyalin zayıf kalıyor.",
+        better_roles: fromModel.slice(0, 3),
+      };
+    }
     return buildRoleSuggestionsFromCv(cvText, lang);
-  }, [cvText, lang]);
+  }, [cvText, lang, engineV2]);
   const roleSuggestions = roleRedirection?.better_roles || [];
   const hardReason = useMemo(
-    () => normalizeSingleHardReason(mainIssue || analysisData?.fit_summary || "", lang),
-    [mainIssue, analysisData, lang]
+    () =>
+      normalizeSingleHardReason(
+        engineV2?.Output?.reasons?.[0] || mainIssue || analysisData?.fit_summary || "",
+        lang
+      ),
+    [engineV2, mainIssue, analysisData, lang]
   );
   const decisionCopy = useMemo(
     () => (decisionScore == null ? null : buildDecisionScreenCopy(decisionScore, hardReason, lang)),
@@ -7725,19 +7729,6 @@ export function AnalyzerPage() {
     if (!user?.email) return;
     setUnlockEmail(user.email);
   }, [user]);
-
-  useEffect(() => {
-    if (!result && !analysisData && !engineV2) return;
-    console.log("[render-debug] state snapshot", {
-      hasResult: Boolean(result),
-      hasAnalysisData: Boolean(analysisData),
-      hasEngineV2: Boolean(engineV2),
-      alignmentScore,
-      hasOutput,
-      reportUnlocked,
-      hasUser: Boolean(user),
-    });
-  }, [result, analysisData, engineV2, alignmentScore, hasOutput, reportUnlocked, user]);
 
   useEffect(() => {
     if (!hasOutput || loading) return;
@@ -8544,6 +8535,18 @@ export function AnalyzerPage() {
               </div>
               <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, marginBottom: 8 }}>
                 {r.reason}
+                <div style={{ marginTop: 6, color: "#cbd5e1" }}>
+                  {"Bu role geçersen:"}
+                </div>
+                <div style={{ marginTop: 3 }}>
+                  {"- CV’n bu role daha doğal oturuyor"}
+                </div>
+                <div>
+                  {"- Recruiter seni daha hızlı anlar"}
+                </div>
+                <div>
+                  {"- Geri dönüş ihtimalin artar"}
+                </div>
               </div>
               <button
                 type="button"
@@ -8568,11 +8571,6 @@ export function AnalyzerPage() {
           ))}
         </div>
       </div>
-    ) : null}
-    {result ? (
-      <pre style={{ marginTop: 10, padding: 10, borderRadius: 8, background: "rgba(15,23,42,0.5)", color: "#cbd5e1", fontSize: 11, overflowX: "auto" }}>
-        {JSON.stringify(result)}
-      </pre>
     ) : null}
     {showMarketInsightsModal ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.76)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
