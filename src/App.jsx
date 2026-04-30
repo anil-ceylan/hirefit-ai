@@ -6691,6 +6691,7 @@ const msgInterval = setInterval(() => {
       });
       if (v2Res.ok) {
         const v2Raw = await v2Res.json();
+        console.log("[analyze-v2] parsed json:", v2Raw);
         const v2 = ensureFailSafeV2(v2Raw, cvText, effectiveJd, lang);
         v2Ok = true;
         setEngineV2(v2);
@@ -6736,6 +6737,7 @@ const msgInterval = setInterval(() => {
         const low = reasons.filter((r) => r.impact === "low").map((r) => r.issue);
         const reportText = `HireFit Decision Engine\nVerdict: ${mapDecisionLabel(v2.Decision?.final_verdict, lang)}\nAlignment: ${fs}\n\n${v2.Decision?.reasoning || ""}`.trim();
         setResult(reportText);
+        console.log("[analyze-v2] setResult(reportText):", reportText);
         const roleMatchesFromV2 =
           !v2.RoleFit?.locked && Array.isArray(v2.RoleFit?.role_fit) && v2.RoleFit.role_fit.length
             ? v2.RoleFit.role_fit.map((r) => ({
@@ -6774,6 +6776,11 @@ const msgInterval = setInterval(() => {
           interview_prep: hasProAccess ? buildInterviewPrepFromV2(v2, lang) : [],
           confidence_score: confNum,
         });
+        console.log("[analyze-v2] setAnalysisData:", {
+          alignment_score: fs,
+          role_type: savedTitle,
+          has_rejection_reasons: Boolean(high.length || med.length || low.length),
+        });
         setScoreHistory((prev) =>
           [{ score: fs, role: savedTitle, date: new Date().toLocaleDateString() }, ...prev].slice(0, 10)
         );
@@ -6806,6 +6813,7 @@ const msgInterval = setInterval(() => {
           body: JSON.stringify({ cvText, jobDescription: effectiveJd, sector, lang, careerArea: effectiveCareerArea || undefined }),
         });
         const data = await res.json();
+        console.log("[analyze-legacy] parsed json:", data);
         const fbLegacy = getFallbackAnalysis(cvText, effectiveJd, lang);
         const safeLegacyV2 = buildFailSafeV2FromFallback(
           { ...fbLegacy, score: Number(data.alignment_score) || fbLegacy.score },
@@ -6856,6 +6864,7 @@ const msgInterval = setInterval(() => {
         const reportText = `Fit Summary:\n${data.fit_summary ?? ""}\n\nStrengths:\n${(data.strengths ?? []).map((s) => `- ${s}`).join("\n")}\n\nImprovement Suggestions:\n${(data.improvements ?? []).map((s) => `- ${s}`).join("\n")}\n\nWhy You Might Get Rejected:\nHIGH: ${(data.rejection_reasons?.high ?? []).join(", ") || "None"}\nMEDIUM: ${(data.rejection_reasons?.medium ?? []).join(", ") || "None"}`.trim();
         setResult(reportText);
         setAnalysisData({ ...data, role_type: legacySavedTitle });
+        console.log("[analyze-legacy] setResult/report + setAnalysisData done");
         const newEntry = { score: data.alignment_score ?? 0, role: legacySavedTitle, date: new Date().toLocaleDateString() };
         setScoreHistory((prev) => [newEntry, ...prev].slice(0, 10));
         await supabase.from("analyses").insert({
@@ -7718,6 +7727,19 @@ export function AnalyzerPage() {
   }, [user]);
 
   useEffect(() => {
+    if (!result && !analysisData && !engineV2) return;
+    console.log("[render-debug] state snapshot", {
+      hasResult: Boolean(result),
+      hasAnalysisData: Boolean(analysisData),
+      hasEngineV2: Boolean(engineV2),
+      alignmentScore,
+      hasOutput,
+      reportUnlocked,
+      hasUser: Boolean(user),
+    });
+  }, [result, analysisData, engineV2, alignmentScore, hasOutput, reportUnlocked, user]);
+
+  useEffect(() => {
     if (!hasOutput || loading) return;
     const runKey = analysisExecutionFingerprint(cvText, jdText, alignmentScore);
     if (!runKey || runKey === unlockRunKey) return;
@@ -8302,7 +8324,7 @@ export function AnalyzerPage() {
         </div>
       </div>
     )}
-    {(reportUnlocked || user) && hasOutput && !loading && decisionCopy && impactProjection ? (
+    {hasOutput && !loading && decisionCopy && impactProjection ? (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -8489,7 +8511,7 @@ export function AnalyzerPage() {
         </div>
       </motion.div>
     ) : null}
-    {(reportUnlocked || user) && hasOutput && !loading && roleSuggestions.length ? (
+    {hasOutput && !loading && roleSuggestions.length ? (
       <div
         ref={roleSuggestionsRef}
         style={{
@@ -8546,6 +8568,11 @@ export function AnalyzerPage() {
           ))}
         </div>
       </div>
+    ) : null}
+    {result ? (
+      <pre style={{ marginTop: 10, padding: 10, borderRadius: 8, background: "rgba(15,23,42,0.5)", color: "#cbd5e1", fontSize: 11, overflowX: "auto" }}>
+        {JSON.stringify(result)}
+      </pre>
     ) : null}
     {showMarketInsightsModal ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.76)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
