@@ -730,21 +730,19 @@ function CareerNavigationMap({
                 cursor: "pointer",
               }}
             >
-              📤 {tr ? "LinkedIn'de paylaş" : "Share on LinkedIn"}
+              📤 {"LinkedIn'de paylaş"}
             </button>
           </div>
 
           <div style={{ marginTop: 10, borderRadius: 12, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(15,23,42,0.28)", padding: "10px 10px" }}>
             <div style={{ fontSize: 12, color: "#f1f5f9", fontWeight: 800 }}>
-              {tr ? "Başvurduğunda geri gel." : "When you apply, come back."}
+              {"Başvurduğunda geri gel."}
             </div>
             <div style={{ fontSize: 11.5, color: "#cbd5e1", marginTop: 4 }}>
-              {tr
-                ? "Sonuçlarını analiz eder, stratejini gerçek veriye göre iyileştiririz."
-                : "We'll analyze your results and improve your strategy."}
+              {"Sonuçlarını analiz eder, stratejini gerçek veriye göre iyileştiririz."}
             </div>
             <div style={{ marginTop: 8, fontSize: 12, color: "#a5b4fc", fontWeight: 800 }}>
-              {tr ? "Sıradaki hedef: Mülakatlar" : "Your next goal: Interviews"}
+              {"Sıradaki hedef: Mülakatlar"}
             </div>
             <div style={{ fontSize: 11.5, color: "#cbd5e1", marginTop: 3 }}>
               {tr ? "Sıradaki yükseltme: Mülakatları geçmek" : "Next upgrade: Passing interviews"}

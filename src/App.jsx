@@ -122,9 +122,8 @@ const SECTOR_CHIP_THEME = {
 
 function getSectorDisplayLabel(sectorKey, lang) {
   const idx = HF_SECTOR_VALUES.indexOf(String(sectorKey || ""));
-  const tr = ["Otomatik (ilan)", "Teknoloji / Startup", "Danışmanlık", "Finans", "FMCG / Perakende", "Sağlık", "Kamu", "Telekom / Donanım", "Ürün Tasarımı / UX"];
-  const en = ["Auto (from job)", "Tech / Startup", "Consulting", "Finance", "FMCG / Retail", "Healthcare", "Government", "Telecom / Hardware", "Product Design / UX"];
-  if (idx >= 0) return lang === "TR" ? tr[idx] : en[idx];
+  const labels = ["Otomatik (ilan)", "Teknoloji / Startup", "Danışmanlık", "Finans", "FMCG / Perakende", "Sağlık", "Kamu", "Telekom / Donanım", "Ürün Tasarımı / UX"];
+  if (idx >= 0) return labels[idx];
   return String(sectorKey || "");
 }
 
@@ -340,8 +339,7 @@ function hasMeaningfulText(v) {
 }
 
 function normalizeRoleLabel(rawRole, lang) {
-  const tr = String(lang || "").trim().toLowerCase() === "tr";
-  const fallback = tr ? "Analist" : "Analyst";
+  const fallback = "Analist";
   const raw = String(rawRole || "")
     .replace(/[\u2022•]+/g, " ")
     .replace(/\s+/g, " ")
@@ -361,7 +359,7 @@ function normalizeRoleLabel(rawRole, lang) {
     { key: /project\s+manager|proje\s+yönetic/i, tr: "Proje Yöneticisi", en: "Project Manager" },
   ];
   const matched = roleMap.find((x) => x.key.test(lower));
-  if (matched) return tr ? matched.tr : matched.en;
+  if (matched) return matched.tr;
 
   // If model returns a sentence/ad copy instead of role title, force a clean fallback role.
   const looksNoisy =
@@ -392,48 +390,47 @@ function dedupeTextList(lines) {
 }
 
 function buildRoleSuggestionsFromCv(cvText, lang = "TR") {
-  const tr = String(lang || "").toUpperCase() === "TR";
   const text = String(cvText || "").toLowerCase();
   const roleDefs = [
     {
-      role: tr ? "Veri Analisti" : "Data Analyst",
+      role: "Veri Analisti",
       patterns: [/sql\b/i, /python\b/i, /tableau|power\s?bi/i, /dashboard/i, /veri|data/i, /analiz|analysis/i],
-      reason: tr ? "Veri analizi ve raporlama sinyalleri bu rolle güçlü örtüşüyor." : "Data analysis and reporting signals align strongly with this role.",
+      reason: "Veri analizi ve raporlama sinyalleri bu rolle güçlü örtüşüyor.",
     },
     {
-      role: tr ? "İş Analisti" : "Business Analyst",
+      role: "İş Analisti",
       patterns: [/iş\s?analiz|business\s?analyst/i, /süreç|process/i, /gereksinim|requirement/i, /paydaş|stakeholder/i, /rapor|report/i],
-      reason: tr ? "Süreç, paydaş ve iş analizi odaklı deneyim bu role yakın." : "Process, stakeholder, and business-analysis experience fits this role.",
+      reason: "Süreç, paydaş ve iş analizi odaklı deneyim bu role yakın.",
     },
     {
-      role: tr ? "Ürün Analisti" : "Product Analyst",
+      role: "Ürün Analisti",
       patterns: [/ürün|product/i, /kpi|metric/i, /a\/b|ab\s?test/i, /funnel|dönüşüm|conversion/i, /kullanıcı|user/i],
-      reason: tr ? "Ürün metrikleri ve kullanıcı davranışı odaklı sinyal bu role uyuyor." : "Product metrics and user-behavior signals fit this role.",
+      reason: "Ürün metrikleri ve kullanıcı davranışı odaklı sinyal bu role uyuyor.",
     },
     {
-      role: tr ? "Ürün Yöneticisi" : "Product Manager",
+      role: "Ürün Yöneticisi",
       patterns: [/product\s?manager|ürün\s?yönetic/i, /roadmap/i, /önceliklendirme|prioritization/i, /paydaş|stakeholder/i, /go-to-market|gtm/i],
-      reason: tr ? "Önceliklendirme ve ürün sahipliği sinyalleri bu role yakın." : "Prioritization and product ownership signals align with this role.",
+      reason: "Önceliklendirme ve ürün sahipliği sinyalleri bu role yakın.",
     },
     {
-      role: tr ? "Yazılım Geliştirici" : "Software Developer",
+      role: "Yazılım Geliştirici",
       patterns: [/react|node|javascript|typescript|java|c#|go|python/i, /api/i, /backend|frontend/i, /deploy|aws|docker/i, /yazılım|software/i],
-      reason: tr ? "Kod, sistem ve teslimat odaklı teknik sinyaller bu role uyuyor." : "Code, systems, and delivery-focused technical signals fit this role.",
+      reason: "Kod, sistem ve teslimat odaklı teknik sinyaller bu role uyuyor.",
     },
     {
-      role: tr ? "Pazarlama Uzmanı" : "Marketing Specialist",
+      role: "Pazarlama Uzmanı",
       patterns: [/pazarlama|marketing/i, /seo|sem/i, /kampanya|campaign/i, /ga4|google\sanalytics/i, /lead|growth/i],
-      reason: tr ? "Kampanya, büyüme ve performans pazarlaması sinyalleri bu role uygun." : "Campaign, growth, and performance marketing signals fit this role.",
+      reason: "Kampanya, büyüme ve performans pazarlaması sinyalleri bu role uygun.",
     },
     {
-      role: tr ? "Finans Analisti" : "Financial Analyst",
+      role: "Finans Analisti",
       patterns: [/finans|financial/i, /bütçe|budget/i, /forecast|tahmin/i, /p&l|karlılık|profit/i, /excel/i],
-      reason: tr ? "Finansal analiz ve planlama odaklı deneyim bu role yakın." : "Financial analysis and planning experience aligns with this role.",
+      reason: "Finansal analiz ve planlama odaklı deneyim bu role yakın.",
     },
     {
-      role: tr ? "Operasyon Uzmanı" : "Operations Specialist",
+      role: "Operasyon Uzmanı",
       patterns: [/operasyon|operations/i, /verimlilik|efficiency/i, /süreç|process/i, /koordinasyon|coordination/i, /lojistik|logistics/i],
-      reason: tr ? "Operasyon ve süreç iyileştirme sinyalleri bu role güçlü uyuyor." : "Operations and process-improvement signals strongly fit this role.",
+      reason: "Operasyon ve süreç iyileştirme sinyalleri bu role güçlü uyuyor.",
     },
   ];
 
@@ -454,15 +451,9 @@ function buildRoleSuggestionsFromCv(cvText, lang = "TR") {
   const hasClearRoleSignal = scored[0]?.hit >= 2;
   const currentDirectionProblem = hasClearRoleSignal
     ? (hasMetrics
-      ? (tr
-        ? "Mevcut yönün dağınık; CV bir role net odak vermiyor."
-        : "Your current direction is scattered; the CV does not show one clear role focus.")
-      : (tr
-        ? "Mevcut yönün zayıf; CV görev yazıyor ama sonuç kanıtı vermiyor."
-        : "Your current direction is weak; the CV lists tasks but not proof of outcomes."))
-    : (tr
-      ? "Mevcut yönün zayıf; CV sinyalleri hedef role net bağlanmıyor."
-      : "Your current direction is weak; CV signals do not connect to a clear target role.");
+      ? "Mevcut yönün dağınık; CV bir role net odak vermiyor."
+      : "Mevcut yönün zayıf; CV görev yazıyor ama sonuç kanıtı vermiyor.")
+    : "Mevcut yönün zayıf; CV sinyalleri hedef role net bağlanmıyor.";
 
   return {
     current_direction_problem: currentDirectionProblem,
@@ -471,23 +462,13 @@ function buildRoleSuggestionsFromCv(cvText, lang = "TR") {
 }
 
 function buildRoleContextJobDescription(role, lang = "TR") {
-  const tr = String(lang || "").toUpperCase() === "TR";
-  const r = String(role || "").trim() || (tr ? "İş Analisti" : "Business Analyst");
-  if (tr) {
-    return [
-      `${r} rolü için hedef profil:`,
-      "- Ölçülebilir iş çıktısı üretir",
-      "- Süreçleri iyileştirir ve net etki gösterir",
-      "- Araç ve yöntem bilgisini somut örneklerle kanıtlar",
-      "- Paydaşlarla net iletişim kurar ve sonuç odaklı çalışır",
-    ].join("\n");
-  }
+  const r = String(role || "").trim() || "İş Analisti";
   return [
-    `Target profile for ${r}:`,
-    "- Produces measurable business outcomes",
-    "- Improves processes and shows clear impact",
-    "- Demonstrates tools and methods with concrete examples",
-    "- Communicates clearly with stakeholders and executes with ownership",
+    `${r} rolü için hedef profil:`,
+    "- Ölçülebilir iş çıktısı üretir",
+    "- Süreçleri iyileştirir ve net etki gösterir",
+    "- Araç ve yöntem bilgisini somut örneklerle kanıtlar",
+    "- Paydaşlarla net iletişim kurar ve sonuç odaklı çalışır",
   ].join("\n");
 }
 
@@ -541,7 +522,7 @@ function getFallbackAnalysis(cvText, jobDescription, lang = "EN") {
 
   const verdict = score < 55 ? "Stop" : "Improve";
   const keyGap = !hasMetrics
-    ? (tr ? "Ölçülebilir etki görünmüyor" : "Your CV doesn't show real results.")
+    ? "CV’n gerçek sonuçlar göstermiyor."
     : visibleTools.length === 0
       ? (tr ? "Görünür araç seti sinyali yok" : "No visible tools stack")
       : mismatch
@@ -1599,100 +1580,77 @@ function AnalysisThinkingOverlay({ lang, loading }) {
 }
 
 function pickLeadInsight(engineV2, analysisData, lang) {
-  const tr = lang === "TR";
   const insight =
     engineV2?.Gaps?.biggest_gap ||
     engineV2?.Gaps?.rejection_reasons?.[0]?.issue ||
     analysisData?.rejection_reasons?.high?.[0] ||
     analysisData?.fit_summary ||
-    (tr
-      ? "CV sinyalin rol beklentisine göre zayıf kalıyor."
-      : "Your CV signal is weaker than the role expectation.");
+    "CV sinyalin rol beklentisine göre zayıf kalıyor.";
   return String(insight || "").trim();
 }
 
 function pickLeadSuggestion(engineV2, analysisData, lang) {
-  const tr = lang === "TR";
   const suggestion =
     engineV2?.Decision?.what_to_fix_first?.[0] ||
     analysisData?.improvements?.[0] ||
     analysisData?.missing_skills?.[0] ||
-    (tr
-      ? "Her ana deneyime ölçülebilir etki ekle."
-      : "Add measurable impact to each core experience.");
+    "Her ana deneyime ölçülebilir etki ekle.";
   return String(suggestion || "").trim();
 }
 
 function normalizeSingleHardReason(rawIssue, lang) {
-  const tr = lang === "TR";
   const issue = String(rawIssue || "").trim();
   const lo = issue.toLowerCase();
   if (!issue) {
-    return tr ? "CV'inde ölçülebilir sonuç yok" : "Your CV doesn't show real results";
+    return "CV’n gerçek sonuçlar göstermiyor";
   }
   if (lo.includes("ölç") || lo.includes("metric") || lo.includes("quant") || lo.includes("impact")) {
-    return tr ? "CV'inde ölçülebilir sonuç yok" : "Your CV doesn't show real results";
+    return "CV’n gerçek sonuçlar göstermiyor";
   }
   if (lo.includes("eşleş") || lo.includes("match") || lo.includes("deneyim") || lo.includes("experience")) {
-    return tr ? "İlanla doğrudan eşleşen deneyim eksik" : "You lack directly matching experience";
+    return "İlanla doğrudan eşleşen deneyim eksik";
   }
   if (lo.includes("anahtar") || lo.includes("keyword") || lo.includes("beceri") || lo.includes("skill")) {
-    return tr ? "Anahtar beceriler görünmüyor" : "Key skills are not visible";
+    return "Anahtar beceriler görünmüyor";
   }
   return firstTwoSentences(issue);
 }
 
 function buildDecisionScreenCopy(score, reason, lang) {
-  const tr = lang === "TR";
   const s = Math.round(Number(score) || 0);
   if (s < 50) {
     return {
-      title: tr ? "Büyük ihtimalle eleneceksin" : "You'll get rejected",
-      subtext: tr
-        ? `${reason} ve bu ilanın eşiğinin altındasın.`
-        : `${reason} and you are below this role's threshold.`,
-      microEmotion: tr ? "Bu yüzden geri dönüş alamıyorsun." : "That is why you are not getting callbacks.",
+      title: "Büyük ihtimalle eleneceksin",
+      subtext: `${reason} ve bu ilanın eşiğinin altındasın.`,
+      microEmotion: "Bu yüzden geri dönüş alamıyorsun.",
     };
   }
   if (s <= 70) {
     return {
-      title: tr ? "Sınırdasın — risk altındasın" : "You are on the edge — at risk",
-      subtext: tr
-        ? `${reason}. Tek bir kritik boşluk seni eler.`
-        : `${reason}. One critical gap can eliminate you.`,
-      microEmotion: tr ? "Bu yüzden çoğu başvuru sessiz kalıyor." : "That is why most applications stay silent.",
+      title: "Sınırdasın — risk altındasın",
+      subtext: `${reason}. Tek bir kritik boşluk seni eler.`,
+      microEmotion: "Bu yüzden çoğu başvuru sessiz kalıyor.",
     };
   }
   return {
-    title: tr ? "Şansın var — ama garanti değil" : "You have a chance — not a guarantee",
-    subtext: tr
-      ? `${reason}. Kanıt net değilse geri dönüş yine düşer.`
-      : `${reason}. If proof is weak, response still drops.`,
-    microEmotion: tr ? "Bu yüzden güçlü adaylar arasında kaybolabilirsin." : "That is why you can still get lost among stronger candidates.",
+    title: "Şansın var — ama garanti değil",
+    subtext: `${reason}. Kanıt net değilse geri dönüş yine düşer.`,
+    microEmotion: "Bu yüzden güçlü adaylar arasında kaybolabilirsin.",
   };
 }
 
 function buildSingleActionFromReason(reason, lang) {
-  const tr = lang === "TR";
   const lo = String(reason || "").toLowerCase();
   if (lo.includes("ölç") || lo.includes("metric") || lo.includes("impact")) {
-    return tr
-      ? "CV'deki en kritik deneyimi tek cümlede, net sonuç rakamıyla yeniden yaz."
-      : "Rewrite your most critical experience in one line with a clear outcome metric.";
+    return "CV'deki en kritik deneyimi tek cümlede, net sonuç rakamıyla yeniden yaz.";
   }
   if (lo.includes("eşleş") || lo.includes("deneyim") || lo.includes("experience") || lo.includes("match")) {
-    return tr
-      ? "Bu ilana değil, profiline daha yakın role göre CV özetini yeniden konumlandır."
-      : "Reposition your CV summary for a role that matches your profile better.";
+    return "CV’ni bu role göre yeniden konumlandır.";
   }
   if (lo.includes("anahtar") || lo.includes("keyword") || lo.includes("beceri") || lo.includes("skill")) {
-    return tr
-      ? "İlanda geçen 3 kritik beceriyi CV'nin üst bölümünde açık ve görünür yaz."
-      : "Put the 3 critical skills from the JD clearly at the top of your CV.";
+    return "İlanda geçen 3 kritik beceriyi CV'nin üst bölümünde açık ve görünür yaz.";
   }
-  return tr
-    ? "En kritik boşluğu şimdi kapat: bu ilana özel tek bir güçlü kanıt satırı ekle."
-    : "Close the top gap now: add one strong proof line tailored to this role.";
+  return "En kritik boşluğu şimdi kapat: bu ilana özel tek bir güçlü kanıt satırı ekle.";
 }
 
 function UnlockReportGateCard({
@@ -1720,15 +1678,14 @@ function UnlockReportGateCard({
   unlockError,
   onUnlockSubmit,
 }) {
-  const tr = lang === "TR";
   const [showFixConfirmation, setShowFixConfirmation] = useState(false);
   const scoreNow = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
   const verdictText =
     scoreNow < 50
-      ? (tr ? "Büyük ihtimalle eleneceksin." : "You'll get rejected.")
+      ? "Büyük ihtimalle eleneceksin."
       : scoreNow <= 70
-        ? (tr ? "Sınırdasın — risk altındasın." : "You're on the edge — at risk.")
-        : (tr ? "Şansın var — ama garanti değil." : "You have a chance — not guaranteed.");
+        ? "Sınırdasın — risk altındasın."
+        : "Şansın var — ama garanti değil.";
   const reasonRaw = String(insight || "").trim();
   const reasonNorm = reasonRaw.toLowerCase();
   const topReason = reasonRaw
@@ -1736,9 +1693,9 @@ function UnlockReportGateCard({
       || reasonNorm.includes("no measurable")
       || reasonNorm.includes("ölçülebilir")
       || reasonNorm.includes("impact"))
-      ? (tr ? "CV'inde ölçülebilir sonuç yok." : "Your CV doesn't show real results.")
+      ? "CV’n gerçek sonuçlar göstermiyor."
       : reasonRaw)
-    : (tr ? "CV'inde ölçülebilir sonuç yok." : "Your CV doesn't show real results.");
+    : "CV’n gerçek sonuçlar göstermiyor.";
   const impactDelta = scoreNow < 50 ? 18 : scoreNow <= 70 ? 12 : 8;
   const scoreAfterFix = Math.min(100, scoreNow + impactDelta);
   const actionRaw = String(suggestion || "").trim();
@@ -1751,8 +1708,8 @@ function UnlockReportGateCard({
       ? "Görev yazmayı bırak, sonuç yaz."
       : actionRaw)
     : "Görev yazmayı bırak, sonuç yaz.";
-  const transformOld = String(previewFixResult?.old || "Your CV doesn't show real results").trim();
-  const transformNew = String(previewFixResult?.new || "Increased efficiency by 23% across operations").trim();
+  const transformOld = String(previewFixResult?.old || "CV’n gerçek sonuçlar göstermiyor").trim();
+  const transformNew = String(previewFixResult?.new || "Operasyonlarda verimliliği %23 artırdım").trim();
 
   useEffect(() => {
     if (!previewFixResult?.new) {
@@ -1790,7 +1747,7 @@ function UnlockReportGateCard({
             {verdictText}
           </div>
           <div style={{ fontSize: 13, color: "#fecaca", lineHeight: 1.45 }}>
-            {tr ? "Bu başvuru şu haliyle güçlü görünmüyor." : "This CV won't pass screening."}
+            {"Bu başvuru şu haliyle güçlü görünmüyor."}
           </div>
         </div>
 
@@ -1803,7 +1760,7 @@ function UnlockReportGateCard({
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 800, color: "#fca5a5", marginBottom: 5 }}>
-            {tr ? "Seni eleyen asıl şey:" : "The main reason you get rejected:"}
+            {"Seni eleyen asıl şey:"}
           </div>
           <div style={{ fontSize: 14, color: "#fee2e2", lineHeight: 1.45, fontWeight: 700 }}>
             {topReason}
@@ -1819,13 +1776,13 @@ function UnlockReportGateCard({
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 800, color: "#86efac", marginBottom: 5 }}>
-            {tr ? "Bunu düzeltirsen:" : "If you fix this:"}
+            {"Bunu düzeltirsen:"}
           </div>
           <div style={{ fontSize: 18, color: "#dcfce7", lineHeight: 1.2, fontWeight: 900, marginBottom: 4 }}>
-            {`${scoreNow} → ${scoreAfterFix} (+${impactDelta}${tr ? " puan" : " pts"})`}
+            {`${scoreNow} → ${scoreAfterFix} (+${impactDelta} puan)`}
           </div>
           <div style={{ fontSize: 12, color: "#bbf7d0", lineHeight: 1.35 }}>
-            {"In this state, you will keep getting rejected."}
+            {"Recruiter beklentilerine göre hesaplandı"}
           </div>
         </div>
 
@@ -1838,7 +1795,7 @@ function UnlockReportGateCard({
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 800, color: "#cbd5e1", marginBottom: 5 }}>
-            {"What should you do now?"}
+            {"Şimdi ne yapmalısın?"}
           </div>
           <div style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.45, fontWeight: 700 }}>
             {actionLine}
@@ -1872,7 +1829,7 @@ function UnlockReportGateCard({
               opacity: previewFixBusy ? 0.8 : 1,
             }}
           >
-            {previewFixBusy ? (tr ? "Düzeltiliyor..." : "Fixing...") : "Fix this issue"}
+            {previewFixBusy ? "Düzeltiliyor..." : "Bu sorunu düzelt"}
           </button>
           <button
             type="button"
@@ -1903,10 +1860,10 @@ function UnlockReportGateCard({
             }}
           >
             <Lock size={13} />
-            {"Create a perfect CV for this role"}
+            {"Bu role uygun CV oluştur"}
           </button>
           <div style={{ marginTop: 4, fontSize: 11, color: "#facc15", opacity: 0.82 }}>
-            {"Optimized for ATS and recruiter expectations"}
+            {"Recruiter beklentilerine göre hesaplandı"}
           </div>
         </div>
         <AnimatePresence initial={false}>
@@ -1944,7 +1901,7 @@ function UnlockReportGateCard({
               }}
             >
               <div style={{ fontSize: 12, color: "#bae6fd", marginBottom: 6 }}>
-                {`Old: "${transformOld}"`}
+                {`Eski: "${transformOld}"`}
               </div>
               <motion.div
                 animate={{ x: [0, 6, 0], opacity: [0.7, 1, 0.7] }}
@@ -1954,7 +1911,7 @@ function UnlockReportGateCard({
                 {"→"}
               </motion.div>
               <div style={{ fontSize: 12, color: "#dcfce7", fontWeight: 700 }}>
-                {`New: "${transformNew}"`}
+                {`Yeni: "${transformNew}"`}
               </div>
             </motion.div>
           ) : null}
@@ -1999,7 +1956,7 @@ function UnlockReportGateCard({
                   opacity: previewReanalyzing ? 0.8 : 1,
                 }}
               >
-                {previewReanalyzing ? (tr ? "Analiz ediliyor..." : "Analyzing...") : (tr ? "Yeni sonucu gör" : "See new result")}
+                {previewReanalyzing ? "Analiz ediliyor..." : "Yeni sonucu gör"}
               </button>
               {previewScoreDelta ? (
                 <div style={{ marginTop: 8, fontSize: 12, color: "#bae6fd", fontWeight: 700 }}>
@@ -2117,12 +2074,10 @@ function UnlockReportGateCard({
         }}
       >
         <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, color: "#f8fafc", marginBottom: 6 }}>
-          {tr ? "Tam ret kırılımını gör" : "See your full rejection breakdown"}
+          {"Tüm analizini gör"}
         </div>
         <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 14 }}>
-          {tr
-            ? "Tam nedenleri, eksik anahtar kelimeleri ve düzeltme adımlarını aç."
-            : "Get exact reasons, missing keywords, and how to fix them."}
+          {"Tam nedenleri, eksik anahtar kelimeleri ve düzeltme adımlarını aç."}
         </div>
 
         <form onSubmit={onUnlockSubmit} style={{ display: "grid", gap: 10 }}>
@@ -2131,7 +2086,7 @@ function UnlockReportGateCard({
             required
             value={unlockEmail}
             onChange={(e) => setUnlockEmail(e.target.value)}
-            placeholder={tr ? "E-posta" : "Email"}
+            placeholder={"E-posta"}
             style={{
               width: "100%",
               padding: "11px 12px",
@@ -2157,10 +2112,10 @@ function UnlockReportGateCard({
               fontFamily: "'DM Sans', sans-serif",
             }}
           >
-            <option value="Student">{tr ? "Öğrenci" : "Student"}</option>
-            <option value="Job Seeker">{tr ? "İş Arayan" : "Job Seeker"}</option>
-            <option value="Employed">{tr ? "Çalışan" : "Employed"}</option>
-            <option value="Career Switcher">{tr ? "Kariyer Değiştiriyor" : "Career Switcher"}</option>
+            <option value="Student">{"Öğrenci"}</option>
+            <option value="Job Seeker">{"İş arayan"}</option>
+            <option value="Employed">{"Çalışan"}</option>
+            <option value="Career Switcher">{"Kariyer değiştiriyor"}</option>
           </select>
           {unlockError ? (
             <div
@@ -2202,12 +2157,12 @@ function UnlockReportGateCard({
             {unlockSubmitting ? (
               <>
                 <Loader2 size={14} style={{ animation: "spin 0.8s linear infinite" }} />
-                {tr ? "Açılıyor..." : "Unlocking..."}
+                {"Açılıyor..."}
               </>
             ) : (
               <>
                 <Lock size={14} />
-                {tr ? "Tam neden elendiğini gör" : "See what's actually killing your application"}
+                {"Tüm analizini gör"}
               </>
             )}
           </button>
@@ -2225,18 +2180,18 @@ function SharePromptModal({ open, lang, score, verdictLabel, biggestMistake, onC
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.78)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
       <div style={{ width: "min(560px, 96vw)", borderRadius: 16, border: "1px solid rgba(99,102,241,0.28)", background: "linear-gradient(160deg,#0b1220,#05070f)", padding: 20 }}>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, color: "#f1f5f9", marginBottom: 8 }}>{lang === "TR" ? "Bu sonuç seni şaşırttı mı?" : "This result surprised you?"}</div>
-        <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>{lang === "TR" ? `Skor: ${score}` : `Score: ${score}`}</div>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, color: "#f1f5f9", marginBottom: 8 }}>{"Bu sonuç seni şaşırttı mı?"}</div>
+        <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>{`Skor: ${score}`}</div>
         <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6, color: "#cbd5e1", padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>{text}</pre>
         <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
           <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch {} }} style={{ flex: 1, minWidth: 120, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.25)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", fontWeight: 700, cursor: "pointer" }}>
-            {copied ? (lang === "TR" ? "Kopyalandı!" : "Copied!") : (lang === "TR" ? "Kopyala" : "Copy")}
+            {copied ? "Kopyalandı!" : "Kopyala"}
           </button>
           <a href={li} target="_blank" rel="noopener noreferrer" style={{ flex: 1, minWidth: 120, textDecoration: "none", padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(10,102,194,0.35)", background: "rgba(10,102,194,0.12)", color: "#7dd3fc", fontWeight: 700, textAlign: "center" }}>
-            {lang === "TR" ? "LinkedIn'de paylaş" : "Share to LinkedIn"}
+            {"LinkedIn'de paylaş"}
           </a>
           <button type="button" onClick={onClose} style={{ padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.12)", background: "transparent", color: "#94a3b8", cursor: "pointer" }}>
-            {lang === "TR" ? "Kapat" : "Close"}
+            {"Kapat"}
           </button>
         </div>
       </div>
@@ -3725,7 +3680,7 @@ const translations = {
     previewEmptyMarket: "No company or market block in this run.",
   },
   TR: {
-    slogan: "AI Career Decision Engine",
+    slogan: "HireFit — Kariyer Karar Motoru",
     privacy: "Gizlilik Politikası",
     terms: "Kullanım Şartları",
     cookiePolicy: "Çerez Politikası",
@@ -3997,7 +3952,7 @@ const translations = {
     focusImpactKicker: "Skor etkisi",
     focusImpactExpl: "Bu boşluğu kapatmak profil gücün için yaklaşık +{pts} puanlık bir kazanım demek.",
     focusActionKicker: "Tek hamlen",
-    focusCtaSeeFull: "Neden elendiğini tam gör →",
+    focusCtaSeeFull: "Tüm analizini gör →",
     focusCtaApplyFix: "Bu odağı CV'me uygula →",
     focusHiddenGapsTeaser: "Skorunu etkileyen {n} boşluk daha var. Tüm dökümü Pro ile görebilirsin.",
     bestPathForward: "En İyi Kariyer Yolun",
@@ -4014,9 +3969,9 @@ const translations = {
     bestProjectOutcomeTitle: "Beklenen çıktı",
     bestPathCareerTitle: "Senin için en iyi yol:",
     bestPathRoadmapTitle: "Yürütme yol haritası",
-    bestPathPhaseImmediate: "PHASE 1 — Immediate Fix (0–7 gün)",
-    bestPathPhaseStrategic: "PHASE 2 — Strategic Build (2–4 hafta)",
-    bestPathPhaseApplication: "PHASE 3 — Application Strategy",
+    bestPathPhaseImmediate: "Faz 1 — Acil düzeltme (0–7 gün)",
+    bestPathPhaseStrategic: "Faz 2 — Stratejik güçlenme (2–4 hafta)",
+    bestPathPhaseApplication: "Faz 3 — Başvuru stratejisi",
     bestPathTransformTitle: "Bu yolu uygularsan:",
     bestPathTransformFit: "Fit skoru: {fit}",
     doThisFirstTitle: "ÖNCE BUNU YAP",
@@ -4032,7 +3987,7 @@ const translations = {
     focusPreviewSectionTitle: "Pro analizinde neler var?",
     focusPreviewCtaTitle: "Neden elendiğini satır satır gör",
     focusPreviewCtaSubtitle: "Bu ilana göre recruiter taraması, tüm boşluklar, skora göre sıralı düzeltmeler ve şirket ile ATS bağlamı.",
-    focusPreviewUpgradeBtn: "Tam red dökümünü aç →",
+    focusPreviewUpgradeBtn: "Tüm analizini gör →",
     focusPreviewCardRecruiter: "Recruiter görüşü",
     focusPreviewCardGaps: "Tüm boşluklar",
     focusPreviewCardPlan: "Aksiyon planı",
@@ -4095,6 +4050,8 @@ const translations = {
     previewEmptyMarket: "Bu turda şirket veya pazar özeti yok.",
   },
 };
+
+translations.EN = { ...translations.TR };
 
 const T = {
   bg: "#020617",
@@ -5389,70 +5346,15 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
           </div>
         </div>
         <div className="hf-nav-right-cluster">
-          <div ref={langMenuRef} className="hf-nav-lang-wrap">
-            <button
-              ref={langTriggerRef}
-              type="button"
-              id="hf-nav-lang-trigger"
-              className={
-                langMenuOpen
-                  ? `hf-nav-lang hf-nav-lang-toggle hf-nav-lang--open ${lang === "TR" ? "hf-nav-lang--tr" : "hf-nav-lang--en"}`
-                  : `hf-nav-lang hf-nav-lang-toggle ${lang === "TR" ? "hf-nav-lang--tr" : "hf-nav-lang--en"}`
-              }
-              aria-expanded={langMenuOpen}
-              aria-haspopup="menu"
-              aria-controls={langMenuOpen ? "hf-nav-lang-menu" : undefined}
-              aria-label={lang === "TR" ? "Dil: Türkçe. Seçenekleri göster" : "Language: English. Show options"}
-              onClick={() => setLangMenuOpen((o) => !o)}
+          <div className="hf-nav-lang-wrap">
+            <span
+              className="hf-nav-lang hf-nav-lang-toggle hf-nav-lang--tr"
+              aria-label="Arayüz dili: Türkçe"
+              style={{ cursor: "default", pointerEvents: "none" }}
             >
-              {lang === "EN" ? <NavBarFlagEn /> : <NavBarFlagTr />}
-              <span className="hf-nav-lang-label">{lang === "EN" ? "English" : "Türkçe"}</span>
-              <ChevronDown className="hf-nav-lang-chevron" size={14} strokeWidth={2.25} aria-hidden />
-            </button>
-            {langMenuOpen && langPopoverPos
-              ? createPortal(
-                <div
-                  ref={langPopoverRef}
-                  id="hf-nav-lang-menu"
-                  className="hf-nav-lang-popover"
-                  role="menu"
-                  aria-label={lang === "TR" ? "Dil seçimi" : "Language"}
-                  style={{
-                    top: langPopoverPos.top,
-                    left: langPopoverPos.left,
-                    width: langPopoverPos.width,
-                  }}
-                >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={`hf-nav-lang-option${lang === "EN" ? " hf-nav-lang-option--active" : ""}`}
-                    onClick={() => {
-                      setLang("EN");
-                      setLangMenuOpen(false);
-                    }}
-                  >
-                    <span className="hf-nav-lang-option-flag"><NavBarFlagEn w={18} h={13} /></span>
-                    <span className="hf-nav-lang-option-text">English</span>
-                    {lang === "EN" ? <Check className="hf-nav-lang-option-check" size={14} strokeWidth={2.5} aria-hidden /> : <span className="hf-nav-lang-option-checkSpacer" aria-hidden />}
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className={`hf-nav-lang-option${lang === "TR" ? " hf-nav-lang-option--active" : ""}`}
-                    onClick={() => {
-                      setLang("TR");
-                      setLangMenuOpen(false);
-                    }}
-                  >
-                    <span className="hf-nav-lang-option-flag"><NavBarFlagTr w={18} h={13} /></span>
-                    <span className="hf-nav-lang-option-text">Türkçe</span>
-                    {lang === "TR" ? <Check className="hf-nav-lang-option-check" size={14} strokeWidth={2.5} aria-hidden /> : <span className="hf-nav-lang-option-checkSpacer" aria-hidden />}
-                  </button>
-                </div>,
-                document.body,
-              )
-              : null}
+              <NavBarFlagTr />
+              <span className="hf-nav-lang-label">Türkçe</span>
+            </span>
           </div>
           <div className="hf-nav-sep" aria-hidden />
           {user ? (
@@ -5743,7 +5645,7 @@ function HeroSection({ navigate, lang }) {
       decisionColor: "#f87171",
       decisionBg: "rgba(239,68,68,0.08)",
       decisionBorder: "rgba(239,68,68,0.2)",
-      mistake: "Your CV doesn't show real results.",
+      mistake: "CV’n gerçek sonuçlar göstermiyor.",
       fix: "Turn your tasks into results. Example: Increased X by %Y.",
       insight: "This CV looks like everyone else's. Nothing stands out in 7 seconds.",
     },
@@ -6411,7 +6313,7 @@ function HireFitLayout() {
   const [detectedCareerAreaConfidence, setDetectedCareerAreaConfidence] = useState("medium");
   const [detectedCareerAreaReason, setDetectedCareerAreaReason] = useState("");
   const [careerAreaOverride, setCareerAreaOverride] = useState("");
-  const [lang, setLang] = useState("EN");
+  const [lang, setLang] = useState("TR");
   const [showPaywall, setShowPaywall] = useState(false);
   /** Logged-in users: row from user_plans (analysis_count, last_reset_at, plan). */
   const [userPlanRow, setUserPlanRow] = useState(null);
@@ -7726,6 +7628,7 @@ export function AnalyzerPage() {
   const [careerAreaReanalyzePending, setCareerAreaReanalyzePending] = useState(false);
   const [showMarketInsightsModal, setShowMarketInsightsModal] = useState(false);
   const [showCareerSuggestionsModal, setShowCareerSuggestionsModal] = useState(false);
+  const [actionCommitChecked, setActionCommitChecked] = useState(false);
   const [decisionLockChoice, setDecisionLockChoice] = useState(null);
   const roleSuggestionsRef = useRef(null);
   const PREVIEW_FIX_KEY = "__preview_gate_fix__";
@@ -8399,33 +8302,6 @@ export function AnalyzerPage() {
         </div>
       </div>
     )}
-    {shouldShowUnlockGate ? (
-      <UnlockReportGateCard
-        lang={lang}
-        score={partialScore}
-        insight={partialInsight}
-        suggestion={partialSuggestion}
-        previewFixResult={previewFixResult}
-        previewFixBusy={previewFixBusy}
-        previewReanalyzing={previewReanalyzePending || loading}
-        previewScoreDelta={previewScoreDelta}
-        onPreviewFix={applyPreviewFix}
-        onPreviewReanalyze={rerunPreviewWithImprovedCv}
-        isPro={isPro}
-        optimizing={optimizing}
-        onOptimizeFullCv={optimizeCv}
-        onUpgrade={openUpgrade}
-        onOpenRoleSuggestions={() => setShowCareerSuggestionsModal(true)}
-        onOpenMarketInsights={() => setShowMarketInsightsModal(true)}
-        unlockEmail={unlockEmail}
-        setUnlockEmail={setUnlockEmail}
-        unlockJobStatus={unlockJobStatus}
-        setUnlockJobStatus={setUnlockJobStatus}
-        unlockSubmitting={unlockSubmitting}
-        unlockError={unlockError}
-        onUnlockSubmit={unlockFullReport}
-      />
-    ) : null}
     {(reportUnlocked || user) && hasOutput && !loading && decisionCopy && impactProjection ? (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -8481,6 +8357,26 @@ export function AnalyzerPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
             <button
               type="button"
+              onClick={() => setDecisionLockChoice("continue")}
+              style={{
+                width: "100%",
+                borderRadius: 10,
+                border: decisionLockChoice === "continue" ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(148,163,184,0.35)",
+                background: "rgba(15,23,42,0.28)",
+                padding: "12px 11px",
+                textAlign: "left",
+                cursor: "pointer",
+              }}
+            >
+              <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 800, marginBottom: 3 }}>
+                {"Bu role devam et"}
+              </div>
+              <div style={{ fontSize: 11, color: "#fca5a5", lineHeight: 1.35 }}>
+                {"Yüksek elenme riski"}
+              </div>
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 setDecisionLockChoice("switch");
                 roleSuggestionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -8501,26 +8397,6 @@ export function AnalyzerPage() {
               </div>
               <div style={{ fontSize: 11, color: "rgba(236,253,245,0.9)", lineHeight: 1.35 }}>
                 {"Daha yüksek geri dönüş ihtimali"}
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => setDecisionLockChoice("continue")}
-              style={{
-                width: "100%",
-                borderRadius: 10,
-                border: decisionLockChoice === "continue" ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(148,163,184,0.35)",
-                background: "rgba(15,23,42,0.28)",
-                padding: "12px 11px",
-                textAlign: "left",
-                cursor: "pointer",
-              }}
-            >
-              <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 800, marginBottom: 3 }}>
-                {"Bu role devam et"}
-              </div>
-              <div style={{ fontSize: 11, color: "#fca5a5", lineHeight: 1.35 }}>
-                {"Yüksek elenme riski"}
               </div>
             </button>
           </div>
@@ -8545,23 +8421,23 @@ export function AnalyzerPage() {
           </div>
         </div>
 
-        <div>
-          <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 800, marginBottom: 6 }}>
-            {"Bu sorunu düzeltirsen:"}
-          </div>
+        <div
+          style={{
+            borderRadius: 10,
+            border: "1px solid rgba(16,185,129,0.28)",
+            background: "rgba(16,185,129,0.08)",
+            padding: "10px 12px",
+          }}
+        >
           <div
             style={{
               fontSize: 20,
               color: "#bbf7d0",
               fontWeight: 900,
               letterSpacing: "-0.01em",
-              marginBottom: 4,
             }}
           >
             {impactProjection.current} → {impactProjection.projected} (+{impactProjection.delta})
-          </div>
-          <div style={{ fontSize: 12, color: "#86efac", fontWeight: 700 }}>
-            {"Recruiter beklentilerine göre hesaplandı."}
           </div>
         </div>
 
@@ -8581,13 +8457,34 @@ export function AnalyzerPage() {
               fontWeight: 700,
             }}
           >
-            {"CV’ne şu formatta 1 cümle ekle: 'X sürecini iyileştirerek %Y sonuç elde ettim.'"}
+            {"CV’ne şu formatta 1 cümle ekle:"}
+            <div style={{ marginTop: 4, color: "#e2e8f0" }}>
+              {"X sürecini iyileştirerek %Y sonuç elde ettim."}
+            </div>
           </div>
           <div style={{ marginTop: 4, fontSize: 11, color: "#94a3b8", opacity: 0.78 }}>
             {"Örn: %X artırdım, X sürede tamamladım"}
           </div>
-          <div style={{ marginTop: 3, fontSize: 11, color: "#fca5a5", opacity: 0.9 }}>
-            {"Bunu düzeltmeden başvurmaya devam edersen zaman kaybedersin."}
+          <div style={{ marginTop: 8, fontSize: 11, color: "#94a3b8", opacity: 0.9 }}>
+            {"Bu düzeltmeyi uygularsan:"}
+          </div>
+          <div style={{ marginTop: 2, fontSize: 13, color: "#bbf7d0", fontWeight: 800 }}>
+            {`${impactProjection.current} → ${impactProjection.projected} → ${Math.min(100, impactProjection.projected + 5)}`}
+          </div>
+          <div style={{ marginTop: 2, fontSize: 12, color: "#86efac", fontWeight: 700 }}>
+            {`(+${Math.max(0, Math.min(100, impactProjection.projected + 5) - impactProjection.current)} toplam iyileşme)`}
+          </div>
+          <label style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#cbd5e1", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={actionCommitChecked}
+              onChange={(e) => setActionCommitChecked(e.target.checked)}
+              style={{ accentColor: "#22c55e", cursor: "pointer" }}
+            />
+            {"Bu cümleyi CV'me ekleyeceğim"}
+          </label>
+          <div style={{ marginTop: 2, fontSize: 11, color: "#94a3b8", opacity: 0.86 }}>
+            {"Şimdi bunu CV’ne ekleyecek misin?"}
           </div>
         </div>
       </motion.div>
@@ -8607,7 +8504,7 @@ export function AnalyzerPage() {
           {"Yanlış role başvuruyorsun."}
         </div>
         <div style={{ fontSize: 12, color: "#fca5a5", marginBottom: 10, fontWeight: 700 }}>
-          {"Profilin bu role uymuyor."}
+          {"Profilin bu role tam uymuyor."}
         </div>
         <div style={{ display: "grid", gap: 8 }}>
           {roleSuggestions.map((r) => (
@@ -8643,7 +8540,7 @@ export function AnalyzerPage() {
                   fontFamily: "'DM Sans', sans-serif",
                 }}
               >
-                {"Bu role geç ve tekrar dene"}
+                {"Bu role geç → sonucu gör"}
               </button>
             </div>
           ))}

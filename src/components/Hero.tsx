@@ -19,27 +19,27 @@ export default function Hero() {
       {/* LEFT */}
       <div>
         <p className="text-sm text-purple-400 mb-4">
-          AI-Powered Resume Intelligence
+          Yapay Zeka Destekli CV Analizi
         </p>
         <h1 className="text-5xl font-bold leading-tight mb-6">
-          Stop guessing why your CV gets rejected.
+          CV’nin neden elendiğini tahmin etmeyi bırak.
         </h1>
         <p className="text-gray-400 mb-8 text-lg">
-          Get exact feedback, missing keywords, and recruiter-level insights in 10 seconds.
+          10 saniyede net geri bildirim, eksik anahtar kelimeler ve recruiter içgörüsü al.
         </p>
         <div className="flex gap-4">
           <button className="bg-gradient-to-r from-purple-500 to-blue-500 px-6 py-3 rounded-xl font-medium hover:opacity-90 transition">
-            Get My CV Score →
+            CV Skorumu Gör →
           </button>
           <button className="border border-gray-600 px-6 py-3 rounded-xl hover:bg-gray-800 transition">
-            See Demo
+            Demoyu Gör
           </button>
         </div>
       </div>
 
       {/* RIGHT */}
       <div className="bg-[#0f172a] border border-gray-800 rounded-2xl p-6 shadow-xl">
-        <p className="text-sm text-gray-400 mb-4">Live Analysis Preview</p>
+        <p className="text-sm text-gray-400 mb-4">Canlı Analiz Önizlemesi</p>
 
         <div className="flex items-center gap-4 mb-6">
           <div className="text-3xl font-bold text-red-400">62</div>
@@ -49,26 +49,26 @@ export default function Hero() {
         </div>
 
         <div className="mb-4">
-          <p className="text-sm text-red-400 mb-1">Missing Keywords</p>
+          <p className="text-sm text-red-400 mb-1">Eksik Anahtar Kelimeler</p>
           <ul className="text-gray-300 text-sm space-y-1">
             <li>- SQL</li>
-            <li>- Stakeholder Management</li>
+            <li>- Paydaş Yönetimi</li>
           </ul>
         </div>
 
         <div className="mb-4">
-          <p className="text-sm text-yellow-400 mb-1">Red Flags</p>
+          <p className="text-sm text-yellow-400 mb-1">Kritik Riskler</p>
           <ul className="text-gray-300 text-sm space-y-1">
-            <li>- No measurable impact</li>
-            <li>- Weak action verbs</li>
+            <li>- Ölçülebilir sonuç yok</li>
+            <li>- Zayıf aksiyon dili</li>
           </ul>
         </div>
 
         <div>
-          <p className="text-sm text-green-400 mb-1">Fix Suggestions</p>
+          <p className="text-sm text-green-400 mb-1">Düzeltme Önerileri</p>
           <ul className="text-gray-300 text-sm space-y-1">
-            <li>- Add metrics (%)</li>
-            <li>- Improve bullet clarity</li>
+            <li>- Metrik ekle (%)</li>
+            <li>- Madde netliğini artır</li>
           </ul>
         </div>
       </div>

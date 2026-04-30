@@ -3549,7 +3549,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                     }}
                   >
                     <Linkedin size={18} />
-                    {lang === "TR" ? "LinkedIn'de paylaş" : "Share on LinkedIn"}
+                    {"LinkedIn'de paylaş"}
                   </button>
                   <button
                     type="button"

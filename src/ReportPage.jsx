@@ -634,7 +634,7 @@ export default function ReportPage() {
     return (
       <div className="rp-loading">
         <div className="rp-spinner" />
-        <span>Loading report...</span>
+        <span>Rapor yükleniyor...</span>
       </div>
     );
   }
@@ -642,14 +642,14 @@ export default function ReportPage() {
   if (!report) {
     return (
       <div className="rp-loading">
-        <span style={{ color: "#f87171" }}>Report not found.</span>
-        <a href="/" style={{ color: "#3b82f6", fontSize: 14 }}>← Go back</a>
+        <span style={{ color: "#f87171" }}>Rapor bulunamadı.</span>
+        <a href="/" style={{ color: "#3b82f6", fontSize: 14 }}>← Geri dön</a>
       </div>
     );
   }
 
   const sanitizeReportText = (txt) =>
-    String(txt || "").replace(/\bDo not apply\b/gi, "Application not recommended");
+    String(txt || "").replace(/\bDo not apply\b/gi, "Başvuru önerilmiyor");
 
   const score = report.alignment_score || 0;
   const matchedSkills = Array.isArray(report.matched_skills) ? report.matched_skills : [];
@@ -658,19 +658,19 @@ export default function ReportPage() {
   const rejectionReasons = report.rejection_reasons || {};
 
   const scoreColor = score <= 40 ? "#ef4444" : score <= 69 ? "#f97316" : "#22c55e";
-  const verdict = score >= 80 ? "Strong Match" : score >= 60 ? "Moderate Match" : "Needs Work";
+  const verdict = score >= 80 ? "Güçlü Uyum" : score >= 60 ? "Orta Uyum" : "Geliştirme Gerekli";
   const verdictDesc = score >= 80
-    ? "Your CV is well-aligned with this role. Focus on tailoring your narrative."
+    ? "CV’n bu rolle güçlü uyumlu. Anlatını role göre keskinleştir."
     : score >= 60
-    ? "Your CV partially matches. Address the missing skills to improve your chances."
-    : "Significant gaps detected. Review missing skills and optimize your CV.";
+    ? "CV’n kısmi uyum veriyor. Eksik becerileri kapatıp şansını yükselt."
+    : "Kritik boşluklar var. Eksik becerileri kapat ve CV’ni güçlendir.";
 
   const skillsScore = score;
   const keywordsScore = Math.min(100, score + 10);
   const experienceScore = Math.max(35, score - 10);
   const formattingScore = 75;
 
-  const linkedinText = `I analyzed my CV for ${report.role || "a job"} using HireFit AI.\n\nATS Score: ${score}/100 — ${verdict}\n\nMissing skills: ${missingSkills.slice(0, 3).join(", ") || "None"}\n\nCheck your own CV →`;
+  const linkedinText = `${report.role || "bu rol"} için CV analizimi HireFit ile yaptım.\n\nATS Skoru: ${score}/100 — ${verdict}\n\nEksik beceriler: ${missingSkills.slice(0, 3).join(", ") || "Yok"}\n\nKendi CV’ni analiz et →`;
 
   return (
     <div className="rp-root">
@@ -686,15 +686,15 @@ export default function ReportPage() {
             <div className="rp-brand-icon">✦</div>
             <span className="rp-brand-name">HireFit</span>
           </a>
-          <div className="rp-role">{report.role || "CV Analysis"}</div>
-          <div className="rp-subtitle">AI-powered resume analysis · {new Date(report.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</div>
+          <div className="rp-role">{report.role || "CV Analizi"}</div>
+          <div className="rp-subtitle">Yapay zeka destekli CV analizi · {new Date(report.created_at).toLocaleDateString("tr-TR", { year: "numeric", month: "long", day: "numeric" })}</div>
         </div>
 
         {/* Share bar */}
         <div className="rp-share-bar">
           <button onClick={copyLink} className="rp-btn-copy">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-            Copy Report Link
+            Rapor Linkini Kopyala
           </button>
           <a
             href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(window.location.href)}&summary=${encodeURIComponent(linkedinText)}`}
@@ -702,7 +702,7 @@ export default function ReportPage() {
             className="rp-btn-linkedin"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
-            Share on LinkedIn
+            LinkedIn'de Paylaş
           </a>
         </div>
 
@@ -710,14 +710,14 @@ export default function ReportPage() {
         <div className="rp-score-hero">
           <ScoreRing score={score} color={scoreColor} />
           <div>
-            <div className="rp-score-label">ATS Alignment Score</div>
+            <div className="rp-score-label">ATS Uyum Skoru</div>
             <div className="rp-score-verdict" style={{ color: scoreColor }}>{verdict}</div>
             <div className="rp-score-desc">{verdictDesc}</div>
             <div className="rp-score-bars">
-              <MiniBar label="Skills Match" value={skillsScore} />
-              <MiniBar label="Keyword Match" value={keywordsScore} />
-              <MiniBar label="Experience Match" value={experienceScore} />
-              <MiniBar label="Formatting" value={formattingScore} />
+              <MiniBar label="Beceri Uyumu" value={skillsScore} />
+              <MiniBar label="Anahtar Kelime Uyumu" value={keywordsScore} />
+              <MiniBar label="Deneyim Uyumu" value={experienceScore} />
+              <MiniBar label="Format" value={formattingScore} />
             </div>
           </div>
         </div>
@@ -725,23 +725,23 @@ export default function ReportPage() {
         {/* Job Intelligence + Hire Probability */}
         <div className="rp-grid-2">
           <div className="rp-card">
-            <div className="rp-card-title" style={{ color: "#3b82f6" }}>Job Intelligence</div>
+            <div className="rp-card-title" style={{ color: "#3b82f6" }}>İlan İçgörüsü</div>
             <div style={{ display: "flex", gap: 32 }}>
               <div>
-                <div className="rp-intel-label">Role Type</div>
+                <div className="rp-intel-label">Rol Tipi</div>
                 <div className="rp-intel-value">{report.role || "—"}</div>
               </div>
               <div>
-                <div className="rp-intel-label">Seniority</div>
+                <div className="rp-intel-label">Seviye</div>
                 <div className="rp-intel-value">{report.seniority || "—"}</div>
               </div>
             </div>
           </div>
           <div className="rp-card">
-            <div className="rp-card-title" style={{ color: "#22d3ee" }}>Confidence Level</div>
+            <div className="rp-card-title" style={{ color: "#22d3ee" }}>Güven Seviyesi</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
               <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, color: scoreColor }}>{score}%</span>
-              <span style={{ color: "#475569", fontSize: 14 }}>hire probability</span>
+              <span style={{ color: "#475569", fontSize: 14 }}>işe alım olasılığı</span>
             </div>
             <div style={{ height: 6, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
               <div style={{ width: `${score}%`, height: "100%", background: `linear-gradient(90deg, ${scoreColor}, ${scoreColor}99)`, borderRadius: 999, transition: "width 1s ease" }} />
@@ -752,40 +752,40 @@ export default function ReportPage() {
         {/* Skills */}
         <div className="rp-grid-3">
           <div className="rp-card">
-            <div className="rp-card-title" style={{ color: "#10b981" }}>Matched Skills</div>
+            <div className="rp-card-title" style={{ color: "#10b981" }}>Eşleşen Beceriler</div>
             <div>
               {matchedSkills.length > 0
                 ? matchedSkills.map((s, i) => <span key={i} className="rp-skill-tag matched">{s}</span>)
                 : (
                   <div style={{ color: "#334155", fontSize: 13, lineHeight: 1.55 }}>
-                    <div>No matched skills were stored for this report.</div>
-                    <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>Mirror phrasing from the job description in your CV, then re-run analysis.</div>
+                    <div>Bu rapor için eşleşen beceri kaydı yok.</div>
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>İlandaki dili CV’ne yansıtıp analizi tekrar çalıştır.</div>
                   </div>
                 )}
             </div>
           </div>
           <div className="rp-card">
-            <div className="rp-card-title" style={{ color: "#ef4444" }}>Missing Skills</div>
+            <div className="rp-card-title" style={{ color: "#ef4444" }}>Eksik Beceriler</div>
             <div>
               {missingSkills.length > 0
                 ? missingSkills.map((s, i) => <span key={i} className="rp-skill-tag missing">{s}</span>)
                 : (
                   <div style={{ color: "#334155", fontSize: 13, lineHeight: 1.55 }}>
-                    <div>No missing skills flagged — either a strong match or limited JD data.</div>
-                    <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>Still skim the job text for tools you use but did not mention.</div>
+                    <div>Eksik beceri işaretlenmedi — ya güçlü uyum var ya da ilan verisi sınırlı.</div>
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>Yine de kullandığın ama yazmadığın araçları metinle karşılaştır.</div>
                   </div>
                 )}
             </div>
           </div>
           <div className="rp-card">
-            <div className="rp-card-title" style={{ color: "#60a5fa" }}>Top Keywords</div>
+            <div className="rp-card-title" style={{ color: "#60a5fa" }}>Öne Çıkan Anahtar Kelimeler</div>
             <div>
               {topKeywords.length > 0
                 ? topKeywords.map((s, i) => <span key={i} className="rp-skill-tag keyword">{s}</span>)
                 : (
                   <div style={{ color: "#334155", fontSize: 13, lineHeight: 1.55 }}>
-                    <div>No top keywords were stored for this report.</div>
-                    <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>Paste the full posting as plain text and run analysis again.</div>
+                    <div>Bu rapor için anahtar kelime kaydı yok.</div>
+                    <div style={{ marginTop: 6, fontSize: 12, color: "#64748b" }}>İlanı düz metin olarak yapıştırıp analizi tekrar çalıştır.</div>
                   </div>
                 )}
             </div>
@@ -796,11 +796,11 @@ export default function ReportPage() {
         {(rejectionReasons.high?.length > 0 || rejectionReasons.medium?.length > 0 || rejectionReasons.low?.length > 0) && (
           <div className="rp-rejection">
             <div className="rp-rejection-title">
-              <span>🚫</span> Why You Might Get Rejected
+              <span>🚫</span> Neden Elenebilirsin
             </div>
             {rejectionReasons.high?.length > 0 && (
               <div className="rp-rejection-group">
-                <div className="rp-rejection-badge high">● High Risk</div>
+                <div className="rp-rejection-badge high">● Yüksek Risk</div>
                 {rejectionReasons.high.map((r, i) => (
                   <div key={i} className="rp-rejection-item">
                     <div className="rp-rejection-dot" style={{ background: "#f87171" }} />
@@ -811,7 +811,7 @@ export default function ReportPage() {
             )}
             {rejectionReasons.medium?.length > 0 && (
               <div className="rp-rejection-group">
-                <div className="rp-rejection-badge medium">● Medium Risk</div>
+                <div className="rp-rejection-badge medium">● Orta Risk</div>
                 {rejectionReasons.medium.map((r, i) => (
                   <div key={i} className="rp-rejection-item">
                     <div className="rp-rejection-dot" style={{ background: "#fbbf24" }} />
@@ -822,7 +822,7 @@ export default function ReportPage() {
             )}
             {rejectionReasons.low?.length > 0 && (
               <div className="rp-rejection-group">
-                <div className="rp-rejection-badge low">● Low Risk</div>
+                <div className="rp-rejection-badge low">● Düşük Risk</div>
                 {rejectionReasons.low.map((r, i) => (
                   <div key={i} className="rp-rejection-item">
                     <div className="rp-rejection-dot" />
@@ -837,17 +837,17 @@ export default function ReportPage() {
         {/* Full Report */}
         {report.report && (
           <div className="rp-card rp-report" style={{ marginBottom: 16 }}>
-            <div className="rp-card-title" style={{ color: "#94a3b8" }}>Full Analysis</div>
+            <div className="rp-card-title" style={{ color: "#94a3b8" }}>Tam Analiz</div>
             <div className="rp-report-text">{sanitizeReportText(report.report)}</div>
           </div>
         )}
 
         {/* CTA */}
         <div className="rp-cta">
-          <h3>Want to improve your score?</h3>
-          <p>Analyze another CV or optimize your existing one with AI.</p>
+          <h3>Skorunu yükseltmek ister misin?</h3>
+          <p>Yeni bir CV analiz et veya mevcut CV’ni yapay zeka ile güçlendir.</p>
           <a href="/" className="rp-cta-btn">
-            ✦ Analyze Another CV
+            ✦ Yeni CV Analizi Yap
           </a>
         </div>
 
@@ -855,7 +855,7 @@ export default function ReportPage() {
 
       {/* Toast */}
       <div className={`rp-toast ${copied ? "show" : ""}`}>
-        ✓ Link copied to clipboard
+        ✓ Link panoya kopyalandı
       </div>
     </div>
   );
