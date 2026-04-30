@@ -7528,6 +7528,11 @@ export function AnalyzerPage() {
   }, [cvText, lang, engineV2]);
   const roleSuggestions = roleRedirection?.better_roles || [];
   const aiDecisionText = String(engineV2?.Output?.decision || "").trim();
+  const aiRecognitionLine = String(engineV2?.Output?.recognition_line || "").trim();
+  const aiCoreProblem = String(engineV2?.Output?.core_problem || "").trim();
+  const aiImpactStatement = String(engineV2?.Output?.impact_statement || "").trim();
+  const aiFirstAction = String(engineV2?.Output?.first_action || "").trim();
+  const aiPatternSummary = String(engineV2?.Output?.pattern_summary || "").trim();
   const aiRecruiterView = String(engineV2?.Output?.recruiter_view || "").trim();
   const aiReasons = Array.isArray(engineV2?.Output?.reasons)
     ? engineV2.Output.reasons.map((x) => String(x || "").trim()).filter(Boolean)
@@ -7535,7 +7540,10 @@ export function AnalyzerPage() {
   const aiFixes = Array.isArray(engineV2?.Output?.fixes)
     ? engineV2.Output.fixes.map((x) => String(x || "").trim()).filter(Boolean)
     : [];
-  const primaryReason = aiReasons[0] || String(mainIssue || analysisData?.fit_summary || "").trim();
+  const primaryReason =
+    aiCoreProblem
+    || aiReasons[0]
+    || String(mainIssue || analysisData?.fit_summary || "").trim();
   const impactProjection = useMemo(() => {
     if (decisionScore == null) return null;
     const fromV2 = computeImpactProjection(
@@ -7559,7 +7567,8 @@ export function AnalyzerPage() {
       narrative: lang === "TR" ? "Küçük bir değişiklik, büyük fark yaratır." : "Small change, big difference.",
     };
   }, [decisionScore, engineV2, analysisData, missingSkills, lang]);
-  const singleAction = aiFixes[0]
+  const singleAction = aiFirstAction
+    || aiFixes[0]
     || String(engineV2?.Decision?.what_to_fix_first?.[0] || analysisData?.improvements?.[0] || "").trim()
     || buildSingleActionFromReason(primaryReason, lang);
 
@@ -8168,6 +8177,76 @@ export function AnalyzerPage() {
           gap: 14,
         }}
       >
+        <div>
+          {aiRecognitionLine ? (
+            <div
+              style={{
+                marginBottom: 10,
+                padding: "9px 11px",
+                borderRadius: 10,
+                border: "1px solid rgba(148,163,184,0.28)",
+                background: "rgba(148,163,184,0.08)",
+                fontSize: 13,
+                color: "#dbeafe",
+                lineHeight: 1.5,
+                fontWeight: 500,
+                fontStyle: "italic",
+              }}
+            >
+              {aiRecognitionLine}
+            </div>
+          ) : null}
+          <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 800, marginBottom: 6 }}>
+            {"Core problem"}
+          </div>
+          <div
+            style={{
+              fontSize: 15,
+              color: "#fee2e2",
+              fontWeight: 700,
+              borderRadius: 10,
+              border: "1px solid rgba(239,68,68,0.28)",
+              background: "rgba(239,68,68,0.08)",
+              padding: "10px 12px",
+            }}
+          >
+            {primaryReason}
+          </div>
+          {aiImpactStatement ? (
+            <div
+              style={{
+                marginTop: 6,
+                fontSize: 12,
+                color: "#fca5a5",
+                lineHeight: 1.45,
+                fontWeight: 700,
+              }}
+            >
+              {aiImpactStatement}
+            </div>
+          ) : null}
+        </div>
+
+        <div
+          style={{
+            borderRadius: 10,
+            border: "1px solid rgba(16,185,129,0.28)",
+            background: "rgba(16,185,129,0.08)",
+            padding: "10px 12px",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 20,
+              color: "#bbf7d0",
+              fontWeight: 900,
+              letterSpacing: "-0.01em",
+            }}
+          >
+            {impactProjection.current} → {impactProjection.projected} (+{impactProjection.delta})
+          </div>
+        </div>
+
         <div
           style={{
             borderRadius: 12,
@@ -8186,6 +8265,7 @@ export function AnalyzerPage() {
             {aiRecruiterView || firstTwoSentences(primaryReason)}
           </div>
         </div>
+
         <div
           style={{
             marginTop: 6,
@@ -8250,43 +8330,21 @@ export function AnalyzerPage() {
           </div>
         </div>
 
-        <div>
-          <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 800, marginBottom: 6 }}>
-            {"Seni eleyen asıl şey:"}
-          </div>
-          <div
-            style={{
-              fontSize: 15,
-              color: "#fee2e2",
-              fontWeight: 700,
-              borderRadius: 10,
-              border: "1px solid rgba(239,68,68,0.28)",
-              background: "rgba(239,68,68,0.08)",
-              padding: "10px 12px",
-            }}
-          >
-            {primaryReason}
-          </div>
-        </div>
-
-        <div
-          style={{
-            borderRadius: 10,
-            border: "1px solid rgba(16,185,129,0.28)",
-            background: "rgba(16,185,129,0.08)",
-            padding: "10px 12px",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 20,
-              color: "#bbf7d0",
-              fontWeight: 900,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {impactProjection.current} → {impactProjection.projected} (+{impactProjection.delta})
-          </div>
+        <div style={{ marginTop: -2 }}>
+          {aiPatternSummary ? (
+            <div style={{ marginTop: 6, fontSize: 12, color: "#94a3b8", lineHeight: 1.4 }}>
+              {aiPatternSummary}
+            </div>
+          ) : null}
+          {aiReasons.length > 1 ? (
+            <div style={{ marginTop: 8, display: "grid", gap: 4 }}>
+              {aiReasons.slice(0, 3).map((r, idx) => (
+                <div key={`reason-${idx}`} style={{ fontSize: 12, color: "#cbd5e1", lineHeight: 1.4 }}>
+                  {`- ${r}`}
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div>

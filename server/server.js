@@ -35,22 +35,35 @@ process.on("unhandledRejection", (reason) => {
 const EXTRACT_JOB_MAX_TOKENS = 8192;
 
 const app = express();
+const ALLOWED_ORIGIN = "https://hirefit-ai.vercel.app";
+
+// CORS MUST be first global middleware (before all routes)
 app.use(
   cors({
-    origin: [
-      "https://hirefit-ai.vercel.app",
-      "http://localhost:5173",
-      "http://localhost:5174",
-      "http://localhost:5175",
-      "http://localhost:5176",
-      "http://localhost:5177",
-      "http://localhost:5178",
-      "http://localhost:5179",
-      "http://localhost:5180",
-    ],
+    origin: ALLOWED_ORIGIN,
+    methods: ["GET", "POST", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
+    optionsSuccessStatus: 204,
   })
 );
+
+// Manual fallback headers to guarantee CORS behavior
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  next();
+});
+
+// Global preflight support
+app.options("*", (req, res) => {
+  res.header("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  return res.sendStatus(204);
+});
+
 const jsonParser = express.json();
 app.use((req, res, next) => {
   // Webhook must keep raw bytes for HMAC validation.
@@ -81,6 +94,10 @@ const analysisRateLimiter = rateLimit({
 /** Railway (and similar) set PORT; health checks often need a simple 200. */
 app.get("/health", (_req, res) => {
   res.status(200).type("text/plain").send("ok");
+});
+
+app.get("/test", (_req, res) => {
+  return res.status(200).json({ status: "ok" });
 });
 
 app.post("/api/analyze", requireAuthExpress, analysisRateLimiter, async (req, res) => {
@@ -1191,7 +1208,7 @@ const lemonWebhookHandler = async (req, res) => {
 app.post("/api/webhook", express.raw({ type: "application/json" }), lemonWebhookHandler);
 app.post("/webhook", express.raw({ type: "application/json" }), lemonWebhookHandler);
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 3000);
 
 try {
   const server = app.listen(PORT, "0.0.0.0", () => {
