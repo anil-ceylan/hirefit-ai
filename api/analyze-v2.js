@@ -8,8 +8,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    const start = Date.now();
-    console.log("[api/analyze-v2] request start");
     const auth = await getUserFromRequest(req);
     if (!auth.ok) {
       return res.status(auth.status).json({ error: auth.error });
@@ -40,12 +38,11 @@ export default async function handler(req, res) {
       careerArea,
       lang,
     });
-    console.log("[api/analyze-v2] request done", { elapsed_ms: Date.now() - start });
     return res.status(200).json(payload);
   } catch (e) {
-    console.error("[api/analyze-v2] failed", e);
+    console.error("[api/analyze-v2]", e?.message || e);
     return res.status(500).json({
-      error: "An error occurred. Please try again.",
+      error: "analysis_failed",
     });
   }
 }

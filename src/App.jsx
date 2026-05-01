@@ -6636,7 +6636,6 @@ const msgInterval = setInterval(() => {
     let creditConsumed = false;
     const jdDerivedTitle = extractJobTitleFromJd(effectiveJd);
     try {
-      console.log("[analyze] v2 request start");
       const v2Res = await fetch(`${HF_API_BASE}/api/analyze-v2`, {
         method: "POST",
         headers: await getApiAuthHeaders({ requireSession: false }),
@@ -6649,9 +6648,31 @@ const msgInterval = setInterval(() => {
           isPro: hasProAccess,
         }),
       });
-      if (v2Res.ok) {
-        console.log("[analyze] v2 response ok");
-        const v2Raw = await v2Res.json();
+      const responseText = await v2Res.text();
+      let v2Payload = {};
+      try {
+        v2Payload = responseText ? JSON.parse(responseText) : {};
+      } catch (_parseErr) {
+        v2Payload = {};
+      }
+      if (!v2Res.ok) {
+        const serverErr =
+          typeof v2Payload?.error === "string" ? v2Payload.error : "";
+        const msg =
+          serverErr === "analysis_failed"
+            ? (lang === "TR"
+              ? "Analiz sunucuda tamamlanamadı. Biraz sonra tekrar dene."
+              : "The analysis could not be completed. Try again in a moment.")
+            : lang === "TR"
+              ? "Analiz alınamadı. Bağlantını kontrol et veya tekrar dene."
+              : "Analysis could not be retrieved. Check your connection or try again.";
+        setError(msg);
+        clearInterval(msgInterval);
+        setLoadingMessage("");
+        setLoading(false);
+        return;
+      }
+        const v2Raw = v2Payload;
         const v2 = ensureFailSafeV2(v2Raw, cvText, effectiveJd, lang);
         v2Ok = true;
         setEngineV2(v2);
@@ -6756,13 +6777,11 @@ const msgInterval = setInterval(() => {
         await fetchAnalyses();
         setShowSharePrompt(true);
         creditConsumed = true;
-      }
     } catch (e) {
-      console.error("[analyze] v2 failed, fallback will run", e);
+      console.error("[analyze] v2", e?.message || e);
     }
 
     if (!v2Ok) {
-      console.error("[analyze] v2 pipeline failed; legacy Groq fallback disabled");
       setError(lang === "TR"
         ? "Analiz tamamlanamadı. Lütfen tekrar dene."
         : "Analysis failed. Please try again.");
