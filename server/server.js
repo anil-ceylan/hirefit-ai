@@ -83,7 +83,12 @@ const analysisRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later" },
-  validate: { trustProxy: false },
+  /* trustProxy:false = skip "trust proxy: true is too permissive"; xForwardedForHeader:false = skip ERR_ERL_UNEXPECTED_X_FORWARDED_FOR when proxy headers exist; forwardedHeader:false = Express 5 does not honor Forwarded RFC header (Railway may send it) */
+  validate: {
+    trustProxy: false,
+    xForwardedForHeader: false,
+    forwardedHeader: false,
+  },
 });
 
 /** Railway (and similar) set PORT; health checks often need a simple 200. */
