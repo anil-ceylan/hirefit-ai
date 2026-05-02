@@ -91,4 +91,4 @@ if (!app.includes("export default HireFitLayout")) {
   process.exit(1);
 }
 fs.writeFileSync(appPath, app);
-console.log("injected pages");
+process.stdout.write("injected pages\n");

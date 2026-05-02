@@ -1,6 +1,7 @@
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronUp, Copy, ArrowRight, Download, Linkedin, Loader2, Share2 } from "lucide-react";
 import { parseLearningRoadmapToSteps, parseRoadmapStepDescription } from "./roadmapUtils";
+import { parseLocalStorageJson } from "./utils/safeJson";
 import {
   applyJobToFocusMicroLine,
   buildRetentionSharePost,
@@ -45,7 +46,6 @@ function buildSmoothPathHorizontal(pts) {
     const p0 = pts[i];
     const p1 = pts[i + 1];
     const dx = p1.x - p0.x;
-    const dy = p1.y - p0.y;
     const sag = Math.min(48, Math.max(16, Math.abs(dx) * 0.12)) * (i % 2 === 0 ? 1 : -1);
     const cx1 = p0.x + dx * 0.35;
     const cy1 = p0.y + sag;
@@ -62,7 +62,6 @@ function buildSmoothPathVertical(pts) {
   for (let i = 0; i < pts.length - 1; i++) {
     const p0 = pts[i];
     const p1 = pts[i + 1];
-    const dx = p1.x - p0.x;
     const dy = p1.y - p0.y;
     const sag = Math.min(36, Math.max(12, Math.abs(dy) * 0.1)) * (i % 2 === 0 ? 1 : -1);
     const cx1 = p0.x + sag;
@@ -127,30 +126,24 @@ function emptyFixProofGrid(fixes) {
 
 function loadRoadmapFixExecutionState(fp, fixes) {
   if (!fp || !fixes.length) return emptyFixProofGrid(fixes);
-  try {
-    const raw = localStorage.getItem(LS_FIX_PROGRESS + fp);
-    if (!raw) return emptyFixProofGrid(fixes);
-    const parsed = JSON.parse(raw);
-    return {
-      completed:
-        Array.isArray(parsed.completed) && parsed.completed.length === fixes.length
-          ? parsed.completed.map(Boolean)
-          : Array.from({ length: fixes.length }, () => false),
-      fixProofs:
-        Array.isArray(parsed.fixProofs) && parsed.fixProofs.length === fixes.length
-          ? parsed.fixProofs.map((v) => String(v ?? ""))
-          : Array.from({ length: fixes.length }, () => ""),
-    };
-  } catch {
-    return emptyFixProofGrid(fixes);
-  }
+  const parsed = parseLocalStorageJson(LS_FIX_PROGRESS + fp, null);
+  if (!parsed || typeof parsed !== "object") return emptyFixProofGrid(fixes);
+  return {
+    completed:
+      Array.isArray(parsed.completed) && parsed.completed.length === fixes.length
+        ? parsed.completed.map(Boolean)
+        : Array.from({ length: fixes.length }, () => false),
+    fixProofs:
+      Array.isArray(parsed.fixProofs) && parsed.fixProofs.length === fixes.length
+        ? parsed.fixProofs.map((v) => String(v ?? ""))
+        : Array.from({ length: fixes.length }, () => ""),
+  };
 }
 
 function saveRoadmapFixExecutionState(fp, state) {
   if (!fp || !state) return;
   try {
-    const raw = localStorage.getItem(LS_FIX_PROGRESS + fp);
-    const prev = raw ? JSON.parse(raw) : {};
+    const prev = parseLocalStorageJson(LS_FIX_PROGRESS + fp, {});
     localStorage.setItem(
       LS_FIX_PROGRESS + fp,
       JSON.stringify({
@@ -469,7 +462,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
     const read = () => {
       try {
         setStoredPlan(localStorage.getItem("hirefit-learning-plan") || "");
-        setStoredMeta(JSON.parse(localStorage.getItem("hirefit-roadmap-meta") || "{}"));
+        setStoredMeta(parseLocalStorageJson("hirefit-roadmap-meta", {}));
       } catch {
         setStoredPlan("");
         setStoredMeta({ roleType: "", seniority: "" });
@@ -965,7 +958,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
   useLayoutEffect(() => {
     socialAnimFromRef.current = socialProofAheadPct;
     setDisplaySocialPct(socialProofAheadPct);
-  }, [planKey]);
+  }, [planKey, socialProofAheadPct]);
 
   useEffect(() => {
     const from = socialAnimFromRef.current;
@@ -988,7 +981,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
   useEffect(() => {
     displayPctRef.current = retentionProgressPercent;
     setDisplayRetentionPct(retentionProgressPercent);
-  }, [planKey, catalogKey]);
+  }, [planKey, catalogKey, retentionProgressPercent]);
 
   useEffect(() => {
     const target = retentionProgressPercent;
@@ -1027,7 +1020,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
       map.set(si, ids.length > 0 && ids.every((id) => done.has(id)));
     }
     return map;
-  }, [progressEngineEnabled, roadmapSteps, fixExecState.completed, taskCatalog, completedTaskIds, roadmapSteps.length]);
+  }, [progressEngineEnabled, roadmapSteps, fixExecState.completed, taskCatalog, completedTaskIds]);
 
   const journeyStepIndex = useMemo(() => {
     if (progressEngineEnabled) {
@@ -1083,7 +1076,9 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
     if (saved.planKey !== planKey || ids.join("|") !== saved.completedTasks.join("|")) {
       saveRoadmapProgress({ completedTasks: ids, progress: pct, planKey });
     }
-  }, [planKey, catalogKey, taskCatalog.length]);
+  }, [planKey, catalogKey, taskCatalog]);
+
+  const completedTasksSig = useMemo(() => completedTaskIds.join("|"), [completedTaskIds]);
 
   useEffect(() => {
     if (!taskCatalog.length) {
@@ -1112,7 +1107,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
       saveRoadmapDaily(d);
     }
     setDailyState(d);
-  }, [planKey, catalogKey, taskCatalog.length, completedTaskIds.join("|")]);
+  }, [planKey, catalogKey, taskCatalog, completedTaskIds, completedTasksSig]);
 
   useEffect(() => {
     if (!dailyState?.currentTaskId || !planKey) {
@@ -1137,7 +1132,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
 
   const layout = isMobile ? "column" : "row";
 
-  const updatePath = () => {
+  const updatePath = useCallback(() => {
     const inner = mapInnerRef.current;
     if (!inner || totalNodes < 2) {
       setPathD("");
@@ -1171,14 +1166,14 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
     }
 
     setPathRedraw((k) => k + 1);
-  };
+  }, [layout, totalNodes, roadmapFocusIndex]);
 
   useLayoutEffect(() => {
     const t0 = requestAnimationFrame(() => {
       requestAnimationFrame(updatePath);
     });
     return () => cancelAnimationFrame(t0);
-  }, [roadmapSteps.length, roadmapFocusIndex, layout, effectivePlan, totalNodes]);
+  }, [updatePath, effectivePlan]);
 
   useEffect(() => {
     const inner = mapInnerRef.current;
@@ -1193,7 +1188,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
       if (sr) sr.removeEventListener("scroll", updatePath);
       window.removeEventListener("resize", updatePath);
     };
-  }, [layout, totalNodes, roadmapFocusIndex, effectivePlan]);
+  }, [updatePath]);
 
   useEffect(() => {
     if (!pathD || !pathRef.current) {
@@ -1251,8 +1246,6 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
     roadmapSteps.length > 0
       ? Math.min(100, Math.round(((roadmapFocusIndex + 1) / roadmapSteps.length) * 100))
       : 0;
-  const journeyProgressPercent = retentionTotal > 0 ? retentionProgressPercent : focusJourneyPercent;
-
   const progressMilestoneLine =
     roadmapSteps.length > 0
       ? retentionTotal > 0

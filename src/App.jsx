@@ -2,7 +2,6 @@ import "./App.css";
 import "./landing-ambient.css";
 import { parseActionPlan, enrichActionPlan, pickDoThisNextStep } from "../lib/analyze-v2/actionPlanNormalize.js";
 import supabase from "./supabaseClient";
-import PersonalizedRoadmapPage from "./PersonalizedRoadmapPage.jsx";
 import {
   TrustSection,
   ComparisonSection,
@@ -14,9 +13,9 @@ import {
   YourNextMovePanel,
 } from "./HireFitSections";
 import { useNavigate, useLocation, Outlet, useOutletContext } from "react-router-dom";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { parseLocalStorageJson, safeJsonParse } from "./utils/safeJson";
 import {
   Sparkles, FileText, Briefcase, AlertCircle, Loader2,
   Upload, Copy, Wand2, Target, Search, History, Trash2,
@@ -26,10 +25,7 @@ import {
   Cpu, FileUp, Lock, Check,
 } from "lucide-react";
 
-import * as pdfjsLib from "pdfjs-dist";
-import workerSrc from "pdfjs-dist/build/pdf.worker?url";
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+const LazyPersonalizedRoadmapPage = lazy(() => import("./PersonalizedRoadmapPage.jsx"));
 
 const HF_API_BASE =
   typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL
@@ -120,13 +116,6 @@ const SECTOR_CHIP_THEME = {
   "Product Design / UX": { dot: "#e879f9", ring: "rgba(232,121,249,0.65)", bg: "rgba(232,121,249,0.12)" },
 };
 
-function getSectorDisplayLabel(sectorKey, lang) {
-  const idx = HF_SECTOR_VALUES.indexOf(String(sectorKey || ""));
-  const labels = ["Otomatik (ilan)", "Teknoloji / Startup", "Danışmanlık", "Finans", "FMCG / Perakende", "Sağlık", "Kamu", "Telekom / Donanım", "Ürün Tasarımı / UX"];
-  if (idx >= 0) return labels[idx];
-  return String(sectorKey || "");
-}
-
 /** HireFit results surface — semantic colors + premium contrast. */
 const RS = {
   pageGradient: "linear-gradient(165deg, #020617 0%, #0f172a 42%, #0c1222 100%)",
@@ -202,15 +191,6 @@ function computeScoreRunProgress(newScore) {
   };
 }
 
-function formatBlockerTransform(currentScore, impactPts, lang) {
-  const cur = Math.min(100, Math.max(0, Math.round(Number(currentScore) || 0)));
-  const imp = Math.max(1, Math.min(18, Math.round(Number(impactPts) || 0)));
-  const nxt = Math.min(100, cur + imp);
-  return lang === "TR"
-    ? `Bunu düzeltmek skorunuzu ${cur} → ${nxt} (+${imp}) seviyesine taşıyabilir.`
-    : `Fixing this can move your score from ${cur} → ${nxt} (+${imp}).`;
-}
-
 /** Stable key for persisting per-fix checklists for this run. */
 function analysisExecutionFingerprint(cv, jd, alignmentScore) {
   const a = String(cv || "").slice(0, 2400);
@@ -222,85 +202,6 @@ function analysisExecutionFingerprint(cv, jd, alignmentScore) {
     h = Math.imul(h, 16777619);
   }
   return `v1_${(h >>> 0).toString(16)}`;
-}
-
-const LS_FIX_PROGRESS = "hirefit-fix-progress-";
-
-function emptyStepProofGrid(fixes) {
-  return fixes.map((f) => Array(Math.max(0, f.steps?.length || 0)).fill(""));
-}
-
-function loadExecutionPlanState(fp, fixes) {
-  const n = fixes.length;
-  const blank = () => ({
-    completed: Array.from({ length: n }, () => false),
-    fixProofs: Array.from({ length: n }, () => ""),
-    stepProofs: emptyStepProofGrid(fixes),
-  });
-  if (!fp || !n) return blank();
-  try {
-    const raw = localStorage.getItem(LS_FIX_PROGRESS + fp);
-    if (!raw) return blank();
-    const o = JSON.parse(raw);
-    const completed =
-      Array.isArray(o.completed) && o.completed.length === n
-        ? o.completed.map(Boolean)
-        : Array.from({ length: n }, () => false);
-    const fixProofs =
-      Array.isArray(o.fixProofs) && o.fixProofs.length === n
-        ? o.fixProofs.map((x) => String(x ?? ""))
-        : Array.from({ length: n }, () => "");
-    let stepProofs = emptyStepProofGrid(fixes);
-    if (Array.isArray(o.stepProofs) && o.stepProofs.length === n) {
-      stepProofs = fixes.map((f, fi) => {
-        const row = Array.isArray(o.stepProofs[fi]) ? o.stepProofs[fi] : [];
-        const sn = Math.max(0, f.steps?.length || 0);
-        return Array.from({ length: sn }, (_, si) => String(row[si] ?? ""));
-      });
-    }
-    return { completed, fixProofs, stepProofs };
-  } catch {
-    return blank();
-  }
-}
-
-function saveExecutionPlanState(fp, state) {
-  if (!fp || !state?.completed || !Array.isArray(state.completed)) return;
-  try {
-    localStorage.setItem(
-      LS_FIX_PROGRESS + fp,
-      JSON.stringify({
-        completed: state.completed,
-        fixProofs: Array.isArray(state.fixProofs) ? state.fixProofs : [],
-        stepProofs: Array.isArray(state.stepProofs) ? state.stepProofs : [],
-        updatedAt: Date.now(),
-      }),
-    );
-  } catch {
-    /* ignore */
-  }
-}
-
-/** Cumulative projected alignment after completing fixes 0..i (inclusive). */
-function cumulativeScoresAfterFixes(baseScore, fixes) {
-  const base = Math.min(100, Math.max(0, Math.round(Number(baseScore) || 0)));
-  const out = [];
-  let run = base;
-  for (const f of fixes) {
-    const imp = Math.max(1, Math.min(18, Math.round(Number(f?.score_impact) || 0)));
-    run = Math.min(100, run + imp);
-    out.push(run);
-  }
-  return out;
-}
-
-function splitImpactAcrossSteps(impPts, stepCount) {
-  const n = Math.max(0, Math.floor(stepCount));
-  if (n <= 0) return [];
-  const total = Math.max(1, Math.min(18, Math.round(Number(impPts) || 0)));
-  const base = Math.floor(total / n);
-  let rem = total - base * n;
-  return Array.from({ length: n }, (_, i) => base + (i < rem ? 1 : 0));
 }
 
 const RAW_PARSE_FAIL_RE = /\b(parsing failed|gpt parsing failed|parse failed|json parse)\b/i;
@@ -359,7 +260,7 @@ function normalizeRoleLabel(rawRole, lang) {
     { key: /project\s+manager|proje\s+yönetic/i, tr: "Proje Yöneticisi", en: "Project Manager" },
   ];
   const matched = roleMap.find((x) => x.key.test(lower));
-  if (matched) return matched.tr;
+  if (matched) return lang === "TR" ? matched.tr : matched.en;
 
   // If model returns a sentence/ad copy instead of role title, force a clean fallback role.
   const looksNoisy =
@@ -389,7 +290,7 @@ function dedupeTextList(lines) {
   return out;
 }
 
-function buildRoleSuggestionsFromCv(cvText, lang = "TR") {
+function buildRoleSuggestionsFromCv(cvText, _lang = "TR") {
   const text = String(cvText || "").toLowerCase();
   const roleDefs = [
     {
@@ -461,7 +362,7 @@ function buildRoleSuggestionsFromCv(cvText, lang = "TR") {
   };
 }
 
-function buildRoleContextJobDescription(role, lang = "TR") {
+function buildRoleContextJobDescription(role, _lang = "TR") {
   const r = String(role || "").trim() || "İş Analisti";
   return [
     `${r} rolü için hedef profil:`,
@@ -474,6 +375,22 @@ function buildRoleContextJobDescription(role, lang = "TR") {
 
 const HF_ANALYTICS_DEBOUNCE_MS = 900;
 const hfAnalyticsLastFire = new Map();
+const ANALYZE_V2_TIMEOUT_MS = 10_000;
+const ANALYZE_MIN_DURATION_MS = 1_500;
+let pdfjsLoaderPromise = null;
+
+async function loadPdfjs() {
+  if (!pdfjsLoaderPromise) {
+    pdfjsLoaderPromise = Promise.all([
+      import("pdfjs-dist"),
+      import("pdfjs-dist/build/pdf.worker?url"),
+    ]).then(([pdfjsLib, worker]) => {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = worker.default;
+      return pdfjsLib;
+    });
+  }
+  return pdfjsLoaderPromise;
+}
 
 /** Forwards to gtag, Plausible, or dataLayer when available (no-op otherwise). */
 function hirefitTrack(eventName, params = {}) {
@@ -1018,173 +935,6 @@ function normalizeShareVerdictLabel(verdictLabel, lang) {
   return s;
 }
 
-function scoreHeroLines(scoreRounded, lang) {
-  const tk = translations[isUiTurkish(lang) ? "TR" : "EN"];
-  if (!Number.isFinite(scoreRounded)) return null;
-  if (scoreRounded < 60) {
-    return { big: tk.heroStopBig, line1: tk.heroStopLine1, line2: tk.heroStopLine2 };
-  }
-  if (scoreRounded < 75) {
-    return { big: tk.heroRiskBig, line1: tk.heroRiskLine1, line2: tk.heroRiskLine2 };
-  }
-  if (scoreRounded < 85) {
-    return { big: tk.heroCloseBig, line1: tk.heroCloseLine1, line2: tk.heroCloseLine2 };
-  }
-  return { big: tk.heroStrongBig, line1: tk.heroStrongLine1, line2: tk.heroStrongLine2 };
-}
-
-function scoreInsightBlock(scoreRounded, lang) {
-  const tk = translations[isUiTurkish(lang) ? "TR" : "EN"];
-  if (!Number.isFinite(scoreRounded)) return { main: "", bench: "" };
-  if (scoreRounded < 60) return { main: tk.scoreInsightLow, bench: tk.scoreInsightBench };
-  if (scoreRounded < 75) return { main: tk.scoreInsightMid, bench: tk.scoreInsightBench };
-  return { main: tk.scoreInsightHigh, bench: tk.scoreInsightBench };
-}
-
-function stepCtaFromText(step, lang) {
-  const tk = translations[isUiTurkish(lang) ? "TR" : "EN"];
-  const s = String(step || "");
-  const url = s.match(/https?:\/\/[^\s)\]}>]+/i)?.[0] || null;
-  if (url) return { label: tk.stepCtaOpenLink, href: url };
-  if (/github/i.test(s)) return { label: tk.stepCtaGithub, href: null };
-  if (/apply|annotation|başvur|işe|job/i.test(s)) return { label: tk.stepCtaApply, href: null };
-  return { label: lang === "TR" ? "Start mission →" : "Start mission →", href: null };
-}
-
-function useScore(targetScore) {
-  const [animatedScore, setAnimatedScore] = useState(
-    targetScore != null && Number.isFinite(Number(targetScore)) ? Math.round(Number(targetScore)) : null,
-  );
-  const [floatingFeedback, setFloatingFeedback] = useState(null);
-  useEffect(() => {
-    if (targetScore == null || !Number.isFinite(Number(targetScore))) {
-      setAnimatedScore(null);
-      return undefined;
-    }
-    const from = animatedScore == null || !Number.isFinite(Number(animatedScore)) ? Number(targetScore) : Number(animatedScore);
-    const to = Number(targetScore);
-    if (Math.round(from) === Math.round(to)) {
-      setAnimatedScore(Math.round(to));
-      return undefined;
-    }
-    let raf = 0;
-    const t0 = performance.now();
-    const dur = 520;
-    const tick = (now) => {
-      const u = Math.min(1, (now - t0) / dur);
-      const ease = 1 - (1 - u) ** 2;
-      setAnimatedScore(Math.round(from + (to - from) * ease));
-      if (u < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => {
-      if (raf) cancelAnimationFrame(raf);
-    };
-  }, [targetScore]);
-
-  useEffect(() => {
-    if (!floatingFeedback) return undefined;
-    const id = window.setTimeout(() => setFloatingFeedback(null), 1700);
-    return () => window.clearTimeout(id);
-  }, [floatingFeedback]);
-
-  return { animatedScore, floatingFeedback, setFloatingFeedback };
-}
-
-function useLevel(score) {
-  const levels = [
-    { id: 1, min: 0, max: 20, title: "Lost Candidate" },
-    { id: 2, min: 20, max: 40, title: "Direction Found" },
-    { id: 3, min: 40, max: 60, title: "Structured Thinker" },
-    { id: 4, min: 60, max: 80, title: "Market Ready" },
-    { id: 5, min: 80, max: 100, title: "Interview Ready" },
-  ];
-  const s = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
-  const current = levels.find((lvl, idx) => s >= lvl.min && (idx === levels.length - 1 || s < lvl.max)) || levels[0];
-  const next = levels.find((lvl) => lvl.id === current.id + 1) || null;
-  const pct = next
-    ? Math.max(0, Math.min(100, Math.round(((s - current.min) / (next.min - current.min)) * 100)))
-    : 100;
-  return { currentLevel: current, nextLevel: next, progressToNext: pct };
-}
-
-function useStreak(seedKey, activityTick) {
-  const [streakCount, setStreakCount] = useState(0);
-  useEffect(() => {
-    const key = `hirefit-streak-${seedKey || "global"}`;
-    const today = new Date().toISOString().slice(0, 10);
-    const dayMs = 24 * 60 * 60 * 1000;
-    try {
-      const raw = localStorage.getItem(key);
-      const parsed = raw ? JSON.parse(raw) : { count: 0, lastDate: "" };
-      const last = parsed.lastDate ? new Date(parsed.lastDate).getTime() : null;
-      const now = new Date(today).getTime();
-      let nextCount = Number(parsed.count) || 0;
-      if (!last) nextCount = 1;
-      else if (now - last >= dayMs * 2) nextCount = 1;
-      else if (parsed.lastDate !== today) nextCount += 1;
-      localStorage.setItem(key, JSON.stringify({ count: nextCount, lastDate: today }));
-      setStreakCount(nextCount);
-    } catch {
-      setStreakCount(1);
-    }
-  }, [seedKey, activityTick]);
-  return { streakCount };
-}
-
-function useTasks(seedKey, lang, planFixes) {
-  const [task, setTask] = useState(null);
-  useEffect(() => {
-    const key = `hirefit-daily-task-${seedKey || "global"}`;
-    const today = new Date().toISOString().slice(0, 10);
-    const pool = [
-      { title: lang === "TR" ? "CV'ye ölçülebilir sonuç ekle" : "Add measurable results to your CV", reward: 8 },
-      { title: lang === "TR" ? "Araçları netleştir (Excel, SQL vb.)" : "Add tools clearly (Excel, SQL, etc.)", reward: 6 },
-      { title: lang === "TR" ? "Rol hedeflemeyi düzelt" : "Fix role targeting", reward: 10 },
-      { title: lang === "TR" ? "Mini proje inşa et" : "Build a mini project", reward: 12 },
-      { title: lang === "TR" ? "Kanıt yükle" : "Upload proof", reward: 7 },
-    ];
-    const fromFix = planFixes.find((f) => !f.done);
-    try {
-      const raw = localStorage.getItem(key);
-      const parsed = raw ? JSON.parse(raw) : null;
-      if (parsed?.date === today && parsed?.task) {
-        setTask(parsed.task);
-        return;
-      }
-      const fallback = pool[Math.floor(Math.random() * pool.length)];
-      const next = fromFix
-        ? {
-            title: String(fromFix.issue || fallback.title),
-            reward: Math.max(4, Math.min(18, Math.round(Number(fromFix.score_impact) || fallback.reward))),
-            done: false,
-          }
-        : { ...fallback, done: false };
-      const payload = { date: today, task: next };
-      localStorage.setItem(key, JSON.stringify(payload));
-      setTask(next);
-    } catch {
-      setTask({ ...pool[0], done: false });
-    }
-  }, [seedKey, lang, JSON.stringify(planFixes.map((f) => ({ issue: f.issue, score_impact: f.score_impact, done: !!f.done })))]);
-
-  const completeTask = () => {
-    if (!task || task.done) return 0;
-    const next = { ...task, done: true };
-    setTask(next);
-    try {
-      const key = `hirefit-daily-task-${seedKey || "global"}`;
-      const today = new Date().toISOString().slice(0, 10);
-      localStorage.setItem(key, JSON.stringify({ date: today, task: next }));
-    } catch {
-      // ignore
-    }
-    return Math.max(1, Number(task.reward) || 0);
-  };
-
-  return { dailyTask: task, completeTask };
-}
-
 function ResultsBulletRow({ sentiment, children }) {
   const dot =
     sentiment === "positive"
@@ -1386,16 +1136,16 @@ function AiLivePipelinePanel({ lang, loading, hasOutput, cvReady, jdReady, extra
   const steps =
     lang === "TR"
       ? [
-          { key: "match", label: "CV ile ilan eşleştiriliyor..." },
-          { key: "kw", label: "Anahtar kelimeler çıkarılıyor..." },
-          { key: "rec", label: "Recruiter simülasyonu çalışıyor..." },
-          { key: "dec", label: "Karar üretiliyor..." },
+          { key: "cv", label: "CV analiz ediliyor" },
+          { key: "ats", label: "ATS kontrolü yapılıyor" },
+          { key: "rec", label: "Recruiter değerlendirmesi" },
+          { key: "dec", label: "Karar oluşturuluyor" },
         ]
       : [
-          { key: "match", label: "Matching CV with JD..." },
-          { key: "kw", label: "Extracting keywords..." },
-          { key: "rec", label: "Simulating recruiter..." },
-          { key: "dec", label: "Generating decision..." },
+          { key: "cv", label: "Analyzing CV" },
+          { key: "ats", label: "Running ATS checks" },
+          { key: "rec", label: "Recruiter evaluation" },
+          { key: "dec", label: "Building decision" },
         ];
 
   const idleTitle = lang === "TR" ? "Canlı analiz hattı" : "Live analysis pipeline";
@@ -1580,40 +1330,34 @@ function AnalysisThinkingOverlay({ lang, loading }) {
 }
 
 function pickLeadInsight(engineV2, analysisData, lang) {
+  const fb =
+    lang === "TR"
+      ? "CV sinyalin rol beklentisine göre zayıf kalıyor."
+      : "Your CV signal looks weak versus what this role expects.";
   const insight =
     engineV2?.Gaps?.biggest_gap ||
     engineV2?.Gaps?.rejection_reasons?.[0]?.issue ||
     analysisData?.rejection_reasons?.high?.[0] ||
     analysisData?.fit_summary ||
-    "CV sinyalin rol beklentisine göre zayıf kalıyor.";
+    fb;
   return String(insight || "").trim();
 }
 
 function pickLeadSuggestion(engineV2, analysisData, lang) {
+  const fb =
+    lang === "TR"
+      ? "Her ana deneyime ölçülebilir etki ekle."
+      : "Add measurable impact to each major experience line.";
   const suggestion =
     engineV2?.Decision?.what_to_fix_first?.[0] ||
     analysisData?.improvements?.[0] ||
     analysisData?.missing_skills?.[0] ||
-    "Her ana deneyime ölçülebilir etki ekle.";
+    fb;
   return String(suggestion || "").trim();
 }
 
-function buildSingleActionFromReason(reason, lang) {
-  const lo = String(reason || "").toLowerCase();
-  if (lo.includes("ölç") || lo.includes("metric") || lo.includes("impact")) {
-    return "CV'deki en kritik deneyimi tek cümlede, net sonuç rakamıyla yeniden yaz.";
-  }
-  if (lo.includes("eşleş") || lo.includes("deneyim") || lo.includes("experience") || lo.includes("match")) {
-    return "CV’ni bu role göre yeniden konumlandır.";
-  }
-  if (lo.includes("anahtar") || lo.includes("keyword") || lo.includes("beceri") || lo.includes("skill")) {
-    return "İlanda geçen 3 kritik beceriyi CV'nin üst bölümünde açık ve görünür yaz.";
-  }
-  return "En kritik boşluğu şimdi kapat: bu ilana özel tek bir güçlü kanıt satırı ekle.";
-}
-
 function UnlockReportGateCard({
-  lang,
+  lang: _lang,
   score,
   insight,
   suggestion,
@@ -1646,15 +1390,7 @@ function UnlockReportGateCard({
         ? "Sınırdasın — risk altındasın."
         : "Şansın var — ama garanti değil.";
   const reasonRaw = String(insight || "").trim();
-  const reasonNorm = reasonRaw.toLowerCase();
-  const topReason = reasonRaw
-    ? ((reasonNorm.includes("measurable impact")
-      || reasonNorm.includes("no measurable")
-      || reasonNorm.includes("ölçülebilir")
-      || reasonNorm.includes("impact"))
-      ? "CV’n gerçek sonuçlar göstermiyor."
-      : reasonRaw)
-    : "CV’n gerçek sonuçlar göstermiyor.";
+  const topReason = reasonRaw || "CV’n gerçek sonuçlar göstermiyor.";
   const impactDelta = scoreNow < 50 ? 18 : scoreNow <= 70 ? 12 : 8;
   const scoreAfterFix = Math.min(100, scoreNow + impactDelta);
   const actionRaw = String(suggestion || "").trim();
@@ -2143,7 +1879,7 @@ function SharePromptModal({ open, lang, score, verdictLabel, biggestMistake, onC
         <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>{`Skor: ${score}`}</div>
         <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6, color: "#cbd5e1", padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>{text}</pre>
         <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
-          <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch {} }} style={{ flex: 1, minWidth: 120, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.25)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", fontWeight: 700, cursor: "pointer" }}>
+          <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { /* clipboard unavailable */ } }} style={{ flex: 1, minWidth: 120, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(148,163,184,0.25)", background: "rgba(255,255,255,0.04)", color: "#e2e8f0", fontWeight: 700, cursor: "pointer" }}>
             {copied ? "Kopyalandı!" : "Kopyala"}
           </button>
           <a href={li} target="_blank" rel="noopener noreferrer" style={{ flex: 1, minWidth: 120, textDecoration: "none", padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(10,102,194,0.35)", background: "rgba(10,102,194,0.12)", color: "#7dd3fc", fontWeight: 700, textAlign: "center" }}>
@@ -2795,7 +2531,7 @@ function buildPersonalizedProjectEngine({ lang, biggestGap, missingSkills, topRo
   return { title, why, steps, outcome, timeEstimate };
 }
 
-function buildBestPathForwardModel({ data, lang, score, t, cvText, jdText }) {
+function buildBestPathForwardModel({ data, lang, score, t: _t, cvText, jdText }) {
   const strengths = Array.isArray(data?.Recruiter?.strengths) ? data.Recruiter.strengths.map((x) => String(x).trim()).filter(Boolean) : [];
   const matched = Array.isArray(data?.ATS?.matched_skills) ? data.ATS.matched_skills.map((x) => String(x).trim()).filter(Boolean) : [];
   const gaps = Array.isArray(data?.Gaps?.rejection_reasons) ? data.Gaps.rejection_reasons : [];
@@ -4175,7 +3911,7 @@ function PaywallModal({ onClose, onUpgrade, lang }) {
   );
 }
 
-function DecisionCard({ data, loading, lang, isPro, onApplyFix, applyingFix, fixResults, onUpgrade, alignmentScore, impactContext }) {
+function DecisionCard({ data, loading, lang, alignmentScore }) {
   const t = translations[lang];
   if (loading) return (
     <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 20, marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
@@ -4593,454 +4329,6 @@ function buildInterviewPrepFromV2(v2, lang) {
   return out.slice(0, 2);
 }
 
-function DashboardResults({ data, score, matchedSkills, missingSkills, topKeywords, result, optimizedCv, learningPlan, downloadText, lang, navigate, isPro = false, onUpgrade = () => {}, roleFitLocked = false, useV2Engine = false }) {
-  const t = translations[lang];
-  useEffect(() => {
-    if (!document.getElementById("db-fonts")) {
-      const el = document.createElement("style");
-      el.id = "db-fonts";
-      el.textContent = `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');`;
-      document.head.appendChild(el);
-    }
-  }, []);
-
-  const [displayScore, setDisplayScore] = useState(0);
-
-  useEffect(() => {
-    setDisplayScore(0);
-    const steps = 60;
-    const increment = score / steps;
-    let current = 0;
-    const timer = setInterval(() => {
-      current += increment;
-      if (current >= score) {
-        setDisplayScore(score);
-        clearInterval(timer);
-      } else {
-        setDisplayScore(Math.floor(current));
-      }
-    }, 1200 / steps);
-    return () => clearInterval(timer);
-  }, [score]);
-
-  const fvDash = getScoreFinalVerdict(score, lang);
-  const verdict = fvDash.title;
-
-  const DB = {
-    root: { background: "#080808", borderRadius: 20, padding: 28, marginBottom: 16, fontFamily: "'Space Grotesk', sans-serif" },
-    hero: { border: "1px solid #1c1c1c", borderRadius: 20, padding: "28px 32px", marginBottom: 20, display: "grid", gridTemplateColumns: "auto 1fr auto", gap: 32, alignItems: "center", background: "#0c0c0c", position: "relative", overflow: "hidden" },
-    grid2: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 },
-    grid3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 0 },
-    grid4: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10, marginBottom: 24 },
-    card: { border: "1px solid #1c1c1c", borderRadius: 16, padding: 22, background: "#0c0c0c", position: "relative", overflow: "hidden" },
-    statCard: { border: "1px solid #1c1c1c", borderRadius: 12, padding: "16px 18px", background: "#0c0c0c", position: "relative", overflow: "hidden" },
-    sectionHeader: { display: "flex", alignItems: "center", gap: 12, marginBottom: 14, marginTop: 4 },
-    cardTag: { fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10, color: "#d4af37" },
-    moreLink: { fontSize: 12, color: "#d4af37", fontWeight: 700, marginTop: 12, letterSpacing: "0.04em", opacity: 0.7 },
-  };
-
-  const statLabels = lang === "TR"
-    ? ["Beceri Eşleşmesi", "Anahtar Kelimeler", "Deneyim", "Biçimlendirme"]
-    : ["Skills Match", "Keywords", "Experience", "Formatting"];
-
-  const rt = String(data.role_type || "").trim();
-  const displayRoleTitle =
-    rt && !/^role$/i.test(rt) ? rt : lang === "TR" ? "İş ilanı" : "Job posting";
-
-  const cs = data.confidence_score;
-  const hasConfidenceNum = typeof cs === "number" && !Number.isNaN(cs);
-  const cl = String(data.confidence_level || "").trim();
-  const inferredPct = cl === "High" ? 78 : cl === "Medium" ? 62 : cl === "Low" ? 45 : null;
-  const confidencePct = hasConfidenceNum ? cs : inferredPct;
-  const basisFromLevel =
-    cl && /^(low|medium|high)$/i.test(cl)
-      ? lang === "TR"
-        ? `${cl} güven seviyesi`
-        : `${cl} confidence level`
-      : "";
-  const confidenceBasisText = String(data.confidence_basis || "").trim() || basisFromLevel;
-
-  const roleRows = (data.role_matches || []).filter((r) => r && String(r.role || "").trim());
-  const showRolesProLock = !!roleFitLocked && !isPro;
-  const interviewRows = Array.isArray(data.interview_prep) ? data.interview_prep : [];
-  const showInterviewProLock = !isPro;
-  const showInterviewCard = showInterviewProLock || interviewRows.length > 0;
-
-  const proLockBox = (desc) => (
-    <div
-      style={{
-        padding: 18,
-        borderRadius: 12,
-        border: "1px dashed rgba(212,175,55,0.35)",
-        background: "rgba(212,175,55,0.04)",
-        textAlign: "center",
-      }}
-    >
-      <div style={{ fontSize: 13, color: "#a8a29e", lineHeight: 1.55, marginBottom: 12 }}>{desc}</div>
-      <button
-        type="button"
-        onClick={onUpgrade}
-        style={{
-          padding: "8px 16px",
-          borderRadius: 10,
-          border: "none",
-          background: "linear-gradient(135deg, #d4af37, #f0d060)",
-          color: "#000",
-          fontWeight: 700,
-          fontSize: 13,
-          cursor: "pointer",
-        }}
-      >
-        {t.unlockWithPro}
-      </button>
-    </div>
-  );
-
-  return (
-    <>
-      <div style={DB.root}>
-        <div style={DB.hero}>
-          <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "linear-gradient(180deg, #d4af37, #b8860b, #8b6914)", borderRadius: "3px 0 0 3px" }} />
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(212,175,55,0.4), transparent)" }} />
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-            <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: "0.14em", color: "#6a6a6a", textTransform: "uppercase", marginBottom: 2 }}>{lang === "TR" ? "FİNAL KARAR" : "FINAL VERDICT"}</div>
-            <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 76, fontWeight: 400, lineHeight: 1, letterSpacing: "-0.03em", background: "linear-gradient(135deg, #f0d060, #d4af37, #b8860b)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{displayScore}</div>
-            <div style={{ fontSize: 11, color: "#7a7a7a", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase" }}>{lang === "TR" ? "100 üzerinden" : "out of 100"}</div>
-            <div style={{ fontSize: 11, fontWeight: 700, padding: "4px 10px", borderRadius: 4, background: "rgba(212,175,55,0.08)", color: "#d4af37", border: "1px solid rgba(212,175,55,0.2)", marginTop: 6, letterSpacing: "0.06em", textTransform: "uppercase" }}>{verdict}</div>
-            {(() => {
-              const rr = getRejectionRiskFromAlignmentScore(score, lang);
-              return (
-                <div style={{ marginTop: 10, textAlign: "center", maxWidth: 200 }}>
-                  <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: "0.12em", color: "#6a6a6a", textTransform: "uppercase", marginBottom: 4 }}>{rr.title}</div>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: rr.color, lineHeight: 1.35 }}>{rr.mainLine}</div>
-                </div>
-              );
-            })()}
-          </div>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#d4af37", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 10 }}>{displayRoleTitle}</div>
-            <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 26, color: "#e8e8e8", lineHeight: 1.3, marginBottom: 12, fontStyle: "italic" }}>
-              <span style={{ fontStyle: "normal", color: "#cbd5e1", fontWeight: 600 }}>{fvDash.explanation}</span>
-              {(data.missing_skills || []).length > 0 && score < 85 ? (
-                <span style={{ display: "block", marginTop: 10, fontSize: 15, fontStyle: "normal", color: "#94a3b8" }}>
-                  {lang === "TR" ? (
-                    <>Ayrıca <span style={{ color: "#f87171", fontWeight: 700 }}>{(data.missing_skills || []).length} kritik boşluk</span> seni filtrede düşürüyor.</>
-                  ) : (
-                    <><span style={{ color: "#f87171", fontWeight: 700 }}>{(data.missing_skills || []).length} critical gaps</span> are dragging you down in the filter.</>
-                  )}
-                </span>
-              ) : null}
-            </div>
-            <div style={{ fontSize: 13, color: "#7a7a7a", lineHeight: 1.65 }}>{data.fit_summary || ""}</div>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-            <div style={{ fontSize: 10, color: "#7a7a7a", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 700 }}>{lang === "TR" ? "AI Güveni" : "AI Confidence"}</div>
-            {(() => {
-              const tier = getConfidenceTierLabel(confidencePct, lang);
-              if (!tier) return <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 28, color: "#6a6a6a", lineHeight: 1 }}>{t.confidenceNA}</div>;
-              return (
-                <div
-                  title={lang === "TR" ? "Analiz kalitesi CV ve JD netliğine göre değişir." : "Analysis quality can vary based on CV and JD clarity."}
-                  style={{ fontSize: 18, fontWeight: 800, color: tier.color, lineHeight: 1.2 }}
-                >
-                  {tier.label} ⓘ
-                </div>
-              );
-            })()}
-            {confidenceBasisText ? (
-              <div style={{ fontSize: 11, color: "#7a7a7a", textAlign: "right", lineHeight: 1.5, maxWidth: 200 }}>{confidenceBasisText}</div>
-            ) : null}
-          </div>
-        </div>
-
-        <div style={{ marginBottom: 20 }}>
-          <ImpactProjectionPanel
-            projection={computeImpactProjection(score, {
-              gaps: [
-                ...(data.rejection_reasons?.high || []).map((issue) => ({ issue: String(issue), impact: "high", explanation: "" })),
-                ...(data.rejection_reasons?.medium || []).map((issue) => ({ issue: String(issue), impact: "medium", explanation: "" })),
-              ],
-              missingKeywords: data.top_keywords || [],
-              missingSkills: missingSkills.length ? missingSkills : data.missing_skills || [],
-              improvements: data.improvements || [],
-              rejectionHigh: data.rejection_reasons?.high,
-              rejectionMedium: data.rejection_reasons?.medium,
-            }, lang)}
-            lang={lang}
-          />
-        </div>
-
-        <div style={DB.grid4}>
-          {[
-            {
-              label: statLabels[0],
-              val: data.score_breakdown?.skills_match ?? score,
-              color: "#60a5fa",
-              ctx:
-                data.score_breakdown?.skills_explanation ||
-                (() => {
-                  const m = (data.matched_skills || []).length;
-                  const tot = m + (data.missing_skills || []).length;
-                  if (lang === "TR") {
-                    if (tot <= 0) return "Beceri eşleşmesi verisi yok";
-                    return `${tot}'dan ${m} eşleşti`;
-                  }
-                  return `${m} of ${tot} matched`;
-                })(),
-            },
-            { label: statLabels[1], val: data.score_breakdown?.keyword_match ?? 100, color: "#10b981", ctx: `${(data.top_keywords || []).length} ${lang === "TR" ? "anahtar kelime tespit edildi" : "keywords detected"}` },
-            { label: statLabels[2], val: data.score_breakdown?.experience_depth ?? Math.max(35, score - 10), color: "#f59e0b", ctx: data.score_breakdown?.experience_explanation || (lang === "TR" ? "Derinlik değerlendirildi" : "Depth evaluated") },
-            { label: statLabels[3], val: data.score_breakdown?.formatting ?? 75, color: "#60a5fa", ctx: data.language_analysis?.tone || (lang === "TR" ? "Biçimlendirme incelendi" : "Formatting reviewed") },
-          ].map(({ label, val, color, ctx }) => (
-            <div key={label} style={DB.statCard}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(212,175,55,0.2), transparent)" }} />
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#d4af37", marginBottom: 6 }}>{label}</div>
-              <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 30, lineHeight: 1, color, marginBottom: 3 }}>{val}</div>
-              <div style={{ fontSize: 11, color: "#7a7a7a", fontWeight: 500 }}>{ctx}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={DB.sectionHeader}>
-          <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#d4af37", fontStyle: "italic" }}>01</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.14em" }}>{lang === "TR" ? "İşe Alım Uzmanı Görüşü" : "Recruiter View"}</div>
-          <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(212,175,55,0.2), transparent)" }} />
-        </div>
-        <div style={DB.grid2}>
-          <div style={DB.card}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #f0d060)" }} />
-            <div style={DB.cardTag}>{lang === "TR" ? "İşe alım uzmanının gerçekte ne düşündüğü" : "What the recruiter actually thinks"}</div>
-            {(() => {
-              const rr = getRejectionRiskFromAlignmentScore(score, lang);
-              return (
-                <div style={{ fontSize: 11, fontWeight: 700, color: rr.color, marginBottom: 10, lineHeight: 1.45 }}>
-                  {rr.title}: {rr.mainLine}
-                </div>
-              );
-            })()}
-            <div style={{ borderLeft: "2px solid #d4af37", padding: "14px 16px", background: "rgba(212,175,55,0.03)", borderRadius: "0 10px 10px 0", marginBottom: 14 }}>
-              <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 15, color: "#8a8a8a", lineHeight: 1.7, fontStyle: "italic" }}>&quot;{data.recruiter_simulation?.internal_monologue || data.fit_summary || (lang === "TR" ? "Analiz tamamlandı." : "Analysis complete.")}&quot;</div>
-              <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700, marginTop: 8, letterSpacing: "0.04em" }}>— {data.recruiter_simulation?.sector || (lang === "TR" ? "Sektör" : "Industry")} {lang === "TR" ? "İşe Alım Uzmanı" : "Recruiter"} · {data.seniority || (lang === "TR" ? "Belirtilmedi" : "Junior")} {lang === "TR" ? "seviye işe alım" : "level hiring"}</div>
-            </div>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "7px 14px", borderRadius: 6, background: data.recruiter_simulation?.would_interview ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)", border: `1px solid ${data.recruiter_simulation?.would_interview ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)"}`, color: data.recruiter_simulation?.would_interview ? "#10b981" : "#f87171", fontSize: 12, fontWeight: 700 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: data.recruiter_simulation?.would_interview ? "#10b981" : "#f87171", display: "inline-block", flexShrink: 0 }} />
-              {mapDecisionLabel(
-                data.recruiter_simulation?.decision ||
-                  (data.recruiter_simulation?.would_interview ? (lang === "TR" ? "Listeye alır" : "Would shortlist") : (lang === "TR" ? "İlerlemez" : "Would not proceed")),
-                lang
-              )}
-            </div>
-          </div>
-          <div style={DB.card}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #ef4444, #f97316)" }} />
-            <div style={DB.cardTag}>{lang === "TR" ? "İyi sanıp aslında sorunlu olan şeyler" : "What you think is fine — but isn't"}</div>
-            {(data.blind_spots || (data.rejection_reasons?.high || []).map((r) => ({ issue: r, fix: "" }))).slice(0, 3).map((item, i) => (
-              <div key={i} style={{ display: "flex", gap: 12, marginBottom: 14, paddingBottom: 14, borderBottom: i < 2 ? "1px solid #1c1c1c" : "none" }}>
-                <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 22, color: "rgba(212,175,55,0.4)", flexShrink: 0, marginTop: -2 }}>{i + 1}</div>
-                <div>
-                  <div style={{ fontSize: 13, color: "#8a8a8a", lineHeight: 1.55, marginBottom: 6 }}>{item.issue || item}</div>
-                  {item.fix && <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", background: "rgba(212,175,55,0.06)", border: "1px solid rgba(212,175,55,0.15)", borderRadius: 4, padding: "4px 10px", display: "inline-block" }}>→ {item.fix}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={DB.sectionHeader}>
-          <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#d4af37", fontStyle: "italic" }}>02</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.14em" }}>{lang === "TR" ? "Derin Analiz" : "Deep Analysis"}</div>
-          <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(212,175,55,0.2), transparent)" }} />
-        </div>
-        <div style={DB.grid2}>
-          <div style={DB.card}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #10b981)" }} />
-            <div style={DB.cardTag}>{lang === "TR" ? "Siz ve hayal ettikleri aday" : "You vs the candidate they're picturing"}</div>
-            <CriticalSkillsGapBlock skills={missingSkills.length ? missingSkills : data.missing_skills || []} lang={lang} />
-            {(data.benchmark?.dimensions || [
-              {
-                name: lang === "TR" ? "Beceri eşleşmesi" : "Skills match",
-                candidate_level: matchedSkills.length > 2 ? (lang === "TR" ? "İyi" : "Good") : (lang === "TR" ? "Temel" : "Basic"),
-                ideal_level: lang === "TR" ? "İleri" : "Advanced",
-              },
-              {
-                name: lang === "TR" ? "Etki kanıtı" : "Impact proof",
-                candidate_level: lang === "TR" ? "Eksik" : "Missing",
-                ideal_level: lang === "TR" ? "Ölçümlenmiş" : "Quantified",
-              },
-            ]).slice(0, 4).map((dim, i) => {
-              const cand = dim.candidate_level;
-              const positive =
-                ["Strong ✓", "Good", "Some"].includes(cand) ||
-                (lang === "TR" && ["İyi", "Güçlü ✓", "Var", "Bazı"].includes(cand));
-              return (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, paddingBottom: 10, borderBottom: i < 3 ? "1px solid #1c1c1c" : "none" }}>
-                <span style={{ fontSize: 12, color: "#7a7a7a", width: 100, flexShrink: 0, fontWeight: 500 }}>{dim.name}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 4, background: positive ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)", color: positive ? "#10b981" : "#f87171", border: `1px solid ${positive ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)"}` }}>{dim.candidate_level}</span>
-                <span style={{ fontSize: 10, color: "#5a5a5a", fontWeight: 700 }}>{lang === "TR" ? "karşı" : "vs"}</span>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: "3px 9px", borderRadius: 4, background: "rgba(16,185,129,0.08)", color: "#10b981", border: "1px solid rgba(16,185,129,0.15)" }}>{dim.ideal_level}</span>
-              </div>
-            );
-            })}
-            <div style={DB.moreLink}>{lang === "TR" ? `İlk 2'yi düzelt → tahmini skor: ${score} → ${data.benchmark?.before_after_estimate || Math.min(91, score + 9)} →` : `Fix top 2 → estimated score: ${score} → ${data.benchmark?.before_after_estimate || Math.min(91, score + 9)} →`}</div>
-          </div>
-          <div style={DB.card}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #a78bfa)" }} />
-            <div style={DB.cardTag}>{lang === "TR" ? "CV'nizin parladığı diğer roller" : "Roles where your CV also shines"}</div>
-            <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#e8e8e8", marginBottom: 16, lineHeight: 1.25 }}>
-              {lang === "TR" ? "CV'niz burada daha fazla kapı açabilir." : "Your CV may open more doors here."} <em style={{ color: "#8a8a8a", fontSize: 16 }}>{lang === "TR" ? "Başvurmadan önce bilin." : "Worth knowing before you apply."}</em>
-            </div>
-            {showRolesProLock ? (
-              proLockBox(t.proFeatureRoles)
-            ) : roleRows.length ? (
-              roleRows.slice(0, 4).map((r, i) => {
-                const colors = ["#10b981", "#60a5fa", "#f59e0b", "#555555"];
-                const ms = Number(r.match_score);
-                const scoreDisp = Number.isFinite(ms) ? ms : "—";
-                const barW = Number.isFinite(ms) ? Math.min(90, ms * 0.6) : 0;
-                return (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                    <span style={{ fontFamily: "'Instrument Serif', serif", fontSize: 22, color: colors[i], width: 36, flexShrink: 0 }}>{scoreDisp}</span>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: i < 3 ? "#c8c8c8" : "#6a6a6a", flex: 1 }}>{r.role}</span>
-                    <div style={{ width: `${barW}px`, height: 2, borderRadius: 999, background: i < 3 ? `linear-gradient(90deg, #d4af37, ${colors[i]})` : "#1c1c1c" }} />
-                  </div>
-                );
-              })
-            ) : (
-              <EmptyGuidance primary={isPro ? t.rolesEmptyPro : t.rolesEmptyGeneric} action={t.rolesEmptyNext} />
-            )}
-          </div>
-        </div>
-
-        <div style={DB.sectionHeader}>
-          <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#d4af37", fontStyle: "italic" }}>03</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.14em" }}>{lang === "TR" ? "Aksiyon Planı" : "Action Plan"}</div>
-          <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(212,175,55,0.2), transparent)" }} />
-        </div>
-        <div style={{ ...DB.grid2, gridTemplateColumns: showInterviewCard ? "1fr 1fr" : "1fr" }}>
-          {showInterviewCard ? (
-            <div style={DB.card}>
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #7c3aed)" }} />
-              <div style={DB.cardTag}>{lang === "TR" ? "Mülakat Hazırlığı" : "Interview Prep"}</div>
-              {showInterviewProLock ? (
-                proLockBox(t.proFeatureInterview)
-              ) : (
-                interviewRows.slice(0, 2).map((q, i) => (
-                  <div key={i} style={{ marginBottom: 14, paddingBottom: 14, borderBottom: i === 0 ? "1px solid #1c1c1c" : "none" }}>
-                    <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 15, color: "#e8e8e8", lineHeight: 1.5, marginBottom: 5, fontStyle: "italic" }}>&quot;{q.question}&quot;</div>
-                    <div style={{ fontSize: 11, color: "#7a7a7a", marginBottom: 4, fontWeight: 500 }}>{q.why_asked}</div>
-                    <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>{q.personal_angle}</div>
-                  </div>
-                ))
-              )}
-            </div>
-          ) : null}
-          <div style={DB.card}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "16px 16px 0 0", background: "linear-gradient(90deg, #d4af37, #22d3ee)" }} />
-            <div style={DB.cardTag}>{lang === "TR" ? "Pazar İstihbaratı" : "Market Intelligence"}</div>
-            {data.salary_insight && (
-              <>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#d4af37", marginBottom: 8 }}>{lang === "TR" ? "Maaş Bilgisi" : "Salary Insight"}</div>
-                <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 28, color: "#e8e8e8", lineHeight: 1, marginBottom: 3 }}>
-                  {data.salary_insight.currency === "TRY" ? "₺" : data.salary_insight.currency === "USD" ? "$" : "€"}{(data.salary_insight.range_min || 0).toLocaleString()} – {(data.salary_insight.range_max || 0).toLocaleString()}
-                </div>
-                <div style={{ fontSize: 12, color: "#7a7a7a", marginBottom: 14 }}>{data.role_type} · {data.seniority} · Mid: {data.salary_insight.currency === "TRY" ? "₺" : "$"}{(data.salary_insight.mid_point || 0).toLocaleString()}</div>
-                <div style={{ height: 1, background: "#1c1c1c", marginBottom: 14 }} />
-              </>
-            )}
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "#d4af37", marginBottom: 10 }}>{lang === "TR" ? "ATS Uyumluluğu" : "ATS Compatibility"}</div>
-            {(data.ats_compatibility || [
-              { system: "Workday", status: "Passes", note: lang === "TR" ? "Anahtar kelimeler tespit edildi" : "Keywords detected" },
-              { system: "Greenhouse", status: "Passes", note: lang === "TR" ? "Format uyumlu" : "Format compatible" },
-              { system: "Lever", status: "Review", note: lang === "TR" ? "PDF ayrıştırmasını kontrol edin" : "Check PDF parsing" },
-            ]).slice(0, 3).map((ats, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: i < 2 ? "1px solid #1c1c1c" : "none" }}>
-                <span style={{ fontSize: 13, color: "#8a8a8a", fontWeight: 600 }}>{ats.system}</span>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: ats.status === "Passes" ? "#10b981" : ats.status === "Review" ? "#f59e0b" : "#f87171" }}>{ats.status === "Passes" ? "✓ Passes" : ats.status === "Review" ? "⚡ Review" : "✗ At Risk"}</div>
-                  <div style={{ fontSize: 11, color: "#7a7a7a", marginTop: 1 }}>{ats.note}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div style={DB.sectionHeader}>
-          <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, color: "#d4af37", fontStyle: "italic" }}>04</div>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#d4af37", textTransform: "uppercase", letterSpacing: "0.14em" }}>{lang === "TR" ? "Beceriler & Anahtar Kelimeler" : "Skills & Keywords"}</div>
-          <div style={{ flex: 1, height: 1, background: "linear-gradient(90deg, rgba(212,175,55,0.2), transparent)" }} />
-        </div>
-        <div style={DB.grid3}>
-          {[
-            { title: lang === "TR" ? "Eşleşen Beceriler" : "Matched Skills", skills: matchedSkills, bg: "rgba(16,185,129,0.08)", border: "rgba(16,185,129,0.15)", color: "#6ee7b7", titleColor: "#10b981" },
-            { title: lang === "TR" ? "Eksik Beceriler" : "Missing Skills", skills: missingSkills, bg: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.15)", color: "#fca5a5", titleColor: "#f87171" },
-            { title: lang === "TR" ? "Önemli Anahtar Kelimeler" : "Top Keywords", skills: topKeywords, bg: "rgba(212,175,55,0.08)", border: "rgba(212,175,55,0.15)", color: "#d4af37", titleColor: "#d4af37" },
-          ].map(({ title, skills, bg, border, color, titleColor }) => (
-            <div key={title} style={{ border: "1px solid #1c1c1c", borderRadius: 16, padding: 18, background: "#0c0c0c" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: titleColor, marginBottom: 12 }}>{title}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {skills.length ? (
-                  skills.map((s) => <span key={s} style={{ padding: "4px 10px", borderRadius: 999, background: bg, border: `1px solid ${border}`, color, fontSize: 11, fontWeight: 600 }}>{s}</span>)
-                ) : (
-                  <div style={{ fontSize: 12, lineHeight: 1.55 }}>
-                    <div style={{ color: "#94a3b8" }}>{t.emptyNoneDetectedSkills}</div>
-                    <div style={{ color: "#5a5a5a", marginTop: 6, fontWeight: 600 }}>{t.emptyNoneDetectedSkillsNext}</div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
-          <button className="hf-btn-ghost" onClick={() => navigator.clipboard.writeText(result)} style={{ fontSize: "12px", padding: "9px 16px", borderRadius: 8 }}><Copy size={12} />{t.copyReport}</button>
-          <button className="hf-btn-ghost" onClick={() => downloadText(result, "hirefit-report.txt")} style={{ fontSize: "12px", padding: "9px 16px", borderRadius: 8 }}><Download size={12} />{t.download}</button>
-        </div>
-      </div>
-
-      {optimizedCv && (
-        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(34,211,238,0.12)", borderRadius: 20, padding: 24, marginBottom: 14 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: T.cyan }}>{t.cvComparison}</div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button className="hf-btn-ghost" onClick={() => navigator.clipboard.writeText(optimizedCv)} style={{ fontSize: "12px", padding: "7px 14px", borderRadius: 8 }}><Copy size={12} />{t.copyOptimized}</button>
-              <button className="hf-btn-ghost" onClick={() => downloadText(optimizedCv, "hirefit-optimized-cv.txt")} style={{ fontSize: "12px", padding: "7px 14px", borderRadius: 8 }}><Download size={12} />{t.download}</button>
-            </div>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#f87171", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#f87171", display: "inline-block" }} />
-                {t.originalCV}
-              </div>
-              <div style={{ background: "rgba(239,68,68,0.04)", border: "1px solid rgba(239,68,68,0.1)", borderRadius: 12, padding: 16, maxHeight: 400, overflowY: "auto" }}>
-                <pre style={{ whiteSpace: "pre-wrap", fontFamily: "'DM Sans', sans-serif", fontSize: "12px", lineHeight: 1.8, color: "#64748b", margin: 0 }}>{result}</pre>
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#10b981", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", display: "inline-block" }} />
-                {t.optimizedCV}
-              </div>
-              <div style={{ background: "rgba(16,185,129,0.04)", border: "1px solid rgba(16,185,129,0.1)", borderRadius: 12, padding: 16, maxHeight: 400, overflowY: "auto" }}>
-                <pre style={{ whiteSpace: "pre-wrap", fontFamily: "'DM Sans', sans-serif", fontSize: "12px", lineHeight: 1.8, color: "#94a3b8", margin: 0 }}>{optimizedCv}</pre>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {learningPlan && (
-        <div style={{ marginTop: 16, padding: 18, borderRadius: 14, border: "1px solid rgba(16,185,129,0.18)", background: "rgba(16,185,129,0.06)", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-          <div style={{ fontSize: 13, color: "#6ee7b7", fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>{t.roadmapReadyBanner}</div>
-          <button type="button" className="hf-btn-primary" onClick={() => navigate("/roadmap")} style={{ fontSize: 12, padding: "9px 18px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 8 }}>
-            {t.openJourneyMap} <ArrowRight size={14} />
-          </button>
-        </div>
-      )}
-    </>
-  );
-}
-
 /** First whitespace-delimited token (given name) for compact navbar display. */
 function navFirstGivenName(displayName) {
   if (!displayName || typeof displayName !== "string") return "";
@@ -5110,7 +4398,7 @@ function HireFitLogoMark({ size = 56, color = "#6366f1" }) {
   );
 }
 
-function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
+function NavBar({ pathname, user, logout, navigate, lang }) {
   const t = translations[lang];
   const navTab = pathname === "/roadmap" ? "roadmap" : pathname === "/dashboard" ? "dashboard" : pathname === "/" ? "landing" : null;
   const [scrolled, setScrolled] = useState(false);
@@ -5118,7 +4406,7 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
   const [navLinkHover, setNavLinkHover] = useState(null);
   const [navLinkPressed, setNavLinkPressed] = useState(null);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
-  const [langPopoverPos, setLangPopoverPos] = useState(null);
+  const [, setLangPopoverPos] = useState(null);
   const langMenuRef = useRef(null);
   const langPopoverRef = useRef(null);
   const langTriggerRef = useRef(null);
@@ -5126,7 +4414,7 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
   const navButtonRefs = useRef([]);
   const [activeTabPosition, setActiveTabPosition] = useState({ left: 0, top: 0, width: 0, height: 0, visible: false });
 
-  const updateActiveTabIndicator = () => {
+  const updateActiveTabIndicator = useCallback(() => {
     const container = navTabsRef.current;
     if (!container) return;
     const idx = navTab === "landing" ? 0 : navTab === "roadmap" ? 1 : navTab === "dashboard" ? 2 : -1;
@@ -5145,7 +4433,7 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
       height: br.height,
       visible: true,
     });
-  };
+  }, [navTab]);
 
   useLayoutEffect(() => {
     updateActiveTabIndicator();
@@ -5157,7 +4445,7 @@ function NavBar({ pathname, user, logout, navigate, lang, setLang }) {
       if (container && ro) ro.disconnect();
       window.removeEventListener("resize", updateActiveTabIndicator);
     };
-  }, [pathname, lang]);
+  }, [updateActiveTabIndicator]);
 
   useEffect(() => {
     const clearPress = () => setNavLinkPressed(null);
@@ -6290,7 +5578,6 @@ function HireFitLayout() {
   const [reanalysisBaseline, setReanalysisBaseline] = useState(null);
   const [reanalysisResult, setReanalysisResult] = useState(null);
   const [loadingMessage, setLoadingMessage] = useState("");
-  const [pressedBtn, setPressedBtn] = useState(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [applyingFix, setApplyingFix] = useState(null);
   const [fixResults, setFixResults] = useState({});
@@ -6299,9 +5586,7 @@ function HireFitLayout() {
   const [jdDragOver, setJdDragOver] = useState(false);
   const cvPdfInputRef = useRef(null);
   const jdTxtInputRef = useRef(null);
-  const [scoreHistory, setScoreHistory] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("hirefit-score-history") || "[]"); } catch { return []; }
-  });
+  const [scoreHistory, setScoreHistory] = useState(() => parseLocalStorageJson("hirefit-score-history", []));
 
   const t = translations[lang];
   const isAdminUser = useMemo(() => isAdmin(user), [user]);
@@ -6363,7 +5648,7 @@ function HireFitLayout() {
     try {
       if (learningPlan) {
         localStorage.setItem("hirefit-learning-plan", learningPlan);
-        const prev = JSON.parse(localStorage.getItem("hirefit-roadmap-meta") || "{}");
+        const prev = parseLocalStorageJson("hirefit-roadmap-meta", {});
         localStorage.setItem(
           "hirefit-roadmap-meta",
           JSON.stringify({
@@ -6375,7 +5660,9 @@ function HireFitLayout() {
         localStorage.removeItem("hirefit-learning-plan");
         localStorage.removeItem("hirefit-roadmap-meta");
       }
-    } catch {}
+    } catch {
+      /* ignore localStorage errors */
+    }
   }, [learningPlan, roleType, seniority]);
 
   const syncUserPlanForUser = useCallback(async (userId) => {
@@ -6439,7 +5726,7 @@ function HireFitLayout() {
     setTopKeywords(parseBullets(text, "Top Keywords"));
   };
 
-  const fetchAnalyses = async () => {
+  const fetchAnalyses = useCallback(async () => {
     try {
       const clearedAt = localStorage.getItem("hirefit-cleared-at");
       const { data: { user: currentUser } } = await supabase.auth.getUser();
@@ -6474,7 +5761,7 @@ function HireFitLayout() {
         })
       );
     } catch (err) { console.error(err); }
-  };
+  }, [lang]);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -6500,25 +5787,27 @@ function HireFitLayout() {
   useEffect(() => {
     const savedUser = localStorage.getItem("hirefit-user");
     const savedWaitlist = localStorage.getItem("hirefit-waitlist");
-    if (savedUser) { try { setUser(JSON.parse(savedUser)); } catch {} }
-    if (savedWaitlist) { try { setWaitlist(JSON.parse(savedWaitlist)); } catch {} }
+    if (savedUser) {
+      try {
+        setUser(safeJsonParse(savedUser, null, { label: "hirefit-user-cache" }));
+      } catch {
+        /* ignore invalid cached user JSON */
+      }
+    }
+    if (savedWaitlist) {
+      try {
+        setWaitlist(safeJsonParse(savedWaitlist, [], { label: "hirefit-waitlist-cache" }));
+      } catch {
+        /* ignore invalid cached waitlist JSON */
+      }
+    }
     fetchAnalyses();
-  }, []);
+  }, [fetchAnalyses]);
 
   useEffect(() => { localStorage.setItem("hirefit-history", JSON.stringify(history)); }, [history]);
   useEffect(() => { localStorage.setItem("hirefit-waitlist", JSON.stringify(waitlist)); }, [waitlist]);
   useEffect(() => { localStorage.setItem("hirefit-score-history", JSON.stringify(scoreHistory)); }, [scoreHistory]);
   useEffect(() => { if (user) localStorage.setItem("hirefit-user", JSON.stringify(user)); else localStorage.removeItem("hirefit-user"); }, [user]);
-
-  const atsBreakdown = useMemo(() => {
-    const keywordCoverage = topKeywords.length > 0 ? Math.round((matchedSkills.length / topKeywords.length) * 100) : 0;
-    const skillsScore = alignmentScore !== null ? Math.min(100, Math.max(0, alignmentScore)) : 0;
-    const keywordsScore = Math.min(100, Math.max(0, keywordCoverage));
-    const experienceScore = alignmentScore !== null ? Math.max(35, alignmentScore - 10) : 0;
-    const formattingScore = cvText.trim().length > 200 ? 75 : 45;
-    const finalAts = Math.round(skillsScore * 0.4 + keywordsScore * 0.3 + experienceScore * 0.2 + formattingScore * 0.1);
-    return { skillsScore, keywordsScore, experienceScore, formattingScore, finalAts };
-  }, [alignmentScore, matchedSkills, topKeywords, cvText]);
 
   const averageScore = useMemo(() => {
     if (!history.length) return 0;
@@ -6585,10 +5874,8 @@ function HireFitLayout() {
   };
 
   const analyze = async (opts = {}) => {
-    const roleOverride = String(opts?.targetRoleOverride || "").trim();
     const jdOverride = String(opts?.jobDescriptionOverride || "").trim();
     const effectiveJd = jdOverride || String(jdText || "").trim();
-    const activeTargetRole = roleOverride || String(targetRole || "").trim();
     if (!cvText.trim() || !effectiveJd) { setError(lang === "TR" ? "Lütfen hem CV'yi hem de iş ilanını yapıştırın." : "Please paste both the CV and the Job Description."); return; }
 
     if (user?.id) {
@@ -6612,20 +5899,44 @@ function HireFitLayout() {
 
     setShowAnonSavePrompt(false);
     setLoading(true); 
-    // Loading messages
-const loadingMessages = lang === "TR"
-  ? ["Şirket ve sektör çıkarılıyor...", "Şirket araştırılıyor...", "Sektör trendleri analiz ediliyor...", "CV ve ilan eşleştiriliyor...", "Rapor hazırlanıyor..."]
-  : ["Extracting company & sector...", "Researching the company...", "Analyzing sector trends...", "Matching CV to the role...", "Preparing your report..."];
-let msgIndex = 0;
-setLoadingMessage(loadingMessages[0]);
-const msgInterval = setInterval(() => {
-  msgIndex++;
-  if (msgIndex < loadingMessages.length) {
-    setLoadingMessage(loadingMessages[msgIndex]);
-  } else {
-    clearInterval(msgInterval);
-  }
-}, 900);
+    const stagedMessages =
+      lang === "TR"
+        ? [
+            "CV analiz ediliyor",
+            "ATS kontrolü yapılıyor",
+            "Recruiter değerlendirmesi",
+            "Karar oluşturuluyor",
+          ]
+        : [
+            "Analyzing CV",
+            "Running ATS checks",
+            "Recruiter evaluation",
+            "Building decision",
+          ];
+    const stagedStartAt = Date.now();
+    let stagedIdx = 0;
+    let stagedFinalized = false;
+    const stageIntervalMs = Math.max(250, Math.floor(ANALYZE_MIN_DURATION_MS / stagedMessages.length));
+    setLoadingMessage(stagedMessages[0]);
+    const msgInterval = window.setInterval(() => {
+      stagedIdx = Math.min(stagedMessages.length - 1, stagedIdx + 1);
+      setLoadingMessage(stagedMessages[stagedIdx]);
+      if (stagedIdx >= stagedMessages.length - 1) {
+        window.clearInterval(msgInterval);
+      }
+    }, stageIntervalMs);
+    const finalizeAnalyzeLoading = async () => {
+      if (stagedFinalized) return;
+      stagedFinalized = true;
+      const elapsed = Date.now() - stagedStartAt;
+      const remaining = Math.max(0, ANALYZE_MIN_DURATION_MS - elapsed);
+      if (remaining > 0) {
+        await new Promise((resolve) => window.setTimeout(resolve, remaining));
+      }
+      window.clearInterval(msgInterval);
+      setLoadingMessage("");
+      setLoading(false);
+    };
     setError("");
     setFixResults({});
     setDecisionData(null);
@@ -6633,12 +5944,18 @@ const msgInterval = setInterval(() => {
     setLastDetectedSector("");
 
     let v2Ok = false;
+    let analyzeTimedOut = false;
     let creditConsumed = false;
     const jdDerivedTitle = extractJobTitleFromJd(effectiveJd);
     try {
+      const analyzeController = new AbortController();
+      const timeoutId = window.setTimeout(() => {
+        analyzeController.abort();
+      }, ANALYZE_V2_TIMEOUT_MS);
       const v2Res = await fetch(`${HF_API_BASE}/api/analyze-v2`, {
         method: "POST",
         headers: await getApiAuthHeaders({ requireSession: false }),
+        signal: analyzeController.signal,
         body: JSON.stringify({
           cvText,
           jobDescription: effectiveJd,
@@ -6647,14 +5964,19 @@ const msgInterval = setInterval(() => {
           lang: lang === "TR" ? "tr" : "en",
           isPro: hasProAccess,
         }),
+      }).finally(() => {
+        window.clearTimeout(timeoutId);
       });
       const responseText = await v2Res.text();
-      let v2Payload = {};
-      try {
-        v2Payload = responseText ? JSON.parse(responseText) : {};
-      } catch (_parseErr) {
-        v2Payload = {};
-      }
+      const v2PayloadFallback = {
+        error: "",
+        ATS: {},
+        Gaps: {},
+        Decision: {},
+        Output: {},
+        Context: {},
+      };
+      const v2Payload = safeJsonParse(responseText, v2PayloadFallback, { label: "analyze-v2-response" });
       if (!v2Res.ok) {
         const serverErr =
           typeof v2Payload?.error === "string" ? v2Payload.error : "";
@@ -6667,9 +5989,7 @@ const msgInterval = setInterval(() => {
               ? "Analiz alınamadı. Bağlantını kontrol et veya tekrar dene."
               : "Analysis could not be retrieved. Check your connection or try again.";
         setError(msg);
-        clearInterval(msgInterval);
-        setLoadingMessage("");
-        setLoading(false);
+        await finalizeAnalyzeLoading();
         return;
       }
         const v2Raw = v2Payload;
@@ -6778,22 +6098,25 @@ const msgInterval = setInterval(() => {
         setShowSharePrompt(true);
         creditConsumed = true;
     } catch (e) {
-      console.error("[analyze] v2", e?.message || e);
+      if (e?.name === "AbortError") {
+        analyzeTimedOut = true;
+        setError(lang === "TR" ? "Analiz beklenenden uzun sürüyor" : "Analysis is taking longer than expected.");
+      } else {
+        console.error("[analyze] v2", e?.message || e);
+      }
     }
 
     if (!v2Ok) {
-      setError(lang === "TR"
-        ? "Analiz tamamlanamadı. Lütfen tekrar dene."
-        : "Analysis failed. Please try again.");
-      clearInterval(msgInterval);
-      setLoadingMessage("");
-      setLoading(false);
+      if (!analyzeTimedOut) {
+        setError(lang === "TR"
+          ? "Analiz tamamlanamadı. Lütfen tekrar dene."
+          : "Analysis failed. Please try again.");
+      }
+      await finalizeAnalyzeLoading();
       return;
     }
 
-    clearInterval(msgInterval);
-    setLoadingMessage("");
-    setLoading(false);
+    await finalizeAnalyzeLoading();
 
     if (creditConsumed) {
       if (user?.id) {
@@ -6900,6 +6223,7 @@ const msgInterval = setInterval(() => {
     setError("");
     try {
       const arrayBuffer = await file.arrayBuffer();
+      const pdfjsLib = await loadPdfjs();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       let fullText = "";
       for (let i = 1; i <= pdf.numPages; i++) {
@@ -7136,6 +6460,8 @@ const msgInterval = setInterval(() => {
     deadline,
     setDeadline,
     userPlanRow,
+    targetRole,
+    setTargetRole,
     analyze,
     loading,
     loadingMessage,
@@ -7149,6 +6475,7 @@ const msgInterval = setInterval(() => {
     handleSharePrompt,
     fixResults,
     applyingFix,
+    setApplyingFix,
     applyFix,
     showAnonSavePrompt,
     setShowAnonSavePrompt,
@@ -7180,7 +6507,7 @@ const msgInterval = setInterval(() => {
     <div style={styles.page}>
       <AmbientBackgroundLayer />
       <div style={{ position: "relative", zIndex: 1 }}>
-      <Navbar pathname={location.pathname} user={user} logout={logout} navigate={navigate} lang={lang} setLang={setLang} />
+      <Navbar pathname={location.pathname} user={user} logout={logout} navigate={navigate} lang={lang} />
 
       {showPaywall && (
         <PaywallModal
@@ -7337,18 +6664,20 @@ export function PrivacyPage() {
 export function RoadmapRoute() {
   const { navigate, lang, t, isPro, openUpgrade, analysisData, engineV2, cvText, jdText, alignmentScore } = useOutletContext();
   return (
-    <PersonalizedRoadmapPage
-      navigate={navigate}
-      lang={lang}
-      t={t}
-      isPro={isPro}
-      openUpgrade={openUpgrade}
-      analysisData={analysisData}
-      engineV2={engineV2}
-      cvText={cvText}
-      jdText={jdText}
-      alignmentScore={alignmentScore}
-    />
+    <Suspense fallback={<div style={{ padding: "24px", color: "#94a3b8" }}>{lang === "TR" ? "Yol haritası yükleniyor..." : "Loading roadmap..."}</div>}>
+      <LazyPersonalizedRoadmapPage
+        navigate={navigate}
+        lang={lang}
+        t={t}
+        isPro={isPro}
+        openUpgrade={openUpgrade}
+        analysisData={analysisData}
+        engineV2={engineV2}
+        cvText={cvText}
+        jdText={jdText}
+        alignmentScore={alignmentScore}
+      />
+    </Suspense>
   );
 }
 
@@ -7472,14 +6801,14 @@ export function AnalyzerPage() {
     navigate, lang, t, activeInput, cvLoaded, uploadingPdf, cvPdfInputRef, cvDragOver, setCvDragOver,
     handlePdfUpload, onCvDrop, cvText, setCvText, setActiveInput, cvSectionsOk, jdLoaded, jdDragOver, setJdDragOver, onJdDrop,
     jdText, setJdText, jobUrl, setJobUrl, jobUrlIsLinkedIn, extractingJob, extractJobFromUrl, jdTxtInputRef, handleJdTextFile,
-    showAdvanced, setShowAdvanced, lastDetectedSector, sector, setSector, sectorLabels, sectorValues,
-    detectedCareerArea, detectedCareerAreaConfidence, detectedCareerAreaReason, careerAreaOverride, setCareerAreaOverride,
+    showAdvanced, setShowAdvanced,
+    detectedCareerArea, detectedCareerAreaConfidence, careerAreaOverride, setCareerAreaOverride,
     isPro, user, userPlanRow, analyze, loading, loadingMessage, error, hasOutput,
-    engineV2, alignmentScore, decisionData, decisionLoading, openUpgrade, optimizeCv, optimizing,
-    handleSharePrompt, fixResults, applyingFix, applyFix, showAnonSavePrompt, setShowAnonSavePrompt,
-    analysisData, matchedSkills, missingSkills, topKeywords, result, optimizedCv, learningPlan, roleType,
-    downloadText, reanalyzeAfterFix, roadmapLoading, generateLearningPlan, decisionImpactContext,
-    reanalysisResult, history, clearHistory, loadHistoryItem, scoreRunProgress, setWaitlist, setReanalysisBaseline,
+    engineV2, alignmentScore, decisionData,
+    openUpgrade, optimizeCv, optimizing,
+    applyingFix, setApplyingFix, showAnonSavePrompt, setShowAnonSavePrompt,
+    analysisData, missingSkills, roleType,
+    reanalysisResult, history, clearHistory, loadHistoryItem, setWaitlist, setReanalysisBaseline, setTargetRole,
   } = useOutletContext();
   const safeUiError = useMemo(() => sanitizeUserErrorMessage(error, lang), [error, lang]);
   const [reportUnlocked, setReportUnlocked] = useState(Boolean(user));
@@ -7521,7 +6850,6 @@ export function AnalyzerPage() {
     "Pazarlama",
     "Finans",
   ];
-  const NEXT_ACTION_FIX_KEY = "__next_action_fix__";
   const mainIssue = useMemo(() => {
     const issue =
       engineV2?.Gaps?.biggest_gap ||
@@ -7531,7 +6859,6 @@ export function AnalyzerPage() {
       "";
     return String(issue || "").trim();
   }, [engineV2, decisionData, analysisData]);
-  const nextActionFixResult = fixResults?.[NEXT_ACTION_FIX_KEY] || null;
   const previewFixBusy = applyingFix === PREVIEW_FIX_KEY;
   const previewScoreDelta = previewReanalyzePending ? null : reanalysisResult;
   const decisionScore = Number.isFinite(Number(alignmentScore)) ? Math.round(Number(alignmentScore)) : null;
@@ -7550,14 +6877,11 @@ export function AnalyzerPage() {
   const aiRecognitionLine = String(engineV2?.Output?.recognition_line || "").trim();
   const aiCoreProblem = String(engineV2?.Output?.core_problem || "").trim();
   const aiImpactStatement = String(engineV2?.Output?.impact_statement || "").trim();
-  const aiFirstAction = String(engineV2?.Output?.first_action || "").trim();
   const aiPatternSummary = String(engineV2?.Output?.pattern_summary || "").trim();
+  const firstAction = String(engineV2?.Output?.first_action || "").trim();
   const aiRecruiterView = String(engineV2?.Output?.recruiter_view || "").trim();
   const aiReasons = Array.isArray(engineV2?.Output?.reasons)
     ? engineV2.Output.reasons.map((x) => String(x || "").trim()).filter(Boolean)
-    : [];
-  const aiFixes = Array.isArray(engineV2?.Output?.fixes)
-    ? engineV2.Output.fixes.map((x) => String(x || "").trim()).filter(Boolean)
     : [];
   const primaryReason =
     aiCoreProblem
@@ -7586,10 +6910,6 @@ export function AnalyzerPage() {
       narrative: lang === "TR" ? "Küçük bir değişiklik, büyük fark yaratır." : "Small change, big difference.",
     };
   }, [decisionScore, engineV2, analysisData, missingSkills, lang]);
-  const singleAction = aiFirstAction
-    || aiFixes[0]
-    || String(engineV2?.Decision?.what_to_fix_first?.[0] || analysisData?.improvements?.[0] || "").trim()
-    || buildSingleActionFromReason(primaryReason, lang);
 
   useEffect(() => {
     if (!user?.email) return;
@@ -7666,7 +6986,7 @@ export function AnalyzerPage() {
     setTargetRole(roleName);
     setJdText(syntheticJd);
     if (alignmentScore != null) setReanalysisBaseline(alignmentScore);
-    await analyze({ targetRoleOverride: roleName, jobDescriptionOverride: syntheticJd });
+    await analyze({ jobDescriptionOverride: syntheticJd });
   };
   const applyPreviewFix = async () => {
     const oldLine = String(partialInsight || "").trim();
@@ -7699,25 +7019,7 @@ export function AnalyzerPage() {
     await analyze();
     setPreviewReanalyzePending(false);
   };
-  const runNextActionFix = async () => {
-    if (!mainIssue) return;
-    await applyFix(
-      {
-        problem: mainIssue,
-        fix:
-          lang === "TR"
-            ? "Tek cümlede güçlü, ölçülebilir ve profesyonel şekilde yeniden yaz."
-            : "Rewrite as one strong, measurable, professional sentence.",
-      },
-      NEXT_ACTION_FIX_KEY
-    );
-  };
-  const rerunAfterNextAction = async () => {
-    if (alignmentScore != null) {
-      setReanalysisBaseline(alignmentScore);
-    }
-    await analyze();
-  };
+
   return (
   <div className="hf-analyzer-page" style={{ maxWidth: 1320, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
     <AnalysisThinkingOverlay lang={lang} loading={loading} />
@@ -7735,6 +7037,34 @@ export function AnalyzerPage() {
         {lang === "TR" ? "Recruiter'ların CV'ni saniyeler içinde nasıl değerlendirdiğini net gör." : "See exactly how recruiters evaluate your CV in seconds."}
       </p>
     </div>
+
+    {shouldShowUnlockGate ? (
+      <UnlockReportGateCard
+        lang={lang}
+        score={alignmentScore}
+        insight={partialInsight}
+        suggestion={partialSuggestion}
+        previewFixResult={previewFixResult}
+        previewFixBusy={previewFixBusy}
+        previewReanalyzing={previewReanalyzePending}
+        previewScoreDelta={previewScoreDelta}
+        onPreviewFix={applyPreviewFix}
+        onPreviewReanalyze={rerunPreviewWithImprovedCv}
+        isPro={isPro}
+        optimizing={optimizing}
+        onOptimizeFullCv={optimizeCv}
+        onUpgrade={openUpgrade}
+        onOpenRoleSuggestions={() => roleSuggestionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+        onOpenMarketInsights={() => setShowMarketInsightsModal(true)}
+        unlockEmail={unlockEmail}
+        setUnlockEmail={setUnlockEmail}
+        unlockJobStatus={unlockJobStatus}
+        setUnlockJobStatus={setUnlockJobStatus}
+        unlockSubmitting={unlockSubmitting}
+        unlockError={unlockError}
+        onUnlockSubmit={unlockFullReport}
+      />
+    ) : null}
 
     <div className="hf-analyzer-layout">
     <motion.div
@@ -8395,14 +7725,22 @@ export function AnalyzerPage() {
               fontWeight: 700,
             }}
           >
-            {"CV’ne şu formatta 1 cümle ekle:"}
-            <div style={{ marginTop: 4, color: "#e2e8f0" }}>
-              {"X sürecini iyileştirerek %Y sonuç elde ettim."}
-            </div>
+            {firstAction ? (
+              <div style={{ color: "#e2e8f0" }}>{firstAction}</div>
+            ) : (
+              <>
+                {"CV’ne şu formatta 1 cümle ekle:"}
+                <div style={{ marginTop: 4, color: "#e2e8f0" }}>
+                  {"X sürecini iyileştirerek %Y sonuç elde ettim."}
+                </div>
+              </>
+            )}
           </div>
+          {!firstAction ? (
           <div style={{ marginTop: 4, fontSize: 11, color: "#94a3b8", opacity: 0.78 }}>
             {"Örn: %X artırdım, X sürede tamamladım"}
           </div>
+          ) : null}
           <div style={{ marginTop: 8, fontSize: 11, color: "#94a3b8", opacity: 0.9 }}>
             {"Bu düzeltmeyi uygularsan:"}
           </div>

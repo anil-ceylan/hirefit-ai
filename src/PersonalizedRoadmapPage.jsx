@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { parseLocalStorageJson } from "./utils/safeJson";
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
@@ -604,7 +605,8 @@ function CareerNavigationMap({
               fontWeight: 700,
             }}
           >
-            {Math.round(Date.now() / 1000) % 2 === 0 ? urgencyLine : altUrgencyLine}
+            {urgencyLine}
+            <span style={{ opacity: 0.75, display: "block", marginTop: 4 }}>{altUrgencyLine}</span>
           </div>
 
           <div style={{ marginTop: 10, borderRadius: 12, border: "1px solid rgba(255,255,255,0.14)", background: "rgba(2,6,23,0.26)", padding: "10px 10px" }}>
@@ -1107,7 +1109,7 @@ function CareerNavigationMap({
   );
 }
 
-export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, openUpgrade, analysisData, engineV2, cvText, jdText, alignmentScore }) {
+export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, openUpgrade, analysisData, engineV2, cvText, jdText: _jdText, alignmentScore }) {
   const roleRows = useMemo(
     () => detectRoleCandidates({ engineV2, analysisData, cvText, lang }),
     [engineV2, analysisData, cvText, lang],
@@ -1176,17 +1178,8 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
   }, []);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(progressStorageKey);
-      if (!raw) {
-        setCompletedSteps({});
-        return;
-      }
-      const parsed = JSON.parse(raw);
-      setCompletedSteps(typeof parsed === "object" && parsed ? parsed : {});
-    } catch {
-      setCompletedSteps({});
-    }
+    const parsed = parseLocalStorageJson(progressStorageKey, {});
+    setCompletedSteps(typeof parsed === "object" && parsed ? parsed : {});
   }, [progressStorageKey]);
 
   useEffect(() => {

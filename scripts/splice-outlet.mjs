@@ -21,4 +21,4 @@ const before = s.slice(0, i0);
 const after = s.slice(i1);
 const insert = "      <Outlet context={hireFitOutletContext} />\n";
 fs.writeFileSync(p, before + insert + after);
-console.log("ok");
+process.stdout.write("ok\n");

@@ -1,4 +1,3 @@
-/* eslint-env node */
 import { openaiChat } from "../../lib/analyze-v2/openaiClient.js";
 import { parseModelJson } from "../../lib/analyze-v2/json.js";
 import { criticalOutputLanguageInstruction, MANDATORY_TURKISH_AI_OUTPUT } from "../../lib/analyze-v2/lang.js";

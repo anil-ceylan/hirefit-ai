@@ -1,5 +1,5 @@
 import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import supabase from "./supabaseClient";
 
 const styles = `
@@ -607,6 +607,14 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
+  const fetchReport = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("analyses").select("*").eq("id", id).single();
+    if (error) { console.error(error); setLoading(false); return; }
+    setReport(data);
+    setLoading(false);
+  }, [id]);
+
   useEffect(() => {
     const styleEl = document.createElement("style");
     styleEl.textContent = styles;
@@ -614,15 +622,9 @@ export default function ReportPage() {
     return () => document.head.removeChild(styleEl);
   }, []);
 
-  useEffect(() => { fetchReport(); }, []);
-
-  const fetchReport = async () => {
-    const { data, error } = await supabase
-      .from("analyses").select("*").eq("id", id).single();
-    if (error) { console.error(error); setLoading(false); return; }
-    setReport(data);
-    setLoading(false);
-  };
+  useEffect(() => {
+    fetchReport();
+  }, [fetchReport]);
 
   const copyLink = () => {
     navigator.clipboard.writeText(window.location.href);
@@ -702,7 +704,7 @@ export default function ReportPage() {
             className="rp-btn-linkedin"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 016 6v7h-4v-7a2 2 0 00-2-2 2 2 0 00-2 2v7h-4v-7a6 6 0 016-6zM2 9h4v12H2z"/><circle cx="4" cy="4" r="2"/></svg>
-            LinkedIn'de Paylaş
+            {"LinkedIn'de Paylaş"}
           </a>
         </div>
 

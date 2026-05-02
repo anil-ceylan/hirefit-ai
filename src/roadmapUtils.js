@@ -4,7 +4,7 @@ export function cleanRoadmapTitle(line) {
 
 export function parseLearningRoadmapToSteps(text, lang) {
   if (!text?.trim()) return [];
-  const headerRe = /^(week\s*\d+|hafta\s*\d+|phase\s*\d+|stage\s*\d+|day\s*\d+|\d+[\.)]\s+)/i;
+  const headerRe = /^(week\s*\d+|hafta\s*\d+|phase\s*\d+|stage\s*\d+|day\s*\d+|\d+[.)]\s+)/i;
   const blocks = text.trim().split(/\n{2,}/).map((b) => b.trim()).filter(Boolean);
 
   const fromBlocks = () =>
@@ -60,7 +60,7 @@ export function extractBulletText(line) {
   const m =
     line.match(/^[-*•]\s+(.+)$/) ||
     line.match(/^[-–—]\s+(.+)$/) ||
-    line.match(/^\d+[\.)]\s+(.+)$/);
+    line.match(/^\d+[.)]\s+(.+)$/);
   return m ? m[1].trim() : "";
 }
 

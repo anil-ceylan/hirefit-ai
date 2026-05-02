@@ -1,4 +1,5 @@
 import { parseRoadmapStepDescription } from "./roadmapUtils";
+import { parseLocalStorageJson } from "./utils/safeJson";
 
 export const LS_PROGRESS = "hirefit-progress";
 export const LS_DAILY = "hirefit-daily";
@@ -8,16 +9,11 @@ export const LS_FOCUS_JOB = "hirefit-job";
 
 export function loadRoadmapXp(planKey) {
   const pk = planKey || "";
-  try {
-    const raw = localStorage.getItem(LS_ROADMAP_XP);
-    if (!raw) return { total: 0, planKey: pk };
-    const j = JSON.parse(raw);
-    if (typeof j.total !== "number") return { total: 0, planKey: pk };
-    if (j.planKey !== pk) return { total: 0, planKey: pk };
-    return { total: j.total, planKey: pk };
-  } catch {
-    return { total: 0, planKey: pk };
-  }
+  const j = parseLocalStorageJson(LS_ROADMAP_XP, null);
+  if (!j || typeof j !== "object") return { total: 0, planKey: pk };
+  if (typeof j.total !== "number") return { total: 0, planKey: pk };
+  if (j.planKey !== pk) return { total: 0, planKey: pk };
+  return { total: j.total, planKey: pk };
 }
 
 export function bumpRoadmapXp(planKey, delta = 10) {
@@ -26,7 +22,9 @@ export function bumpRoadmapXp(planKey, delta = 10) {
   const next = { total: prev.planKey === pk ? prev.total + delta : delta, planKey: pk };
   try {
     localStorage.setItem(LS_ROADMAP_XP, JSON.stringify(next));
-  } catch {}
+  } catch {
+    /* ignore persistence errors */
+  }
   return next;
 }
 
@@ -275,18 +273,13 @@ export function todayYMD() {
 }
 
 export function loadRoadmapProgress() {
-  try {
-    const raw = localStorage.getItem(LS_PROGRESS);
-    if (!raw) return { completedTasks: [], progress: 0, planKey: "" };
-    const j = JSON.parse(raw);
-    return {
-      completedTasks: Array.isArray(j.completedTasks) ? j.completedTasks : [],
-      progress: typeof j.progress === "number" ? j.progress : 0,
-      planKey: typeof j.planKey === "string" ? j.planKey : "",
-    };
-  } catch {
-    return { completedTasks: [], progress: 0, planKey: "" };
-  }
+  const j = parseLocalStorageJson(LS_PROGRESS, null);
+  if (!j || typeof j !== "object") return { completedTasks: [], progress: 0, planKey: "" };
+  return {
+    completedTasks: Array.isArray(j.completedTasks) ? j.completedTasks : [],
+    progress: typeof j.progress === "number" ? j.progress : 0,
+    planKey: typeof j.planKey === "string" ? j.planKey : "",
+  };
 }
 
 export function saveRoadmapProgress({ completedTasks, progress, planKey }) {
@@ -294,18 +287,13 @@ export function saveRoadmapProgress({ completedTasks, progress, planKey }) {
 }
 
 export function loadRoadmapDaily() {
-  try {
-    const raw = localStorage.getItem(LS_DAILY);
-    if (!raw) return { currentTaskId: "", date: "", planKey: "" };
-    const j = JSON.parse(raw);
-    return {
-      currentTaskId: j.currentTaskId || "",
-      date: j.date || "",
-      planKey: typeof j.planKey === "string" ? j.planKey : "",
-    };
-  } catch {
-    return { currentTaskId: "", date: "", planKey: "" };
-  }
+  const j = parseLocalStorageJson(LS_DAILY, null);
+  if (!j || typeof j !== "object") return { currentTaskId: "", date: "", planKey: "" };
+  return {
+    currentTaskId: j.currentTaskId || "",
+    date: j.date || "",
+    planKey: typeof j.planKey === "string" ? j.planKey : "",
+  };
 }
 
 export function saveRoadmapDaily(state) {
@@ -313,17 +301,12 @@ export function saveRoadmapDaily(state) {
 }
 
 export function loadRoadmapStreak() {
-  try {
-    const raw = localStorage.getItem(LS_STREAK);
-    if (!raw) return { count: 0, lastYmd: "" };
-    const j = JSON.parse(raw);
-    return {
-      count: typeof j.count === "number" ? j.count : 0,
-      lastYmd: typeof j.lastYmd === "string" ? j.lastYmd : "",
-    };
-  } catch {
-    return { count: 0, lastYmd: "" };
-  }
+  const j = parseLocalStorageJson(LS_STREAK, null);
+  if (!j || typeof j !== "object") return { count: 0, lastYmd: "" };
+  return {
+    count: typeof j.count === "number" ? j.count : 0,
+    lastYmd: typeof j.lastYmd === "string" ? j.lastYmd : "",
+  };
 }
 
 export function saveRoadmapStreak(s) {
@@ -416,20 +399,14 @@ export function applyJobToFocusMicroLine(microLabel, jobTitle, lang, bucket) {
 }
 
 export function loadFocusJob() {
-  try {
-    const raw = localStorage.getItem(LS_FOCUS_JOB);
-    if (!raw) return null;
-    const j = JSON.parse(raw);
-    if (!j || typeof j.jobUrl !== "string" || !String(j.jobUrl).trim()) return null;
-    return {
-      planKey: String(j.planKey || ""),
-      taskId: String(j.taskId || ""),
-      jobTitle: String(j.jobTitle || "").trim(),
-      jobUrl: String(j.jobUrl || "").trim(),
-    };
-  } catch {
-    return null;
-  }
+  const j = parseLocalStorageJson(LS_FOCUS_JOB, null);
+  if (!j || typeof j !== "object" || typeof j.jobUrl !== "string" || !String(j.jobUrl).trim()) return null;
+  return {
+    planKey: String(j.planKey || ""),
+    taskId: String(j.taskId || ""),
+    jobTitle: String(j.jobTitle || "").trim(),
+    jobUrl: String(j.jobUrl || "").trim(),
+  };
 }
 
 export function saveFocusJob({ planKey, taskId, jobTitle, jobUrl }) {
@@ -443,13 +420,17 @@ export function saveFocusJob({ planKey, taskId, jobTitle, jobUrl }) {
         jobUrl: String(jobUrl || "").trim(),
       })
     );
-  } catch {}
+  } catch {
+    /* ignore persistence errors */
+  }
 }
 
 export function clearFocusJob() {
   try {
     localStorage.removeItem(LS_FOCUS_JOB);
-  } catch {}
+  } catch {
+    /* ignore persistence errors */
+  }
 }
 
 /** LinkedIn-style post after completing a focus task (dynamic). */
@@ -459,10 +440,11 @@ export function buildTaskCompletionSharePost({ taskLabel, progressPct, streakDay
   const task = String(taskLabel || "").trim() || (lang === "TR" ? "bir görev" : "a task");
   const p = Math.min(100, Math.max(0, Math.round(Number(progressPct) || 0)));
   const s = Math.max(0, Math.round(Number(streakDays) || 0));
-  if (lang === "TR") {
+    if (lang === "TR") {
     return `HireFit ile adım adım kariyer yolumu inşa ediyorum.
 
 Bugün tamamladım: ${task}
+Odak: ${roleStr}
 
 İlerleme: %${p}
 Seri: ${s} gün
@@ -472,6 +454,7 @@ Bu benim yolculuğum 🚀`;
   return `I'm building my career path step by step with HireFit.
 
 Today I completed: ${task}
+Focus: ${roleStr}
 
 Progress: ${p}%
 Streak: ${s} days
@@ -479,7 +462,7 @@ Streak: ${s} days
 This is my journey 🚀`;
 }
 
-export function buildRetentionSharePost({ progressPct, role, seniority, steps, lang }) {
+export function buildRetentionSharePost({ progressPct: _progressPct, role, seniority, steps: _steps, lang }) {
   const roleStr =
     [role, seniority].filter(Boolean).join(" · ") || (lang === "TR" ? "hedef rolüm" : "my target role");
   if (lang === "TR") {

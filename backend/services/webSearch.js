@@ -1,4 +1,3 @@
-/* eslint-env node */
 import { openaiChat } from "../../lib/analyze-v2/openaiClient.js";
 import { parseModelJson } from "../../lib/analyze-v2/json.js";
 import { criticalOutputLanguageInstruction, MANDATORY_TURKISH_AI_OUTPUT } from "../../lib/analyze-v2/lang.js";
@@ -59,7 +58,7 @@ async function tavilySearch(query) {
     setCached(key, { results });
     return { results };
   } catch (e) {
-    console.warn("[tavilySearch]", e?.message || e);
+    console.error("[tavilySearch]", e?.message || e);
     return { results: [] };
   }
 }
@@ -581,7 +580,7 @@ export async function buildCompanyIntelligenceLayer({ extracted, cvText, jobDesc
       companySearch = await searchCompany(company, sectorLabel, langNorm);
     }
   } catch (e) {
-    console.warn("[buildCompanyIntelligenceLayer] searchCompany", e?.message || e);
+    console.error("[buildCompanyIntelligenceLayer] searchCompany", e?.message || e);
   }
 
   try {
@@ -589,7 +588,7 @@ export async function buildCompanyIntelligenceLayer({ extracted, cvText, jobDesc
       sectorTrends = await searchSectorTrends(sectorLabel, langNorm);
     }
   } catch (e) {
-    console.warn("[buildCompanyIntelligenceLayer] searchSectorTrends", e?.message || e);
+    console.error("[buildCompanyIntelligenceLayer] searchSectorTrends", e?.message || e);
   }
 
   try {
@@ -597,7 +596,7 @@ export async function buildCompanyIntelligenceLayer({ extracted, cvText, jobDesc
       cvComparison = await compareCvToSectorTrends(cvText, sectorTrends.trending_skills, langNorm);
     }
   } catch (e) {
-    console.warn("[buildCompanyIntelligenceLayer] compareCv", e?.message || e);
+    console.error("[buildCompanyIntelligenceLayer] compareCv", e?.message || e);
   }
 
   const reportCard = await buildCompanyIntelligenceReport({

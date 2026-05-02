@@ -257,8 +257,8 @@ app.post("/optimize", requireAuthExpress, analysisRateLimiter, async (req, res) 
           role: "system",
           content: languageDirective,
         },
-        {
-          role: "user",
+          {
+            role: "user",
           content: `You are a senior recruiter-turned-CV writer doing a "Fix My CV" pass for one specific job.
 
 TASK — rewrite the ENTIRE CV for this job description:
@@ -533,7 +533,7 @@ app.post("/api/admin/pro-access", async (req, res) => {
       plan,
       adminGranted: grantPro,
     });
-  } catch (e) {
+  } catch {
     return res.status(500).json({
       error: "An error occurred. Please try again.",
     });
@@ -557,9 +557,10 @@ const lemonWebhookHandler = async (req, res) => {
   let payload = null;
   try {
     payload = JSON.parse(rawBody.toString());
-  } catch {}
+  } catch {
+    /* webhook body parse — invalid JSON yields null payload handled below */
+  }
   const eventName = payload?.meta?.event_name || req.headers["x-event-name"] || "unknown";
-  console.log("[lemon-webhook] Webhook received:", eventName);
 
   const crypto = await import("crypto");
   const bodyString = rawBody.toString("utf8");
@@ -570,28 +571,21 @@ const lemonWebhookHandler = async (req, res) => {
     .toLowerCase();
 
   if (computedSignature !== signature) {
-    console.log("[lemon-webhook] Signature verification: FAIL", {
-      receivedSigLength: signature.length,
-      computedSigLength: computedSignature.length,
-    });
     return res.status(401).json({ error: "Invalid signature" });
   }
-  console.log("[lemon-webhook] Signature verification: PASS");
 
   const userEmail = payload?.data?.attributes?.user_email;
-  console.log("[lemon-webhook] Event payload user:", userEmail || "no user_email");
 
   const proEvents = new Set(["order_created", "subscription_created", "subscription_payment_success"]);
   const freeEvents = new Set(["subscription_cancelled", "subscription_expired"]);
   const targetPlan = proEvents.has(eventName) ? "pro" : freeEvents.has(eventName) ? "free" : null;
 
   if (!targetPlan) {
-    console.log("[lemon-webhook] No plan change action for event:", eventName);
     return res.json({ received: true, event: eventName, action: "ignored" });
   }
 
   if (!userEmail) {
-    console.warn("[lemon-webhook] Missing user_email for event:", eventName);
+    console.error("[lemon-webhook] Missing user_email for event:", eventName);
     return res.json({ received: true, event: eventName, action: "no_user_email" });
   }
 
@@ -607,14 +601,11 @@ const lemonWebhookHandler = async (req, res) => {
         return res.status(500).json({
           error: "An error occurred. Please try again.",
         });
-      } else {
-        console.log(`[lemon-webhook] Supabase update success (${targetPlan}):`, userEmail);
-        return res.json({ received: true, event: eventName, action: "updated", plan: targetPlan });
       }
-    } else {
-      console.warn("[lemon-webhook] Supabase user not found for:", userEmail);
-      return res.json({ received: true, event: eventName, action: "user_not_found" });
+      return res.json({ received: true, event: eventName, action: "updated", plan: targetPlan });
     }
+    console.error("[lemon-webhook] Supabase user not found for:", userEmail);
+    return res.json({ received: true, event: eventName, action: "user_not_found" });
   } catch (e) {
     console.error("[lemon-webhook] Unexpected processing error:", e?.message || e);
     return res.status(500).json({
@@ -630,7 +621,7 @@ const PORT = 3000;
 
 try {
   const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Backend listening on 0.0.0.0:${PORT} (health: /health)`);
+    process.stdout.write(`[server] Listening on 0.0.0.0:${PORT} (health: /health)\n`);
   });
   server.on("error", (err) => {
     console.error("SERVER LISTEN ERROR:", err.message, err.stack);

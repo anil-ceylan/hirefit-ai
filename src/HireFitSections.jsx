@@ -801,7 +801,7 @@ export function YourNextMovePanel({
       targetInt: target,
       gainPts: gain,
     };
-  }, [data, alignmentScore, lang]);
+  }, [data, alignmentScore, lang, tr]);
 
   if (!data) return null;
 
