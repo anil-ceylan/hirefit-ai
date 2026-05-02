@@ -96,7 +96,7 @@ app.get("/test", (_req, res) => {
   return res.status(200).json({ status: "ok" });
 });
 
-app.post("/api/analyze-v2", requireAuthExpress, analysisRateLimiter, async (req, res) => {
+app.post("/api/analyze-v2", requireAuthExpress, async (req, res) => {
   try {
     const { cvText, jobDescription, cv, jd, isPro, sector, careerArea, lang } = req.body || {};
     const c = String(cvText ?? cv ?? "").trim();
