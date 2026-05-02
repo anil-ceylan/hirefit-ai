@@ -1,4 +1,4 @@
-import { openaiChat } from "../../lib/analyze-v2/openaiClient.js";
+import { callClaudeHaiku } from "../../lib/analyze-v2/openaiClient.js";
 import { parseModelJson } from "../../lib/analyze-v2/json.js";
 import { criticalOutputLanguageInstruction, MANDATORY_TURKISH_AI_OUTPUT } from "../../lib/analyze-v2/lang.js";
 import { companyNameForSearch } from "../engines/companyIntelEngine.js";
@@ -81,10 +81,7 @@ async function summarizeInsights(prompt, lang) {
   const base = isTr
     ? "Sen bir iş analisti asistanısın. Sadece verilen arama özetlerinden çıkarım yap; uydurma. Çıktı JSON."
     : "You are a workplace research assistant. Infer only from provided snippets; do not invent. JSON only.";
-  const content = await openaiChat({
-    model: "llama-3.3-70b-versatile",
-    temperature: 0.2,
-    responseFormat: { type: "json_object" },
+  const content = await callClaudeHaiku({
     langNorm: lang === "tr" ? "tr" : "en",
     messages: [
       {
@@ -242,10 +239,7 @@ Use only evidence present in CV. JSON:
   "narrative": "Your CV shows trending skills X, Y. In demand but missing from your CV: A, B."
 }`;
 
-  const content = await openaiChat({
-    model: "llama-3.3-70b-versatile",
-    temperature: 0.15,
-    responseFormat: { type: "json_object" },
+  const content = await callClaudeHaiku({
     langNorm: lang === "tr" ? "tr" : "en",
     messages: [
       {
@@ -517,10 +511,7 @@ Max 2 preparation_steps.`;
     ? "Yapılandırılmış işveren/sektör raporu üretiyorsun. Yalnızca geçerli JSON; kullanıcı mesajındaki alan kurallarına uy."
     : "You produce a structured employer/sector report. Valid JSON only; follow the per-field rules in the user message.";
 
-  const content = await openaiChat({
-    model: "llama-3.3-70b-versatile",
-    temperature: 0.25,
-    responseFormat: { type: "json_object" },
+  const content = await callClaudeHaiku({
     langNorm: lang === "tr" ? "tr" : "en",
     messages: [
       { role: "system", content: buildSystemPrompt(reportSystemBase, lang) },

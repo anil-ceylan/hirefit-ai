@@ -1,4 +1,4 @@
-import { openaiChat } from "../../lib/analyze-v2/openaiClient.js";
+import { callClaudeHaiku } from "../../lib/analyze-v2/openaiClient.js";
 import { parseModelJson } from "../../lib/analyze-v2/json.js";
 import { criticalOutputLanguageInstruction, MANDATORY_TURKISH_AI_OUTPUT } from "../../lib/analyze-v2/lang.js";
 
@@ -198,10 +198,7 @@ Rules:
       ? "İş ilanından işveren ve pazar bağlamı çıkar. Yalnızca JSON üret; JSON dışında düz metin yok."
       : "You extract employer and market context from job postings. JSON only. No prose outside JSON.";
 
-  const content = await openaiChat({
-    model: "llama-3.3-70b-versatile",
-    temperature: 0.1,
-    responseFormat: { type: "json_object" },
+  const content = await callClaudeHaiku({
     langNorm,
     messages: [
       {

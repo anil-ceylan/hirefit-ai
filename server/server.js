@@ -12,12 +12,12 @@ import {
   parseTitleFromVerbatimExtract,
   stripHtmlToJobVisibleText,
 } from "../lib/extractJobCompose.js";
-import { logPromptBeingSent } from "../lib/aiPromptLog.js";
 import {
   enforcePromptLanguageRules,
   normalizeAnalyzeLang,
   requiredResponseLanguageDirective,
 } from "../lib/analyze-v2/lang.js";
+import { callClaudeHaiku } from "../lib/analyze-v2/openaiClient.js";
 
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err.message, err.stack);
@@ -65,8 +65,8 @@ app.use((req, res, next) => {
   return jsonParser(req, res, next);
 });
 
-if (!process.env.GROQ_API_KEY) {
-  console.error("❌ GROQ_API_KEY missing!");
+if (!process.env.ANTHROPIC_API_KEY) {
+  console.error("❌ ANTHROPIC_API_KEY missing!");
 }
 
 function responseLanguageLabel(langNorm) {
@@ -180,35 +180,22 @@ app.post("/api/extract-job", requireAuthExpress, async (req, res) => {
     let title = fallbackTitle;
     let jobText = visible;
 
-    if (process.env.GROQ_API_KEY && visible.length > 120) {
+    if (process.env.ANTHROPIC_API_KEY && visible.length > 120) {
       try {
-        const extractGroqBody = {
-          model: "llama-3.3-70b-versatile",
+        const raw = await callClaudeHaiku({
+          langNorm: "en",
           max_tokens: EXTRACT_JOB_MAX_TOKENS,
-          temperature: 0.1,
-          messages: constrainedMessages([
-            { role: "system", content: EXTRACT_JOB_SYSTEM },
-            {
-              role: "user",
-              content: buildExtractJobUserMessage(visible),
-            },
-          ], "en"),
-        };
-        logPromptBeingSent(extractGroqBody.messages);
-        const aiRes = await fetchWithTimeout(
-          "https://api.groq.com/openai/v1/chat/completions",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(extractGroqBody),
-          },
-          45000
-        );
-        const aiData = await aiRes.json();
-        const raw = aiData?.choices?.[0]?.message?.content || "";
+          messages: constrainedMessages(
+            [
+              { role: "system", content: EXTRACT_JOB_SYSTEM },
+              {
+                role: "user",
+                content: buildExtractJobUserMessage(visible),
+              },
+            ],
+            "en"
+          ),
+        });
         const normalized = normalizeVerbatimExtract(raw);
         if (normalized.length > 80) {
           jobText = normalized;
@@ -251,18 +238,19 @@ app.post("/optimize", requireAuthExpress, analysisRateLimiter, async (req, res) 
   try {
     const langNorm = normalizeAnalyzeLang(lang);
     const languageDirective = requiredResponseLanguageDirective(langNorm);
-    const optimizeGroqBody = {
-      model: "llama-3.3-70b-versatile",
-      max_tokens: 800,
-      temperature: 0.35,
-      messages: constrainedMessages([
-        {
-          role: "system",
-          content: languageDirective,
-        },
-          {
-            role: "user",
-          content: `You are a senior recruiter-turned-CV writer doing a "Fix My CV" pass for one specific job.
+    const optimizedCv =
+      (await callClaudeHaiku({
+        langNorm,
+        max_tokens: 800,
+        messages: constrainedMessages(
+          [
+            {
+              role: "system",
+              content: languageDirective,
+            },
+            {
+              role: "user",
+              content: `You are a senior recruiter-turned-CV writer doing a "Fix My CV" pass for one specific job.
 
 TASK — rewrite the ENTIRE CV for this job description:
 1) Every bullet: strong action verb + outcome + metric (use plausible estimates like "~20%", "~15k users", "~$XM" only where reasonable from context; if unknown, still quantify scope: "across 3 teams", "weekly reports for leadership").
@@ -279,21 +267,11 @@ ${cvText}
 
 Job Description:
 ${jobDescription}`,
-        },
-      ], langNorm),
-    };
-    logPromptBeingSent(optimizeGroqBody.messages);
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(optimizeGroqBody),
-    });
-
-    const data = await response.json();
-    const optimizedCv = data?.choices?.[0]?.message?.content || "";
+            },
+          ],
+          langNorm
+        ),
+      })) || "";
     return res.json({ optimizedCv });
 
   } catch (err) {
@@ -317,36 +295,27 @@ app.post("/roadmap", requireAuthExpress, async (req, res) => {
   try {
     const langNorm = normalizeAnalyzeLang(lang);
     const languageDirective = requiredResponseLanguageDirective(langNorm);
-    const roadmapGroqBody = {
-      model: "llama-3.3-70b-versatile",
-      max_tokens: 800,
-      temperature: 0.4,
-      messages: constrainedMessages([
-        {
-          role: "system",
-          content: languageDirective,
-        },
-        {
-          role: "user",
-          content: `Create a concise 30-day learning roadmap for someone targeting a ${seniority || "Junior"} ${roleType || "role"} who is missing these skills: ${missingSkills.join(", ")}.
+    const roadmap =
+      (await callClaudeHaiku({
+        langNorm,
+        max_tokens: 800,
+        messages: constrainedMessages(
+          [
+            {
+              role: "system",
+              content: languageDirective,
+            },
+            {
+              role: "user",
+              content: `Create a concise 30-day learning roadmap for someone targeting a ${seniority || "Junior"} ${roleType || "role"} who is missing these skills: ${missingSkills.join(", ")}.
 
 For each skill provide: week number, specific resource (course/book/project), and estimated hours. Be practical and specific. Return as plain text, no JSON.
 Respond entirely in ${responseLanguageLabel(langNorm)}.`,
-        },
-      ], langNorm),
-    };
-    logPromptBeingSent(roadmapGroqBody.messages);
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(roadmapGroqBody),
-    });
-
-    const data = await response.json();
-    const roadmap = data?.choices?.[0]?.message?.content || "";
+            },
+          ],
+          langNorm
+        ),
+      })) || "";
     return res.json({ roadmap });
 
   } catch (err) {
@@ -376,19 +345,18 @@ app.post("/apply-fix", requireAuthExpress, async (req, res) => {
   try {
     const langNorm = normalizeAnalyzeLang(lang);
     const languageDirective = requiredResponseLanguageDirective(langNorm);
-    const applyFixGroqBody = {
-      model: "llama-3.3-70b-versatile",
+    const content = await callClaudeHaiku({
+      langNorm,
       max_tokens: 420,
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: constrainedMessages([
-        {
-          role: "system",
-          content: languageDirective,
-        },
-        {
-          role: "user",
-          content: `Görevin:
+      messages: constrainedMessages(
+        [
+          {
+            role: "system",
+            content: languageDirective,
+          },
+          {
+            role: "user",
+            content: `Görevin:
 
 Adayın CV’sindeki zayıf noktayı al ve bunu güçlü, ölçülebilir ve profesyonel bir şekilde yeniden yaz.
 
@@ -430,21 +398,11 @@ Return ONLY valid JSON:
   "old": "${weakBullet.replace(/"/g, '\\"')}",
   "new": "<single strong measurable sentence>"
 }`,
-        },
-      ], langNorm),
-    };
-    logPromptBeingSent(applyFixGroqBody.messages);
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(applyFixGroqBody),
+          },
+        ],
+        langNorm
+      ),
     });
-
-    const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content;
     const parsed = extractJSON(content);
     if (!parsed || !parsed.new) {
       return res.json({ error: "Could not parse response" });
