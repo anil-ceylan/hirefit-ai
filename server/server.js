@@ -29,7 +29,7 @@ process.on("unhandledRejection", (reason) => {
   process.exit(1);
 });
 
-/** Groq output budget — must be ≥2000 so long postings are not cut off mid-generation */
+/** Claude extraction budget — long postings must not be truncated mid-generation */
 const EXTRACT_JOB_MAX_TOKENS = 8192;
 
 const app = express();

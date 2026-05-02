@@ -5,11 +5,10 @@ import {
   parseTitleFromVerbatimExtract,
   stripHtmlToJobVisibleText,
 } from "../lib/extractJobCompose.js";
-import { logPromptBeingSent } from "../lib/aiPromptLog.js";
-import { enforcePromptLanguageRules } from "../lib/analyze-v2/lang.js";
+import { callClaudeHaiku } from "../lib/analyze-v2/openaiClient.js";
 import { getUserFromRequest } from "../lib/auth/verifySupabaseJwt.js";
 
-/** Groq output budget — must be ≥2000 so long postings are not cut off mid-generation */
+/** Claude output budget — long postings must not be truncated mid-generation */
 const EXTRACT_MAX_TOKENS = 8192;
 
 export default async function handler(req, res) {
@@ -78,38 +77,20 @@ export default async function handler(req, res) {
 
     let title = fallbackTitle;
     let jobText = visible;
-    const key = process.env.GROQ_API_KEY;
 
-    if (key && visible.length > 120) {
+    if (process.env.ANTHROPIC_API_KEY && visible.length > 120) {
       try {
-        const extractMessages = enforcePromptLanguageRules([
-          { role: "system", content: EXTRACT_JOB_SYSTEM },
-          {
-            role: "user",
-            content: buildExtractJobUserMessage(visible),
-          },
-        ], "en");
-        logPromptBeingSent(extractMessages);
-        const aiRes = await fetchWithTimeout(
-          "https://api.groq.com/openai/v1/chat/completions",
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${key}`,
-              "Content-Type": "application/json",
+        const raw = await callClaudeHaiku({
+          langNorm: "en",
+          max_tokens: EXTRACT_MAX_TOKENS,
+          messages: [
+            { role: "system", content: EXTRACT_JOB_SYSTEM },
+            {
+              role: "user",
+              content: buildExtractJobUserMessage(visible),
             },
-            body: JSON.stringify({
-              model: "llama-3.3-70b-versatile",
-              max_tokens: EXTRACT_MAX_TOKENS,
-              temperature: 0.1,
-              messages: extractMessages,
-            }),
-          },
-          45000
-        );
-
-        const aiData = await aiRes.json();
-        const raw = aiData?.choices?.[0]?.message?.content || "";
+          ],
+        });
         const normalized = normalizeVerbatimExtract(raw);
         if (normalized.length > 80) {
           jobText = normalized;

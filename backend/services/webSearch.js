@@ -63,7 +63,7 @@ async function tavilySearch(query) {
   }
 }
 
-/** Groq system prefix: single output language. */
+/** System prefix: single output language (aligned with Claude Haiku helpers). */
 function systemLangDirective(lang) {
   return lang === "tr"
     ? "Tüm yanıtlarını YALNIZCA Türkçe olarak ver."
