@@ -84,13 +84,28 @@ function glassCardStyle(extra = {}) {
   };
 }
 
+function LandingScrollSection({ className, style, children }) {
+  return (
+    <motion.section
+      className={className}
+      style={style}
+      initial={{ opacity: 0, y: 42 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.14, margin: "0px 0px -7% 0px" }}
+      transition={{ duration: 0.56, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {children}
+    </motion.section>
+  );
+}
+
 export function SocialProofSection({ lang }) {
   const tr = lang === "TR";
   const logos = tr
     ? ["Teknoloji", "Finans", "Ürün", "Danışmanlık", "Startup"]
     : ["Technology", "Finance", "Product", "Consulting", "Startups"];
   return (
-    <section className="hf-section hf-section--social" style={{ padding: "56px 0 32px" }}>
+    <LandingScrollSection className="hf-section hf-section--social" style={{ padding: "56px 0 32px" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 28 }}>
           <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
@@ -129,7 +144,7 @@ export function SocialProofSection({ lang }) {
           ))}
         </div>
       </div>
-    </section>
+    </LandingScrollSection>
   );
 }
 
@@ -148,7 +163,7 @@ export function HowItWorksSection({ lang }) {
       ];
 
   return (
-    <section className="hf-section hf-section--how" style={{ padding: "72px 0" }}>
+    <LandingScrollSection className="hf-section hf-section--how" style={{ padding: "72px 0" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 44 }}>
           <div style={pill}>{tr ? "Nasıl çalışır" : "How it works"}</div>
@@ -166,13 +181,9 @@ export function HowItWorksSection({ lang }) {
             gap: 18,
           }}
         >
-          {steps.map((s, i) => (
-            <motion.div
+          {steps.map((s) => (
+            <div
               key={s.n}
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-40px" }}
-              transition={{ duration: 0.35, delay: i * 0.06 }}
               className="hf-micro-lift hf-glass-card"
               style={{
                 ...glassCardStyle({ padding: 26 }),
@@ -197,11 +208,11 @@ export function HowItWorksSection({ lang }) {
               <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#64748b", marginBottom: 8 }}>STEP {s.n}</div>
               <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 800, margin: "0 0 10px", color: "#f1f5f9" }}>{s.title}</h3>
               <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.6, color: "#94a3b8" }}>{s.body}</p>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>
-    </section>
+    </LandingScrollSection>
   );
 }
 
@@ -220,7 +231,7 @@ export function DecisionEngineExplainedSection({ lang }) {
       ];
 
   return (
-    <section className="hf-section hf-section--decision" style={{ padding: "72px 0" }}>
+    <LandingScrollSection className="hf-section hf-section--decision" style={{ padding: "72px 0" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           <div style={pill}>{tr ? "Karar motoru" : "Decision engine"}</div>
@@ -246,14 +257,14 @@ export function DecisionEngineExplainedSection({ lang }) {
           ))}
         </div>
       </div>
-    </section>
+    </LandingScrollSection>
   );
 }
 
 export function BeforeAfterSection({ lang }) {
   const tr = lang === "TR";
   return (
-    <section className="hf-section hf-section--before-after" style={{ padding: "72px 0" }}>
+    <LandingScrollSection className="hf-section hf-section--before-after" style={{ padding: "72px 0" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <div style={pill}>{tr ? "Önce / Sonra" : "Before / After"}</div>
@@ -303,7 +314,7 @@ export function BeforeAfterSection({ lang }) {
           </div>
         </div>
       </div>
-    </section>
+    </LandingScrollSection>
   );
 }
 
@@ -356,7 +367,7 @@ export function TrustSection({ lang }) {
       ];
 
   return (
-    <section className="hf-section hf-section--trust" style={{ padding: "80px 0" }}>
+    <LandingScrollSection className="hf-section hf-section--trust" style={{ padding: "80px 0" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 48 }}>
           <div style={pill}>{tr ? "Güven" : "Trust"}</div>
@@ -407,7 +418,7 @@ export function TrustSection({ lang }) {
           ))}
         </div>
       </div>
-    </section>
+    </LandingScrollSection>
   );
 }
 
@@ -516,7 +527,7 @@ export function HiringLogicQaSection({ lang }) {
       ];
 
   return (
-    <section className="hf-section hf-section--qa" style={{ padding: "80px 0" }}>
+    <LandingScrollSection className="hf-section hf-section--qa" style={{ padding: "80px 0" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 42 }}>
           <div style={pill}>{tr ? "Insight Engine" : "Insight Engine"}</div>
@@ -588,7 +599,7 @@ export function HiringLogicQaSection({ lang }) {
           ))}
         </div>
       </div>
-    </section>
+    </LandingScrollSection>
   );
 }
 
@@ -653,7 +664,7 @@ export function ComparisonSection({ lang }) {
   };
 
   return (
-    <section className="hf-section hf-section--compare" style={{ padding: "80px 0" }}>
+    <LandingScrollSection className="hf-section hf-section--compare" style={{ padding: "80px 0" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           <div style={pill}>{tr ? "Karşılaştırma" : "Comparison"}</div>
@@ -685,7 +696,9 @@ export function ComparisonSection({ lang }) {
             }}
           >
             <div>{colHead(tr ? "Özellik" : "Capability", "#94a3b8")}</div>
-            <div style={{ background: "rgba(59,130,246,0.06)" }}>{colHead("HireFit", "#93c5fd")}</div>
+            <div className="hf-verdict-column-cell" style={{ background: "rgba(59,130,246,0.06)" }}>
+              {colHead("HireFit", "#93c5fd")}
+            </div>
             <div>{colHead(tr ? "Tipik ATS kontrolü" : "Typical ATS checker", "#64748b")}</div>
             <div>{colHead(tr ? "Genel sohbet AI" : "Generic chat AI", "#64748b")}</div>
 
@@ -704,6 +717,7 @@ export function ComparisonSection({ lang }) {
                   {row.label}
                 </div>
                 <div
+                  className="hf-verdict-column-cell"
                   style={{
                     background: "rgba(59,130,246,0.04)",
                     borderTop: "1px solid rgba(255,255,255,0.06)",
@@ -718,7 +732,7 @@ export function ComparisonSection({ lang }) {
           </div>
         </div>
       </div>
-    </section>
+    </LandingScrollSection>
   );
 }
 

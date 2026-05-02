@@ -36,11 +36,19 @@ const ADMIN_EMAIL =
     ? String(import.meta.env.VITE_ADMIN_EMAIL).trim().toLowerCase()
     : "";
 
-/** Landing hero loop: set `VITE_HERO_VIDEO_URL` or add `public/videos/hero-ambient.mp4`. */
+/** Landing hero loop: set `VITE_HERO_VIDEO_URL` (e.g. `/videos/hero-ambient.mp4` or CDN URL). Omit for gradient-only placeholder — no bogus 404 when the file is missing. */
 const HERO_VIDEO_SRC =
   typeof import.meta !== "undefined" && import.meta.env?.VITE_HERO_VIDEO_URL
     ? String(import.meta.env.VITE_HERO_VIDEO_URL).trim()
-    : "/videos/hero-ambient.mp4";
+    : "";
+
+/** Landing page sections: fade-in + slide-up when scrolled into view. */
+const landingScrollSectionProps = {
+  initial: { opacity: 0, y: 42 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.14, margin: "0px 0px -7% 0px" },
+  transition: { duration: 0.56, ease: [0.22, 1, 0.36, 1] },
+};
 
 /** 30-day rolling window for free-tier analysis_count reset (user_plans.last_reset_at). */
 const USER_PLAN_RESET_MS = 30 * 24 * 60 * 60 * 1000;
@@ -4653,17 +4661,27 @@ function LandingPageAmbient() {
           0% { background-position: 0% 50%; }
           100% { background-position: 100% 50%; }
         }
-        .hf-hero-scrim--video {
-          background: linear-gradient(
-            90deg,
-            rgba(8,10,22,0.52) 0%,
-            rgba(8,10,22,0.28) 34%,
-            rgba(8,10,22,0.08) 60%,
-            rgba(8,10,22,0.02) 100%
-          );
+        @keyframes hfHeroCinematicDrift {
+          0% { background-position: 12% 42%; }
+          50% { background-position: 88% 58%; }
+          100% { background-position: 12% 42%; }
         }
-        .hf-hero-scrim--static {
-          background: linear-gradient(165deg, #0A0A0B 0%, #12121c 45%, #0A0A0B 100%);
+        .hf-hero-cinematic-fill {
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background: linear-gradient(
+            122deg,
+            #010102 0%,
+            #05050c 14%,
+            #0a0a18 28%,
+            #0e1230 44%,
+            #1a1242 58%,
+            #120a2e 72%,
+            #04040a 100%
+          );
+          background-size: 320% 320%;
+          animation: hfHeroCinematicDrift 36s ease-in-out infinite;
         }
         .hf-hero-sheen {
           background: linear-gradient(
@@ -4700,6 +4718,7 @@ function LandingPageAmbient() {
   }, []);
 
   const [videoFailed, setVideoFailed] = useState(false);
+  const heroVideoActive = Boolean(HERO_VIDEO_SRC) && !videoFailed;
   const [isDesktop, setIsDesktop] = useState(() =>
     typeof window !== "undefined" && window.matchMedia("(min-width: 901px)").matches
   );
@@ -4714,7 +4733,7 @@ function LandingPageAmbient() {
 
   return (
     <div
-      className={`hf-ambient-root hf-hero${videoFailed ? " hf-hero--no-video" : ""}`}
+      className={`hf-ambient-root hf-hero${heroVideoActive ? "" : " hf-hero--no-video"}`}
       style={{
         position: "absolute",
         inset: 0,
@@ -4734,7 +4753,8 @@ function LandingPageAmbient() {
           zIndex: 0,
         }}
       >
-        {!videoFailed ? (
+        <div className="hf-hero-cinematic-fill" aria-hidden />
+        {heroVideoActive ? (
           <video
             key={HERO_VIDEO_SRC}
             aria-hidden
@@ -4825,12 +4845,12 @@ function LandingPageAmbient() {
       </div>
       <div
         aria-hidden
-        className={videoFailed ? "hf-hero-scrim hf-hero-scrim--static" : "hf-hero-scrim hf-hero-scrim--video"}
         style={{
           position: "absolute",
           inset: 0,
           pointerEvents: "none",
           zIndex: 0,
+          backgroundColor: "rgba(0,0,0,0.6)",
         }}
       />
       <div
@@ -4909,7 +4929,7 @@ function HeroSection({ navigate, lang }) {
 
   const r = fakeResult[lang];
   return (
-    <section
+    <motion.section
       className="hf-section hf-section--hero"
       style={{
         width: "100vw",
@@ -4919,6 +4939,7 @@ function HeroSection({ navigate, lang }) {
         display: "flex",
         flexDirection: "column",
       }}
+      {...landingScrollSectionProps}
     >
       <div
         className="hf-hero-inner"
@@ -5017,6 +5038,7 @@ function HeroSection({ navigate, lang }) {
               }}
             />
             <div
+              className="hf-verdict-card-glow"
               style={{
                 background: "rgba(255,255,255,0.04)",
                 border: "1px solid rgba(255,255,255,0.1)",
@@ -5182,7 +5204,7 @@ function HeroSection({ navigate, lang }) {
             </div>
           </div>
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -5199,8 +5221,10 @@ function FeatureCards({ lang }) {
 { icon: "✨", tag: "Premium", tagColor: "#d4af37", tagBg: "rgba(212,175,55,0.1)", title: "Turn weak bullets into real impact", desc: "CV Rewriter rewrites your bullets to be specific, metric-driven, and human. Not AI-sounding — recruiter-approved.", accent: "#d4af37", glow: "rgba(212,175,55,0.08)", border: "rgba(212,175,55,0.15)", stat: "+23pts avg. boost" },
   ];
 
+  const verdictSpotlightIdx = lang === "TR" ? 1 : 0;
+
   return (
-    <section className="hf-section hf-section--features" style={{ padding: "80px 0" }}>
+    <motion.section className="hf-section hf-section--features" style={{ padding: "80px 0" }} {...landingScrollSectionProps}>
       <div style={styles.container}>
         <div style={{ textAlign: "center", marginBottom: 56 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)", fontSize: "11px", fontWeight: 700, color: "#60a5fa", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>
@@ -5222,8 +5246,12 @@ function FeatureCards({ lang }) {
             gap: 20,
           }}
         >
-          {features.map(({ icon, tag, tagColor, tagBg, title, desc, accent, glow, border, stat }) => (
-            <div key={title} className="hf-elevated-card hf-micro-lift" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 24, padding: 32, transition: "transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease", position: "relative", overflow: "hidden" }}>
+          {features.map(({ icon, tag, tagColor, tagBg, title, desc, accent, glow, border, stat }, idx) => (
+            <div
+              key={title}
+              className={`hf-elevated-card hf-micro-lift${idx === verdictSpotlightIdx ? " hf-verdict-card-glow" : ""}`}
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.09)", borderRadius: 24, padding: 32, transition: "transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease", position: "relative", overflow: "hidden" }}
+            >
               <div style={{ position: "absolute", top: 0, right: 0, width: 200, height: 200, borderRadius: "50%", background: `radial-gradient(circle, ${glow}, transparent 70%)`, pointerEvents: "none" }} />
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                 <div style={{ width: 52, height: 52, borderRadius: 16, background: "rgba(255,255,255,0.04)", border: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px" }}>{icon}</div>
@@ -5239,7 +5267,7 @@ function FeatureCards({ lang }) {
           ))}
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -5259,7 +5287,7 @@ const coachFeatures = lang === "TR"
   
 
   return (
-    <section className="hf-section hf-section--pricing" style={{ padding: "80px 0" }}>
+    <motion.section className="hf-section hf-section--pricing" style={{ padding: "80px 0" }} {...landingScrollSectionProps}>
       <div style={styles.container}>
         <div style={{ textAlign: "center", marginBottom: 48 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)", fontSize: "11px", fontWeight: 700, color: "#60a5fa", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>
@@ -5283,7 +5311,7 @@ const coachFeatures = lang === "TR"
             </ul>
             <button onClick={() => navigate("/app")} className="hf-btn-ghost" style={{ width: "100%", justifyContent: "center", fontSize: "14px" }}>{lang === "TR" ? "Başla" : "Get Started"}</button>
           </div>
-          <div style={{ background: "linear-gradient(145deg, rgba(59,130,246,0.1), rgba(99,102,241,0.07))", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 24, padding: 32, position: "relative", overflow: "hidden" }}>
+          <div className="hf-verdict-card-glow" style={{ background: "linear-gradient(145deg, rgba(59,130,246,0.1), rgba(99,102,241,0.07))", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 24, padding: 32, position: "relative", overflow: "hidden" }}>
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.6), transparent)" }} />
             <div style={{ position: "absolute", top: 16, right: -30, background: "linear-gradient(135deg, #3b82f6, #6366f1)", color: "white", fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", padding: "4px 40px", transform: "rotate(45deg)" }}>POPULAR</div>
             <div style={{ fontSize: "13px", fontWeight: 600, color: "#93c5fd", marginBottom: 8 }}>Pro</div>
@@ -5313,7 +5341,7 @@ const coachFeatures = lang === "TR"
           </div>
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -5322,7 +5350,7 @@ const LEMONSQUEEZY_PRO_CHECKOUT =
 
 function ProLiveSection({ navigate, lang }) {
   return (
-    <section className="hf-section hf-section--pro" style={{ padding: "80px 0 100px" }}>
+    <motion.section className="hf-section hf-section--pro" style={{ padding: "80px 0 100px" }} {...landingScrollSectionProps}>
       <div style={styles.container}>
         <div
           style={{
@@ -5419,7 +5447,7 @@ function ProLiveSection({ navigate, lang }) {
           </div>
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -5428,7 +5456,7 @@ function Footer({ navigate, lang }) {
   const productLinks = lang === "TR" ? [["CV Analiz Et", "/app"], ["Panel", "/dashboard"], ["Fiyatlandırma", "/"]] : [["Analyze CV", "/app"], ["Dashboard", "/dashboard"], ["Pricing", "/"]];
 
   return (
-    <footer className="hf-section hf-section--footer" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "48px 0 32px" }}>
+    <motion.footer className="hf-section hf-section--footer" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "48px 0 32px" }} {...landingScrollSectionProps}>
       <div style={styles.container}>
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 48, marginBottom: 48 }}>
           <div>
@@ -5503,7 +5531,7 @@ function Footer({ navigate, lang }) {
           </div>
         </div>
       </div>
-    </footer>
+    </motion.footer>
   );
 }
 
