@@ -33,6 +33,7 @@ process.on("unhandledRejection", (reason) => {
 const EXTRACT_JOB_MAX_TOKENS = 8192;
 
 const app = express();
+app.set("trust proxy", 1);
 const ALLOWED_ORIGIN = "https://hirefit-ai.vercel.app";
 
 // CORS MUST be first global middleware (before all routes)
@@ -82,6 +83,7 @@ const analysisRateLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too many requests, please try again later" },
+  validate: { trustProxy: false },
 });
 
 /** Railway (and similar) set PORT; health checks often need a simple 200. */
