@@ -375,7 +375,7 @@ function buildRoleContextJobDescription(role, _lang = "TR") {
 
 const HF_ANALYTICS_DEBOUNCE_MS = 900;
 const hfAnalyticsLastFire = new Map();
-const ANALYZE_V2_TIMEOUT_MS = 60_000;
+const ANALYZE_V2_TIMEOUT_MS = 90_000;
 const ANALYZE_MIN_DURATION_MS = 1_500;
 let pdfjsLoaderPromise = null;
 
