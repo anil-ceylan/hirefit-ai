@@ -167,8 +167,9 @@
 
 .hf-analyzer-analyze-wrap {
   width: 100%;
-  max-width: 100%;
-  margin: 0;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
   box-sizing: border-box;
 }
 
@@ -244,8 +245,8 @@
 
   .hf-analyzer-analyze-wrap {
     width: 100%;
-    max-width: 100%;
-    margin: 24px 0 0;
+    max-width: 600px;
+    margin: 24px auto 0;
   }
 
   .hf-analyzer-results {
@@ -441,14 +442,6 @@
 
 .hf-analyzer-example-preview {
   opacity: 0.92;
-}
-
-@media (max-width: 1080px) {
-  .hf-analyzer-analyze-wrap {
-    width: 100%;
-    max-width: 100%;
-    margin-top: 20px;
-  }
 }
 
 .hf-output-loading {

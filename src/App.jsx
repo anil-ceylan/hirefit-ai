@@ -6788,6 +6788,13 @@ export function AnalyzerPage() {
     setPreviewReanalyzePending(false);
   };
 
+  const analyzerResultsChromeVisible =
+    Boolean(
+      (showAnonSavePrompt && !user && reportUnlocked) ||
+        (hasOutput && !loading && impactProjection) ||
+        (hasOutput && !loading && roleSuggestions?.length > 0)
+    );
+
   return (
   <div className="hf-analyzer-page" style={{ maxWidth: 1320, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
     <AnalysisThinkingOverlay lang={lang} loading={loading} loadingMessage={loadingMessage} />
@@ -7066,15 +7073,6 @@ export function AnalyzerPage() {
     </motion.div>
 
     <div className="hf-analyzer-post-grid">
-    <div className={`hf-data-bridge${loading || (cvLoaded && jdLoaded) ? " hf-data-bridge--hot" : ""}`} aria-hidden>
-      <div className="hf-data-bridge__line" />
-      <motion.span
-        className="hf-data-bridge__pulse"
-        animate={{ x: ["0%", "98%"] }}
-        transition={{ repeat: Infinity, duration: loading ? 1.35 : 2.3, ease: "linear" }}
-      />
-      {(loading || (cvLoaded && jdLoaded)) ? <span className="hf-data-bridge__pulse hf-data-bridge__pulse--trail" /> : null}
-    </div>
 
     {/* DECISION SUPPORT SETTINGS */}
     <div style={{ marginBottom: 24 }}>
@@ -7212,6 +7210,11 @@ export function AnalyzerPage() {
       className="hf-input-panel hf-analyzer-example-preview"
       style={{
         marginTop: 20,
+        marginLeft: "auto",
+        marginRight: "auto",
+        width: "100%",
+        maxWidth: 600,
+        boxSizing: "border-box",
         padding: "20px 20px",
         borderRadius: 16,
         border: "1px solid rgba(148,163,184,0.14)",
@@ -7289,6 +7292,7 @@ export function AnalyzerPage() {
     </div>
     </div>
 
+    {analyzerResultsChromeVisible ? (
     <motion.div
       className="hf-output-panel hf-analyzer-results"
       initial={{ opacity: 0, x: 16 }}
@@ -7661,6 +7665,9 @@ export function AnalyzerPage() {
         </div>
       </div>
     ) : null}
+    </motion.div>
+    ) : null}
+
     {showMarketInsightsModal ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.76)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
         <div style={{ width: "min(560px, 96vw)", borderRadius: 14, border: "1px solid rgba(99,102,241,0.3)", background: "linear-gradient(160deg,#0b1220,#05070f)", padding: 18 }}>
@@ -7723,7 +7730,6 @@ export function AnalyzerPage() {
         </div>
       </div>
     ) : null}
-    </motion.div>
 
     {/* HISTORY — compact, en altta */}
     {history.length > 0 && (
