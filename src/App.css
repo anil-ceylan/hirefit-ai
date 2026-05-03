@@ -456,8 +456,13 @@
     0 10px 36px rgba(99, 102, 241, 0.36);
 }
 
-.hf-analyzer-history-item:focus-visible {
+/* Cancel Vite/index.css global button focus ring on /app only; history rows opt in below. */
+.hf-analyzer-page button:focus,
+.hf-analyzer-page button:focus-visible {
   outline: none;
+}
+
+.hf-analyzer-page button.hf-analyzer-history-item:focus-visible {
   box-shadow:
     0 0 0 2px rgba(99, 102, 241, 0.45),
     0 10px 36px rgba(99, 102, 241, 0.28);
