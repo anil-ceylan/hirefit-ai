@@ -130,6 +130,11 @@
 /* Analyzer /app — desktop 2-column inputs + full-width footer row */
 .hf-analyzer-page {
   box-sizing: border-box;
+  position: relative;
+  background-image:
+    radial-gradient(ellipse 920px 420px at 88% -6%, rgba(99, 102, 241, 0.17), transparent 56%),
+    radial-gradient(ellipse 920px 420px at 12% 106%, rgba(129, 140, 248, 0.18), transparent 56%);
+  background-repeat: no-repeat;
 }
 
 .hf-analyzer-hero {
@@ -303,6 +308,52 @@
 .hf-input-panel .hf-textarea:focus {
   border-color: rgba(34, 211, 238, 0.5);
   box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.14), 0 0 24px rgba(34, 211, 238, 0.18);
+}
+
+/* Analyzer page — CV + İlan cards: clearer chrome, softer lift on hover */
+.hf-analyzer-page .hf-analyzer-layout .hf-analyzer-cv.hf-input-panel,
+.hf-analyzer-page .hf-analyzer-layout .hf-analyzer-jd.hf-input-panel {
+  border-color: rgba(165, 180, 201, 0.34);
+  background:
+    radial-gradient(1180px 260px at 10% -20%, rgba(99, 102, 241, 0.1), transparent 42%),
+    linear-gradient(180deg, rgba(24, 32, 53, 0.62), rgba(22, 30, 50, 0.36));
+  transition:
+    border-color 0.22s ease,
+    box-shadow 0.26s ease;
+}
+
+.hf-analyzer-page .hf-analyzer-layout .hf-analyzer-cv.hf-input-panel:not(.hf-input-panel--active):hover,
+.hf-analyzer-page .hf-analyzer-layout .hf-analyzer-jd.hf-input-panel:not(.hf-input-panel--active):hover {
+  border-color: rgba(186, 200, 220, 0.42);
+  box-shadow:
+    0 0 0 1px rgba(129, 140, 248, 0.14),
+    0 10px 36px rgba(99, 102, 241, 0.36);
+}
+
+/* Analyzer textareas — border + placeholder legibility */
+.hf-analyzer-page .hf-analyzer-layout .hf-input-panel textarea.hf-textarea.hf-analyzer-textarea {
+  border-color: rgba(148, 163, 184, 0.32);
+}
+
+.hf-analyzer-page .hf-analyzer-layout .hf-input-panel textarea.hf-textarea.hf-analyzer-textarea::placeholder {
+  color: rgba(186, 198, 214, 0.88);
+  opacity: 1;
+}
+
+/* Primary analyze CTA — richer gradient + glow (overrides inline + global hf-btn-primary) */
+.hf-analyzer-page button.hf-btn-primary.hf-analyzer-main-cta:not(:disabled) {
+  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 45%, #8b5cf6 100%) !important;
+  box-shadow:
+    0 0 12px rgba(99, 102, 241, 0.4),
+    0 6px 22px rgba(79, 70, 229, 0.24) !important;
+}
+
+.hf-analyzer-page button.hf-btn-primary.hf-analyzer-main-cta:not(:disabled):hover {
+  background: linear-gradient(135deg, #5b53f8 0%, #7378fb 42%, #9d6dff 100%) !important;
+  box-shadow:
+    0 0 18px rgba(129, 140, 248, 0.48),
+    0 0 32px rgba(99, 102, 241, 0.32),
+    0 8px 26px rgba(91, 79, 232, 0.32) !important;
 }
 
 .hf-data-bridge {
