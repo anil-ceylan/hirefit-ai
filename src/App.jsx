@@ -17,7 +17,7 @@ import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRe
 import { AnimatePresence, motion } from "framer-motion";
 import { parseLocalStorageJson, safeJsonParse } from "./utils/safeJson";
 import {
-  Sparkles, FileText, Briefcase, AlertCircle, Loader2,
+  FileText, Briefcase, AlertCircle, Loader2,
   Upload, Copy, Wand2, Target, Search, History, Trash2,
   CheckCircle2, ArrowRight, LogIn, LogOut, Download, Mail,
   Zap, Star, TrendingUp, Crown, Linkedin, Instagram, Link2, Workflow,
@@ -1130,7 +1130,8 @@ function AnimatedAlignmentScore({ alignmentScore, fontSize = "clamp(48px, 11vw, 
   );
 }
 
-function AiLivePipelinePanel({ lang, loading, hasOutput, cvReady, jdReady, extractingJob }) {
+/** Full-screen loading overlay only while `loading` — same step labels as the former in-page pipeline. */
+function AnalysisThinkingOverlay({ lang, loading, loadingMessage }) {
   const [step, setStep] = useState(0);
   useEffect(() => {
     if (!loading) {
@@ -1157,101 +1158,7 @@ function AiLivePipelinePanel({ lang, loading, hasOutput, cvReady, jdReady, extra
           { key: "dec", label: "Building decision" },
         ];
 
-  const idleTitle = lang === "TR" ? "Canlı analiz hattı" : "Live analysis pipeline";
-  const idleSub =
-    extractingJob
-      ? lang === "TR"
-        ? "İlan detayları linkten çekiliyor..."
-        : "Extracting job details from link..."
-      : !(cvReady && jdReady)
-        ? lang === "TR"
-          ? "CV ve iş ilanını ekleyerek motoru aktive et."
-          : "Add your CV and job description to activate the engine."
-        : lang === "TR"
-          ? "Girdiler hazır. Analizi başlatabilirsin."
-          : "Inputs ready. Start analysis when you are.";
-
-  return (
-    <div className={`hf-ai-pipeline ${loading ? "hf-ai-pipeline--running" : ""}`}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-        <div style={{ width: 36, height: 36, borderRadius: 10, display: "grid", placeItems: "center", background: "rgba(99,102,241,0.2)", border: "1px solid rgba(129,140,248,0.35)" }}>
-          <Cpu size={18} color="#c4b5fd" />
-        </div>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: "#f1f5f9" }}>{idleTitle}</div>
-          <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>{idleSub}</div>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="hf-output-loading-bar" style={{ marginBottom: 14 }}>
-          <motion.div className="hf-output-loading-progress" animate={{ x: ["-100%", "220%"] }} transition={{ repeat: Infinity, duration: 1.25, ease: "linear" }} />
-        </div>
-      ) : null}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {steps.map((s, i) => {
-          const done = hasOutput && !loading ? true : loading && step > i;
-          const active = loading && step === i;
-          const pending = !loading && !hasOutput && !done;
-          return (
-            <div
-              key={`${s.key}-${done ? "1" : "0"}`}
-              className={`hf-ai-pipeline-step${done ? " hf-ai-pipeline-step--done" : ""}${active ? " hf-ai-pipeline-step--active" : ""}${pending ? " hf-ai-pipeline-step--pending" : ""}`}
-            >
-              <div style={{ width: 22, height: 22, display: "grid", placeItems: "center" }}>
-                {done ? (
-                  <span className="hf-pipeline-check">
-                    <CheckCircle2 size={16} color="#34d399" />
-                  </span>
-                ) : active ? (
-                  <Loader2 size={14} color="#a78bfa" style={{ animation: "spin 0.8s linear infinite" }} />
-                ) : (
-                  <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(148,163,184,0.35)" }} />
-                )}
-              </div>
-              <div style={{ fontSize: 13, fontWeight: done || active ? 700 : 600, color: done ? "#a7f3d0" : active ? "#e9d5ff" : "#64748b" }}>{s.label}</div>
-            </div>
-          );
-        })}
-      </div>
-
-      {hasOutput && !loading ? (
-        <div style={{ marginTop: 12, fontSize: 11, color: "#34d399", fontWeight: 700, textAlign: "center" }}>
-          {lang === "TR" ? "✓ Analiz tamamlandı — sonuçlar aşağıda" : "✓ Analysis complete — results below"}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function AnalysisThinkingOverlay({ lang, loading }) {
-  const [activeIdx, setActiveIdx] = useState(0);
-  useEffect(() => {
-    if (!loading) {
-      setActiveIdx(0);
-      return;
-    }
-    setActiveIdx(0);
-    const delays = [860, 980, 1120, 900];
-    const ids = [];
-    let total = 0;
-    delays.forEach((ms, i) => {
-      total += ms;
-      ids.push(window.setTimeout(() => setActiveIdx(i + 1), total));
-    });
-    return () => ids.forEach((id) => window.clearTimeout(id));
-  }, [loading]);
-
   if (!loading) return null;
-
-  const steps = [
-    lang === "TR" ? "CV parsing" : "CV parsing",
-    lang === "TR" ? "Skill matching" : "Skill matching",
-    lang === "TR" ? "Gap detection" : "Gap detection",
-    lang === "TR" ? "Recruiter simulation" : "Recruiter simulation",
-    lang === "TR" ? "Strategy building" : "Strategy building",
-  ];
 
   return (
     <div
@@ -1270,12 +1177,13 @@ function AnalysisThinkingOverlay({ lang, loading }) {
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.25 }}
+        className={`hf-ai-pipeline hf-ai-pipeline--running`}
         style={{
-          width: "min(760px, 96vw)",
+          width: "min(520px, 96vw)",
           borderRadius: 18,
           border: `1px solid ${rsAlpha(RS.indigo, 0.32)}`,
           background: "linear-gradient(165deg, #0b1220 0%, #101a2e 55%, #0a0f1b 100%)",
-          padding: "30px 28px",
+          padding: "24px 22px",
           position: "relative",
           overflow: "hidden",
           boxShadow: "0 24px 90px rgba(0,0,0,0.5)",
@@ -1293,42 +1201,47 @@ function AnalysisThinkingOverlay({ lang, loading }) {
           }}
         />
         <div style={{ position: "relative" }}>
-          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: RS.textMuted, marginBottom: 10 }}>
-            {lang === "TR" ? "AI pipeline" : "AI pipeline"}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, display: "grid", placeItems: "center", background: "rgba(99,102,241,0.2)", border: "1px solid rgba(129,140,248,0.35)" }}>
+              <Cpu size={18} color="#c4b5fd" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, color: "#f1f5f9" }}>
+                {lang === "TR" ? "Analiz çalışıyor" : "Running analysis"}
+              </div>
+              <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 2 }}>
+                {loadingMessage || (lang === "TR" ? "Lütfen bu pencereyi kapatmadan bekleyin." : "Please keep this tab open.")}
+              </div>
+            </div>
           </div>
-          <div style={{ fontSize: "clamp(18px, 2.8vw, 24px)", fontWeight: 800, color: RS.textPrimary, marginBottom: 18 }}>
-            {lang === "TR" ? "Profilin derin analiz ediliyor..." : "Analyzing your profile deeply..."}
+
+          <div className="hf-output-loading-bar" style={{ marginBottom: 14 }}>
+            <motion.div className="hf-output-loading-progress" animate={{ x: ["-100%", "220%"] }} transition={{ repeat: Infinity, duration: 1.25, ease: "linear" }} />
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {steps.slice(0, Math.min(steps.length, activeIdx + 1)).map((label, i) => {
-              const done = activeIdx > i;
-              const active = activeIdx === i;
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {steps.map((s, i) => {
+              const done = step > i;
+              const active = step === i;
+              const pending = step < i;
               return (
-                <motion.div
-                  key={`${label}-${i}`}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    minHeight: 38,
-                    borderRadius: 10,
-                    border: `1px solid ${done ? rsAlpha(RS.green, 0.38) : rsAlpha(RS.border, 0.9)}`,
-                    background: done ? rsAlpha(RS.green, 0.08) : rsAlpha(RS.bgElevated, 0.55),
-                    padding: "8px 12px",
-                  }}
+                <div
+                  key={s.key}
+                  className={`hf-ai-pipeline-step${done ? " hf-ai-pipeline-step--done" : ""}${active ? " hf-ai-pipeline-step--active" : ""}${pending ? " hf-ai-pipeline-step--pending" : ""}`}
                 >
-                  {done ? (
-                    <CheckCircle2 size={16} color={RS.green} />
-                  ) : active ? (
-                    <Loader2 size={16} color={RS.indigo} style={{ animation: "spin 0.8s linear infinite" }} />
-                  ) : (
-                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: rsAlpha(RS.textMuted, 0.6) }} />
-                  )}
-                  <span style={{ fontSize: 14, fontWeight: 700, color: done ? "#bbf7d0" : RS.textPrimary }}>{label}</span>
-                </motion.div>
+                  <div style={{ width: 22, height: 22, display: "grid", placeItems: "center" }}>
+                    {done ? (
+                      <span className="hf-pipeline-check">
+                        <CheckCircle2 size={16} color="#34d399" />
+                      </span>
+                    ) : active ? (
+                      <Loader2 size={14} color="#a78bfa" style={{ animation: "spin 0.8s linear infinite" }} />
+                    ) : (
+                      <div style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(148,163,184,0.35)" }} />
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: done || active ? 700 : 600, color: done ? "#a7f3d0" : active ? "#e9d5ff" : "#64748b" }}>{s.label}</div>
+                </div>
               );
             })}
           </div>
@@ -6877,7 +6790,7 @@ export function AnalyzerPage() {
 
   return (
   <div className="hf-analyzer-page" style={{ maxWidth: 1320, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
-    <AnalysisThinkingOverlay lang={lang} loading={loading} />
+    <AnalysisThinkingOverlay lang={lang} loading={loading} loadingMessage={loadingMessage} />
 
     {/* HEADER */}
     <div className="hf-analyzer-hero">
@@ -7041,52 +6954,8 @@ export function AnalyzerPage() {
       </div>
       <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 10 }}>
         {lang === "TR"
-          ? "Yapıştır, .txt bırak veya linkten çek — en doğru sonuç için tam metin. "
-          : "Paste, drop a .txt, or extract from a link — full text works best. "}
-        <span style={{ color: "#67e8f9", fontWeight: 700 }}>{t.orPasteLinkHint}</span>
-      </div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-        <input
-          value={jobUrl}
-          onChange={(e) => setJobUrl(e.target.value)}
-          placeholder={lang === "TR" ? "İş ilanı URL (isteğe bağlı)" : "Job posting URL (optional)"}
-          style={{ flex: 1, minWidth: 200, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#cbd5e1", outline: "none" }}
-        />
-        <motion.button
-          type="button"
-          onClick={extractJobFromUrl}
-          disabled={extractingJob || jobUrlIsLinkedIn}
-          whileHover={{ scale: extractingJob || jobUrlIsLinkedIn ? 1 : 1.02 }}
-          whileTap={{ scale: extractingJob || jobUrlIsLinkedIn ? 1 : 0.98 }}
-          style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(34,211,238,0.45)", background: jobUrlIsLinkedIn ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg, rgba(34,211,238,0.2), rgba(59,130,246,0.16))", color: jobUrlIsLinkedIn ? "#64748b" : "#67e8f9", fontWeight: 800, cursor: extractingJob || jobUrlIsLinkedIn ? "not-allowed" : "pointer", boxShadow: jobUrlIsLinkedIn ? "none" : "0 0 18px rgba(34,211,238,0.2)" }}
-        >
-          <Link2 size={12} />
-          {extractingJob ? (lang === "TR" ? "İlan detayları çekiliyor..." : "Extracting job details...") : (lang === "TR" ? "Linkten İlanı Analiz Et" : "Analyze Job from Link")}
-        </motion.button>
-      </div>
-      {jobUrlIsLinkedIn ? (
-        <div
-          role="status"
-          style={{
-            marginBottom: 10,
-            padding: "12px 14px",
-            borderRadius: 10,
-            border: "1px solid rgba(251,191,36,0.35)",
-            background: "rgba(251,191,36,0.08)",
-            fontSize: 13,
-            lineHeight: 1.45,
-            color: "#fde68a",
-          }}
-        >
-          {lang === "TR"
-            ? "LinkedIn ilanları tam olarak çekilemeyebilir. En iyi sonuç için ilanı LinkedIn'den kopyalayıp buraya yapıştırın."
-            : "LinkedIn job posts can't be fully extracted. For best results, copy and paste the job description directly."}
-        </div>
-      ) : null}
-      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10 }}>
-        {lang === "TR"
-          ? "Diğer siteler (Kariyer.net, Indeed, Glassdoor vb.) için link genelde çalışır; olmazsa yapıştırın."
-          : "URL extraction works for many job boards (e.g. Kariyer.net, Indeed, Glassdoor); paste the text if it doesn’t."}
+          ? "İlan metnini yapıştırın veya .txt sürükleyin — tam metin en doğru sonucu verir."
+          : "Paste the job description or drop a .txt file — full text works best."}
       </div>
 
       <div
@@ -7132,28 +7001,68 @@ export function AnalyzerPage() {
           onBlur={() => setActiveInput((v) => (v === "jd" ? null : v))}
           readOnly={extractingJob}
         />
+
+        <details style={{ marginTop: 12 }}>
+          <summary
+            style={{
+              cursor: "pointer",
+              fontSize: 12,
+              fontWeight: 600,
+              color: "#64748b",
+              listStyle: "none",
+            }}
+            className="hf-analyzer-url-details"
+          >
+            {lang === "TR" ? "veya URL'den çek" : "or fetch from URL"}
+          </summary>
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: "1px solid rgba(148,163,184,0.12)" }}>
+            <div style={{ display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+              <input
+                value={jobUrl}
+                onChange={(e) => setJobUrl(e.target.value)}
+                placeholder={lang === "TR" ? "İş ilanı URL" : "Job posting URL"}
+                style={{ flex: 1, minWidth: 200, padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.03)", color: "#cbd5e1", outline: "none" }}
+              />
+              <motion.button
+                type="button"
+                onClick={extractJobFromUrl}
+                disabled={extractingJob || jobUrlIsLinkedIn}
+                whileHover={{ scale: extractingJob || jobUrlIsLinkedIn ? 1 : 1.02 }}
+                whileTap={{ scale: extractingJob || jobUrlIsLinkedIn ? 1 : 0.98 }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(34,211,238,0.45)", background: jobUrlIsLinkedIn ? "rgba(255,255,255,0.04)" : "linear-gradient(135deg, rgba(34,211,238,0.2), rgba(59,130,246,0.16))", color: jobUrlIsLinkedIn ? "#64748b" : "#67e8f9", fontWeight: 800, cursor: extractingJob || jobUrlIsLinkedIn ? "not-allowed" : "pointer", boxShadow: jobUrlIsLinkedIn ? "none" : "0 0 18px rgba(34,211,238,0.2)" }}
+              >
+                <Link2 size={12} />
+                {extractingJob ? (lang === "TR" ? "Çekiliyor..." : "Fetching...") : (lang === "TR" ? "Metni getir" : "Fetch text")}
+              </motion.button>
+            </div>
+            {jobUrlIsLinkedIn ? (
+              <div
+                role="status"
+                style={{
+                  marginBottom: 10,
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(251,191,36,0.35)",
+                  background: "rgba(251,191,36,0.08)",
+                  fontSize: 13,
+                  lineHeight: 1.45,
+                  color: "#fde68a",
+                }}
+              >
+                {lang === "TR"
+                  ? "LinkedIn ilanları tam olarak çekilemeyebilir. En iyi sonuç için ilanı kopyalayıp yukarıya yapıştırın."
+                  : "LinkedIn job posts can't be fully extracted. For best results, copy and paste the job description above."}
+              </div>
+            ) : null}
+            <div style={{ fontSize: 11, color: "#64748b" }}>
+              {lang === "TR"
+                ? "Kariyer.net, Indeed, Glassdoor vb. için çoğu zaman çalışır; olmazsa metni yapıştırın."
+                : "Works for many job boards; paste the text if extraction fails."}
+            </div>
+          </div>
+        </details>
       </div>
     </motion.div>
-    </motion.div>
-
-    <motion.div
-      className="hf-output-panel hf-analyzer-pipeline"
-      initial={{ opacity: 0, x: 16 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.35 }}
-    >
-    <AiLivePipelinePanel
-      lang={lang}
-      loading={loading}
-      hasOutput={hasOutput}
-      cvReady={cvLoaded}
-      jdReady={jdLoaded}
-      extractingJob={extractingJob}
-    />
-    <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginTop: 14, display: "flex", alignItems: "center", gap: 8, lineHeight: 1.45 }}>
-      <Workflow size={14} color="#a78bfa" />
-      {lang === "TR" ? "Recruiter'ın 7 saniyede gördüğü ekran bu." : "This is what a recruiter sees in 7 seconds."}
-    </div>
     </motion.div>
 
     <div className="hf-analyzer-post-grid">
@@ -7261,24 +7170,98 @@ export function AnalyzerPage() {
     <button
       onClick={analyze}
       disabled={loading}
+      type="button"
+      className="hf-btn-primary hf-analyzer-main-cta"
       style={{
-        width: "100%", padding: "16px", borderRadius: 14, border: "none",
-        background: loading ? "rgba(99,102,241,0.3)" : "linear-gradient(135deg, #3b82f6, #6366f1)",
-        color: "white", fontSize: 16, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
-        fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+        width: "100%",
+        padding: "18px 20px",
+        borderRadius: 14,
+        border: "none",
+        background: loading ? "rgba(99,102,241,0.35)" : "linear-gradient(135deg, #3b82f6, #6366f1)",
+        color: "white",
+        fontSize: 17,
+        fontWeight: 700,
+        cursor: loading ? "not-allowed" : "pointer",
+        fontFamily: "'DM Sans', sans-serif",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 10,
         boxShadow: loading ? "none" : "0 0 32px rgba(99,102,241,0.35)",
-        transition: "all 0.2s ease", marginBottom: 0,
-        opacity: loading ? 0.8 : 1,
+        transition: "all 0.2s ease",
+        marginBottom: 0,
+        opacity: loading ? 0.88 : 1,
       }}
     >
-      {loading ? <><Loader2 size={16} style={{ animation: "spin 0.8s linear infinite" }} />{"CV + İlan uyumu analiz ediliyor..."} {loadingMessage ? `• ${loadingMessage}` : ""}</> : <>{"Bu ilana başvurmak mantıklı mı, şimdi öğren"} <Sparkles size={16} /></>}
+      {loading ? (
+        <>
+          <Loader2 size={18} style={{ animation: "spin 0.8s linear infinite" }} />
+          {lang === "TR" ? "Analiz ediliyor…" : "Analyzing…"}
+        </>
+      ) : (
+        <>{lang === "TR" ? "Analiz Et →" : "Analyze →"}</>
+      )}
     </button>
     <div style={{ marginTop: 8, textAlign: "center", fontSize: 11, color: "#94a3b8", opacity: 0.65 }}>
-      {"2 analiz ücretsiz."}
+      {lang === "TR" ? "2 analiz ücretsiz." : "First 2 analyses free."}
     </div>
-    <div style={{ marginTop: 4, textAlign: "center", fontSize: 10, color: "#94a3b8", opacity: 0.46 }}>
-      {"Çoğu kişi neden elendiğini bilmiyor."}
     </div>
+
+    {/* Static example verdict (mock) — onboarding preview */}
+    <div
+      className="hf-input-panel hf-analyzer-example-preview"
+      style={{
+        marginTop: 20,
+        padding: "20px 20px",
+        borderRadius: 16,
+        border: "1px solid rgba(148,163,184,0.14)",
+      }}
+      aria-hidden
+    >
+      <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", marginBottom: 14 }}>
+        {lang === "TR" ? "Örnek analiz sonucu" : "Sample analysis result"}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginBottom: 14 }}>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            padding: "6px 12px",
+            borderRadius: 999,
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            background: "rgba(34,197,94,0.15)",
+            border: "1px solid rgba(34,197,94,0.45)",
+            color: "#86efac",
+          }}
+        >
+          Apply
+        </span>
+        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, color: "#e2e8f0", lineHeight: 1 }}>
+          87%
+          <span style={{ fontSize: 14, fontWeight: 600, color: "#94a3b8", marginLeft: 6 }}>{lang === "TR" ? "uyum" : "match"}</span>
+        </div>
+      </div>
+      <ul style={{ margin: 0, paddingLeft: 18, color: "#cbd5e1", fontSize: 14, lineHeight: 1.55 }}>
+        {(lang === "TR"
+          ? [
+              "İlandaki araçlar (Python, Looker) deneyiminle örtüşüyor.",
+              "İşe alım filtresinden geçme olasılığın güçlü — ölçülebilir çıktılar net.",
+              "İlk mülakatta hazırlanman için 2 net aksiyon önerisi üretildi.",
+            ]
+          : [
+              "Job tools (Python, Looker) line up with your experience.",
+              "Strong signal you clear the first hiring screen — metrics read clearly.",
+              "Two concrete actions surfaced for interview prep.",
+            ]
+        ).map((line) => (
+          <li key={line} style={{ marginBottom: 8 }}>
+            {line}
+          </li>
+        ))}
+      </ul>
     </div>
 
     {/* ERROR */}
