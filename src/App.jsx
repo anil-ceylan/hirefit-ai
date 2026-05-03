@@ -7213,7 +7213,7 @@ export function AnalyzerPage() {
         marginLeft: "auto",
         marginRight: "auto",
         width: "100%",
-        maxWidth: 600,
+        maxWidth: "none",
         boxSizing: "border-box",
         padding: "20px 20px",
         borderRadius: 16,
@@ -7733,7 +7733,7 @@ export function AnalyzerPage() {
 
     {/* HISTORY — compact, en altta */}
     {history.length > 0 && (
-      <div style={{ marginTop: 40, paddingTop: 32, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+      <div style={{ marginTop: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#334155", display: "flex", alignItems: "center", gap: 6 }}>
             <History size={12} /> {t.previousAnalyses}
