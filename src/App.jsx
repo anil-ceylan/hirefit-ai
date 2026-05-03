@@ -561,13 +561,14 @@ function buildFailSafeV2FromFallback(fb, cvText, jobDescription, lang) {
 }
 
 function ensureFailSafeV2(rawV2, cvText, jobDescription, lang) {
-  const baseScore = Number(rawV2?.["Final Alignment Score"]);
+  const fromFinal = Number(rawV2?.["Final Alignment Score"]);
+  const baseScore = Number.isFinite(fromFinal) ? fromFinal : Number(rawV2?.score);
+  /* Free tier (applyTierGate) often sends rejection_reasons: [] when the gap list was empty —
+     we must still trust the pipeline score + verdict or every run falls back to getFallbackAnalysis (~40). */
   const hasCore =
-    Number.isFinite(baseScore) &&
-    String(rawV2?.Decision?.final_verdict || "").trim() &&
-    (Array.isArray(rawV2?.Gaps?.rejection_reasons) && rawV2.Gaps.rejection_reasons.length > 0);
+    Number.isFinite(baseScore) && Boolean(String(rawV2?.Decision?.final_verdict || "").trim());
   if (hasCore) {
-    const score = Number(rawV2?.["Final Alignment Score"]);
+    const score = baseScore;
     const keyGap = String(rawV2?.Gaps?.biggest_gap || rawV2?.Gaps?.rejection_reasons?.[0]?.issue || "").trim();
     const verdict =
       String(rawV2?.Decision?.final_verdict || "").toLowerCase() === "do_not_apply"
@@ -6596,20 +6597,6 @@ export function DashboardPage() {
             <HistoryList history={history} onLoadItem={loadHistoryItem} onClear={clearHistory} lang={lang} />
             <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
               <ScoreProgressCard scoreHistory={scoreHistory} lang={lang} />
-              <div className="hf-card" style={{ padding: 28 }}>
-                <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 700, marginBottom: 20 }}>{t.productRoadmap}</h3>
-                <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12 }}>
-                  {(lang === "TR"
-                    ? ["Gerçek kimlik doğrulama (Supabase)", "Veritabanı destekli raporlar", "Paylaşılabilir rapor URL'leri", "Stripe ödeme sistemi", "İşe alım uzmanı paneli modu"]
-                    : ["Real authentication (Supabase / Clerk)", "Database-backed saved reports", "Shareable public report URLs", "Stripe checkout for Pro plan", "Recruiter dashboard mode"]
-                  ).map((item) => (
-                    <li key={item} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: theme.textSub }}>
-                      <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.blue, flexShrink: 0 }} />{item}
-                    </li>
-                  ))}
-                </ul>
-                <button className="hf-btn-primary" onClick={() => navigate("/app")} style={{ marginTop: 24, fontSize: "14px" }}>{t.openProduct} <ArrowRight size={14} /></button>
-              </div>
               {isAdminUser ? (
                 <div className="hf-card" style={{ padding: 22 }}>
                   <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
