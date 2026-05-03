@@ -498,8 +498,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
         50% { transform: scale(1.14); box-shadow: 0 0 0 12px rgba(59,130,246,0), 0 0 36px rgba(99,102,241,0.85), 0 0 52px rgba(129,140,248,0.45); }
       }
       @keyframes roadmapNodePulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.5), 0 0 20px rgba(99,102,241,0.45); } 50% { box-shadow: 0 0 0 10px rgba(59,130,246,0), 0 0 32px rgba(99,102,241,0.6); } }
-      .roadmap-scroll-hide { scrollbar-width: none; -ms-overflow-style: none; scroll-behavior: smooth; }
-      .roadmap-scroll-hide::-webkit-scrollbar { display: none; height: 0; width: 0; }
+      .roadmap-scroll-hide { scroll-behavior: smooth; }
       .roadmap-action-row { transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease; }
       .roadmap-action-row:hover { background: rgba(99,102,241,0.12); transform: translateX(3px); border-color: rgba(129,140,248,0.35) !important; }
       @keyframes roadmapYouRippleExpand {

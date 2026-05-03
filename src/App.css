@@ -168,8 +168,9 @@
 
 .hf-analyzer-analyze-wrap {
   width: 100%;
-  max-width: none;
+  max-width: 100%;
   margin: 0;
+  box-sizing: border-box;
 }
 
 .hf-analyzer-results {
@@ -295,10 +296,9 @@
   position: sticky;
   top: 1.25rem;
   align-self: start;
-  max-height: calc(100vh - 2.5rem);
-  overflow-y: auto;
+  max-height: none;
+  overflow-y: visible;
   z-index: 2;
-  -webkit-overflow-scrolling: touch;
 }
 
 .hf-input-panel--active {

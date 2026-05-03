@@ -46,7 +46,7 @@ const HERO_VIDEO_SRC =
 const landingScrollSectionProps = {
   initial: { opacity: 0, y: 42 },
   whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, amount: 0.14, margin: "0px 0px -7% 0px" },
+  viewport: { once: false, amount: 0.14, margin: "0px 0px -7% 0px" },
   transition: { duration: 0.56, ease: [0.22, 1, 0.36, 1] },
 };
 
@@ -3806,16 +3806,16 @@ const styles = {
   page: {
     minHeight: "100vh",
     width: "100%",
-    maxWidth: "none",
+    maxWidth: "100%",
     margin: 0,
-    overflowX: "hidden",
+    overflow: "visible",
     background: "linear-gradient(165deg, #05070f 0%, #0a0f1a 48%, #080d16 100%)",
     color: T.text,
     fontFamily: "'DM Sans', sans-serif",
     position: "relative",
     isolation: "isolate",
   },
-  container: { maxWidth: "1500px", margin: "0 auto", padding: "0 24px", width: "100%" },
+  container: { maxWidth: "min(1500px, 100%)", margin: "0 auto", padding: "0 24px", width: "100%", boxSizing: "border-box" },
 };
 
 if (!document.getElementById("hirefit-styles")) {
@@ -4547,8 +4547,8 @@ function NavBar({ pathname, user, logout, navigate, lang }) {
             <HireFitLogoMark size={56} />
           </div>
           <div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "22px", letterSpacing: "-0.03em", lineHeight: 1.05, color: hovered === "logo" ? "#c4b5fd" : "#f8fafc", transition: "color 0.28s ease" }}>HireFit</div>
-            <div style={{ fontSize: "10px", fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", lineHeight: 1, marginTop: 3, color: "#94a3b8", opacity: 0.95 }}>AI CAREER DECISION ENGINE</div>
+            <div className="hf-nav-brand-name">HireFit</div>
+            <div className="hf-nav-brand-tagline">AI CAREER DECISION ENGINE</div>
           </div>
         </div>
         <div className="hf-nav-tabs-center">
@@ -4650,12 +4650,12 @@ function LandingPageAmbient() {
         @keyframes heroFadeUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
         @keyframes floatY { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
         @keyframes shimmer { 0%{background-position:-200% 0;} 100%{background-position:200% 0;} }
-        .hf-hero-col-left { flex: 1; min-width: 0; padding-left: 0; padding-right: 0; position: relative; z-index: 1; }
-        .hf-hero-col-right { flex: 0 0 400px; max-width: 400px; min-width: 0; position: relative; z-index: 1; flex-shrink: 0; }
+        .hf-hero-inner { box-sizing: border-box; max-width: 100%; justify-content: flex-start; align-items: center; gap: 0 !important; }
+        .hf-hero-col-left { flex: 0 1 auto; min-width: 0; padding-left: 0; padding-right: 0; position: relative; z-index: 1; max-width: min(640px, 100%); margin-right: auto; }
         @media (max-width: 900px) {
-          .hf-hero-inner { flex-direction: column !important; align-items: stretch !important; padding: 0 24px !important; gap: 32px !important; min-height: auto !important; }
-          .hf-hero-col-right { flex: 1 1 auto !important; max-width: 100% !important; width: 100%; }
-          .hf-hero-headline { font-size: clamp(28px, 7vw, 40px) !important; line-height: 1.05 !important; }
+          .hf-hero-inner { align-items: flex-start !important; padding: 0 clamp(16px, 5vw, 24px) !important; gap: 0 !important; min-height: auto !important; }
+          .hf-hero-col-left { max-width: 100% !important; }
+          .hf-hero-headline { font-size: clamp(22px, 5.6vw, 32px) !important; line-height: 1.05 !important; }
         }
         @keyframes hfHeroSheen {
           0% { background-position: 0% 50%; }
@@ -4699,10 +4699,9 @@ function LandingPageAmbient() {
           opacity: 0.85;
         }
         @media (min-width: 901px) {
-          .hf-hero-inner { padding: 0 96px !important; gap: 96px !important; min-height: min(92vh, 920px) !important; }
+          .hf-hero-inner { padding: 0 clamp(48px, 8vw, 96px) !important; gap: 0 !important; min-height: min(92vh, 920px) !important; }
           .hf-hero-radial-glow { opacity: 0.92 !important; }
           .hf-hero.hf-hero--no-video .hf-hero-radial-glow { opacity: 0.72 !important; }
-          .hf-hero-card-halo { filter: blur(34px) !important; opacity: 1 !important; }
           .hf-hero-sheen { opacity: 0.95 !important; }
         }
         .hf-hero-radial-glow { opacity: 0.88; }
@@ -4739,22 +4738,12 @@ function LandingPageAmbient() {
         inset: 0,
         zIndex: 0,
         pointerEvents: "none",
-        overflow: "hidden",
+        overflow: "visible",
       }}
     >
-      <div className="hf-ambient-base" aria-hidden />
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          overflow: "hidden",
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      >
-        <div className="hf-hero-cinematic-fill" aria-hidden />
-        {heroVideoActive ? (
+      {heroVideoActive ? (
+        <>
+          <div aria-hidden style={{ position: "absolute", inset: 0, background: "#000", zIndex: 0 }} />
           <video
             key={HERO_VIDEO_SRC}
             aria-hidden
@@ -4767,175 +4756,180 @@ function LandingPageAmbient() {
             onError={() => setVideoFailed(true)}
             style={{
               position: "absolute",
-              inset: "-4%",
-              width: "108%",
-              height: "108%",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
               objectFit: "cover",
-              opacity: 0.88,
-              filter: "saturate(1.12) contrast(1.06) brightness(1.08)",
+              objectPosition: "center center",
+              zIndex: 0,
             }}
           />
-        ) : null}
-        <motion.div
-          style={{
-            position: "absolute",
-            inset: "-16%",
-            pointerEvents: "none",
-            mixBlendMode: "screen",
-            background:
-              "linear-gradient(130deg, rgba(59,130,246,0.38) 0%, rgba(14,165,233,0.2) 30%, rgba(251,146,60,0.28) 58%, rgba(99,102,241,0.32) 100%)",
-            filter: "blur(28px)",
-          }}
-          animate={{
-            x: isDesktop ? [0, 32, -20, 0] : [0, 26, -16, 0],
-            y: isDesktop ? [0, -22, 16, 0] : [0, -18, 14, 0],
-            scale: isDesktop ? [1, 1.06, 0.97, 1] : [1, 1.05, 0.98, 1],
-            opacity: isDesktop ? [0.22, 0.32, 0.27, 0.22] : [0.16, 0.24, 0.2, 0.16],
-          }}
-          transition={{ duration: 46, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            width: "760px",
-            height: "760px",
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(59,130,246,0.38) 0%, transparent 58%)",
-            top: "-220px",
-            left: "-160px",
-            filter: "blur(88px)",
-            animation: "blobFloat1 12s ease-in-out infinite alternate",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            width: "680px",
-            height: "680px",
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(29, 78, 216, 0.32) 0%, transparent 58%)",
-            bottom: "-160px",
-            right: "-60px",
-            filter: "blur(78px)",
-            animation: "blobFloat2 15s ease-in-out infinite alternate",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            width: "560px",
-            height: "560px",
-            borderRadius: "50%",
-            background: "radial-gradient(circle, rgba(251, 146, 60, 0.34) 0%, transparent 62%)",
-            top: "28%",
-            left: "40%",
-            filter: "blur(72px)",
-            animation: "blobFloat1 20s ease-in-out infinite alternate-reverse",
-            pointerEvents: "none",
-          }}
-        />
-      </div>
-      <div className="hf-ambient-mesh" aria-hidden />
-      <div className="hf-ambient-orbs hf-ambient-orbs--overlay" aria-hidden>
-        <div className="hf-ambient-orb hf-ambient-orb--1" />
-        <div className="hf-ambient-orb hf-ambient-orb--2" />
-        <div className="hf-ambient-orb hf-ambient-orb--3" />
-      </div>
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 0,
-          backgroundColor: "rgba(0,0,0,0.6)",
-        }}
-      />
-      <div
-        aria-hidden
-        className="hf-hero-radial-glow"
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 0,
-          background:
-            "radial-gradient(ellipse 110% 92% at 88% 8%, rgba(56,189,248,0.42) 0%, transparent 52%), radial-gradient(ellipse 82% 70% at 8% 88%, rgba(99,102,241,0.3) 0%, transparent 50%), radial-gradient(ellipse 95% 72% at 52% 102%, rgba(251,146,60,0.26) 0%, transparent 48%)",
-          mixBlendMode: "screen",
-        }}
-      />
-      <div
-        aria-hidden
-        className="hf-hero-sheen"
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      />
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          pointerEvents: "none",
-          zIndex: 0,
-          background: "radial-gradient(ellipse 90% 85% at 50% 42%, transparent 0%, rgba(5,7,15,0.12) 55%, rgba(5,7,15,0.32) 100%)",
-        }}
-      />
-      <div
-        aria-hidden
-        style={{
-          position: "absolute",
-          inset: 0,
-          backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px)",
-          backgroundSize: "96px 96px",
-          opacity: 0.07,
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      />
-      <div className="hf-ambient-noise-film" aria-hidden />
-
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              zIndex: 1,
+              backgroundColor: "rgba(0,0,0,0.35)",
+            }}
+          />
+        </>
+      ) : (
+        <>
+          <div className="hf-ambient-base" aria-hidden />
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              overflow: "hidden",
+              pointerEvents: "none",
+              zIndex: 0,
+            }}
+          >
+            <div className="hf-hero-cinematic-fill" aria-hidden />
+            <motion.div
+              style={{
+                position: "absolute",
+                inset: "-16%",
+                pointerEvents: "none",
+                mixBlendMode: "screen",
+                background:
+                  "linear-gradient(130deg, rgba(59,130,246,0.38) 0%, rgba(14,165,233,0.2) 30%, rgba(251,146,60,0.28) 58%, rgba(99,102,241,0.32) 100%)",
+                filter: "blur(28px)",
+              }}
+              animate={{
+                x: isDesktop ? [0, 32, -20, 0] : [0, 26, -16, 0],
+                y: isDesktop ? [0, -22, 16, 0] : [0, -18, 14, 0],
+                scale: isDesktop ? [1, 1.06, 0.97, 1] : [1, 1.05, 0.98, 1],
+                opacity: isDesktop ? [0.22, 0.32, 0.27, 0.22] : [0.16, 0.24, 0.2, 0.16],
+              }}
+              transition={{ duration: 46, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                width: "760px",
+                height: "760px",
+                borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(59,130,246,0.38) 0%, transparent 58%)",
+                top: "-220px",
+                left: "-160px",
+                filter: "blur(88px)",
+                animation: "blobFloat1 12s ease-in-out infinite alternate",
+                pointerEvents: "none",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                width: "680px",
+                height: "680px",
+                borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(29, 78, 216, 0.32) 0%, transparent 58%)",
+                bottom: "-160px",
+                right: "-60px",
+                filter: "blur(78px)",
+                animation: "blobFloat2 15s ease-in-out infinite alternate",
+                pointerEvents: "none",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                width: "560px",
+                height: "560px",
+                borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(251, 146, 60, 0.34) 0%, transparent 62%)",
+                top: "28%",
+                left: "40%",
+                filter: "blur(72px)",
+                animation: "blobFloat1 20s ease-in-out infinite alternate-reverse",
+                pointerEvents: "none",
+              }}
+            />
+          </div>
+          <div className="hf-ambient-mesh" aria-hidden />
+          <div className="hf-ambient-orbs hf-ambient-orbs--overlay" aria-hidden>
+            <div className="hf-ambient-orb hf-ambient-orb--1" />
+            <div className="hf-ambient-orb hf-ambient-orb--2" />
+            <div className="hf-ambient-orb hf-ambient-orb--3" />
+          </div>
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              zIndex: 0,
+              backgroundColor: "rgba(0,0,0,0.6)",
+            }}
+          />
+          <div
+            aria-hidden
+            className="hf-hero-radial-glow"
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              zIndex: 0,
+              background:
+                "radial-gradient(ellipse 110% 92% at 88% 8%, rgba(56,189,248,0.42) 0%, transparent 52%), radial-gradient(ellipse 82% 70% at 8% 88%, rgba(99,102,241,0.3) 0%, transparent 50%), radial-gradient(ellipse 95% 72% at 52% 102%, rgba(251,146,60,0.26) 0%, transparent 48%)",
+              mixBlendMode: "screen",
+            }}
+          />
+          <div
+            aria-hidden
+            className="hf-hero-sheen"
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              zIndex: 0,
+            }}
+          />
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              pointerEvents: "none",
+              zIndex: 0,
+              background: "radial-gradient(ellipse 90% 85% at 50% 42%, transparent 0%, rgba(5,7,15,0.12) 55%, rgba(5,7,15,0.32) 100%)",
+            }}
+          />
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px)",
+              backgroundSize: "96px 96px",
+              opacity: 0.07,
+              pointerEvents: "none",
+              zIndex: 0,
+            }}
+          />
+          <div className="hf-ambient-noise-film" aria-hidden />
+        </>
+      )}
     </div>
   );
 }
 
 function HeroSection({ navigate, lang }) {
-  const fakeResult = {
-    EN: {
-      decision: "Not Likely",
-      decisionColor: "#f87171",
-      decisionBg: "rgba(239,68,68,0.08)",
-      decisionBorder: "rgba(239,68,68,0.2)",
-      mistake: "CV’n gerçek sonuçlar göstermiyor.",
-      fix: "Turn your tasks into results. Example: Increased X by %Y.",
-      insight: "This CV looks like everyone else's. Nothing stands out in 7 seconds.",
-    },
-    TR: {
-      decision: "Düşük İhtimal",
-      decisionColor: "#f87171",
-      decisionBg: "rgba(239,68,68,0.08)",
-      decisionBorder: "rgba(239,68,68,0.2)",
-      mistake: "Ölçülebilir etki yok. Her madde 'sorumlu oldum' diyor.",
-      fix: "Rakam ekle. '3 ayda email listesini %40 büyüttüm.'",
-      insight: "Bu CV herkesinkiyle aynı. 7 saniyede hiçbir şey öne çıkmıyor.",
-    }
-  };
-
-  const r = fakeResult[lang];
   return (
     <motion.section
       className="hf-section hf-section--hero"
       style={{
-        width: "100vw",
+        width: "100%",
+        maxWidth: "100%",
         minHeight: "100vh",
         position: "relative",
-        overflow: "hidden",
+        overflow: "visible",
         display: "flex",
         flexDirection: "column",
       }}
@@ -4945,10 +4939,12 @@ function HeroSection({ navigate, lang }) {
         className="hf-hero-inner"
         style={{
           display: "flex",
+          flexDirection: "row",
+          justifyContent: "flex-start",
           alignItems: "center",
           flex: 1,
-          padding: "0 80px",
-          gap: "80px",
+          padding: "0 clamp(24px, 6vw, 80px)",
+          gap: 0,
           width: "100%",
           boxSizing: "border-box",
           position: "relative",
@@ -4968,7 +4964,7 @@ function HeroSection({ navigate, lang }) {
               className="hf-hero-headline"
               style={{
                 fontFamily: "'Syne', sans-serif",
-                fontSize: "clamp(40px, 5vw, 72px)",
+                fontSize: "clamp(32px, 4vw, 58px)",
                 fontWeight: 800,
                 lineHeight: 1.05,
                 letterSpacing: "-0.035em",
@@ -4986,7 +4982,7 @@ function HeroSection({ navigate, lang }) {
                 marginTop: 20,
                 marginBottom: 0,
                 maxWidth: 520,
-                fontSize: "clamp(16px, 1.8vw, 18px)",
+                fontSize: "clamp(13.6px, 1.53vw, 15.3px)",
                 lineHeight: 1.55,
                 fontWeight: 500,
                 color: "#cbd5e1",
@@ -5020,188 +5016,6 @@ function HeroSection({ navigate, lang }) {
             >
               {lang === "TR" ? "Kararını öğren →" : "Get your verdict →"}
             </button>
-          </div>
-
-          <div className="hf-hero-col-right" style={{ position: "relative" }}>
-            <div
-              aria-hidden
-              className="hf-hero-card-halo"
-              style={{
-                position: "absolute",
-                inset: "-28px -20px",
-                borderRadius: 26,
-                pointerEvents: "none",
-                background:
-                  "radial-gradient(ellipse at 25% 20%, rgba(56,189,248,0.28), transparent 62%), radial-gradient(ellipse at 80% 78%, rgba(249,115,22,0.2), transparent 60%)",
-                filter: "blur(26px)",
-                opacity: 1,
-              }}
-            />
-            <div
-              className="hf-verdict-card-glow"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: 20,
-                padding: "16px 16px 14px",
-                position: "relative",
-                overflow: "hidden",
-                boxShadow:
-                  "0 28px 64px rgba(0,0,0,0.48), 0 0 72px rgba(56,189,248,0.28), 0 0 56px rgba(251,146,60,0.2), inset 0 1px 0 rgba(255,255,255,0.06)",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 1,
-                  background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.45), transparent)",
-                }}
-              />
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                {[
-                  { label: "CV", lines: [70, 90, 55, 80] },
-                  { label: lang === "TR" ? "İş İlanı" : "Job Description", lines: [85, 65, 75, 50] },
-                ].map(({ label, lines }) => (
-                  <div
-                    key={label}
-                    style={{
-                      background: "rgba(0,0,0,0.25)",
-                      border: "1px solid rgba(255,255,255,0.06)",
-                      borderRadius: 8,
-                      padding: "8px 10px",
-                    }}
-                  >
-                    <div style={{ fontSize: 9, color: "#64748b", fontWeight: 700, marginBottom: 6 }}>{label}</div>
-                    {lines.map((w, i) => (
-                      <div
-                        key={i}
-                        style={{
-                          height: 4,
-                          borderRadius: 999,
-                          background: "rgba(255,255,255,0.07)",
-                          marginBottom: 5,
-                          width: `${w}%`,
-                        }}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "12px 0 10px" }} />
-
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  marginBottom: 10,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                  <span
-                    style={{
-                      fontSize: 9,
-                      fontWeight: 700,
-                      color: "#64748b",
-                      letterSpacing: "0.12em",
-                      textTransform: "uppercase",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {lang === "TR" ? "Karar" : "Decision"}
-                  </span>
-                  <span
-                    style={{
-                      fontFamily: "'Syne', sans-serif",
-                      fontSize: 16,
-                      fontWeight: 800,
-                      color: r.decisionColor,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {r.decision}
-                  </span>
-                </div>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: "#e2e8f0", flexShrink: 0 }}>
-                  34%
-                </span>
-              </div>
-
-              <div style={{ marginBottom: 8 }}>
-                <div
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    color: "#f87171",
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    marginBottom: 4,
-                  }}
-                >
-                  {lang === "TR" ? "En büyük sorun" : "Biggest mistake"}
-                </div>
-                <div style={{ fontSize: 12, color: "#fca5a5", fontWeight: 500, lineHeight: 1.4 }}>{r.mistake}</div>
-              </div>
-
-              <div style={{ marginBottom: 8 }}>
-                <div
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    color: "#10b981",
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    marginBottom: 4,
-                  }}
-                >
-                  {lang === "TR" ? "Düzeltme" : "Fix"}
-                </div>
-                <div style={{ fontSize: 12, color: "#6ee7b7", fontWeight: 500, lineHeight: 1.4 }}>{r.fix}</div>
-              </div>
-
-              <div style={{ marginBottom: 12 }}>
-                <div
-                  style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    color: "#94a3b8",
-                    letterSpacing: "0.1em",
-                    textTransform: "uppercase",
-                    marginBottom: 4,
-                  }}
-                >
-                  {lang === "TR" ? "Recruiter içgörüsü" : "Recruiter insight"}
-                </div>
-                <div style={{ fontSize: 12, color: "#94a3b8", fontStyle: "italic", lineHeight: 1.45 }}>&quot;{r.insight}&quot;</div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => navigate("/app")}
-                style={{
-                  width: "100%",
-                  padding: "11px 12px",
-                  borderRadius: 10,
-                  border: "none",
-                  background: "linear-gradient(135deg, #3b82f6, #6366f1)",
-                  color: "white",
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontFamily: "'DM Sans', sans-serif",
-                }}
-              >
-                {lang === "TR" ? "Kendi CV'ni analiz et →" : "Analyze your own CV →"}
-              </button>
-            </div>
           </div>
       </div>
     </motion.section>
@@ -5300,7 +5114,17 @@ const coachFeatures = lang === "TR"
   {lang === "TR" ? "Ücretsiz başla. Gerçekten hazır olduğunda yükselt." : "Free gets you started. Pro gets you hired."}
 </p>
 </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, maxWidth: 960, margin: "0 auto" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 16,
+            maxWidth: "min(960px, 100%)",
+            width: "100%",
+            margin: "0 auto",
+            boxSizing: "border-box",
+          }}
+        >
           <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 24, padding: 32 }}>
             <div style={{ fontSize: "13px", fontWeight: 600, color: "#64748b", marginBottom: 8 }}>Free</div>
             <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "48px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, marginBottom: 4 }}>$0</div>
@@ -6534,7 +6358,7 @@ function HireFitLayout() {
   return (
     <div style={styles.page}>
       <AmbientBackgroundLayer />
-      <div style={{ position: "relative", zIndex: 1 }}>
+      <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: "100%", boxSizing: "border-box", overflow: "visible" }}>
       <Navbar pathname={location.pathname} user={user} logout={logout} navigate={navigate} lang={lang} />
 
       {showPaywall && (
@@ -6573,16 +6397,32 @@ export function LandingPage() {
     <div
       style={{
         width: "100%",
+        maxWidth: "100%",
         minHeight: "100vh",
-        overflowX: "hidden",
         position: "relative",
         isolation: "isolate",
         background: "transparent",
+        boxSizing: "border-box",
+        overflow: "visible",
       }}
     >
-      <LandingPageAmbient />
-      <div style={{ position: "relative", zIndex: 1 }}>
-        <HeroSection navigate={navigate} lang={lang} />
+      {/* Ambient + video fill hero viewport only (absolute inset matches this shell). */}
+      <div
+        style={{
+          position: "relative",
+          overflow: "visible",
+          width: "100%",
+          maxWidth: "100%",
+          minHeight: "100vh",
+          boxSizing: "border-box",
+        }}
+      >
+        <LandingPageAmbient />
+        <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: "100%", boxSizing: "border-box", overflow: "visible" }}>
+          <HeroSection navigate={navigate} lang={lang} />
+        </div>
+      </div>
+      <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: "100%", boxSizing: "border-box", overflow: "visible" }}>
         <SocialProofSection lang={lang} />
         <HowItWorksSection lang={lang} />
         <FeatureCards lang={lang} />
@@ -6602,7 +6442,7 @@ export function LandingPage() {
 export function TermsPage() {
   const { navigate, lang, t } = useOutletContext();
   return (
-        <div style={{ width: "100%", maxWidth: "none", margin: 0, padding: "60px clamp(20px, 5vw, 80px)", boxSizing: "border-box" }}>
+        <div style={{ width: "100%", maxWidth: "100%", margin: 0, padding: "60px clamp(20px, 5vw, 80px)", boxSizing: "border-box" }}>
           <button onClick={() => navigate("/")} style={{ marginBottom: 32, background: "none", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>{lang === "TR" ? "← Geri" : "← Back"}</button>
           <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, marginBottom: 8 }}>{t.terms}</h1>
           <p style={{ color: "#475569", marginBottom: 40, fontSize: 14 }}>{lang === "TR" ? "Son güncelleme: Nisan 2026" : "Last updated: April 2026"}</p>
@@ -6646,7 +6486,7 @@ export function TermsPage() {
 export function PrivacyPage() {
   const { navigate, lang, t } = useOutletContext();
   return (
-        <div style={{ width: "100%", maxWidth: "none", margin: 0, padding: "60px clamp(20px, 5vw, 80px)", boxSizing: "border-box" }}>
+        <div style={{ width: "100%", maxWidth: "100%", margin: 0, padding: "60px clamp(20px, 5vw, 80px)", boxSizing: "border-box" }}>
           <button onClick={() => navigate("/")} style={{ marginBottom: 32, background: "none", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>{lang === "TR" ? "← Geri" : "← Back"}</button>
           <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, marginBottom: 8 }}>{t.privacy}</h1>
           <p style={{ color: "#475569", marginBottom: 40, fontSize: 14 }}>{lang === "TR" ? "Son güncelleme: Nisan 2026" : "Last updated: April 2026"}</p>

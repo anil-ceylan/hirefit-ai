@@ -1,7 +1,40 @@
 @import "tailwindcss";
 
+/* Tek dikey scrollbar: kaydırma sadece <html> üzerinde. <body>'de overflow-y: scroll|auto kullanma — ikinci scrollbar üretir. */
 html {
   overflow-x: hidden;
+  overflow-y: auto;
+  max-width: 100%;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  width: 4px;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track,
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover,
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 @keyframes blobFloat1 {
@@ -47,16 +80,26 @@ a:hover {
 }
 
 body {
+  overflow: visible;
+  max-width: 100%;
   width: 100%;
-  overflow-x: hidden;
   margin: 0;
   padding: 0;
 }
 
 #root {
   width: 100%;
+  max-width: 100%;
   min-height: 100vh;
-  overflow-x: hidden;
+  overflow: visible;
+}
+
+/* Media and embeds rarely wider than viewport */
+img,
+canvas,
+svg {
+  max-width: 100%;
+  height: auto;
 }
 
 h1 {
@@ -178,6 +221,16 @@ button:focus-visible {
   50% {
     border-left-color: rgba(224, 204, 255, 0.95);
   }
+}
+
+/* Hero headlines: no drag-select / blue highlight (inputs elsewhere stay selectable) */
+.hf-section--hero .hf-hero-headline,
+.hf-section--hero .hf-hero-sub,
+.hf-section--hero .hf-hero-word,
+.hf-section--hero .hf-hero-line2-wrap {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .hf-hero-word {

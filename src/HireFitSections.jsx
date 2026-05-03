@@ -20,10 +20,11 @@ import {
 } from "lucide-react";
 
 const container = {
-  maxWidth: "1500px",
+  maxWidth: "min(1500px, 100%)",
   margin: "0 auto",
   padding: "0 24px",
   width: "100%",
+  boxSizing: "border-box",
 };
 
 const pill = {
@@ -91,7 +92,7 @@ function LandingScrollSection({ className, style, children }) {
       style={style}
       initial={{ opacity: 0, y: 42 }}
       whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, amount: 0.14, margin: "0px 0px -7% 0px" }}
+      viewport={{ once: false, amount: 0.14, margin: "0px 0px -7% 0px" }}
       transition={{ duration: 0.56, ease: [0.22, 1, 0.36, 1] }}
     >
       {children}
@@ -218,16 +219,16 @@ export function HowItWorksSection({ lang }) {
 
 export function DecisionEngineExplainedSection({ lang }) {
   const tr = lang === "TR";
-  const blocks = tr
+  const verdictCards = tr
     ? [
-        { k: "Sorun", tone: "#fb7185", body: "Tek cümlede neden eleniyorsun — spekülasyon değil, sinyal." },
-        { k: "Boşluk", tone: "#fbbf24", body: "Eksik beceri, anahtar kelime ve deneyim sinyali yan yana." },
-        { k: "Aksiyon", tone: "#4ade80", body: "Bugün yapılacak tek net hamle — sonra tekrar analiz." },
+        { token: "strong", title: "✅ Güçlü eşleşme", body: "İlk elemeden geçme şansın gerçek.", kicker: "Başvur" },
+        { token: "risk", title: "⚠️ Riskli başvuru", body: "Yakınsın — ama recruiter'ın ilk turda aradığı kritik sinyaller eksik.", kicker: "Riskli başvuru" },
+        { token: "bad", title: "🚫 Büyük ihtimalle elenirsin", body: "Bu senin potansiyelin değil — bu rolün filtresiyle uyum eksikliği.", kicker: "Başvurma / bekle" },
       ]
     : [
-        { k: "Problem", tone: "#fb7185", body: "One line on why you’re filtered out — signal, not vibes." },
-        { k: "Gap", tone: "#fbbf24", body: "Missing skills, keywords, and experience signal — side by side." },
-        { k: "Action", tone: "#4ade80", body: "One finishable move today — then re-run the same analysis." },
+        { token: "strong", title: "✅ Strong match", body: "Reality check: this is interview range. Recovery path: keep proof sharp and momentum high.", kicker: "Apply confidently" },
+        { token: "risk", title: "⚠️ Risky apply", body: "Reality check: still risky on first-pass scan. Recovery path: ship 1-2 proof lines and re-enter range.", kicker: "Apply with fixes" },
+        { token: "bad", title: "🚫 You will likely get rejected", body: "Reality check: this role still filters you out today. Recovery path: close the next 2 signal gaps and rerun.", kicker: "Do not apply yet" },
       ];
 
   return (
@@ -238,21 +239,63 @@ export function DecisionEngineExplainedSection({ lang }) {
           <h2 style={h2}>{tr ? "Skor değil — karar + aksiyon" : "Not a score — a decision + action"}</h2>
           <p style={sub}>
             {tr
-              ? "HireFit bir ‘analiz aracı’ gibi değil; başvuru öncesi karar ve tekrar çalıştırma döngüsü gibi davranır."
-              : "HireFit behaves less like a ‘smart analyzer’ and more like a pre-apply decision loop you can re-run."}
+              ? "Üç ana karar çıktısı: başvur, riskli başvuru ve şimdilik başvurma — sonra aynı analizi yeniden çalıştır."
+              : "Three decision outputs: strong apply signal, risky apply, and pause — then re-run the same analysis."}
           </p>
         </div>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: 14,
+            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
+            gap: 20,
           }}
         >
-          {blocks.map((b) => (
-            <div key={b.k} className="hf-micro-lift hf-glass-card" style={glassCardStyle({ padding: 22 })}>
-              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: b.tone, marginBottom: 10 }}>{b.k}</div>
-              <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.65, color: "#cbd5e1" }}>{b.body}</p>
+          {verdictCards.map((v) => (
+            <div
+              key={v.token}
+              className={`hf-micro-lift hf-glass-card hf-verdict-outcome-card hf-verdict-outcome-card--${v.token}`}
+              style={{
+                ...glassCardStyle({
+                  padding: 24,
+                  boxShadow:
+                    v.token === "strong"
+                      ? "0 26px 64px rgba(0,0,0,0.45), inset 0 1px 0 rgba(52,211,153,0.08)"
+                      : v.token === "risk"
+                        ? "0 26px 64px rgba(0,0,0,0.45), inset 0 1px 0 rgba(251,191,36,0.06)"
+                        : "0 26px 64px rgba(0,0,0,0.45), inset 0 1px 0 rgba(251,113,133,0.07)",
+                  border:
+                    v.token === "strong"
+                      ? "1px solid rgba(52,211,153,0.38)"
+                      : v.token === "risk"
+                        ? "1px solid rgba(251,191,36,0.42)"
+                        : "1px solid rgba(248,113,113,0.42)",
+                  background:
+                    v.token === "strong"
+                      ? "linear-gradient(165deg, rgba(16,185,129,0.09) 0%, rgba(255,255,255,0.04) 100%)"
+                      : v.token === "risk"
+                        ? "linear-gradient(165deg, rgba(245,158,11,0.08) 0%, rgba(255,255,255,0.03) 100%)"
+                        : "linear-gradient(165deg, rgba(244,63,94,0.08) 0%, rgba(255,255,255,0.03) 100%)",
+                }),
+                position: "relative",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color:
+                    v.token === "strong" ? "#6ee7b7" : v.token === "risk" ? "#fcd34d" : "#fca5a5",
+                  marginBottom: 10,
+                }}
+              >
+                {v.kicker}
+              </div>
+              <div style={{ fontFamily: "'Syne',sans-serif", fontSize: "clamp(18px, 2.6vw, 22px)", fontWeight: 800, lineHeight: 1.2, marginBottom: 12, color: "#f8fafc" }}>
+                {v.title}
+              </div>
+              <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.65, color: "#cbd5e1" }}>{v.body}</p>
             </div>
           ))}
         </div>
