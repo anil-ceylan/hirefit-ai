@@ -18,7 +18,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { parseLocalStorageJson, safeJsonParse } from "./utils/safeJson";
 import {
   FileText, Briefcase, AlertCircle, Loader2,
-  Upload, Copy, Wand2, Target, Search, History, Trash2,
+  Upload, Copy, Wand2, Target, Search, History, Trash2, Clock,
   CheckCircle2, ArrowRight, LogIn, LogOut, Download, Mail,
   Zap, Star, TrendingUp, Crown, Linkedin, Instagram, Link2, Workflow,
   ChevronRight, ChevronDown, Eye, Layers, KeyRound, LineChart,
@@ -6564,6 +6564,31 @@ export function DashboardPage() {
   );
 }
 
+/** Analyzer /app history list — badge copy + key for styling (reads optional verdict fields only). */
+function getAnalyzerHistoryVerdictMeta(item) {
+  const raw = item?.verdict ?? item?.final_verdict ?? item?.decision;
+  const str = raw != null && String(raw).trim() ? String(raw).toLowerCase().replace(/\s+/g, " ").trim() : "";
+  if (str) {
+    const c = str.replace(/ /g, "_");
+    if (c === "apply_now" || str === "apply" || c === "strong_match") return { key: "apply", label: "APPLY" };
+    if (c === "apply_with_fixes" || str === "risky apply" || c === "risky_apply" || str === "risky") return { key: "risky", label: "RISKY APPLY" };
+    if (c === "do_not_apply" || str === "do not apply" || c === "reject" || c === "stop") return { key: "reject", label: "DO NOT APPLY" };
+  }
+  const n = Number(item?.score);
+  if (!Number.isFinite(n)) return { key: "reject", label: "DO NOT APPLY" };
+  if (n >= 70) return { key: "apply", label: "APPLY" };
+  if (n >= 50) return { key: "risky", label: "RISKY APPLY" };
+  return { key: "reject", label: "DO NOT APPLY" };
+}
+
+function analyzerHistoryScoreColor(score) {
+  const n = Number(score);
+  if (!Number.isFinite(n)) return "#ef4444";
+  if (n >= 70) return "#22c55e";
+  if (n >= 50) return "#f59e0b";
+  return "#ef4444";
+}
+
 export function AnalyzerPage() {
   const {
     navigate, lang, t, activeInput, cvLoaded, uploadingPdf, cvPdfInputRef, cvDragOver, setCvDragOver,
@@ -7732,29 +7757,54 @@ export function AnalyzerPage() {
     ) : null}
 
     {/* HISTORY — compact, en altta */}
-    {history.length > 0 && (
-      <div style={{ marginTop: 24 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#334155", display: "flex", alignItems: "center", gap: 6 }}>
-            <History size={12} /> {t.previousAnalyses}
-          </div>
-          <button onClick={clearHistory} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "rgba(239,68,68,0.08)", color: "#f87171", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 6, padding: "4px 8px", cursor: "pointer", fontWeight: 600, fontSize: 11, fontFamily: "'DM Sans', sans-serif" }}>
-            <Trash2 size={10} /> {t.clear}
+    <div className="hf-analyzer-history-section">
+      <div className="hf-analyzer-history-header">
+        <div className="hf-analyzer-history-title">
+          <History size={14} aria-hidden /> {t.previousAnalyses}
+        </div>
+        {history.length > 0 ? (
+          <button type="button" className="hf-analyzer-history-clear" onClick={clearHistory}>
+            <Trash2 size={11} aria-hidden /> {t.clear}
           </button>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {history.slice(0, 3).map((item) => (
-            <div key={item.id} onClick={() => loadHistoryItem(item)} style={{ padding: "10px 14px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: 10, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0" }}>{item.role}</div>
-                <div style={{ fontSize: 11, color: "#334155", marginTop: 2 }}>{item.createdAt}</div>
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: item.score >= 80 ? "#10b981" : item.score >= 60 ? "#f59e0b" : "#f87171" }}>{item.score}</div>
-            </div>
-          ))}
-        </div>
+        ) : null}
       </div>
-    )}
+      {history.length === 0 ? (
+        <div className="hf-analyzer-history-empty">
+          <Clock size={22} aria-hidden className="hf-analyzer-history-empty__icon" />
+          <span>{lang === "TR" ? "Henüz analiz yapılmadı" : "No analyses yet"}</span>
+        </div>
+      ) : (
+        <div className="hf-analyzer-history-list">
+          {history.slice(0, 3).map((item) => {
+            const verdict = getAnalyzerHistoryVerdictMeta(item);
+            const pct = Math.round(Number(item.score));
+            const scoreNum = Number.isFinite(pct) ? pct : 0;
+            return (
+              <button
+                type="button"
+                key={item.id}
+                className="hf-analyzer-history-item"
+                onClick={() => loadHistoryItem(item)}
+              >
+                <div className="hf-analyzer-history-item__left">
+                  <span className={`hf-analyzer-history-verdict hf-analyzer-history-verdict--${verdict.key}`}>{verdict.label}</span>
+                  <div className="hf-analyzer-history-item__text">
+                    <div className="hf-analyzer-history-item__job">{item.role}</div>
+                    <div className="hf-analyzer-history-item__date">{item.createdAt}</div>
+                  </div>
+                </div>
+                <div className="hf-analyzer-history-item__right">
+                  <span className="hf-analyzer-history-score" style={{ color: analyzerHistoryScoreColor(scoreNum) }}>
+                    {scoreNum}%
+                  </span>
+                  <ChevronRight size={18} className="hf-analyzer-history-chevron" aria-hidden />
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
 
   </div>
   );
