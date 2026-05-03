@@ -383,7 +383,6 @@ function buildRoleContextJobDescription(role, _lang = "TR") {
 
 const HF_ANALYTICS_DEBOUNCE_MS = 900;
 const hfAnalyticsLastFire = new Map();
-const ANALYZE_V2_TIMEOUT_MS = 90_000;
 const ANALYZE_MIN_DURATION_MS = 1_500;
 let pdfjsLoaderPromise = null;
 
@@ -5710,14 +5709,10 @@ function HireFitLayout() {
     setLastDetectedSector("");
 
     let v2Ok = false;
-    let analyzeTimedOut = false;
     let creditConsumed = false;
     const jdDerivedTitle = extractJobTitleFromJd(effectiveJd);
     try {
       const analyzeController = new AbortController();
-      const timeoutId = window.setTimeout(() => {
-        analyzeController.abort();
-      }, ANALYZE_V2_TIMEOUT_MS);
       const v2Res = await fetch(`${HF_API_BASE}/api/analyze-v2`, {
         method: "POST",
         headers: await getApiAuthHeaders({ requireSession: false }),
@@ -5730,8 +5725,6 @@ function HireFitLayout() {
           lang: lang === "TR" ? "tr" : "en",
           isPro: hasProAccess,
         }),
-      }).finally(() => {
-        window.clearTimeout(timeoutId);
       });
       const responseText = await v2Res.text();
       const v2PayloadFallback = {
@@ -5865,19 +5858,16 @@ function HireFitLayout() {
         creditConsumed = true;
     } catch (e) {
       if (e?.name === "AbortError") {
-        analyzeTimedOut = true;
-        setError(lang === "TR" ? "Analiz beklenenden uzun sürüyor" : "Analysis is taking longer than expected.");
-      } else {
-        console.error("[analyze] v2", e?.message || e);
+        await finalizeAnalyzeLoading();
+        return;
       }
+      console.error("[analyze] v2", e?.message || e);
     }
 
     if (!v2Ok) {
-      if (!analyzeTimedOut) {
-        setError(lang === "TR"
-          ? "Analiz tamamlanamadı. Lütfen tekrar dene."
-          : "Analysis failed. Please try again.");
-      }
+      setError(lang === "TR"
+        ? "Analiz tamamlanamadı. Lütfen tekrar dene."
+        : "Analysis failed. Please try again.");
       await finalizeAnalyzeLoading();
       return;
     }
