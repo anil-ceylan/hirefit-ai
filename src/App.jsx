@@ -6680,10 +6680,14 @@ export function AnalyzerPage() {
   const roleSuggestions = roleRedirection?.better_roles || [];
   const aiDecisionText = cleanDisplayText(String(engineV2?.Output?.decision || "").trim());
   const aiRecognitionLine = cleanDisplayText(String(engineV2?.Output?.recognition_line || "").trim());
-  const aiCoreProblem = cleanDisplayText(String(engineV2?.Output?.core_problem || "").trim());
+  const rawCoreProblem = engineV2?.Output?.core_problem;
+  const rawFirstAction = engineV2?.Output?.first_action;
+  const aiCoreProblem = cleanDisplayText(String(rawCoreProblem ?? "").trim());
   const aiImpactStatement = cleanDisplayText(String(engineV2?.Output?.impact_statement || "").trim());
   const aiPatternSummary = cleanDisplayText(String(engineV2?.Output?.pattern_summary || "").trim());
-  const firstAction = cleanDisplayText(String(engineV2?.Output?.first_action || "").trim());
+  const firstAction = cleanDisplayText(
+    String(rawFirstAction ?? engineV2?.Decision?.what_to_fix_first?.[0] ?? "").trim()
+  );
   const aiRecruiterView = cleanDisplayText(String(engineV2?.Output?.recruiter_view || "").trim());
   const aiReasons = Array.isArray(engineV2?.Output?.reasons)
     ? engineV2.Output.reasons
@@ -6694,6 +6698,20 @@ export function AnalyzerPage() {
     aiCoreProblem
     || aiReasons[0]
     || cleanDisplayText(String(mainIssue || analysisData?.fit_summary || "").trim());
+
+  useEffect(() => {
+    if (engineV2 == null) return;
+    console.log("[HireFit debug] core_problem / primaryReason", {
+      "Output.core_problem (raw)": rawCoreProblem,
+      aiCoreProblem,
+      primaryReason,
+      "Output.first_action (raw)": rawFirstAction,
+      "Decision.what_to_fix_first": engineV2?.Decision?.what_to_fix_first,
+      firstAction,
+      tier: engineV2?.tier,
+    });
+  }, [engineV2, rawCoreProblem, aiCoreProblem, primaryReason, rawFirstAction, firstAction]);
+
   const impactProjection = useMemo(() => {
     if (decisionScore == null) return null;
     const fromV2 = computeImpactProjection(
