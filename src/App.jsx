@@ -6701,6 +6701,7 @@ export function AnalyzerPage() {
 
   useEffect(() => {
     if (engineV2 == null) return;
+    // eslint-disable-next-line no-console -- temporary debug for Output.core_problem / first_action wiring
     console.log("[HireFit debug] core_problem / primaryReason", {
       "Output.core_problem (raw)": rawCoreProblem,
       aiCoreProblem,
