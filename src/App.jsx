@@ -1250,6 +1250,12 @@ function AnalysisThinkingOverlay({ lang, loading, loadingMessage }) {
   );
 }
 
+/** Replace underscores in model strings for UI (snake_case tokens → readable words). */
+function cleanDisplayText(text) {
+  if (text == null) return "";
+  return String(text).replace(/_/g, " ").trim();
+}
+
 function pickLeadInsight(engineV2, analysisData, lang) {
   const fb =
     lang === "TR"
@@ -1261,7 +1267,7 @@ function pickLeadInsight(engineV2, analysisData, lang) {
     analysisData?.rejection_reasons?.high?.[0] ||
     analysisData?.fit_summary ||
     fb;
-  return String(insight || "").trim();
+  return cleanDisplayText(String(insight || "").trim());
 }
 
 function pickLeadSuggestion(engineV2, analysisData, lang) {
@@ -1274,7 +1280,7 @@ function pickLeadSuggestion(engineV2, analysisData, lang) {
     analysisData?.improvements?.[0] ||
     analysisData?.missing_skills?.[0] ||
     fb;
-  return String(suggestion || "").trim();
+  return cleanDisplayText(String(suggestion || "").trim());
 }
 
 function UnlockReportGateCard({
@@ -4139,7 +4145,7 @@ function parseSingleLine(text, sectionName) {
 }
 
 function firstTwoSentences(text) {
-  const t = String(text || "").trim();
+  const t = cleanDisplayText(String(text || "").trim());
   if (!t) return "";
   const parts = t.match(/[^.!?]+[.!?]?/g) || [t];
   return parts.slice(0, 2).join(" ").trim();
@@ -6480,7 +6486,7 @@ export function LoginPage() {
 
 export function DashboardPage() {
   const {
-    t, lang, T: ctxTheme, history, loadHistoryItem, clearHistory, averageScore, isPro, isAdminUser, plan, waitlist, scoreHistory, navigate,
+    t, lang, T: ctxTheme, history, loadHistoryItem, clearHistory, averageScore, isPro, isAdminUser, plan, waitlist, scoreHistory,
     adminTargetEmail, setAdminTargetEmail, adminGrantBusy, adminGrantError, adminGrantNotice, setUserProAccessByAdmin,
   } = useOutletContext();
   const theme = ctxTheme || T;
@@ -6640,7 +6646,7 @@ export function AnalyzerPage() {
       analysisData?.rejection_reasons?.high?.[0] ||
       analysisData?.fit_summary ||
       "";
-    return String(issue || "").trim();
+    return cleanDisplayText(String(issue || "").trim());
   }, [engineV2, decisionData, analysisData]);
   const previewFixBusy = applyingFix === PREVIEW_FIX_KEY;
   const previewScoreDelta = previewReanalyzePending ? null : reanalysisResult;
@@ -6649,27 +6655,41 @@ export function AnalyzerPage() {
     const fromModel = Array.isArray(engineV2?.Output?.role_suggestions) ? engineV2.Output.role_suggestions : [];
     if (fromModel.length) {
       return {
-        current_direction_problem: String(engineV2?.Output?.recruiter_view || "").trim(),
-        better_roles: fromModel.slice(0, 3),
+        current_direction_problem: cleanDisplayText(String(engineV2?.Output?.recruiter_view || "").trim()),
+        better_roles: fromModel.slice(0, 3).map((item) => ({
+          ...item,
+          role: cleanDisplayText(String(item?.role ?? "")),
+          reason: cleanDisplayText(String(item?.reason ?? "")),
+        })),
       };
     }
-    return buildRoleSuggestionsFromCv(cvText, lang);
+    const built = buildRoleSuggestionsFromCv(cvText, lang);
+    return {
+      current_direction_problem: cleanDisplayText(String(built.current_direction_problem || "").trim()),
+      better_roles: (built.better_roles || []).map((item) => ({
+        ...item,
+        role: cleanDisplayText(String(item?.role ?? "")),
+        reason: cleanDisplayText(String(item?.reason ?? "")),
+      })),
+    };
   }, [cvText, lang, engineV2]);
   const roleSuggestions = roleRedirection?.better_roles || [];
-  const aiDecisionText = String(engineV2?.Output?.decision || "").trim();
-  const aiRecognitionLine = String(engineV2?.Output?.recognition_line || "").trim();
-  const aiCoreProblem = String(engineV2?.Output?.core_problem || "").trim();
-  const aiImpactStatement = String(engineV2?.Output?.impact_statement || "").trim();
-  const aiPatternSummary = String(engineV2?.Output?.pattern_summary || "").trim();
-  const firstAction = String(engineV2?.Output?.first_action || "").trim();
-  const aiRecruiterView = String(engineV2?.Output?.recruiter_view || "").trim();
+  const aiDecisionText = cleanDisplayText(String(engineV2?.Output?.decision || "").trim());
+  const aiRecognitionLine = cleanDisplayText(String(engineV2?.Output?.recognition_line || "").trim());
+  const aiCoreProblem = cleanDisplayText(String(engineV2?.Output?.core_problem || "").trim());
+  const aiImpactStatement = cleanDisplayText(String(engineV2?.Output?.impact_statement || "").trim());
+  const aiPatternSummary = cleanDisplayText(String(engineV2?.Output?.pattern_summary || "").trim());
+  const firstAction = cleanDisplayText(String(engineV2?.Output?.first_action || "").trim());
+  const aiRecruiterView = cleanDisplayText(String(engineV2?.Output?.recruiter_view || "").trim());
   const aiReasons = Array.isArray(engineV2?.Output?.reasons)
-    ? engineV2.Output.reasons.map((x) => String(x || "").trim()).filter(Boolean)
+    ? engineV2.Output.reasons
+        .map((x) => cleanDisplayText(String(x || "").trim()))
+        .filter(Boolean)
     : [];
   const primaryReason =
     aiCoreProblem
     || aiReasons[0]
-    || String(mainIssue || analysisData?.fit_summary || "").trim();
+    || cleanDisplayText(String(mainIssue || analysisData?.fit_summary || "").trim());
   const impactProjection = useMemo(() => {
     if (decisionScore == null) return null;
     const fromV2 = computeImpactProjection(
