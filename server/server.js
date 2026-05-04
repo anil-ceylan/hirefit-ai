@@ -34,12 +34,28 @@ const EXTRACT_JOB_MAX_TOKENS = 8192;
 
 const app = express();
 app.set("trust proxy", 1);
-const ALLOWED_ORIGIN = "https://hirefit-ai.vercel.app";
+
+/** Browser origins allowed to call this API (credentials: true → must echo request Origin). */
+const ALLOWED_ORIGINS = new Set([
+  "https://www.hirefit.co",
+  "https://hirefit.co",
+  "https://hirefit-ai.vercel.app",
+]);
+
+function isAllowedCorsOrigin(origin) {
+  return Boolean(origin && ALLOWED_ORIGINS.has(origin));
+}
 
 // CORS MUST be first global middleware (before all routes)
 app.use(
   cors({
-    origin: ALLOWED_ORIGIN,
+    origin(origin, callback) {
+      if (!origin || isAllowedCorsOrigin(origin)) {
+        callback(null, true);
+      } else {
+        callback(null, false);
+      }
+    },
     methods: ["GET", "POST", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -49,7 +65,11 @@ app.use(
 
 // Manual fallback headers to guarantee CORS behavior
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+  const origin = req.headers.origin;
+  if (isAllowedCorsOrigin(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Access-Control-Allow-Credentials", "true");
+  }
   res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") {
