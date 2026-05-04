@@ -1400,8 +1400,11 @@ function UnlockReportGateCard({
           <div style={{ fontSize: 12, fontWeight: 800, color: "#86efac", marginBottom: 5 }}>
             {"Bunu düzeltirsen:"}
           </div>
-          <div style={{ fontSize: 18, color: "#dcfce7", lineHeight: 1.2, fontWeight: 900, marginBottom: 4 }}>
-            {`${scoreNow} → ${scoreAfterFix} (+${impactDelta} puan)`}
+          <div style={{ fontSize: 14, color: "#f8fafc", lineHeight: 1.35, fontWeight: 800, marginBottom: 4 }}>
+            {`Mevcut uyum skoru: %${scoreNow}`}
+          </div>
+          <div style={{ fontSize: 16, color: "#86efac", lineHeight: 1.35, fontWeight: 900, marginBottom: 4 }}>
+            {`Düzeltme sonrası: %${scoreAfterFix}`}
           </div>
           <div style={{ fontSize: 12, color: "#bbf7d0", lineHeight: 1.35 }}>
             {"Recruiter beklentilerine göre hesaplandı"}
@@ -1581,8 +1584,9 @@ function UnlockReportGateCard({
                 {previewReanalyzing ? "Analiz ediliyor..." : "Yeni sonucu gör"}
               </button>
               {previewScoreDelta ? (
-                <div style={{ marginTop: 8, fontSize: 12, color: "#bae6fd", fontWeight: 700 }}>
-                  {`${previewScoreDelta.before} → ${previewScoreDelta.after} (${previewScoreDelta.delta >= 0 ? "+" : ""}${previewScoreDelta.delta})`}
+                <div style={{ marginTop: 8, fontSize: 12, color: "#bae6fd", fontWeight: 700, lineHeight: 1.45 }}>
+                  <div style={{ color: "#e2e8f0" }}>{`Mevcut uyum skoru: %${previewScoreDelta.before}`}</div>
+                  <div style={{ color: "#86efac", marginTop: 4 }}>{`Düzeltme sonrası: %${previewScoreDelta.after}`}</div>
                 </div>
               ) : null}
               {previewScoreDelta ? (
@@ -7493,15 +7497,13 @@ export function AnalyzerPage() {
             padding: "10px 12px",
           }}
         >
-          <div
-            style={{
-              fontSize: 20,
-              color: "#bbf7d0",
-              fontWeight: 900,
-              letterSpacing: "-0.01em",
-            }}
-          >
-            {impactProjection.current} → {impactProjection.projected} (+{impactProjection.delta})
+          <div style={{ letterSpacing: "-0.01em" }}>
+            <div style={{ fontSize: 15, color: "#f8fafc", fontWeight: 800 }}>
+              {`Mevcut uyum skoru: %${impactProjection.current}`}
+            </div>
+            <div style={{ fontSize: 17, color: "#bbf7d0", fontWeight: 900, marginTop: 6 }}>
+              {`Düzeltme sonrası: %${impactProjection.projected}`}
+            </div>
           </div>
         </div>
 
@@ -7618,14 +7620,11 @@ export function AnalyzerPage() {
             {"Örn: %X artırdım, X sürede tamamladım"}
           </div>
           ) : null}
-          <div style={{ marginTop: 8, fontSize: 11, color: "#94a3b8", opacity: 0.9 }}>
-            {"Bu düzeltmeyi uygularsan:"}
-          </div>
-          <div style={{ marginTop: 2, fontSize: 13, color: "#bbf7d0", fontWeight: 800 }}>
-            {`${impactProjection.current} → ${impactProjection.projected} → ${Math.min(100, impactProjection.projected + 5)}`}
-          </div>
-          <div style={{ marginTop: 2, fontSize: 12, color: "#86efac", fontWeight: 700 }}>
-            {`(+${Math.max(0, Math.min(100, impactProjection.projected + 5) - impactProjection.current)} toplam iyileşme)`}
+          <div style={{ marginTop: 8, fontSize: 13, color: "#86efac", fontWeight: 800, lineHeight: 1.45 }}>
+            {(() => {
+              const boosted = Math.min(100, impactProjection.projected + 5);
+              return `Bu adımı uygularsan uyumun %${boosted}\u2019ya çıkar`;
+            })()}
           </div>
           <label style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#cbd5e1", cursor: "pointer" }}>
             <input
