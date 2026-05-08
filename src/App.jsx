@@ -7065,7 +7065,9 @@ export function AnalyzerPage() {
     firstAction,
     roleSuggestions,
     recruiterView: aiRecruiterView,
-  }), [lang, aiReasons, firstAction, roleSuggestions, aiRecruiterView]);
+    structured: engineV2?.Recruiter?.structured_analysis,
+  }), [lang, aiReasons, firstAction, roleSuggestions, aiRecruiterView, engineV2]);
+  const recruiterStructured = engineV2?.Recruiter?.structured_analysis || {};
   const finalVerdictRaw = String(engineV2?.Decision?.final_verdict || "").toLowerCase();
   const verdictUi = useMemo(() => {
     if (finalVerdictRaw === "do_not_apply" || (impactProjection?.current ?? 0) < 55) {
@@ -7107,21 +7109,35 @@ export function AnalyzerPage() {
     };
   }, [finalVerdictRaw, impactProjection?.current, lang]);
   const recruiterNarrative = useMemo(
-    () => sanitizeRecruiterNarrative(aiRecruiterView || sanitizedPrimaryReason || verdictUi.recruiterLine, lang),
-    [aiRecruiterView, sanitizedPrimaryReason, verdictUi.recruiterLine, lang]
+    () => sanitizeRecruiterNarrative(
+      recruiterStructured.internal_monologue || aiRecruiterView || sanitizedPrimaryReason || verdictUi.recruiterLine,
+      lang
+    ),
+    [recruiterStructured.internal_monologue, aiRecruiterView, sanitizedPrimaryReason, verdictUi.recruiterLine, lang]
   );
   const topPerceptionInsight = useMemo(() => buildTopPerceptionInsight({
     lang,
-    narrative: recruiterNarrative,
+    firstPerception: recruiterStructured.first_perception,
+    fallbackNarrative: recruiterNarrative,
     roleSuggestions,
-  }), [lang, recruiterNarrative, roleSuggestions]);
-  const recruiterNarrativeParts = useMemo(
-    () => splitRecruiterNarrative(recruiterNarrative, lang),
-    [recruiterNarrative, lang]
+  }), [lang, recruiterStructured.first_perception, recruiterNarrative, roleSuggestions]);
+  const recruiterCoreConcern = useMemo(
+    () => sanitizeRecruiterNarrative(recruiterStructured.core_concern || "", lang),
+    [recruiterStructured.core_concern, lang]
   );
   const recruiterWantedSignal = useMemo(
-    () => buildRecruiterWantedSignal({ lang, reasons: aiReasons, recruiterView: aiRecruiterView, firstAction }),
-    [lang, aiReasons, aiRecruiterView, firstAction]
+    () => buildRecruiterWantedSignal({
+      lang,
+      reasons: aiReasons,
+      recruiterView: aiRecruiterView,
+      firstAction,
+      structured: recruiterStructured,
+    }),
+    [lang, aiReasons, aiRecruiterView, firstAction, recruiterStructured]
+  );
+  const recruiterSignalTags = useMemo(
+    () => normalizeRecruiterSignalTags(recruiterStructured.signal_tags, lang),
+    [recruiterStructured.signal_tags, lang]
   );
 
   useEffect(() => {
@@ -7891,19 +7907,18 @@ export function AnalyzerPage() {
           <div style={{ fontSize: 22, lineHeight: 1.2, fontWeight: 900, color: "#fee2e2", marginBottom: 6 }}>
             {aiDecisionText || mapDecisionLabel(engineV2?.Decision?.final_verdict, lang)}
           </div>
-          <div style={{ maxWidth: 620 }}>
-            <div style={{ fontSize: 15.5, color: "#fecaca", lineHeight: 1.72, marginBottom: 8, fontWeight: 800 }}>
-              {recruiterNarrativeParts.punch}
-            </div>
-            <div style={{ fontSize: 14.5, color: "#fda4af", lineHeight: 1.68, marginBottom: 10, fontWeight: 700 }}>
-              {recruiterNarrativeParts.uncertainty}
-            </div>
-            {recruiterNarrativeParts.support ? (
-              <div style={{ fontSize: 13.5, color: "#fecaca", lineHeight: 1.72, opacity: 0.96 }}>
-                {recruiterNarrativeParts.support}
-              </div>
-            ) : null}
+          <div style={{ maxWidth: 620, fontSize: 15, color: "#fecaca", lineHeight: 1.72 }}>
+            {recruiterNarrative}
           </div>
+          {recruiterSignalTags.length ? (
+            <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {recruiterSignalTags.map((tag) => (
+                <div key={tag.label} style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.02em", color: tag.color, padding: "6px 10px", borderRadius: 999, background: tag.bg, border: `1px solid ${tag.border}` }}>
+                  {tag.label}
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div
@@ -7918,7 +7933,7 @@ export function AnalyzerPage() {
             {lang === "TR" ? "Seni aşağı çeken asıl şey" : "The main thing holding you back"}
           </div>
           <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "#fef3c7", fontWeight: 700 }}>
-            {recruiterWantedSignal}
+            {recruiterCoreConcern || recruiterWantedSignal}
           </div>
         </div>
 
@@ -8337,11 +8352,11 @@ export function AnalyzerPage() {
   );
 }
 
-function buildRecruiterPersuasionTips({ lang, reasons, firstAction, roleSuggestions, recruiterView }) {
+function buildRecruiterPersuasionTips({ lang, reasons, firstAction, roleSuggestions, recruiterView, structured }) {
   const tr = lang === "TR";
   const tips = [];
   const reasonText = (reasons || []).map((r) => String(r || "").toLowerCase()).join(" ");
-  const rv = String(recruiterView || "").toLowerCase();
+  const rv = `${String(recruiterView || "").toLowerCase()} ${String(structured?.internal_monologue || "").toLowerCase()} ${String(structured?.core_concern || "").toLowerCase()}`;
   if (/(seo|icerik|content)/i.test(`${reasonText} ${rv}`)) {
     tips.push(tr
       ? "Ön yazında SEO ve içerik execution tarafına hızlı adapte olabileceğini net anlat."
@@ -8398,9 +8413,11 @@ function sanitizeRecruiterNarrative(text, lang) {
   return s;
 }
 
-function buildTopPerceptionInsight({ lang, narrative, roleSuggestions }) {
+function buildTopPerceptionInsight({ lang, firstPerception, fallbackNarrative, roleSuggestions }) {
   const tr = lang === "TR";
-  const n = String(narrative || "").trim();
+  const fp = String(firstPerception || "").trim();
+  if (fp) return sanitizeRecruiterNarrative(fp, lang);
+  const n = String(fallbackNarrative || "").trim();
   if (tr) {
     if (/product|growth|urun/i.test(n)) return "Recruiter seni daha cok growth/product tarafina konumlandiriyor.";
     if (/risk|tereddut|soru isareti|emin olamad/i.test(n)) return "Ilk bakista potansiyel var ama kafada soru isareti birakiyor.";
@@ -8412,27 +8429,11 @@ function buildTopPerceptionInsight({ lang, narrative, roleSuggestions }) {
   if (Array.isArray(roleSuggestions) && roleSuggestions.length) return "You are not fully out, but the recruiter may prefer a stronger role fit.";
   return "At first glance, the recruiter likely keeps you in the maybe range.";
 }
-
-function splitRecruiterNarrative(narrative, lang) {
+function buildRecruiterWantedSignal({ lang, reasons, recruiterView, firstAction, structured }) {
   const tr = lang === "TR";
-  const normalized = String(narrative || "").replace(/\s+/g, " ").trim();
-  const parts = normalized
-    .split(/(?<=[.!?])\s+/)
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const punch = parts[0] || (tr
-    ? "Ilk bakista potansiyel var ama role ozel guven henuz tam olusmuyor."
-    : "There is visible potential at first glance, but role-specific trust is not fully formed yet.");
-  const uncertainty = parts[1] || (tr
-    ? "Karar aninda tereddut olusturan kritik soru isaretleri devam ediyor."
-    : "Critical question marks still create hesitation at decision time.");
-  const support = parts.slice(2, 4).join(" ").trim();
-  return { punch, uncertainty, support };
-}
-
-function buildRecruiterWantedSignal({ lang, reasons, recruiterView, firstAction }) {
-  const tr = lang === "TR";
-  const text = `${(reasons || []).join(" ")} ${String(recruiterView || "")} ${String(firstAction || "")}`.toLowerCase();
+  const structuredConcern = String(structured?.core_concern || "").trim();
+  if (structuredConcern) return sanitizeRecruiterNarrative(structuredConcern, lang);
+  const text = `${(reasons || []).join(" ")} ${String(recruiterView || "")} ${String(firstAction || "")} ${String(structured?.internal_monologue || "")}`.toLowerCase();
   if (/(seo|icerik|content)/i.test(text)) {
     return tr
       ? "SEO ve icerik tarafinda dogrudan execution ornegi."
@@ -8450,6 +8451,27 @@ function buildRecruiterWantedSignal({ lang, reasons, recruiterView, firstAction 
   }
   if (tr) return "Bu rolun beklentisine dogrudan baglanan somut execution sinyali.";
   return "A concrete execution signal directly tied to this role’s expectation.";
+}
+
+function normalizeRecruiterSignalTags(tags, lang) {
+  const tr = lang === "TR";
+  const raw = Array.isArray(tags) ? tags.map((x) => String(x || "").trim()).filter(Boolean) : [];
+  const picked = [...new Set(raw)].slice(0, 4);
+  if (picked.length) {
+    return picked.map((label, i) => withSignalTheme(label, i));
+  }
+  const fallback = tr ? ["Role-fit sinyali"] : ["Role-fit signal"];
+  return fallback.map((label, i) => withSignalTheme(label, i));
+}
+
+function withSignalTheme(label, i) {
+  const themes = [
+    { color: "#93c5fd", bg: "rgba(59,130,246,0.16)", border: "rgba(59,130,246,0.35)" },
+    { color: "#fbbf24", bg: "rgba(245,158,11,0.16)", border: "rgba(245,158,11,0.35)" },
+    { color: "#86efac", bg: "rgba(16,185,129,0.16)", border: "rgba(16,185,129,0.35)" },
+    { color: "#fca5a5", bg: "rgba(239,68,68,0.16)", border: "rgba(239,68,68,0.35)" },
+  ];
+  return { label, ...themes[i % themes.length] };
 }
 
 export default HireFitLayout;
