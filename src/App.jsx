@@ -6617,6 +6617,9 @@ export function AnalyzerPage() {
     reanalysisResult, history, clearHistory, loadHistoryItem, setWaitlist, setReanalysisBaseline, setTargetRole,
   } = useOutletContext();
   const safeUiError = useMemo(() => sanitizeUserErrorMessage(error, lang), [error, lang]);
+  const missingInputsError =
+    safeUiError === "Lütfen hem CV'yi hem de iş ilanını yapıştırın." ||
+    safeUiError === "Please paste both the CV and the Job Description.";
   const [reportUnlocked, setReportUnlocked] = useState(Boolean(user));
   const [unlockEmail, setUnlockEmail] = useState(user?.email || "");
   const [unlockJobStatus, setUnlockJobStatus] = useState("Job Seeker");
@@ -6882,6 +6885,26 @@ export function AnalyzerPage() {
       <p className="hf-analyzer-hero-sub">
         {lang === "TR" ? "Recruiter'ların CV'ni saniyeler içinde nasıl değerlendirdiğini net gör." : "See exactly how recruiters evaluate your CV in seconds."}
       </p>
+      {missingInputsError ? (
+        <div
+          style={{
+            marginTop: 10,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "10px 12px",
+            borderRadius: 10,
+            border: "1px solid rgba(239,68,68,0.22)",
+            background: "rgba(239,68,68,0.08)",
+            color: "#fca5a5",
+            fontSize: 13,
+            lineHeight: 1.45,
+          }}
+        >
+          <AlertCircle size={14} style={{ flexShrink: 0 }} />
+          <span>{safeUiError}</span>
+        </div>
+      ) : null}
     </div>
 
     {shouldShowUnlockGate ? (
@@ -7339,7 +7362,7 @@ export function AnalyzerPage() {
     </div>
 
     {/* ERROR */}
-    {safeUiError && (
+    {safeUiError && !missingInputsError && (
       <div
         style={{
           display: "flex",
