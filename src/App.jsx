@@ -4549,9 +4549,24 @@ function NavBar({ pathname, user, logout, navigate, lang }) {
               <button type="button" className="hf-btn-ghost hf-nav-signout" onClick={logout} style={{ padding: "9px 18px", fontSize: "13px" }}><LogOut size={13} /> {t.signOut}</button>
             </div>
           ) : (
-            <button className="hf-btn-primary" onClick={() => navigate("/login")} style={{ padding: "10px 24px", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 24px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.15)", borderRadius: 999 }}>
-              <LogIn size={14} /> {t.login}
-            </button>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <button
+                className="hf-btn-ghost"
+                onClick={() => navigate("/login")}
+                style={{
+                  padding: "9px 16px",
+                  fontSize: "13px",
+                  borderRadius: 999,
+                  border: "1px solid rgba(99,102,241,0.35)",
+                  color: "#c7d2fe",
+                }}
+              >
+                {lang === "TR" ? "Kayıt Ol" : "Sign Up"}
+              </button>
+              <button className="hf-btn-primary" onClick={() => navigate("/login")} style={{ padding: "10px 24px", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 24px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.15)", borderRadius: 999 }}>
+                <LogIn size={14} /> {t.login}
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -6086,6 +6101,41 @@ function HireFitLayout() {
     if (error) console.error(error);
   };
 
+  const signup = async () => {
+    if (!email.trim() || !password.trim()) {
+      setError(lang === "TR" ? "Kayıt olmak için email ve şifre girin." : "Enter email and password to sign up.");
+      return;
+    }
+    try {
+      const { data, error: authError } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: "https://hirefit-ai.vercel.app/dashboard" },
+      });
+      if (authError) {
+        setError(sanitizeUserErrorMessage(authError.message, lang));
+        return;
+      }
+      if (data?.session?.user || data?.user) {
+        setUser(data.session?.user || data.user);
+        setError(
+          lang === "TR"
+            ? "Kayıt başarılı. Devam edebilirsin."
+            : "Sign up successful. You can continue."
+        );
+        navigate("/dashboard");
+        return;
+      }
+      setError(
+        lang === "TR"
+          ? "Kayıt oluşturuldu. E-postanı doğrulayıp giriş yapabilirsin."
+          : "Account created. Verify your email, then sign in."
+      );
+    } catch {
+      setError(lang === "TR" ? "Kayıt başarısız." : "Sign up failed.");
+    }
+  };
+
   const logout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem("hirefit-user");
@@ -6180,6 +6230,7 @@ function HireFitLayout() {
     setPassword,
     error,
     login,
+    signup,
     loginWithGoogle,
     isPro: hasProAccess,
     isAdminUser,
@@ -6476,19 +6527,67 @@ export function RoadmapRoute() {
 }
 
 export function LoginPage() {
-  const { t, T: ctxTheme, lang, email, setEmail, password, setPassword, error, login, loginWithGoogle } = useOutletContext();
+  const { t, T: ctxTheme, lang, email, setEmail, password, setPassword, error, login, signup, loginWithGoogle } = useOutletContext();
   const theme = ctxTheme || T;
+  const [authMode, setAuthMode] = useState("login");
   return (
         <div style={{ ...styles.container, padding: "80px 24px" }}>
           <div style={{ maxWidth: 440, margin: "0 auto" }}>
             <div className="hf-card" style={{ padding: 40 }}>
-              <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "28px", fontWeight: 800, marginBottom: 8 }}>{t.welcomeBack}</h2>
-              <p style={{ color: theme.textSub, fontSize: "14px", marginBottom: 28 }}>{t.signInDesc}</p>
+              <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "28px", fontWeight: 800, marginBottom: 8 }}>
+                {authMode === "signup"
+                  ? (lang === "TR" ? "Hesap Oluştur" : "Create Account")
+                  : t.welcomeBack}
+              </h2>
+              <p style={{ color: theme.textSub, fontSize: "14px", marginBottom: 20 }}>
+                {authMode === "signup"
+                  ? (lang === "TR" ? "HireFit'e ücretsiz kayıt ol." : "Sign up to HireFit for free.")
+                  : t.signInDesc}
+              </p>
+              <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                <button
+                  type="button"
+                  onClick={() => setAuthMode("login")}
+                  style={{
+                    flex: 1,
+                    padding: "9px 10px",
+                    borderRadius: 10,
+                    border: authMode === "login" ? "1px solid rgba(99,102,241,0.55)" : "1px solid rgba(148,163,184,0.25)",
+                    background: authMode === "login" ? "rgba(99,102,241,0.22)" : "rgba(15,23,42,0.45)",
+                    color: authMode === "login" ? "#e0e7ff" : "#94a3b8",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {lang === "TR" ? "Giriş Yap" : "Sign In"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthMode("signup")}
+                  style={{
+                    flex: 1,
+                    padding: "9px 10px",
+                    borderRadius: 10,
+                    border: authMode === "signup" ? "1px solid rgba(99,102,241,0.55)" : "1px solid rgba(148,163,184,0.25)",
+                    background: authMode === "signup" ? "rgba(99,102,241,0.22)" : "rgba(15,23,42,0.45)",
+                    color: authMode === "signup" ? "#e0e7ff" : "#94a3b8",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {lang === "TR" ? "Kayıt Ol" : "Sign Up"}
+                </button>
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 <input className="hf-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={lang === "TR" ? "E-posta adresi" : "Email address"} />
                 <input type="password" className="hf-input" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={lang === "TR" ? "Şifre" : "Password"} />
                 {error && <div style={{ color: "#f87171", fontSize: "13px", padding: "10px 14px", background: "rgba(239,68,68,0.1)", borderRadius: 8 }}>{error}</div>}
-                <button className="hf-btn-primary" onClick={login} style={{ justifyContent: "center", marginTop: 4 }}><LogIn size={15} />{t.continueBtn}</button>
+                <button className="hf-btn-primary" onClick={authMode === "signup" ? signup : login} style={{ justifyContent: "center", marginTop: 4 }}>
+                  <LogIn size={15} />
+                  {authMode === "signup"
+                    ? (lang === "TR" ? "Kayıt Ol" : "Sign Up")
+                    : t.continueBtn}
+                </button>
                 <button onClick={loginWithGoogle} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", padding: "12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "white", fontSize: "14px", fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: 8 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                   {t.continueGoogle}
