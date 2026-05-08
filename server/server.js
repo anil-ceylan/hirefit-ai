@@ -40,28 +40,31 @@ const ALLOWED_ORIGINS = new Set([
   "https://www.hirefit.co",
   "https://hirefit.co",
   "https://hirefit-ai.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
 ]);
 
 function isAllowedCorsOrigin(origin) {
   return Boolean(origin && ALLOWED_ORIGINS.has(origin));
 }
 
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || isAllowedCorsOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error("Not allowed by CORS"));
+  },
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-user-id", "x-requested-with"],
+  credentials: true,
+  optionsSuccessStatus: 204,
+};
+
 // CORS MUST be first global middleware (before all routes)
-app.use(
-  cors({
-    origin(origin, callback) {
-      if (!origin || isAllowedCorsOrigin(origin)) {
-        callback(null, true);
-      } else {
-        callback(null, false);
-      }
-    },
-    methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-    optionsSuccessStatus: 204,
-  })
-);
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 
 // Manual fallback headers to guarantee CORS behavior
 app.use((req, res, next) => {
@@ -71,7 +74,7 @@ app.use((req, res, next) => {
     res.header("Access-Control-Allow-Credentials", "true");
   }
   res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, x-user-id, x-requested-with");
   if (req.method === "OPTIONS") {
     return res.sendStatus(204);
   }
