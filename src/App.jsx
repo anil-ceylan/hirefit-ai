@@ -238,6 +238,12 @@ const RAW_TECH_ERROR_RE =
 function sanitizeUserErrorMessage(raw, lang) {
   const txt = String(raw || "").trim();
   if (!txt) return "";
+  const lower = txt.toLowerCase();
+  if (/\b429\b/.test(lower) || lower.includes("email rate limit exceeded")) {
+    return lang === "TR"
+      ? "Cok kisa surede fazla dogrulama e-postasi gonderildi. Lutfen birkac dakika sonra tekrar dene."
+      : "Too many verification emails were sent. Please try again in a few minutes.";
+  }
   if (RAW_PARSE_FAIL_RE.test(txt)) return translations[lang]?.sanitizeParsingFailed || txt;
   if (RAW_TECH_ERROR_RE.test(txt)) return translations[lang]?.sanitizeGenericError || txt;
   return txt;
@@ -5319,6 +5325,7 @@ function HireFitLayout() {
   const [plan] = useState("Free");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [signupLoading, setSignupLoading] = useState(false);
   const [waitlist, setWaitlist] = useState([]);
   const [cvText, setCvText] = useState("");
   const [jdText, setJdText] = useState("");
@@ -5381,6 +5388,7 @@ function HireFitLayout() {
 
   const t = translations[lang];
   const isAdminUser = useMemo(() => isAdmin(user), [user]);
+  const isUserEmailVerified = Boolean(user?.email_confirmed_at);
   const hasProAccess = Boolean(isPro || isAdminUser);
   const cvLoaded = cvText.trim().length > 24;
   const jdLoaded = jdText.trim().length > 40;
@@ -5559,7 +5567,15 @@ function HireFitLayout() {
       if (session?.user) {
         setUser(session.user);
         syncUserPlanForUser(session.user.id);
-        if (event === "SIGNED_IN" && window.location.pathname === "/login") navigate("/dashboard");
+        if (event === "SIGNED_IN" && window.location.pathname === "/login") {
+          const confirmed = Boolean(session.user.email_confirmed_at);
+          if (confirmed) {
+            navigate("/dashboard");
+          } else {
+            const targetEmail = encodeURIComponent(String(session.user.email || "").trim());
+            navigate(`/verify-email?email=${targetEmail}`);
+          }
+        }
       } else {
         setUser(null);
         setIsPro(false);
@@ -5668,6 +5684,11 @@ function HireFitLayout() {
     const jdOverride = String(opts?.jobDescriptionOverride || "").trim();
     const effectiveJd = jdOverride || String(jdText || "").trim();
     if (!cvText.trim() || !effectiveJd) { setError(lang === "TR" ? "Lütfen hem CV'yi hem de iş ilanını yapıştırın." : "Please paste both the CV and the Job Description."); return; }
+    if (user && !isUserEmailVerified) {
+      const targetEmail = encodeURIComponent(String(user.email || "").trim());
+      navigate(`/verify-email?email=${targetEmail}`);
+      return;
+    }
 
     if (user?.id) {
       const row = await syncUserPlanForUser(user.id);
@@ -6089,7 +6110,14 @@ function HireFitLayout() {
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) { setError(sanitizeUserErrorMessage(authError.message, lang)); return; }
-      setUser(data.user); setEmail(""); setPassword(""); setError(""); navigate("/dashboard");
+      setUser(data.user); setEmail(""); setPassword(""); setError("");
+      const confirmed = Boolean(data?.user?.email_confirmed_at);
+      if (confirmed) {
+        navigate("/dashboard");
+      } else {
+        const targetEmail = encodeURIComponent(String(data?.user?.email || email || "").trim());
+        navigate(`/verify-email?email=${targetEmail}`);
+      }
     } catch { setError(lang === "TR" ? "Giriş başarısız." : "Login failed."); }
   };
 
@@ -6106,6 +6134,7 @@ function HireFitLayout() {
   };
 
   const signup = async (profile = {}) => {
+    if (signupLoading) return;
     if (!email.trim() || !password.trim()) {
       setError(lang === "TR" ? "Kayıt olmak için email ve şifre girin." : "Enter email and password to sign up.");
       return;
@@ -6118,6 +6147,7 @@ function HireFitLayout() {
       return;
     }
     try {
+      setSignupLoading(true);
       const authRedirectTo =
         typeof window !== "undefined"
           ? `${window.location.origin}/dashboard`
@@ -6139,28 +6169,49 @@ function HireFitLayout() {
         },
       });
       if (authError) {
-        setError(sanitizeUserErrorMessage(authError.message, lang));
+        const rawAuthError = String(authError?.message || "");
+        const status = Number(authError?.status || authError?.code || 0);
+        if (status === 429 || /email rate limit exceeded/i.test(rawAuthError)) {
+          setError(
+            lang === "TR"
+              ? "Cok kisa surede fazla dogrulama e-postasi gonderildi. Lutfen birkac dakika sonra tekrar dene."
+              : "Too many verification emails were sent. Please try again in a few minutes."
+          );
+        } else {
+          setError(sanitizeUserErrorMessage(rawAuthError, lang));
+        }
         return;
       }
-      if (data?.session?.user) {
-        setUser(data.session.user);
-        setError(
-          lang === "TR"
-            ? "Kayıt başarılı. Devam edebilirsin."
-            : "Sign up successful. You can continue."
-        );
-        navigate("/dashboard");
-        return;
-      }
-      setError(
-        lang === "TR"
-          ? "Kayıt oluşturuldu. E-postanı doğrulayıp giriş yapabilirsin."
-          : "Account created. Verify your email, then sign in."
-      );
-    } catch {
-      setError(lang === "TR" ? "Kayıt başarısız." : "Sign up failed.");
+      setError("");
+      const signupEmail = String(data?.session?.user?.email || data?.user?.email || email || "").trim();
+      // eslint-disable-next-line no-console
+      console.log("SIGNUP SUCCESS REDIRECTING TO VERIFY", signupEmail);
+      const targetEmail = encodeURIComponent(signupEmail);
+      navigate(`/verify-email?email=${targetEmail}`, { replace: true });
+    } catch (e) {
+      const fallback = lang === "TR" ? "Kayıt başarısız." : "Sign up failed.";
+      setError(sanitizeUserErrorMessage(String(e?.message || fallback), lang) || fallback);
+    } finally {
+      setSignupLoading(false);
     }
   };
+
+  const resendSignupVerification = useCallback(async (targetEmail) => {
+    const cleanEmail = String(targetEmail || "").trim();
+    if (!cleanEmail) {
+      throw new Error(lang === "TR" ? "Geçerli bir email girin." : "Enter a valid email.");
+    }
+    const authRedirectTo =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/dashboard`
+        : "https://www.hirefit.co/dashboard";
+    const { error: resendError } = await supabase.auth.resend({
+      type: "signup",
+      email: cleanEmail,
+      options: { emailRedirectTo: authRedirectTo },
+    });
+    if (resendError) throw resendError;
+  }, [lang]);
 
   const logout = async () => {
     await supabase.auth.signOut();
@@ -6257,8 +6308,11 @@ function HireFitLayout() {
     error,
     login,
     signup,
+    signupLoading,
+    resendSignupVerification,
     loginWithGoogle,
     isPro: hasProAccess,
+    isUserEmailVerified,
     isAdminUser,
     plan,
     waitlist,
@@ -6553,7 +6607,10 @@ export function RoadmapRoute() {
 }
 
 export function LoginPage() {
-  const { t, T: ctxTheme, lang, email, setEmail, password, setPassword, error, login, signup, loginWithGoogle } = useOutletContext();
+  const {
+    t, T: ctxTheme, lang, email, setEmail, password, setPassword, error, login, signup, loginWithGoogle,
+    location, signupLoading,
+  } = useOutletContext();
   const theme = ctxTheme || T;
   const [authMode, setAuthMode] = useState("login");
   const [signupFullName, setSignupFullName] = useState("");
@@ -6582,6 +6639,29 @@ export function LoginPage() {
     "Freelancer",
     "Staj Arıyor",
   ];
+
+  useEffect(() => {
+    if (String(email || "").trim()) return;
+    const raw = new URLSearchParams(location?.search || "").get("email");
+    const candidate = String(raw || "").trim();
+    if (!candidate) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidate)) return;
+    setEmail(candidate);
+  }, [location?.search, email, setEmail]);
+
+  const handleAuthSubmit = (e) => {
+    e.preventDefault();
+    if (authMode === "signup") {
+      signup({
+        fullName: signupFullName,
+        careerArea: signupCareerArea,
+        currentSituation: signupCurrentSituation,
+      });
+      return;
+    }
+    login();
+  };
+
   return (
         <div style={{ ...styles.container, padding: "80px 24px" }}>
           <div style={{ maxWidth: 440, margin: "0 auto" }}>
@@ -6630,7 +6710,7 @@ export function LoginPage() {
                   {lang === "TR" ? "Kayıt Ol" : "Sign Up"}
                 </button>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <form onSubmit={handleAuthSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {authMode === "signup" ? (
                   <input
                     className="hf-input"
@@ -6679,29 +6759,23 @@ export function LoginPage() {
                 ) : null}
                 {error && <div style={{ color: "#f87171", fontSize: "13px", padding: "10px 14px", background: "rgba(239,68,68,0.1)", borderRadius: 8 }}>{error}</div>}
                 <button
+                  type="submit"
                   className="hf-btn-primary"
-                  onClick={
-                    authMode === "signup"
-                      ? () =>
-                          signup({
-                            fullName: signupFullName,
-                            careerArea: signupCareerArea,
-                            currentSituation: signupCurrentSituation,
-                          })
-                      : login
-                  }
-                  style={{ justifyContent: "center", marginTop: 4 }}
+                  disabled={authMode === "signup" && signupLoading}
+                  style={{ justifyContent: "center", marginTop: 4, cursor: authMode === "signup" && signupLoading ? "wait" : "pointer", opacity: authMode === "signup" && signupLoading ? 0.78 : 1 }}
                 >
                   <LogIn size={15} />
                   {authMode === "signup"
-                    ? (lang === "TR" ? "Kayıt Ol" : "Sign Up")
+                    ? (signupLoading
+                        ? (lang === "TR" ? "Kayıt oluşturuluyor..." : "Creating account...")
+                        : (lang === "TR" ? "Kayıt Ol" : "Sign Up"))
                     : t.continueBtn}
                 </button>
-                <button onClick={loginWithGoogle} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", padding: "12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "white", fontSize: "14px", fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: 8 }}>
+                <button type="button" onClick={loginWithGoogle} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", padding: "12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "white", fontSize: "14px", fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: 8 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                   {t.continueGoogle}
                 </button>
-              </div>
+              </form>
             </div>
           </div>
         </div>
@@ -6711,9 +6785,28 @@ export function LoginPage() {
 export function DashboardPage() {
   const {
     t, lang, T: ctxTheme, history, loadHistoryItem, clearHistory, averageScore, isPro, isAdminUser, plan, waitlist, scoreHistory,
+    user, isUserEmailVerified, navigate,
     adminTargetEmail, setAdminTargetEmail, adminGrantBusy, adminGrantError, adminGrantNotice, setUserProAccessByAdmin,
   } = useOutletContext();
   const theme = ctxTheme || T;
+  if (user && !isUserEmailVerified) {
+    const targetEmail = encodeURIComponent(String(user.email || "").trim());
+    return (
+      <div style={{ ...styles.container, padding: "80px 24px" }}>
+        <div className="hf-card" style={{ maxWidth: 560, margin: "0 auto", padding: 28 }}>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, marginBottom: 8 }}>
+            {"Verify your email"}
+          </h2>
+          <p style={{ color: theme.textSub, marginBottom: 18 }}>
+            {"Please verify your email before accessing the dashboard."}
+          </p>
+          <button className="hf-btn-primary" onClick={() => navigate(`/verify-email?email=${targetEmail}`)} style={{ width: "100%", justifyContent: "center" }}>
+            {"Go to verification step"}
+          </button>
+        </div>
+      </div>
+    );
+  }
   return (
         <div style={{ ...styles.container, padding: "48px 24px" }}>
           <div style={{ marginBottom: 32 }}>
@@ -6922,6 +7015,9 @@ export function AnalyzerPage() {
     aiCoreProblem
     || aiReasons[0]
     || cleanDisplayText(String(mainIssue || analysisData?.fit_summary || "").trim());
+  const sanitizedPrimaryReason = /^tek bir boşluk izole edilemedi\.?$/i.test(String(primaryReason || "").trim())
+    ? ""
+    : primaryReason;
 
   useEffect(() => {
     if (engineV2 == null) return;
@@ -6960,6 +7056,46 @@ export function AnalyzerPage() {
       narrative: lang === "TR" ? "Küçük bir değişiklik, büyük fark yaratır." : "Small change, big difference.",
     };
   }, [decisionScore, engineV2, analysisData, missingSkills, lang]);
+  const finalVerdictRaw = String(engineV2?.Decision?.final_verdict || "").toLowerCase();
+  const verdictUi = useMemo(() => {
+    if (finalVerdictRaw === "do_not_apply" || (impactProjection?.current ?? 0) < 55) {
+      return {
+        icon: "❌",
+        badge: lang === "TR" ? "Dusuk Eslesme" : "Low Match",
+        color: "#f87171",
+        glow: "0 0 44px rgba(239,68,68,0.28)",
+        recruiterLine: lang === "TR"
+          ? "Bu rol su anki profilinle yeterince ortusmuyor. Daha dogru role yonelmek daha mantikli olabilir."
+          : "This role does not align enough with your current profile. It may be smarter to target a better-fit role.",
+        riskPill: lang === "TR" ? "Yuksek Red Riski" : "High Rejection Risk",
+        matchPill: lang === "TR" ? "Dusuk Rol Eslesmesi" : "Low Role Match",
+      };
+    }
+    if ((impactProjection?.current ?? 0) < 75) {
+      return {
+        icon: "⚠️",
+        badge: lang === "TR" ? "Riskli Basvuru" : "Risky Apply",
+        color: "#f59e0b",
+        glow: "0 0 44px rgba(245,158,11,0.24)",
+        recruiterLine: lang === "TR"
+          ? "Bu role tamamen uzak degilsin. Ama recruiter'in ilk bakista sorgulayacagi bazi kritik sinyaller eksik."
+          : "You are not far from this role, but a recruiter will likely question a few critical signals at first glance.",
+        riskPill: lang === "TR" ? "Orta-Yuksek Red Riski" : "Elevated Rejection Risk",
+        matchPill: lang === "TR" ? "Kismi Rol Eslesmesi" : "Partial Role Match",
+      };
+    }
+    return {
+      icon: "✅",
+      badge: lang === "TR" ? "Guclu Eslesme" : "Strong Match",
+      color: "#34d399",
+      glow: "0 0 44px rgba(16,185,129,0.24)",
+      recruiterLine: lang === "TR"
+        ? "Bu role ciddi sekilde yakinsin. CV sinyallerin recruiter beklentileriyle buyuk olcude ortusuyor."
+        : "You are strongly aligned with this role. Your CV signals mostly match recruiter expectations.",
+      riskPill: lang === "TR" ? "Dusuk Red Riski" : "Low Rejection Risk",
+      matchPill: lang === "TR" ? "Guclu Rol Eslesmesi" : "Strong Role Match",
+    };
+  }, [finalVerdictRaw, impactProjection?.current, lang]);
 
   useEffect(() => {
     if (!user?.email) return;
@@ -7702,32 +7838,44 @@ export function AnalyzerPage() {
               {"Bunu çoğu kişi fark etmiyor"}
             </div>
           ) : null}
-          <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 800, marginBottom: 6 }}>
-            {"Core problem"}
-          </div>
           <div
             style={{
-              fontSize: 15,
-              color: "#fee2e2",
-              fontWeight: 700,
-              borderRadius: 10,
-              border: "1px solid rgba(239,68,68,0.28)",
-              background: "rgba(239,68,68,0.08)",
-              padding: "10px 12px",
+              borderRadius: 18,
+              border: `1px solid ${verdictUi.color}55`,
+              background: "linear-gradient(180deg, rgba(15,23,42,0.95), rgba(2,6,23,0.98))",
+              padding: "16px 14px 14px",
+              boxShadow: verdictUi.glow,
             }}
           >
-            {primaryReason}
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, border: `1px solid ${verdictUi.color}66`, background: `${verdictUi.color}22`, color: verdictUi.color, fontWeight: 900, fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              <span>{verdictUi.icon}</span>
+              <span>{verdictUi.badge}</span>
+            </div>
+            <div style={{ marginTop: 12, fontSize: 17, color: "#f8fafc", lineHeight: 1.45, fontWeight: 700 }}>
+              {verdictUi.recruiterLine}
+            </div>
+            <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 700, padding: "6px 10px", borderRadius: 999, background: "rgba(15,23,42,0.7)", border: "1px solid rgba(148,163,184,0.26)" }}>
+                {`${impactProjection.current}% Alignment`}
+              </div>
+              <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 700, padding: "6px 10px", borderRadius: 999, background: "rgba(15,23,42,0.7)", border: "1px solid rgba(148,163,184,0.26)" }}>
+                {verdictUi.riskPill}
+              </div>
+              <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 700, padding: "6px 10px", borderRadius: 999, background: "rgba(15,23,42,0.7)", border: "1px solid rgba(148,163,184,0.26)" }}>
+                {verdictUi.matchPill}
+              </div>
+              <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 700, padding: "6px 10px", borderRadius: 999, background: "rgba(15,23,42,0.7)", border: "1px solid rgba(148,163,184,0.26)" }}>
+                {lang === "TR" ? "Recruiter Belirsizligi" : "Recruiter Uncertainty"}
+              </div>
+            </div>
           </div>
+          {sanitizedPrimaryReason ? (
+            <div style={{ marginTop: 10, fontSize: 13, color: "#fca5a5", lineHeight: 1.45, fontWeight: 700 }}>
+              {sanitizedPrimaryReason}
+            </div>
+          ) : null}
           {aiImpactStatement ? (
-            <div
-              style={{
-                marginTop: 6,
-                fontSize: 12,
-                color: "#fca5a5",
-                lineHeight: 1.45,
-                fontWeight: 700,
-              }}
-            >
+            <div style={{ marginTop: 6, fontSize: 12, color: "#fca5a5", lineHeight: 1.45, fontWeight: 700 }}>
               {aiImpactStatement}
             </div>
           ) : null}
@@ -7742,13 +7890,13 @@ export function AnalyzerPage() {
           }}
         >
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#fca5a5", marginBottom: 6 }}>
-            {"Karar"}
+            {"Recruiter'ın Ilk Dusuncesi"}
           </div>
           <div style={{ fontSize: 22, lineHeight: 1.2, fontWeight: 900, color: "#fee2e2", marginBottom: 6 }}>
             {aiDecisionText || mapDecisionLabel(engineV2?.Decision?.final_verdict, lang)}
           </div>
           <div style={{ fontSize: 14, color: "#fecaca", lineHeight: 1.45, marginBottom: 4 }}>
-            {aiRecruiterView || firstTwoSentences(primaryReason)}
+            {aiRecruiterView || firstTwoSentences(sanitizedPrimaryReason || verdictUi.recruiterLine)}
           </div>
         </div>
 

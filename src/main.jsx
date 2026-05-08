@@ -11,6 +11,7 @@ import HireFitLayout, {
   TermsPage,
   PrivacyPage,
 } from './App.jsx'
+import VerifyEmailPage from './VerifyEmailPage.jsx'
 import ReportPage from './ReportPage.jsx'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
@@ -24,6 +25,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="app" element={<AnalyzerPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="login" element={<LoginPage />} />
+            <Route path="verify-email" element={<VerifyEmailPage />} />
             <Route path="roadmap" element={<RoadmapRoute />} />
             <Route path="terms" element={<TermsPage />} />
             <Route path="privacy" element={<PrivacyPage />} />
