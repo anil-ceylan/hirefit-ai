@@ -6105,9 +6105,16 @@ function HireFitLayout() {
     if (error) console.error(error);
   };
 
-  const signup = async () => {
+  const signup = async (profile = {}) => {
     if (!email.trim() || !password.trim()) {
       setError(lang === "TR" ? "Kayıt olmak için email ve şifre girin." : "Enter email and password to sign up.");
+      return;
+    }
+    const fullName = String(profile.fullName || "").trim();
+    const sector = String(profile.sector || "").trim();
+    const jobStatus = String(profile.jobStatus || "").trim();
+    if (!fullName) {
+      setError(lang === "TR" ? "Lütfen isim soyisim girin." : "Please enter your full name.");
       return;
     }
     try {
@@ -6115,10 +6122,18 @@ function HireFitLayout() {
         typeof window !== "undefined"
           ? `${window.location.origin}/dashboard`
           : "https://www.hirefit.co/dashboard";
+      const metadata = {
+        full_name: fullName,
+        ...(sector ? { sector } : {}),
+        ...(jobStatus ? { job_status: jobStatus } : {}),
+      };
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: authRedirectTo },
+        options: {
+          emailRedirectTo: authRedirectTo,
+          data: metadata,
+        },
       });
       if (authError) {
         setError(sanitizeUserErrorMessage(authError.message, lang));
@@ -6538,6 +6553,27 @@ export function LoginPage() {
   const { t, T: ctxTheme, lang, email, setEmail, password, setPassword, error, login, signup, loginWithGoogle } = useOutletContext();
   const theme = ctxTheme || T;
   const [authMode, setAuthMode] = useState("login");
+  const [signupFullName, setSignupFullName] = useState("");
+  const [signupSector, setSignupSector] = useState("");
+  const [signupJobStatus, setSignupJobStatus] = useState("");
+  const signupSectorOptions = [
+    "Teknoloji / Startup",
+    "Danışmanlık",
+    "Finans",
+    "FMCG / Perakende",
+    "Sağlık",
+    "Kamu",
+    "Telekom / Donanım",
+    "Ürün Tasarımı / UX",
+    "Diğer",
+  ];
+  const signupJobStatusOptions = [
+    "Öğrenci",
+    "Yeni Mezun",
+    "Çalışıyorum",
+    "Aktif İş Arıyorum",
+    "İş Aramıyorum",
+  ];
   return (
         <div style={{ ...styles.container, padding: "80px 24px" }}>
           <div style={{ maxWidth: 440, margin: "0 auto" }}>
@@ -6587,10 +6623,61 @@ export function LoginPage() {
                 </button>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {authMode === "signup" ? (
+                  <input
+                    className="hf-input"
+                    value={signupFullName}
+                    onChange={(e) => setSignupFullName(e.target.value)}
+                    placeholder={lang === "TR" ? "İsim Soyisim" : "Full name"}
+                  />
+                ) : null}
                 <input className="hf-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={lang === "TR" ? "E-posta adresi" : "Email address"} />
                 <input type="password" className="hf-input" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={lang === "TR" ? "Şifre" : "Password"} />
+                {authMode === "signup" ? (
+                  <>
+                    <select
+                      className="hf-input"
+                      value={signupSector}
+                      onChange={(e) => setSignupSector(e.target.value)}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <option value="">{lang === "TR" ? "Sektör seçin" : "Select sector"}</option>
+                      {signupSectorOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      className="hf-input"
+                      value={signupJobStatus}
+                      onChange={(e) => setSignupJobStatus(e.target.value)}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <option value="">{lang === "TR" ? "İş durumu seçin" : "Select job status"}</option>
+                      {signupJobStatusOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                ) : null}
                 {error && <div style={{ color: "#f87171", fontSize: "13px", padding: "10px 14px", background: "rgba(239,68,68,0.1)", borderRadius: 8 }}>{error}</div>}
-                <button className="hf-btn-primary" onClick={authMode === "signup" ? signup : login} style={{ justifyContent: "center", marginTop: 4 }}>
+                <button
+                  className="hf-btn-primary"
+                  onClick={
+                    authMode === "signup"
+                      ? () =>
+                          signup({
+                            fullName: signupFullName,
+                            sector: signupSector,
+                            jobStatus: signupJobStatus,
+                          })
+                      : login
+                  }
+                  style={{ justifyContent: "center", marginTop: 4 }}
+                >
                   <LogIn size={15} />
                   {authMode === "signup"
                     ? (lang === "TR" ? "Kayıt Ol" : "Sign Up")
