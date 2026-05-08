@@ -7078,24 +7078,6 @@ export function AnalyzerPage() {
     roleSuggestions,
     recruiterView: aiRecruiterView,
   }), [lang, aiReasons, firstAction, roleSuggestions, aiRecruiterView]);
-  const recruiterNarrative = useMemo(
-    () => sanitizeRecruiterNarrative(aiRecruiterView || sanitizedPrimaryReason || verdictUi.recruiterLine, lang),
-    [aiRecruiterView, sanitizedPrimaryReason, verdictUi.recruiterLine, lang]
-  );
-  const topPerceptionInsight = useMemo(() => buildTopPerceptionInsight({
-    lang,
-    narrative: recruiterNarrative,
-    tone: recruiterTone,
-    roleSuggestions,
-  }), [lang, recruiterNarrative, recruiterTone, roleSuggestions]);
-  const recruiterNarrativeParts = useMemo(
-    () => splitRecruiterNarrative(recruiterNarrative, lang),
-    [recruiterNarrative, lang]
-  );
-  const recruiterWantedSignal = useMemo(
-    () => buildRecruiterWantedSignal({ lang, reasons: aiReasons, recruiterView: aiRecruiterView, firstAction }),
-    [lang, aiReasons, aiRecruiterView, firstAction]
-  );
   const finalVerdictRaw = String(engineV2?.Decision?.final_verdict || "").toLowerCase();
   const verdictUi = useMemo(() => {
     if (finalVerdictRaw === "do_not_apply" || (impactProjection?.current ?? 0) < 55) {
@@ -7136,6 +7118,24 @@ export function AnalyzerPage() {
       matchPill: lang === "TR" ? "Guclu Rol Eslesmesi" : "Strong Role Match",
     };
   }, [finalVerdictRaw, impactProjection?.current, lang]);
+  const recruiterNarrative = useMemo(
+    () => sanitizeRecruiterNarrative(aiRecruiterView || sanitizedPrimaryReason || verdictUi.recruiterLine, lang),
+    [aiRecruiterView, sanitizedPrimaryReason, verdictUi.recruiterLine, lang]
+  );
+  const topPerceptionInsight = useMemo(() => buildTopPerceptionInsight({
+    lang,
+    narrative: recruiterNarrative,
+    tone: recruiterTone,
+    roleSuggestions,
+  }), [lang, recruiterNarrative, recruiterTone, roleSuggestions]);
+  const recruiterNarrativeParts = useMemo(
+    () => splitRecruiterNarrative(recruiterNarrative, lang),
+    [recruiterNarrative, lang]
+  );
+  const recruiterWantedSignal = useMemo(
+    () => buildRecruiterWantedSignal({ lang, reasons: aiReasons, recruiterView: aiRecruiterView, firstAction }),
+    [lang, aiReasons, aiRecruiterView, firstAction]
+  );
 
   useEffect(() => {
     if (!user?.email) return;
