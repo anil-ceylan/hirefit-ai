@@ -6612,7 +6612,7 @@ export function AnalyzerPage() {
     engineV2, alignmentScore, decisionData,
     openUpgrade, optimizeCv, optimizing,
     applyingFix, setApplyingFix, showAnonSavePrompt, setShowAnonSavePrompt,
-    showSignupPrompt,
+    showSignupPrompt, setShowSignupPrompt,
     analysisData, missingSkills, roleType,
     reanalysisResult, history, clearHistory, loadHistoryItem, setWaitlist, setReanalysisBaseline, setTargetRole,
   } = useOutletContext();
@@ -7360,52 +7360,6 @@ export function AnalyzerPage() {
       </div>
     )}
 
-    {showSignupPrompt && (
-      <div
-        style={{
-          padding: "16px 18px",
-          borderRadius: 12,
-          background: "rgba(99,102,241,0.08)",
-          border: "1px solid rgba(99,102,241,0.28)",
-          color: "#e2e8f0",
-          marginBottom: 16,
-        }}
-      >
-        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
-          {"Sonucunu görmek için ücretsiz kayıt ol"}
-        </div>
-        <div style={{ display: "grid", gap: 7, fontSize: 14, color: "#cbd5e1", marginBottom: 14 }}>
-          {[
-            "Tüm analizlerini kaydet",
-            "Gelişimini takip et",
-            "Favori ilanlarını bir arada tut",
-          ].map((line) => (
-            <div key={line} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <CheckCircle2 size={15} color="#4ade80" />
-              <span>{line}</span>
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => navigate("/login")}
-          style={{
-            width: "100%",
-            padding: "11px 14px",
-            borderRadius: 10,
-            border: "1px solid rgba(99,102,241,0.45)",
-            background: "linear-gradient(135deg, rgba(99,102,241,0.85), rgba(59,130,246,0.85))",
-            color: "#fff",
-            fontSize: 14,
-            fontWeight: 800,
-            cursor: "pointer",
-          }}
-        >
-          {"Ücretsiz Kayıt Ol"}
-        </button>
-      </div>
-    )}
-
     </div>
     </div>
 
@@ -7780,6 +7734,84 @@ export function AnalyzerPage() {
     </motion.div>
     ) : null}
 
+    {showSignupPrompt ? (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 1300,
+          display: "grid",
+          placeItems: "center",
+          padding: 16,
+          background: "rgba(2,6,23,0.78)",
+          backdropFilter: "blur(2px)",
+        }}
+      >
+        <div
+          style={{
+            width: "min(520px, 96vw)",
+            borderRadius: 14,
+            border: "1px solid rgba(99,102,241,0.35)",
+            background: "linear-gradient(160deg,#0b1220,#05070f)",
+            padding: 18,
+            boxShadow: "0 24px 60px rgba(2,6,23,0.6)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
+            <div style={{ fontSize: 19, fontWeight: 800, color: "#e2e8f0" }}>
+              {"Sonucunu görmek için ücretsiz kayıt ol"}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowSignupPrompt(false)}
+              aria-label="Kapat"
+              style={{
+                width: 30,
+                height: 30,
+                borderRadius: 999,
+                border: "1px solid rgba(148,163,184,0.35)",
+                background: "rgba(15,23,42,0.6)",
+                color: "#cbd5e1",
+                fontSize: 18,
+                lineHeight: 1,
+                cursor: "pointer",
+              }}
+            >
+              {"×"}
+            </button>
+          </div>
+          <div style={{ display: "grid", gap: 7, fontSize: 14, color: "#cbd5e1", marginBottom: 14 }}>
+            {[
+              "Tüm analizlerini kaydet",
+              "Gelişimini takip et",
+              "Favori ilanlarını bir arada tut",
+            ].map((line) => (
+              <div key={line} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <CheckCircle2 size={15} color="#4ade80" />
+                <span>{line}</span>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate("/login")}
+            style={{
+              width: "100%",
+              padding: "11px 14px",
+              borderRadius: 10,
+              border: "1px solid rgba(99,102,241,0.45)",
+              background: "linear-gradient(135deg, rgba(99,102,241,0.88), rgba(59,130,246,0.88))",
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 800,
+              cursor: "pointer",
+            }}
+          >
+            {"Ücretsiz Kayıt Ol"}
+          </button>
+        </div>
+      </div>
+    ) : null}
     {showMarketInsightsModal ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.76)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
         <div style={{ width: "min(560px, 96vw)", borderRadius: 14, border: "1px solid rgba(99,102,241,0.3)", background: "linear-gradient(160deg,#0b1220,#05070f)", padding: 18 }}>
