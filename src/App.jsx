@@ -6094,9 +6094,13 @@ function HireFitLayout() {
   };
 
   const loginWithGoogle = async () => {
+    const authRedirectTo =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/dashboard`
+        : "https://www.hirefit.co/dashboard";
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: "https://hirefit-ai.vercel.app/dashboard" }
+      options: { redirectTo: authRedirectTo }
     });
     if (error) console.error(error);
   };
@@ -6107,17 +6111,21 @@ function HireFitLayout() {
       return;
     }
     try {
+      const authRedirectTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/dashboard`
+          : "https://www.hirefit.co/dashboard";
       const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: "https://hirefit-ai.vercel.app/dashboard" },
+        options: { emailRedirectTo: authRedirectTo },
       });
       if (authError) {
         setError(sanitizeUserErrorMessage(authError.message, lang));
         return;
       }
-      if (data?.session?.user || data?.user) {
-        setUser(data.session?.user || data.user);
+      if (data?.session?.user) {
+        setUser(data.session.user);
         setError(
           lang === "TR"
             ? "Kayıt başarılı. Devam edebilirsin."
