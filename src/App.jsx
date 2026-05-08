@@ -5344,6 +5344,7 @@ function HireFitLayout() {
   const [adminGrantError, setAdminGrantError] = useState("");
   const [adminGrantNotice, setAdminGrantNotice] = useState("");
   const [showAnonSavePrompt, setShowAnonSavePrompt] = useState(false);
+  const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   const [deadline, setDeadline] = useState("1_week");
   const [targetRole, setTargetRole] = useState("");
   const [decisionData, setDecisionData] = useState(null);
@@ -5713,6 +5714,7 @@ function HireFitLayout() {
       setLoading(false);
     };
     setError("");
+    setShowSignupPrompt(false);
     setFixResults({});
     setDecisionData(null);
     setEngineV2(null);
@@ -5749,6 +5751,14 @@ function HireFitLayout() {
       if (!v2Res.ok) {
         const serverErr =
           typeof v2Payload?.error === "string" ? v2Payload.error : "";
+        const authDenied =
+          v2Res.status === 401 ||
+          /missing bearer token|invalid session token/i.test(serverErr);
+        if (authDenied) {
+          setShowSignupPrompt(true);
+          await finalizeAnalyzeLoading();
+          return;
+        }
         const msg =
           serverErr === "analysis_failed"
             ? (lang === "TR"
@@ -6245,6 +6255,8 @@ function HireFitLayout() {
     applyFix,
     showAnonSavePrompt,
     setShowAnonSavePrompt,
+    showSignupPrompt,
+    setShowSignupPrompt,
     analysisData,
     matchedSkills,
     missingSkills,
@@ -6600,6 +6612,7 @@ export function AnalyzerPage() {
     engineV2, alignmentScore, decisionData,
     openUpgrade, optimizeCv, optimizing,
     applyingFix, setApplyingFix, showAnonSavePrompt, setShowAnonSavePrompt,
+    showSignupPrompt,
     analysisData, missingSkills, roleType,
     reanalysisResult, history, clearHistory, loadHistoryItem, setWaitlist, setReanalysisBaseline, setTargetRole,
   } = useOutletContext();
@@ -7344,6 +7357,52 @@ export function AnalyzerPage() {
       >
         <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
         <span>{safeUiError}</span>
+      </div>
+    )}
+
+    {showSignupPrompt && (
+      <div
+        style={{
+          padding: "16px 18px",
+          borderRadius: 12,
+          background: "rgba(99,102,241,0.08)",
+          border: "1px solid rgba(99,102,241,0.28)",
+          color: "#e2e8f0",
+          marginBottom: 16,
+        }}
+      >
+        <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
+          {"Sonucunu görmek için ücretsiz kayıt ol"}
+        </div>
+        <div style={{ display: "grid", gap: 7, fontSize: 14, color: "#cbd5e1", marginBottom: 14 }}>
+          {[
+            "Tüm analizlerini kaydet",
+            "Gelişimini takip et",
+            "Favori ilanlarını bir arada tut",
+          ].map((line) => (
+            <div key={line} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <CheckCircle2 size={15} color="#4ade80" />
+              <span>{line}</span>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => navigate("/login")}
+          style={{
+            width: "100%",
+            padding: "11px 14px",
+            borderRadius: 10,
+            border: "1px solid rgba(99,102,241,0.45)",
+            background: "linear-gradient(135deg, rgba(99,102,241,0.85), rgba(59,130,246,0.85))",
+            color: "#fff",
+            fontSize: 14,
+            fontWeight: 800,
+            cursor: "pointer",
+          }}
+        >
+          {"Ücretsiz Kayıt Ol"}
+        </button>
       </div>
     )}
 
