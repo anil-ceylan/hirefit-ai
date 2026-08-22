@@ -1,23 +1,26 @@
-import { Fragment, useMemo } from "react";
+﻿import { Fragment, useMemo } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { parseActionPlan, enrichActionPlan, pickDoThisNextStep } from "../lib/analyze-v2/actionPlanNormalize.js";
+import { trackActivationEvent } from "./utils/activationEvents.js";
 import {
   ShieldCheck,
-  Lock,
   Eye,
   Server,
-  BadgeCheck,
-  X,
   Sparkles,
   CheckCircle2,
   Cpu,
   Wand2,
   RotateCcw,
   Zap,
+  ArrowRight,
+  ChevronDown,
   Loader2,
   TrendingUp,
   FileText,
 } from "lucide-react";
+
+const CLOSED_BETA_COHORT = "closed_beta_01";
 
 const container = {
   maxWidth: "min(1500px, 100%)",
@@ -39,26 +42,25 @@ const pill = {
   fontWeight: 700,
   color: "#60a5fa",
   letterSpacing: "0.1em",
-  textTransform: "uppercase",
   marginBottom: 16,
 };
 
 const h2 = {
-  fontFamily: "'Syne', sans-serif",
-  fontSize: "clamp(32px, 4vw, 52px)",
-  fontWeight: 800,
-  letterSpacing: "-0.03em",
+  fontFamily: "var(--font-display)",
+  fontSize: "var(--text-heading-xl)",
+  fontWeight: 700,
+  letterSpacing: "var(--tracking-heading)",
   marginBottom: 14,
-  lineHeight: 1.1,
+  lineHeight: "var(--leading-heading)",
   color: "#f8fafc",
 };
 
 const sub = {
   color: "#94a3b8",
-  fontSize: "16px",
+  fontSize: "var(--text-body-lg)",
   maxWidth: 560,
   margin: "0 auto 48px",
-  lineHeight: 1.65,
+  lineHeight: "var(--leading-body)",
 };
 
 const RAW_PARSE_FAIL_RE = /\b(parsing failed|gpt parsing failed|parse failed|json parse)\b/i;
@@ -116,7 +118,7 @@ export function SocialProofSection({ lang }) {
             </span>
             <span className="hf-badge-soft">
               <Sparkles size={12} strokeWidth={2.2} />
-              AI-powered
+              {tr ? "AI destekli" : "AI-supported"}
             </span>
           </div>
         </div>
@@ -149,30 +151,251 @@ export function SocialProofSection({ lang }) {
   );
 }
 
+export function ProductPreviewSection({ lang, navigate }) {
+  const tr = lang === "TR";
+  const [explanationOpen, setExplanationOpen] = useState(false);
+
+  const preview = tr
+    ? {
+        label: "ÜRÜN ÖNİZLEMESİ",
+        headline: "HireFit sana yalnızca skor göstermez.",
+        copy: "Rol yönünü, karar güvenini, en önemli kanıt açığını ve sıradaki en yüksek etkili hamleni tek ekranda gör.",
+        sample: "Örnek profil",
+        chromeTitle: "Career Snapshot",
+        profilePlaceholder: "Profil",
+        identityLabel: "Kariyer Kimliği",
+        identity: "Analytical Product Builder",
+        identityText: "Ürün, analiz ve iş sistemleri arasında güçlü bir geçiş profili.",
+        confidenceLabel: "Karar Güveni",
+        confidence: "Orta",
+        confidenceText: "Ürün ve analiz sinyalleri güçlü; paydaş etkisi kanıtı henüz sınırlı.",
+        roleLabel: "En Güçlü Rol Yönü",
+        role: "Strategy & Operations Intern",
+        roleText: "Mevcut kanıtların bu role daha yakın.",
+        gapLabel: "En Büyük Kanıt Açığı",
+        gap: "Paydaş etkisi",
+        gapText: "Projelerinde kararlarının kimleri ve nasıl etkilediğini görünür kıl.",
+        moveLabel: "Bu Haftaki En Yüksek Etkili Hamle",
+        move: "Bir projene ölçülebilir paydaş etkisi ekle.",
+        explainCta: "Bu öneri neden?",
+        primaryCta: "Kariyer Profilini Oluştur",
+        secondaryCta: "Örnek Akışı İncele",
+        explanationTitle: "Açıklanabilir Karar Desteği",
+        explanation: [
+          { label: "Kanıt", text: "Ürün, analiz ve proje üretimi kanıtların mevcut." },
+          { label: "Yorum", text: "Profilin operasyon ve ürün odaklı rollerde daha güçlü okunuyor." },
+          { label: "Güven", text: "Orta; paydaş etkisi kanıtı sınırlı." },
+          { label: "Öneri", text: "Bir projede karar etkini ölçülebilir sonuçla görünür kıl." },
+        ],
+        chips: ["Sahiplenme", "Ürün düşüncesi", "Teknoloji odağı", "AI ilgisi", "Builder yönü"],
+      }
+    : {
+        label: "PRODUCT PREVIEW",
+        headline: "HireFit shows more than a score.",
+        copy: "See your role direction, decision confidence, biggest proof gap, and highest-impact next move in one screen.",
+        sample: "Sample profile",
+        chromeTitle: "Career Snapshot",
+        profilePlaceholder: "Profile",
+        identityLabel: "Career Identity",
+        identity: "Analytical Product Builder",
+        identityText: "A bridge profile across product, analysis, and business systems.",
+        confidenceLabel: "Decision Confidence",
+        confidence: "Medium",
+        confidenceText: "Product and analysis signals are strong; stakeholder impact proof is still limited.",
+        roleLabel: "Strongest Role Direction",
+        role: "Strategy & Operations Intern",
+        roleText: "Your current proof reads closer to this role.",
+        gapLabel: "Biggest Proof Gap",
+        gap: "Stakeholder impact",
+        gapText: "Make it visible who your decisions affected and how.",
+        moveLabel: "This Week's Highest-Impact Move",
+        move: "Add measurable stakeholder impact to one project.",
+        explainCta: "Why this recommendation?",
+        primaryCta: "Build Career Profile",
+        secondaryCta: "Review Example Flow",
+        explanationTitle: "Explainable Decision Support",
+        explanation: [
+          { label: "Evidence", text: "Product, analysis, and project-building proof is visible." },
+          { label: "Reasoning", text: "Your profile reads stronger for operations and product-oriented roles." },
+          { label: "Confidence", text: "Medium; stakeholder impact proof is limited." },
+          { label: "Recommendation", text: "Make decision impact visible with a measurable project outcome." },
+        ],
+        chips: ["Ownership mindset", "Product thinking", "Technology driven", "AI interest", "Builder mentality"],
+      };
+
+  const metricBlocks = [
+    { label: preview.identityLabel, value: preview.identity, text: preview.identityText, tone: "blue" },
+    { label: preview.confidenceLabel, value: preview.confidence, text: preview.confidenceText, tone: "amber" },
+    { label: preview.roleLabel, value: preview.role, text: preview.roleText, tone: "green" },
+    { label: preview.gapLabel, value: preview.gap, text: preview.gapText, tone: "rose" },
+  ];
+
+  const openExplanation = () => {
+    setExplanationOpen(true);
+    window.requestAnimationFrame(() => {
+      const el = document.getElementById("product-preview-explanation");
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      el?.querySelector("button")?.focus({ preventScroll: true });
+    });
+  };
+
+  const toggleExplanation = () => setExplanationOpen((open) => !open);
+
+  return (
+    <LandingScrollSection className="hf-section hf-section--product-preview" style={{ padding: "var(--hf-product-preview-pt, 120px) 0 var(--hf-flow-tight, 48px)" }}>
+      <div style={container}>
+        <div className="hf-product-preview-heading">
+          <div style={{ ...pill, marginBottom: 26 }}>{preview.label}</div>
+          <h2
+            style={{
+              ...h2,
+              maxWidth: 980,
+              margin: "0 auto 20px",
+              fontSize: "clamp(30px, 3.35vw, 46px)",
+            }}
+          >
+            {preview.headline}
+          </h2>
+          <p style={{ ...sub, maxWidth: 740, margin: "0 auto 52px" }}>{preview.copy}</p>
+        </div>
+
+        <div className="hf-product-preview-shell" aria-label={tr ? "HireFit ürün önizlemesi" : "HireFit product preview"}>
+          <div className="hf-product-preview-topbar">
+            <div className="hf-product-preview-brand">
+              <span className="hf-product-preview-logo" aria-hidden>
+                H
+              </span>
+              <span>HireFit</span>
+            </div>
+            <div className="hf-product-preview-title">{preview.chromeTitle}</div>
+            <div className="hf-product-preview-account" aria-label={preview.profilePlaceholder}>
+              <span aria-hidden />
+              {preview.profilePlaceholder}
+            </div>
+          </div>
+
+          <div className="hf-product-preview-sample-row">
+            <span className="hf-product-preview-sample">{preview.sample}</span>
+            <span className="hf-product-preview-muted">
+              {tr ? "Demo içerik; canlı kullanıcı verisi değildir." : "Demo content; not live user data."}
+            </span>
+          </div>
+
+          <div className="hf-product-preview-main">
+            <div className="hf-product-preview-left">
+              <div className="hf-product-preview-hero-card">
+                <div className="hf-product-preview-kicker">{preview.moveLabel}</div>
+                <h3>{preview.move}</h3>
+                <p>{tr ? "Önce en yüksek güven etkisi olan kanıtı görünür yap." : "Start by making the proof with the highest trust impact visible."}</p>
+                <button type="button" className="hf-product-preview-explain-cta" onClick={openExplanation}>
+                  {preview.explainCta}
+                  <ArrowRight size={15} aria-hidden />
+                </button>
+              </div>
+
+              <div id="product-preview-explanation" className="hf-product-preview-explanation">
+                <button
+                  type="button"
+                  className="hf-product-preview-explanation-toggle"
+                  aria-expanded={explanationOpen}
+                  aria-controls="product-preview-explanation-panel"
+                  onClick={toggleExplanation}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      toggleExplanation();
+                    }
+                  }}
+                >
+                  <span>{preview.explanationTitle}</span>
+                  <ChevronDown size={16} aria-hidden />
+                </button>
+                <div
+                  id="product-preview-explanation-panel"
+                  className="hf-product-preview-explanation-panel"
+                  hidden={!explanationOpen}
+                >
+                  {preview.explanation.map((item) => (
+                    <div key={item.label} className="hf-product-preview-explanation-step">
+                      <div>{item.label}</div>
+                      <p>{item.text}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="hf-product-preview-grid">
+              {metricBlocks.map((item) => (
+                <article key={item.label} className={`hf-product-preview-card hf-product-preview-card--${item.tone}`}>
+                  <div>{item.label}</div>
+                  <h3>{item.value}</h3>
+                  <p>{item.text}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="hf-product-preview-evidence">
+            {preview.chips.slice(0, 5).map((chip) => (
+              <span key={chip}>
+                <CheckCircle2 size={13} aria-hidden />
+                {chip}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="hf-product-preview-actions">
+          <button
+            type="button"
+            className="hf-cta-primary"
+            onClick={() => {
+              trackActivationEvent("landing_cta_clicked", {
+                source: "product_preview",
+                route: "/analyze",
+                lang,
+                beta_cohort: CLOSED_BETA_COHORT,
+              });
+              navigate("/analyze");
+            }}
+          >
+            {preview.primaryCta}
+            <ArrowRight size={16} aria-hidden />
+          </button>
+          <button type="button" className="hf-btn-ghost hf-product-preview-secondary" onClick={openExplanation}>
+            {preview.secondaryCta}
+          </button>
+        </div>
+      </div>
+    </LandingScrollSection>
+  );
+}
+
 export function HowItWorksSection({ lang }) {
   const tr = lang === "TR";
   const steps = tr
     ? [
-        { n: "1", title: "CV + ilanı yapıştır", body: "Gerçek ilan metniyle eşleştiririz — tahmin değil.", icon: FileText },
-        { n: "2", title: "Kararı ve boşlukları gör", body: "Red riski, eksik anahtar kelimeler ve net boşluklar.", icon: Zap },
-        { n: "3", title: "Düzelt → tekrar analiz et", body: "Aynı döngü: düzelt, tekrar çalıştır, ilerlemeyi gör.", icon: RotateCcw },
+        { n: "1", title: "Kariyer profilini oluştur", body: "Kariyer Keşfi, deneyimlerin, projelerin ve CV kanıtların bir araya geldiği ilk analizdir.", icon: FileText },
+        { n: "2", title: "Rol yönünü ve kanıt açıklarını gör", body: "En güçlü rol yönlerin, mevcut kanıtların ve kritik eksiklerin netleşir.", icon: Zap },
+        { n: "3", title: "Sonraki en iyi hamleni uygula", body: "Tek bir yüksek etkili aksiyonla profilini ve başvuru hazırlığını güçlendir.", icon: RotateCcw },
       ]
     : [
-        { n: "1", title: "Paste CV + real JD", body: "We match against the actual posting — not guesses.", icon: FileText },
-        { n: "2", title: "See the decision + gaps", body: "Rejection risk, missing keywords, and clear gaps.", icon: Zap },
-        { n: "3", title: "Fix → re-run", body: "Same loop: fix, re-analyze, watch strength climb.", icon: RotateCcw },
+        { n: "1", title: "Build your career profile", body: "Career Discovery brings together your experience, projects, and CV proof in one first analysis.", icon: FileText },
+        { n: "2", title: "See role direction and proof gaps", body: "Your strongest role directions, current evidence, and critical gaps become clear.", icon: Zap },
+        { n: "3", title: "Act on the next best move", body: "Use one high-impact action to strengthen your profile and application readiness.", icon: RotateCcw },
       ];
 
   return (
-    <LandingScrollSection className="hf-section hf-section--how" style={{ padding: "72px 0" }}>
+    <LandingScrollSection className="hf-section hf-section--how" style={{ padding: "var(--hf-flow-standard, 56px) 0 var(--hf-flow-tight, 48px)" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 44 }}>
           <div style={pill}>{tr ? "Nasıl çalışır" : "How it works"}</div>
           <h2 style={h2}>{tr ? "Üç adımda netlik" : "Clarity in three steps"}</h2>
           <p style={sub}>
             {tr
-              ? "Skor için değil — başvurup başvurmama ve sıradaki hamle için buradasınız."
-              : "Not for vanity scores — you’re here for apply / don’t apply and your next move."}
+              ? "Önce kariyer yönünü netleştir; CV analizini daha sonra bu varsayımları doğrulamak için kullan."
+              : "Clarify career direction first; use CV analysis later to validate those assumptions."}
           </p>
         </div>
         <div
@@ -206,8 +429,8 @@ export function HowItWorksSection({ lang }) {
               >
                 <s.icon size={18} color="#a5b4fc" />
               </div>
-              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#64748b", marginBottom: 8 }}>STEP {s.n}</div>
-              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 800, margin: "0 0 10px", color: "#f1f5f9" }}>{s.title}</h3>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#64748b", marginBottom: 8 }}>{tr ? `ADIM ${s.n}` : `STEP ${s.n}`}</div>
+              <h3 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-md)", fontWeight: 700, lineHeight: "var(--leading-heading)", margin: "0 0 10px", color: "#f1f5f9" }}>{s.title}</h3>
               <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.6, color: "#94a3b8" }}>{s.body}</p>
             </div>
           ))}
@@ -221,26 +444,26 @@ export function DecisionEngineExplainedSection({ lang }) {
   const tr = lang === "TR";
   const verdictCards = tr
     ? [
-        { token: "strong", title: "✅ Güçlü eşleşme", body: "İlk elemeden geçme şansın gerçek.", kicker: "Başvur" },
-        { token: "risk", title: "⚠️ Riskli başvuru", body: "Yakınsın — ama recruiter'ın ilk turda aradığı kritik sinyaller eksik.", kicker: "Riskli başvuru" },
-        { token: "bad", title: "🚫 Büyük ihtimalle elenirsin", body: "Bu senin potansiyelin değil — bu rolün filtresiyle uyum eksikliği.", kicker: "Başvurma / bekle" },
+        { token: "strong", title: "Güçlü başvuru sinyali", body: "Mevcut kanıtlar role yakın görünüyor; başvuru öncesi anlatımı net tutmak önemli.", kicker: "Kanıt güçlü" },
+        { token: "risk", title: "Riskli başvuru", body: "Rol ilgisi var; ancak ilk elemede aranan kritik kanıtlar henüz yeterince görünür değil.", kicker: "Kanıt eksik" },
+        { token: "bad", title: "Şimdilik bekle", body: "Mevcut kanıtlarla elenme riski yüksek olabilir; önce en büyük kanıt açığını kapatmak daha doğru olur.", kicker: "Önce güçlendir" },
       ]
     : [
-        { token: "strong", title: "✅ Strong match", body: "Reality check: this is interview range. Recovery path: keep proof sharp and momentum high.", kicker: "Apply confidently" },
-        { token: "risk", title: "⚠️ Risky apply", body: "Reality check: still risky on first-pass scan. Recovery path: ship 1-2 proof lines and re-enter range.", kicker: "Apply with fixes" },
-        { token: "bad", title: "🚫 You will likely get rejected", body: "Reality check: this role still filters you out today. Recovery path: close the next 2 signal gaps and rerun.", kicker: "Do not apply yet" },
+        { token: "strong", title: "Strong application signal", body: "Current proof looks close to the role; keep the story clear before applying.", kicker: "Strong proof" },
+        { token: "risk", title: "Risky application", body: "There is role interest, but critical proof is not visible enough for a first-pass screen.", kicker: "Proof gap" },
+        { token: "bad", title: "Pause for now", body: "With current evidence, rejection risk may be high; close the biggest proof gap first.", kicker: "Strengthen first" },
       ];
 
   return (
-    <LandingScrollSection className="hf-section hf-section--decision" style={{ padding: "72px 0" }}>
+    <LandingScrollSection className="hf-section hf-section--decision" style={{ padding: "var(--hf-flow-tight, 48px) 0" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           <div style={pill}>{tr ? "Karar motoru" : "Decision engine"}</div>
-          <h2 style={h2}>{tr ? "Skor değil — karar + aksiyon" : "Not a score — a decision + action"}</h2>
+          <h2 style={h2}>{tr ? "Skor değil — açıklanabilir karar desteği" : "Not a score — explainable decision support"}</h2>
           <p style={sub}>
             {tr
-              ? "Üç ana karar çıktısı: başvur, riskli başvuru ve şimdilik başvurma — sonra aynı analizi yeniden çalıştır."
-              : "Three decision outputs: strong apply signal, risky apply, and pause — then re-run the same analysis."}
+              ? "HireFit, mevcut kanıtlara göre başvuru hazırlığını ve sıradaki hamleyi netleştirmene yardımcı olur."
+              : "HireFit helps clarify application readiness and the next move based on available evidence."}
           </p>
         </div>
         <div
@@ -284,7 +507,6 @@ export function DecisionEngineExplainedSection({ lang }) {
                   fontSize: 10,
                   fontWeight: 800,
                   letterSpacing: "0.14em",
-                  textTransform: "uppercase",
                   color:
                     v.token === "strong" ? "#6ee7b7" : v.token === "risk" ? "#fcd34d" : "#fca5a5",
                   marginBottom: 10,
@@ -292,7 +514,7 @@ export function DecisionEngineExplainedSection({ lang }) {
               >
                 {v.kicker}
               </div>
-              <div style={{ fontFamily: "'Syne',sans-serif", fontSize: "clamp(18px, 2.6vw, 22px)", fontWeight: 800, lineHeight: 1.2, marginBottom: 12, color: "#f8fafc" }}>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: "clamp(18px, 2.6vw, 22px)", fontWeight: 700, lineHeight: "var(--leading-heading)", marginBottom: 12, color: "#f8fafc" }}>
                 {v.title}
               </div>
               <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.65, color: "#cbd5e1" }}>{v.body}</p>
@@ -307,15 +529,15 @@ export function DecisionEngineExplainedSection({ lang }) {
 export function BeforeAfterSection({ lang }) {
   const tr = lang === "TR";
   return (
-    <LandingScrollSection className="hf-section hf-section--before-after" style={{ padding: "72px 0" }}>
+    <LandingScrollSection className="hf-section hf-section--before-after" style={{ padding: "var(--hf-flow-tight, 48px) 0" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 36 }}>
           <div style={pill}>{tr ? "Önce / Sonra" : "Before / After"}</div>
           <h2 style={h2}>{tr ? "Aynı başvuru — daha güçlü profil" : "Same application — stronger profile"}</h2>
           <p style={sub}>
             {tr
-              ? "Örnek: ölçülebilir etki + doğru anahtar kelimeler → profil gücü yükselir."
-              : "Example: measurable impact + the right keywords → profile strength climbs."}
+              ? "Örnek: ölçülebilir etki ve role uygun kanıtlar, profilin daha net okunmasına yardımcı olur."
+              : "Example: measurable impact and role-relevant proof help the profile read more clearly."}
           </p>
         </div>
         <div
@@ -337,22 +559,22 @@ export function BeforeAfterSection({ lang }) {
               ))}
             </ul>
             <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>{tr ? "Profil gücü" : "Profile strength"}</div>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, color: "#f87171" }}>54</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>{tr ? "Okunabilirlik" : "Readability"}</div>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800, color: "#f87171" }}>{tr ? "Belirsiz" : "Unclear"}</div>
             </div>
           </div>
           <div className="hf-micro-lift hf-glass-card" style={glassCardStyle({ padding: 24 })}>
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#4ade80", marginBottom: 12 }}>{tr ? "SONRA" : "AFTER"}</div>
             <ul style={{ margin: 0, paddingLeft: 18, color: "#94a3b8", fontSize: 14, lineHeight: 1.7 }}>
               {(tr
-                ? ["Madde başına metrik + sonuç", "İlan diliyle hizalı anahtar kelimeler", "7 saniyede okunur hikâye"]
-                : ["Metrics + outcomes per bullet", "Keywords aligned to the posting", "A story recruiters scan in 7s"]).map((x) => (
+                ? ["Madde başına metrik + sonuç", "İlan diliyle uyumlu kanıtlar", "Daha hızlı anlaşılır rol hikâyesi"]
+                : ["Metrics + outcomes per bullet", "Proof aligned to the posting", "A role story that reads faster"]).map((x) => (
                 <li key={x}>{x}</li>
               ))}
             </ul>
             <div style={{ marginTop: 18, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>{tr ? "Profil gücü" : "Profile strength"}</div>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, color: "#4ade80" }}>81</div>
+              <div style={{ fontSize: 12, color: "#64748b", marginBottom: 6 }}>{tr ? "Okunabilirlik" : "Readability"}</div>
+              <div style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800, color: "#4ade80" }}>{tr ? "Daha net" : "Clearer"}</div>
             </div>
           </div>
         </div>
@@ -367,57 +589,47 @@ export function TrustSection({ lang }) {
     ? [
         {
           icon: ShieldCheck,
-          title: "Veriniz sizde kalır",
-          body: "CV ve ilan metniniz yalnızca analiz için işlenir; üçüncü taraf model sağlayıcıları tarafından model eğitimi için kullanılmaz (varsayılan API politikaları).",
-        },
-        {
-          icon: Lock,
-          title: "Güvenli bağlantı",
-          body: "Oturum ve ödeme akışlarında endüstri standardı şifreleme ve güvenilir barındırma kullanılır.",
+          title: "Veriniz üzerinde kontrol sizde",
+          body: "Profil ve CV verileriniz yalnızca HireFit deneyimini sunmak için işlenir.",
         },
         {
           icon: Eye,
-          title: "Şeffaflık",
-          body: "Skorlar ve öneriler, hangi sinyallere dayandığını anlayabileceğiniz şekilde sunulur — kara kutu değil.",
+          title: "Önerilerin nedenini görebilirsiniz",
+          body: "HireFit, önerilerini mümkün olduğunca kanıt ve açıklamalarla sunar.",
         },
         {
           icon: Server,
-          title: "Profesyonel danışmanlık değildir",
-          body: "HireFit bilgilendirme amaçlıdır; işe alım veya hukuki tavsiye yerine geçmez.",
+          title: "Karar desteği sunar",
+          body: "HireFit bilgilendirme ve karar desteği sağlar; işe alım, hukuk veya profesyonel danışmanlık garantisi vermez.",
         },
       ]
     : [
         {
           icon: ShieldCheck,
-          title: "Your data stays yours",
-          body: "Your CV and job text are processed for analysis only — not used to train third-party models under default API policies.",
-        },
-        {
-          icon: Lock,
-          title: "Secure by design",
-          body: "Industry-standard encryption for sessions and payments, hosted on reliable infrastructure.",
+          title: "You stay in control of your data",
+          body: "Profile and CV data are processed to provide the HireFit experience.",
         },
         {
           icon: Eye,
-          title: "Transparent outputs",
-          body: "Scores and suggestions are structured so you can see what signals drove them — not a black box.",
+          title: "You can see why",
+          body: "HireFit presents recommendations with evidence and explanations wherever possible.",
         },
         {
           icon: Server,
-          title: "Not career or legal advice",
-          body: "HireFit is informational only and does not replace a recruiter, coach, or attorney.",
+          title: "Decision support, not guarantees",
+          body: "HireFit provides informational decision support and does not guarantee hiring, legal, or professional advice outcomes.",
         },
       ];
 
   return (
-    <LandingScrollSection className="hf-section hf-section--trust" style={{ padding: "80px 0" }}>
+    <LandingScrollSection className="hf-section hf-section--trust" style={{ padding: "var(--hf-flow-standard, 56px) 0 var(--hf-flow-tight, 48px)" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 48 }}>
           <div style={pill}>{tr ? "Güven" : "Trust"}</div>
           <h2 style={h2}>{tr ? "Önce güven. Sonra netlik." : "Trust first. Then clarity."}</h2>
           <p style={sub}>
             {tr
-              ? "Kariyer veriniz hassastır. HireFit’i bu yüzden şeffaf ve sorumlu bir şekilde tasarladık."
+              ? "Kariyer verisi hassastır. Bu yüzden önerileri kanıta dayalı, açıklanabilir ve temkinli sunuyoruz."
               : "Career data is sensitive. We built HireFit to be transparent and responsible about how it is used."}
           </p>
         </div>
@@ -455,7 +667,7 @@ export function TrustSection({ lang }) {
               >
                 <Icon size={22} color="#60a5fa" strokeWidth={2} />
               </div>
-              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: "18px", fontWeight: 700, marginBottom: 10, color: "#f1f5f9" }}>{title}</h3>
+              <h3 style={{ fontFamily: "var(--font-display)", fontSize: "18px", fontWeight: 700, marginBottom: 10, color: "#f1f5f9" }}>{title}</h3>
               <p style={{ color: "#64748b", fontSize: "14px", lineHeight: 1.7, margin: 0 }}>{body}</p>
             </div>
           ))}
@@ -470,115 +682,67 @@ export function HiringLogicQaSection({ lang }) {
   const items = tr
     ? [
         {
-          q: "HireFit CV’min eleneceğini nasıl biliyor?",
-          a: "CV’ni ilandaki gerçek filtrelerle eşleştirir: araç, seviye, kapsam ve kanıt. Sonra recruiter ilk eleme davranışını simüle eder. Sinyal zayıfsa red riski yükselir.",
-          insight: "→ Red çoğu zaman yetenek sorunu değil, sinyal uyumsuzluğudur.",
-          share: "“Çoğu kişi yetersiz değil. Çoğu kişi yanlış sinyal veriyor.”",
+          q: "HireFit ChatGPT’den nasıl farklı?",
+          a: "Genel sohbet yerine kariyer kararına odaklanır: rol yönü, kanıt açığı ve sıradaki hamle tek akışta görünür.",
         },
         {
-          q: "Neden ölçülebilir sonuca bu kadar odaklanıyorsunuz?",
-          a: "Çünkü recruiter emek değil, etki görür. “Responsible for” görünmez; “maliyeti %18 düşürdüm” görünür. İlk elemede potansiyelden çok kanıt kazanır.",
-          insight: "→ Recruiter çabayı değil, sonucu işe alır.",
-          share: "“CV bir hikaye değil. Kanıt dokümanıdır.”",
+          q: "HireFit yalnızca ATS anahtar kelimelerine mi bakıyor?",
+          a: "Hayır. Anahtar kelimeler sadece bir katmandır; rol yönü, kanıt kalitesi ve recruiter okuması birlikte değerlendirilir.",
         },
         {
-          q: "HireFit neden bazen başvurma diyor?",
-          a: "Çünkü zamanlama stratejidir. Profil rol barının çok altındaysa hemen başvuru genelde sessiz red olur. Önce düzeltme, sonra başvuru daha yüksek dönüşüm verir.",
-          insight: "→ Duygusal hız yerine stratejik gecikme daha çok dönüşüm getirir.",
-          share: "“Bazen en iyi başvuru, henüz göndermediğindir.”",
+          q: "Öneriler neye dayanıyor?",
+          a: "Kariyer Keşfi cevapların, varsa CV kanıtların, hedef rollerin ve profilinde görünen somut sinyaller kullanılır.",
         },
         {
-          q: "Neden sadece beceri değil, proje öneriyorsunuz?",
-          a: "CV’de beceri bir iddia, proje kanıttır. Hiring ekipleri repo, dashboard ve vaka çıktısı gibi görünür üretime güvenir. Kararı değiştiren “biliyorum” değil, “yaptım” sinyalidir.",
-          insight: "→ Beceriler anlatır, projeler ispatlar.",
-          share: "“‘SQL biliyorum’ zayıf. ‘SQL ile bunu ürettim’ güçlü.”",
+          q: "Kariyer verilerim nasıl kullanılıyor?",
+          a: "Verileriniz HireFit deneyimini sunmak, profilinizi oluşturmak ve önerileri kişiselleştirmek için işlenir.",
         },
         {
-          q: "Bu sadece ATS anahtar kelime aracı değil mi?",
-          a: "Hayır. Anahtar kelime sadece ilk katman. HireFit rol uyumu, deneyim derinliği, etki kalitesi ve güvenilirlik sinyalini de okur. ATS’yi geçmek mülakat için tek başına yetmez.",
-          insight: "→ ATS’yi geçmek giriş bileti; recruiter filtresini geçmek sonuçtur.",
-          share: "“ATS görünürlük sağlar. Sinyal geri dönüşüm sağlar.”",
+          q: "Sonuçlar işe girme garantisi verir mi?",
+          a: "Hayır. HireFit karar desteği sağlar; işe alım sonucu, mülakat veya teklif garantisi vermez.",
         },
         {
-          q: "ChatGPT’den farkı ne?",
-          a: "Genel sohbet yerine başvuru öncesi karar üretir. Çıktı net: risk, ana boşluk, ilk hamle. Daha az genel öneri, daha çok işe alım paterni.",
-          insight: "→ Tavsiye ilginçtir, karar kullanışlıdır.",
-          share: "“Genel AI kulağa iyi geleni söyler. HireFit görüşme getirebilecek sinyali söyler.”",
-        },
-        {
-          q: "Bu gerçekten şansımı artırır mı?",
-          a: "Evet, önerilen düzeltmeleri uygularsan. CV’lerin çoğu saniyeler içinde taranır ve zayıf sinyal hızla elenir. Kanıt, hedefleme ve alaka arttığında görüşme ihtimali yükselir.",
-          insight: "→ Şans, sinyal kalitesi arttıkça artar.",
-          share: "“Görüşme ihtimali şansla değil, sinyal kalitesiyle yükselir.”",
-        },
-        {
-          q: "Recruiter neden bu kadar hızlı eliyor?",
-          a: "Çünkü ilk turda okumuyor, tarıyor. Saniyeler içinde rol uyumu ve kanıt arıyor. Net sinyal yoksa sıradaki adaya geçiyor.",
-          insight: "→ Çoğu CV yanlış okunmaz; hiç derin okunmaz.",
-          share: "“CV’ler çoğu zaman reddedilmez. Sadece atlanır.”",
+          q: "Ücretsiz sürümde ne alırım?",
+          a: "İlk Career Snapshot, temel rol yönleri, en büyük kanıt açığı ve ilk sonraki hamle görünür.",
         },
       ]
     : [
         {
-          q: "How does HireFit know if my CV will be rejected?",
-          a: "It matches your CV to real hiring filters in the JD: tools, scope, level, and proof. Then it simulates first-screen recruiter behavior. If signal is weak, rejection risk rises.",
-          insight: "→ Rejection is usually a signal mismatch, not a talent verdict.",
-          share: "\"Most people aren’t underqualified. They’re under-signaled.\"",
+          q: "How is HireFit different from ChatGPT?",
+          a: "It focuses on career decisions: role direction, proof gaps, and the next move in one structured flow.",
         },
         {
-          q: "Why do you focus on measurable results?",
-          a: "Because recruiters evaluate impact, not effort. “Responsible for” gets ignored; “increased X by 30%” gets noticed. Proof beats potential in first-round screening.",
-          insight: "→ Recruiters don’t hire effort. They hire evidence.",
-          share: "\"Your CV isn’t a story. It’s a proof document.\"",
+          q: "Is HireFit only an ATS keyword tool?",
+          a: "No. Keywords are one layer; role direction, proof quality, and recruiter-style reading are considered together.",
         },
         {
-          q: "Why does HireFit sometimes tell me NOT to apply?",
-          a: "Because timing is strategy. If your profile is far below the hiring bar, applying now usually means silent rejection. Fix first, then apply stronger.",
-          insight: "→ Strategic delay beats emotional apply-now.",
-          share: "\"Sometimes the smartest application is the one you don’t send yet.\"",
+          q: "What are recommendations based on?",
+          a: "Career Discovery answers, available CV proof, target roles, and concrete signals visible in your profile.",
         },
         {
-          q: "Why do you suggest projects instead of just skills?",
-          a: "Skills on a CV are claims; projects are receipts. Hiring teams trust visible output: repos, dashboards, case work, shipped proof. Concrete evidence changes decisions.",
-          insight: "→ Skills tell. Projects prove.",
-          share: "\"‘I know SQL’ is weak. ‘Here’s what I built with SQL’ wins.\"",
+          q: "How is my career data used?",
+          a: "Your data is processed to provide the HireFit experience, build your profile, and personalize recommendations.",
         },
         {
-          q: "Isn’t this just an ATS keyword tool?",
-          a: "No. Keywords are one layer. HireFit also checks role fit, experience depth, impact quality, and credibility signals. Passing ATS alone does not secure interviews.",
-          insight: "→ Beating ATS is entry. Beating recruiter logic is outcome.",
-          share: "\"ATS gets you seen. Signal gets you called.\"",
+          q: "Do results guarantee a job?",
+          a: "No. HireFit provides decision support; it does not guarantee interviews, offers, or hiring outcomes.",
         },
         {
-          q: "How is this different from ChatGPT?",
-          a: "ChatGPT gives broad advice. HireFit gives pre-apply decisions: risk, core gap, and first move. Less generic talk, more recruiter pattern logic.",
-          insight: "→ Advice is interesting. Decisions are useful.",
-          share: "\"General AI tells you what sounds good. Hiring AI tells you what gets through.\"",
-        },
-        {
-          q: "Can this actually improve my chances?",
-          a: "Yes, if you execute the fixes. Most CVs are filtered in seconds when signal quality is weak. Better proof, targeting, and relevance increase interview odds.",
-          insight: "→ Better CV signal creates better recruiter behavior.",
-          share: "\"Interview chances don’t jump by luck. They move by signal.\"",
-        },
-        {
-          q: "Why do recruiters reject so fast?",
-          a: "They don’t fully read in first pass — they scan. They look for role match and proof in seconds. No clear signal means next candidate.",
-          insight: "→ Most CVs aren’t read wrong. They’re never read deeply.",
-          share: "\"Most CVs don’t get rejected. They get skipped.\"",
+          q: "What do I get for free?",
+          a: "Your first Career Snapshot, basic role directions, biggest proof gap, and first next move.",
         },
       ];
 
   return (
-    <LandingScrollSection className="hf-section hf-section--qa" style={{ padding: "80px 0" }}>
+    <LandingScrollSection className="hf-section hf-section--qa" style={{ padding: "var(--hf-flow-standard, 56px) 0" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 42 }}>
-          <div style={pill}>{tr ? "Insight Engine" : "Insight Engine"}</div>
-          <h2 style={h2}>{tr ? "Recruiter gerçeği, net karar" : "Recruiter truth, clear decisions"}</h2>
+          <div style={pill}>{tr ? "SSS" : "FAQ"}</div>
+          <h2 style={h2}>{tr ? "Kısa cevaplarla güven" : "Trust, answered simply"}</h2>
           <p style={sub}>
             {tr
-              ? "Bu bir SSS değil. Ekran görüntüsü alınacak kadar net, paylaşılacak kadar güçlü işe alım içgörüleri."
-              : "Not a FAQ. Screenshot-worthy hiring truths designed for trust, persuasion, and sharing."}
+              ? "HireFit’in ne yaptığı, neye dayandığı ve neyi garanti etmediği net olmalı."
+              : "What HireFit does, what it is based on, and what it does not guarantee should be clear."}
           </p>
         </div>
 
@@ -604,40 +768,17 @@ export function HiringLogicQaSection({ lang }) {
                     border: "1px solid rgba(99,102,241,0.35)",
                     color: "#c7d2fe",
                     fontSize: 12,
-                    fontWeight: 900,
+                    fontWeight: 800,
                     lineHeight: 1,
                   }}
                 >
                   ?
                 </span>
-                <h3 style={{ margin: 0, fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#f8fafc", lineHeight: 1.3 }}>
+                <h3 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, color: "#f8fafc", lineHeight: "var(--leading-heading)" }}>
                   {item.q}
                 </h3>
               </div>
               <div style={{ color: "#cbd5e1", fontSize: 14, lineHeight: 1.6, marginBottom: 12 }}>{item.a}</div>
-              <div
-                style={{
-                  borderRadius: 12,
-                  border: "1px solid rgba(16,185,129,0.22)",
-                  background: "linear-gradient(180deg, rgba(16,185,129,0.08), rgba(16,185,129,0.03))",
-                  padding: "10px 12px",
-                  marginBottom: 8,
-                }}
-              >
-                <div style={{ fontSize: 10, letterSpacing: "0.08em", fontWeight: 800, color: "#6ee7b7", marginBottom: 4 }}>INSIGHT</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#d1fae5", lineHeight: 1.45 }}>{item.insight}</div>
-              </div>
-              <div
-                style={{
-                  borderRadius: 12,
-                  border: "1px solid rgba(99,102,241,0.24)",
-                  background: "linear-gradient(180deg, rgba(99,102,241,0.09), rgba(99,102,241,0.03))",
-                  padding: "10px 12px",
-                }}
-              >
-                <div style={{ fontSize: 10, letterSpacing: "0.08em", fontWeight: 800, color: "#c7d2fe", marginBottom: 4 }}>{tr ? "SHARE" : "SHARE"}</div>
-                <div style={{ fontSize: 13, color: "#e2e8f0", lineHeight: 1.45 }}>{item.share}</div>
-              </div>
             </div>
           ))}
         </div>
@@ -650,28 +791,27 @@ export function ComparisonSection({ lang }) {
   const tr = lang === "TR";
   const rows = tr
     ? [
-        { label: "Net başvuru kararı (risk / güçlü)", hf: true, ats: false, chat: false },
-        { label: "İlan metninden gerçek anahtar kelimeler", hf: true, ats: "kısmi", chat: false },
-        { label: "Red nedenleri + düzeltme önceliği", hf: true, ats: false, chat: "kısmi" },
-        { label: "Sektör / işe alım dili", hf: true, ats: false, chat: false },
-        { label: "ATS + içerik + recruiter bakışı bir arada", hf: true, ats: "kısmi", chat: false },
+        { label: "Kariyer profili ve rol yönü", hf: "Odaklı", ats: "Sınırlı", chat: "Bağlama göre" },
+        { label: "İlan bazlı CV analizi", hf: "Odaklı", ats: "Temel", chat: "Bağlama göre" },
+        { label: "Kanıt açıklarını önceliklendirme", hf: "Odaklı", ats: "Sınırlı", chat: "Bağlama göre" },
+        { label: "Açıklanabilir öneri", hf: "Kanıt odaklı", ats: "Temel", chat: "Bağlama göre" },
+        { label: "Zaman içindeki kariyer gelişimini takip etme", hf: "Gelişiyor", ats: "Sınırlı", chat: "Sınırlı" },
       ]
     : [
-        { label: "Clear apply / risky / don’t apply verdict", hf: true, ats: false, chat: false },
-        { label: "Real JD keywords (not guesses)", hf: true, ats: "partial", chat: false },
-        { label: "Rejection reasons + what to fix first", hf: true, ats: false, chat: "partial" },
-        { label: "Sector-aware hiring bar", hf: true, ats: false, chat: false },
-        { label: "ATS + narrative + recruiter in one flow", hf: true, ats: "partial", chat: false },
+        { label: "Career profile and role direction", hf: "Focused", ats: "Limited", chat: "Context-dependent" },
+        { label: "Job-specific CV analysis", hf: "Focused", ats: "Basic", chat: "Context-dependent" },
+        { label: "Proof-gap prioritization", hf: "Focused", ats: "Limited", chat: "Context-dependent" },
+        { label: "Explainable recommendation", hf: "Evidence-led", ats: "Basic", chat: "Context-dependent" },
+        { label: "Career progress over time", hf: "Developing", ats: "Limited", chat: "Limited" },
       ];
 
   const colHead = (text, accent) => (
     <div
       style={{
-        fontFamily: "'Syne', sans-serif",
+        fontFamily: "var(--font-display)",
         fontSize: "13px",
         fontWeight: 800,
         letterSpacing: "0.06em",
-        textTransform: "uppercase",
         color: accent,
         padding: "12px 14px",
         borderBottom: "1px solid rgba(255,255,255,0.08)",
@@ -684,38 +824,34 @@ export function ComparisonSection({ lang }) {
     </div>
   );
 
-  const cell = (v) => {
-    if (v === true) {
-      return (
-        <div style={{ display: "flex", justifyContent: "center", padding: "14px" }}>
-          <BadgeCheck size={22} color="#34d399" strokeWidth={2.2} />
-        </div>
-      );
-    }
-    if (v === "partial") {
-      return (
-        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "14px", color: "#fbbf24", fontSize: "12px", fontWeight: 700 }}>
-          ~
-        </div>
-      );
-    }
-    return (
-      <div style={{ display: "flex", justifyContent: "center", padding: "14px" }}>
-        <X size={20} color="#64748b" strokeWidth={2} />
-      </div>
-    );
-  };
+  const cell = (v, highlighted = false) => (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        padding: "14px",
+        color: highlighted ? "#bfdbfe" : "#94a3b8",
+        fontSize: "12px",
+        fontWeight: 800,
+        textAlign: "center",
+        lineHeight: 1.35,
+      }}
+    >
+      {v}
+    </div>
+  );
 
   return (
     <LandingScrollSection className="hf-section hf-section--compare" style={{ padding: "80px 0" }}>
       <div style={container}>
         <div style={{ textAlign: "center", marginBottom: 40 }}>
           <div style={pill}>{tr ? "Karşılaştırma" : "Comparison"}</div>
-          <h2 style={h2}>{tr ? "Genel ATS araçları veya sohbet değil" : "Not a generic ATS tool — or a chatbot"}</h2>
+          <h2 style={h2}>{tr ? "CV analizinden daha geniş bir karar akışı" : "A broader decision flow than CV analysis"}</h2>
           <p style={sub}>
             {tr
-              ? "HireFit, tek bir skorun ötesinde işe alım filtresini simüle eder. Aşağıda tipik farkları görebilirsiniz."
-              : "HireFit simulates how hiring filters actually behave — beyond a single keyword score. Here’s how it typically compares."}
+              ? "Bu karşılaştırma genel ürün odaklarını gösterir; her aracın sonucu kullanım bağlamına göre değişebilir."
+              : "This comparison shows general product focus; results can vary by use case and context."}
           </p>
         </div>
 
@@ -742,8 +878,8 @@ export function ComparisonSection({ lang }) {
             <div className="hf-verdict-column-cell" style={{ background: "rgba(59,130,246,0.06)" }}>
               {colHead("HireFit", "#93c5fd")}
             </div>
-            <div>{colHead(tr ? "Tipik ATS kontrolü" : "Typical ATS checker", "#64748b")}</div>
-            <div>{colHead(tr ? "Genel sohbet AI" : "Generic chat AI", "#64748b")}</div>
+            <div>{colHead(tr ? "Genel ATS kontrolü" : "Generic ATS checker", "#64748b")}</div>
+            <div>{colHead(tr ? "Genel sohbet asistanı" : "General chat assistant", "#64748b")}</div>
 
             {rows.map((row) => (
               <Fragment key={row.label}>
@@ -766,7 +902,7 @@ export function ComparisonSection({ lang }) {
                     borderTop: "1px solid rgba(255,255,255,0.06)",
                   }}
                 >
-                  {cell(row.hf)}
+                  {cell(row.hf, true)}
                 </div>
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>{cell(row.ats)}</div>
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>{cell(row.chat)}</div>
@@ -799,7 +935,7 @@ export function YourNextMovePanel({
   const tr = lang === "TR";
   const data = engineV2;
 
-  const { problemLine, oneAction, currentInt, targetInt, gainPts } = useMemo(() => {
+  const { problemLine, oneAction, currentInt } = useMemo(() => {
     if (!data) {
       return {
         problemLine: "",
@@ -877,8 +1013,6 @@ export function YourNextMovePanel({
         { t: "Re-analyze", d: "Re-run with the same CV + JD." },
       ];
 
-  const fillPct = currentInt != null ? Math.min(100, Math.max(6, currentInt)) : 0;
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -910,7 +1044,7 @@ export function YourNextMovePanel({
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.12em", color: "#64748b", textTransform: "uppercase" }}>
               {tr ? "Sıradaki hamle" : "Your next move"}
             </div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "18px", fontWeight: 800, color: "#f8fafc", marginTop: 2 }}>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: "18px", fontWeight: 800, color: "#f8fafc", marginTop: 2 }}>
               {tr ? "Karar → aksiyon → tekrar analiz" : "Decision → action → re-run"}
             </div>
           </div>
@@ -927,22 +1061,33 @@ export function YourNextMovePanel({
               background: "rgba(16,185,129,0.08)",
             }}
           >
-            {tr ? "Son düzeltme: " : "Last fix: "}
-            {reanalysisResult.before}→{reanalysisResult.after} ({reanalysisResult.delta >= 0 ? "+" : ""}
-            {reanalysisResult.delta})
+            {tr ? "Okuma güçlendi" : "Read strengthened"}
           </div>
         ) : null}
       </div>
 
-      {currentInt != null && targetInt != null ? (
+      {currentInt != null ? (
         <div style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 8 }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: "#cbd5e1" }}>
               {tr ? "Profil gücü" : "Profile strength"}
             </span>
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 800, color: "#e2e8f0" }}>
-              {currentInt} → {targetInt}
-              <span style={{ marginLeft: 8, fontSize: 14, fontWeight: 700, color: "#4ade80" }}>+{gainPts}</span>
+            <span style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 800, color: "#e2e8f0" }}>
+              {tr
+                ? currentInt >= 78
+                  ? "Güçlü ihtimal"
+                  : currentInt >= 60
+                    ? "Orta ihtimal"
+                    : currentInt >= 50
+                      ? "Riskli başvuru"
+                      : "Düşük olasılık"
+                : currentInt >= 78
+                  ? "Strong potential"
+                  : currentInt >= 60
+                    ? "Medium potential"
+                    : currentInt >= 50
+                      ? "Risky application"
+                      : "Low probability"}
             </span>
           </div>
           <div
@@ -957,7 +1102,8 @@ export function YourNextMovePanel({
             <div
               style={{
                 height: "100%",
-                width: `${fillPct}%`,
+                width: "100%",
+                opacity: 0.35,
                 borderRadius: 999,
                 background: "linear-gradient(90deg, #6366f1, #22d3ee)",
                 boxShadow: "0 0 24px rgba(99,102,241,0.45)",
@@ -982,7 +1128,7 @@ export function YourNextMovePanel({
           </div>
           <div style={{ fontSize: 15, fontWeight: 600, color: "#fecdd3", lineHeight: 1.5 }}>
             {problemLine ||
-              (tr ? "Profilin, ilanın beklediği sinyalleri net göstermiyor." : "Your profile isn’t showing the signals this posting expects.")}
+              (tr ? "Profilin, ilanın beklediği kanıtları net göstermiyor." : "Your profile isn’t showing the proof this posting expects.")}
           </div>
         </div>
 
@@ -1011,7 +1157,7 @@ export function YourNextMovePanel({
               </div>
             </div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 6 }}>{tr ? "Deneyim sinyali" : "Experience signal"}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", marginBottom: 6 }}>{tr ? "Deneyim okuması" : "Experience read"}</div>
               <div style={{ fontSize: 13, color: "#e2e8f0", lineHeight: 1.55 }}>
                 {problemLine
                   ? tr
@@ -1083,7 +1229,7 @@ export function YourNextMovePanel({
             cursor: optimizing && isPro ? "wait" : "pointer",
             fontWeight: 700,
             fontSize: 15,
-            fontFamily: "'DM Sans', sans-serif",
+            fontFamily: "var(--font-sans)",
             color: "#0f172a",
             opacity: optimizing && isPro ? 0.85 : 1,
           }}
@@ -1109,7 +1255,7 @@ export function YourNextMovePanel({
             color: "#e2e8f0",
             fontWeight: 700,
             fontSize: 14,
-            fontFamily: "'DM Sans', sans-serif",
+            fontFamily: "var(--font-sans)",
             cursor: !String(optimizedCv || "").trim() ? "not-allowed" : "pointer",
             opacity: !String(optimizedCv || "").trim() ? 0.45 : 1,
           }}
@@ -1121,3 +1267,6 @@ export function YourNextMovePanel({
     </motion.div>
   );
 }
+
+
+

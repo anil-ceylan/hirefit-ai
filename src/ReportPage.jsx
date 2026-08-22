@@ -1,17 +1,15 @@
-import { useParams } from "react-router-dom";
+﻿import { useParams } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import supabase from "./supabaseClient";
 
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
-
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   .rp-root {
     min-height: 100vh;
     background: #060910;
     color: #f1f5f9;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
 
@@ -81,14 +79,14 @@ const styles = `
   }
 
   .rp-brand-name {
-    font-family: 'Syne', sans-serif;
+    font-family: var(--font-display);
     font-weight: 800;
     font-size: 16px;
     color: #f1f5f9;
   }
 
   .rp-role {
-    font-family: 'Syne', sans-serif;
+    font-family: var(--font-display);
     font-size: clamp(32px, 5vw, 52px);
     font-weight: 800;
     letter-spacing: -0.03em;
@@ -123,7 +121,7 @@ const styles = `
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     transition: all 0.2s;
   }
 
@@ -146,7 +144,7 @@ const styles = `
     font-weight: 600;
     cursor: pointer;
     text-decoration: none;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     transition: all 0.2s;
   }
 
@@ -215,7 +213,7 @@ const styles = `
   }
 
   .rp-score-num {
-    font-family: 'Syne', sans-serif;
+    font-family: var(--font-display);
     font-size: clamp(52px, 12vw, 96px);
     font-weight: 800;
     line-height: 1;
@@ -237,7 +235,7 @@ const styles = `
   }
 
   .rp-score-verdict {
-    font-family: 'Syne', sans-serif;
+    font-family: var(--font-display);
     font-size: 26px;
     font-weight: 800;
     letter-spacing: -0.02em;
@@ -338,7 +336,7 @@ const styles = `
     display: flex;
     align-items: center;
     gap: 10px;
-    font-family: 'Syne', sans-serif;
+    font-family: var(--font-display);
     font-size: 17px;
     font-weight: 700;
     margin-bottom: 20px;
@@ -453,7 +451,7 @@ const styles = `
   }
 
   .rp-intel-value {
-    font-family: 'Syne', sans-serif;
+    font-family: var(--font-display);
     font-size: 20px;
     font-weight: 700;
   }
@@ -470,7 +468,7 @@ const styles = `
   }
 
   .rp-cta h3 {
-    font-family: 'Syne', sans-serif;
+    font-family: var(--font-display);
     font-size: 22px;
     font-weight: 800;
     margin-bottom: 8px;
@@ -493,7 +491,7 @@ const styles = `
     text-decoration: none;
     font-weight: 700;
     font-size: 14px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     transition: all 0.2s;
   }
 
@@ -512,7 +510,7 @@ const styles = `
     justify-content: center;
     gap: 16px;
     color: #475569;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
   }
 
   .rp-spinner {
@@ -536,7 +534,7 @@ const styles = `
     border-radius: 10px;
     font-size: 13px;
     font-weight: 600;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     transition: transform 0.3s ease;
     z-index: 999;
   }
@@ -742,7 +740,7 @@ export default function ReportPage() {
           <div className="rp-card">
             <div className="rp-card-title" style={{ color: "#22d3ee" }}>Güven Seviyesi</div>
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 12 }}>
-              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, color: scoreColor }}>{score}%</span>
+              <span style={{ fontFamily: "var(--font-display)", fontSize: 36, fontWeight: 800, color: scoreColor }}>{score}%</span>
               <span style={{ color: "#475569", fontSize: 14 }}>işe alım olasılığı</span>
             </div>
             <div style={{ height: 6, background: "rgba(255,255,255,0.06)", borderRadius: 999, overflow: "hidden" }}>
@@ -862,3 +860,4 @@ export default function ReportPage() {
     </div>
   );
 }
+

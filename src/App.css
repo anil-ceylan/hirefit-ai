@@ -1,4 +1,4 @@
-.logo {
+﻿.logo {
   height: 6em;
   padding: 1.5em;
   will-change: filter;
@@ -44,7 +44,7 @@
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  font-family: "DM Sans", system-ui, sans-serif;
+  font-family: var(--font-sans);
   transition:
     transform 0.2s ease,
     border-color 0.2s ease,
@@ -72,18 +72,8 @@
     opacity 0.2s ease;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .hf-sector-chip--active {
-    animation: hf-sector-chip-breathe 2.8s ease-in-out infinite;
-  }
-
-  .hf-sector-chip--active .hf-sector-chip__dot {
-    animation: hf-sector-dot-pulse 1.35s ease-in-out infinite;
-  }
-
-  .hf-sector-lens-chip {
-    animation: hf-sector-lens-glow 4s ease-in-out infinite;
-  }
+.hf-sector-chip--active .hf-sector-chip__dot {
+  opacity: 1;
 }
 
 @keyframes hf-sector-dot-pulse {
@@ -127,24 +117,41 @@
   overflow: visible;
 }
 
-/* Analyzer /app — desktop 2-column inputs + full-width footer row */
+/* Analyzer /app — centered Career OS workspace */
 .hf-analyzer-page {
   box-sizing: border-box;
   position: relative;
-  background-image:
-    radial-gradient(ellipse 920px 420px at 88% -6%, rgba(99, 102, 241, 0.17), transparent 56%),
-    radial-gradient(ellipse 920px 420px at 12% 106%, rgba(129, 140, 248, 0.18), transparent 56%);
-  background-repeat: no-repeat;
+  width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 24px clamp(16px, 3vw, 28px) 40px;
+  background: transparent;
+}
+
+.hf-analyzer-page--results .hf-analyzer-hero {
+  margin-bottom: 16px;
+}
+
+.hf-analyzer-page--results .hf-analyzer-hero-title {
+  font-size: clamp(22px, 3vw, 30px) !important;
+  margin-bottom: 6px !important;
+}
+
+.hf-analyzer-page--results .hf-analyzer-hero-sub {
+  font-size: 13px !important;
 }
 
 .hf-analyzer-hero {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 22px;
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .hf-analyzer-hero-sub {
   color: #475569;
-  font-size: 15px;
+  font-size: 14px;
   max-width: 520px;
   margin: 0 auto;
 }
@@ -192,34 +199,29 @@
 }
 
 @media (min-width: 1081px) {
-  .hf-analyzer-page {
-    padding-left: 0;
-    padding-right: 0;
-  }
-
   .hf-analyzer-hero {
-    text-align: left;
-    margin-bottom: 32px;
-    padding: 0 64px;
+    text-align: center;
+    padding: 0;
   }
 
   .hf-analyzer-hero-sub {
-    margin: 0;
+    margin: 0 auto;
     max-width: 42rem;
   }
 
   .hf-analyzer-hero h1,
   .hf-analyzer-hero .hf-analyzer-hero-title {
-    font-size: clamp(28px, 3vw, 42px) !important;
+    font-size: clamp(26px, 2.8vw, 36px) !important;
   }
 
   .hf-analyzer-layout {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: auto auto;
-    gap: 24px;
-    padding: 0 64px;
+    gap: 20px;
+    padding: 0;
     align-items: start;
+    width: 100%;
   }
 
   .hf-analyzer-cv {
@@ -255,10 +257,12 @@
   }
 
   .hf-analyzer-results {
-    margin-top: 8px;
-    padding-left: 64px;
-    padding-right: 64px;
+    margin-top: 4px;
+    padding: 0;
+    width: 100%;
+    max-width: 100%;
   }
+
 }
 
 @media (max-width: 1080px) {
@@ -277,12 +281,11 @@
 
 .hf-input-panel,
 .hf-output-panel {
-  border-radius: 18px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background:
-    radial-gradient(1200px 240px at 10% -20%, rgba(99, 102, 241, 0.08), transparent 40%),
-    linear-gradient(180deg, rgba(15, 23, 42, 0.5), rgba(15, 23, 42, 0.22));
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #13161c;
   padding: 16px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .hf-input-panel {
@@ -295,8 +298,8 @@
 }
 
 .hf-input-panel--active {
-  border-color: rgba(99, 102, 241, 0.45);
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2), 0 0 36px rgba(99, 102, 241, 0.16);
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 .hf-input-panel .hf-textarea {
@@ -306,28 +309,19 @@
 }
 
 .hf-input-panel .hf-textarea:focus {
-  border-color: rgba(34, 211, 238, 0.5);
-  box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.14), 0 0 24px rgba(34, 211, 238, 0.18);
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 /* Analyzer page — CV + İlan cards: clearer chrome, softer lift on hover */
 .hf-analyzer-page .hf-analyzer-layout .hf-analyzer-cv.hf-input-panel,
 .hf-analyzer-page .hf-analyzer-layout .hf-analyzer-jd.hf-input-panel {
-  border-color: rgba(165, 180, 201, 0.34);
-  background:
-    radial-gradient(1180px 260px at 10% -20%, rgba(99, 102, 241, 0.1), transparent 42%),
-    linear-gradient(180deg, rgba(24, 32, 53, 0.62), rgba(22, 30, 50, 0.36));
-  transition:
-    border-color 0.22s ease,
-    box-shadow 0.26s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .hf-analyzer-page .hf-analyzer-layout .hf-analyzer-cv.hf-input-panel:not(.hf-input-panel--active):hover,
 .hf-analyzer-page .hf-analyzer-layout .hf-analyzer-jd.hf-input-panel:not(.hf-input-panel--active):hover {
-  border-color: rgba(186, 200, 220, 0.42);
-  box-shadow:
-    0 0 0 1px rgba(129, 140, 248, 0.14),
-    0 10px 36px rgba(99, 102, 241, 0.36);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 /* Analyzer textareas — border + placeholder legibility */
@@ -340,20 +334,13 @@
   opacity: 1;
 }
 
-/* Primary analyze CTA — richer gradient + glow (overrides inline + global hf-btn-primary) */
 .hf-analyzer-page button.hf-btn-primary.hf-analyzer-main-cta:not(:disabled) {
-  background: linear-gradient(135deg, #4f46e5 0%, #6366f1 45%, #8b5cf6 100%) !important;
-  box-shadow:
-    0 0 12px rgba(99, 102, 241, 0.4),
-    0 6px 22px rgba(79, 70, 229, 0.24) !important;
+  background: #3b82f6 !important;
+  box-shadow: none !important;
 }
 
 .hf-analyzer-page button.hf-btn-primary.hf-analyzer-main-cta:not(:disabled):hover {
-  background: linear-gradient(135deg, #5b53f8 0%, #7378fb 42%, #9d6dff 100%) !important;
-  box-shadow:
-    0 0 18px rgba(129, 140, 248, 0.48),
-    0 0 32px rgba(99, 102, 241, 0.32),
-    0 8px 26px rgba(91, 79, 232, 0.32) !important;
+  background: #2563eb !important;
 }
 
 /* Analyzer — Önceki Analizler */
@@ -390,7 +377,7 @@
   border: 1px solid rgba(239, 68, 68, 0.45);
   background: transparent;
   color: #f87171;
-  font-family: "DM Sans", sans-serif;
+  font-family: var(--font-sans);
   font-size: 10px;
   font-weight: 600;
   cursor: pointer;
@@ -441,7 +428,7 @@
   background: linear-gradient(180deg, rgba(26, 34, 56, 0.55), rgba(20, 28, 48, 0.38));
   cursor: pointer;
   text-align: left;
-  font-family: "DM Sans", sans-serif;
+  font-family: var(--font-sans);
   color: inherit;
   transition:
     border-color 0.22s ease,
@@ -450,10 +437,8 @@
 }
 
 .hf-analyzer-history-item:hover {
-  border-color: rgba(186, 200, 220, 0.42);
-  box-shadow:
-    0 0 0 1px rgba(129, 140, 248, 0.14),
-    0 10px 36px rgba(99, 102, 241, 0.36);
+  border-color: rgba(255, 255, 255, 0.12);
+  background: #181c24;
 }
 
 /* Cancel Vite/index.css global button focus ring on /app only; history rows opt in below. */
@@ -463,9 +448,7 @@
 }
 
 .hf-analyzer-page button.hf-analyzer-history-item:focus-visible {
-  box-shadow:
-    0 0 0 2px rgba(99, 102, 241, 0.45),
-    0 10px 36px rgba(99, 102, 241, 0.28);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35);
 }
 
 .hf-analyzer-history-item__left {
@@ -610,9 +593,9 @@
 }
 
 .hf-dropzone--drag {
-  border-color: rgba(99, 102, 241, 0.55);
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2), 0 0 28px rgba(99, 102, 241, 0.18);
-  background: rgba(99, 102, 241, 0.06);
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background: rgba(59, 130, 246, 0.06);
 }
 
 .hf-dropzone--loading {
@@ -643,7 +626,7 @@
 }
 
 .hf-ai-pipeline--running {
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.12), 0 12px 40px rgba(2, 6, 23, 0.45);
+  border-color: rgba(59, 130, 246, 0.25);
 }
 
 .hf-ai-pipeline-step {
@@ -657,11 +640,10 @@
 }
 
 .hf-ai-pipeline-step--active {
-  border-color: rgba(167, 139, 250, 0.35) !important;
-  background: rgba(99, 102, 241, 0.08) !important;
-  border-left: 3px solid rgba(167, 139, 250, 0.45) !important;
+  border-color: rgba(59, 130, 246, 0.35) !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+  border-left: 2px solid #3b82f6 !important;
   padding-left: 10px;
-  animation: hfPipelineBorderPulse 1.45s ease-in-out infinite;
 }
 
 .hf-ai-pipeline-step--done {
@@ -674,6 +656,10 @@
 }
 
 .hf-analyzer-url-details::-webkit-details-marker {
+  display: none;
+}
+
+.hf-analyzer-deep-dive-summary::-webkit-details-marker {
   display: none;
 }
 
@@ -713,16 +699,15 @@
 }
 
 .hf-role-tag--best {
-  animation: hf-role-best-glow 2.6s ease-in-out infinite;
+  border-color: rgba(34, 197, 94, 0.35);
 }
 
 .hf-insight-card {
-  transition: border-color 0.22s ease, box-shadow 0.22s ease;
+  transition: border-color 0.15s ease;
 }
 
 .hf-insight-card:hover {
-  border-color: rgba(129, 140, 248, 0.45);
-  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.16), 0 14px 28px rgba(2, 6, 23, 0.34);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 @media (max-width: 1080px) {
@@ -741,6 +726,69 @@
   }
 }
 
+@media (max-width: 640px) {
+  .hf-analyzer-page {
+    padding: 18px 16px calc(32px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .hf-analyzer-hero {
+    margin-bottom: 18px;
+    text-align: left;
+  }
+
+  .hf-analyzer-hero h1,
+  .hf-analyzer-hero .hf-analyzer-hero-title {
+    font-size: clamp(24px, 8vw, 31px) !important;
+    line-height: 1.14 !important;
+  }
+
+  .hf-analyzer-hero-sub {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .hf-input-panel,
+  .hf-output-panel {
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .hf-analyzer-textarea {
+    min-height: 180px !important;
+    height: 180px !important;
+    max-height: 42svh !important;
+    font-size: 14px !important;
+  }
+
+  .hf-analyzer-analyze-wrap {
+    max-width: 100%;
+  }
+
+  .hf-analyzer-page button,
+  .hf-analyzer-page a,
+  .hf-input-panel button,
+  .hf-output-panel button {
+    min-height: 44px;
+  }
+
+  .hf-analyzer-history-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 420px) {
+  .hf-analyzer-page {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .hf-analyzer-layout {
+    gap: 14px;
+  }
+}
+
 @keyframes hf-role-best-glow {
   0%,
   100% {
@@ -750,3 +798,6 @@
     box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
   }
 }
+
+
+

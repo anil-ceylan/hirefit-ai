@@ -1,4 +1,4 @@
-import { parseRoadmapStepDescription } from "./roadmapUtils";
+﻿import { parseRoadmapStepDescription } from "./roadmapUtils";
 import { parseLocalStorageJson } from "./utils/safeJson";
 
 export const LS_PROGRESS = "hirefit-progress";
@@ -482,3 +482,4 @@ Let's go 🚀
 
 Built with HireFit AI`;
 }
+

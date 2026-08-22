@@ -1,11 +1,23 @@
 import "./App.css";
 import "./landing-ambient.css";
 import { parseActionPlan, enrichActionPlan, pickDoThisNextStep } from "../lib/analyze-v2/actionPlanNormalize.js";
-import supabase from "./supabaseClient";
+import supabase, {
+  cacheSupabaseSession,
+  clearSupabaseAuthStorage,
+  getSupabaseSessionSafe,
+  handleSupabaseAuthFailure,
+  initializeSupabaseAuth,
+  isSupabaseConfigured,
+  isSupabaseNetworkError,
+  isSupabaseSessionFailure,
+  isSupabaseStaleSessionError,
+  prepareAuthSessionStorage,
+  consumeOAuthSessionPersistencePreference,
+  setOAuthSessionPersistencePreference,
+} from "./supabaseClient";
 import {
   TrustSection,
-  ComparisonSection,
-  SocialProofSection,
+  ProductPreviewSection,
   HowItWorksSection,
   DecisionEngineExplainedSection,
   BeforeAfterSection,
@@ -13,30 +25,72 @@ import {
   YourNextMovePanel,
 } from "./HireFitSections";
 import { useNavigate, useLocation, Outlet, useOutletContext } from "react-router-dom";
-import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { parseLocalStorageJson, safeJsonParse } from "./utils/safeJson";
+import {
+  normalizeAnalysisForUI,
+  assertNoForbiddenVisibleCopy,
+  normalizeHistoryRowForUI,
+} from "./utils/normalizeAnalysisForUI.js";
+import {
+  RecruiterVerdictMeter,
+  ShortlistChanceCard,
+  FirstScreenPulse,
+  CareerMomentumBlock,
+  CareerMemoryBlock,
+  CareerGrowthCard,
+  RecommendedJobsSection,
+  PersonalizedProfileInsights,
+  CvHeatmapBlock,
+  RecruiterReactionPanel,
+} from "./components/HireFitPremiumReport.jsx";
+import CareerIntelligenceDashboard from "./components/CareerIntelligenceDashboard.jsx";
+import RecentAnalysesAccordion from "./components/RecentAnalysesAccordion.jsx";
+import WeeklyDecisionCenter from "./components/dashboard/WeeklyDecisionCenter.jsx";
+import {
+  fetchCareerProfileStatus,
+  loadLocalCareerProfile,
+  syncCareerMemoryAfterAnalyze,
+} from "./utils/careerMemoryClient.js";
+import {
+  fetchCareerProgress,
+  loadLocalCareerProgress,
+  recordCareerProgressAfterAnalyze,
+} from "./utils/careerProgressClient.js";
+import {
+  fetchRecommendedJobs,
+  skipJobId,
+} from "./utils/jobDiscoveryClient.js";
+import { resolvePostLoginPath } from "./utils/careerOnboardingClient.js";
+import { getApiBase } from "./utils/apiBase.js";
+import {
+  buildActivationNavItems,
+  getContextualAuthCta,
+  getAuthIntentFromNext,
+  resolveActivationState,
+} from "./utils/activationFlow.js";
+import { trackActivationEvent } from "./utils/activationEvents.js";
+import { buildCareerGrowthView } from "../lib/careerProgress/index.js";
 import {
   FileText, Briefcase, AlertCircle, Loader2,
   Upload, Copy, Wand2, Target, Search, History, Trash2, Clock,
   CheckCircle2, ArrowRight, LogIn, LogOut, Download, Mail,
-  Zap, Star, TrendingUp, Crown, Linkedin, Instagram, Link2, Workflow,
+  Zap, TrendingUp, Crown, Linkedin, Instagram, Link2, Workflow,
   ChevronRight, ChevronDown, Eye, Layers, KeyRound, LineChart,
   Cpu, FileUp, Lock, Check,
 } from "lucide-react";
 
 const LazyPersonalizedRoadmapPage = lazy(() => import("./PersonalizedRoadmapPage.jsx"));
 
-const HF_API_BASE =
-  typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL
-    ? String(import.meta.env.VITE_API_URL).replace(/\/$/, "")
-    : "https://hirefit-ai-production.up.railway.app";
+const HF_API_BASE = getApiBase();
 const ADMIN_EMAIL =
   typeof import.meta !== "undefined" && import.meta.env?.VITE_ADMIN_EMAIL
     ? String(import.meta.env.VITE_ADMIN_EMAIL).trim().toLowerCase()
     : "";
+const CLOSED_BETA_COHORT = "closed_beta_01";
 
-/** Landing hero loop: set `VITE_HERO_VIDEO_URL` (e.g. `/videos/hero-ambient.mp4` or CDN URL). Omit for gradient-only placeholder — no bogus 404 when the file is missing. */
+/** Landing hero loop: set `VITE_HERO_VIDEO_URL` (e.g. `/videos/hero-ambient.mp4` or CDN URL). Omit for gradient-only placeholder â€” no bogus 404 when the file is missing. */
 const HERO_VIDEO_SRC =
   typeof import.meta !== "undefined" && import.meta.env?.VITE_HERO_VIDEO_URL
     ? String(import.meta.env.VITE_HERO_VIDEO_URL).trim()
@@ -124,7 +178,7 @@ const SECTOR_CHIP_THEME = {
   "Product Design / UX": { dot: "#e879f9", ring: "rgba(232,121,249,0.65)", bg: "rgba(232,121,249,0.12)" },
 };
 
-/** HireFit results surface — semantic colors + premium contrast. */
+/** HireFit results surface â€” semantic colors + premium contrast. */
 const RS = {
   pageGradient: "linear-gradient(165deg, #020617 0%, #0f172a 42%, #0c1222 100%)",
   bgBase: "#0b1220",
@@ -140,8 +194,8 @@ const RS = {
   red: "#ff4d4f",
   redDim: "#fda4a6",
   indigo: "#818cf8",
-  fontUi: "'DM Sans', sans-serif",
-  fontMono: "'DM Mono', ui-monospace, monospace",
+  fontUi: "var(--font-sans)",
+  fontMono: "var(--font-mono)",
 };
 
 function rsRgb(hex) {
@@ -221,7 +275,7 @@ function humanizeUserFacingReason(text, lang) {
   if (tr) {
     const norm = raw.toLowerCase();
     if (norm === "no measurable impact") return "Ölçülebilir etki görünmüyor";
-    if (norm === "foundational experience signal is present") return "Temel deneyim sinyali var";
+    if (norm === "foundational experience signal is present") return "Temel geçmişin role giriş için yeterli";
     if (norm === "target role") return "Hedef rol";
     if (norm === "target role (near match)") return "Hedef rol (yakın eşleşme)";
     if (norm.startsWith("recommended path:")) {
@@ -241,12 +295,94 @@ function sanitizeUserErrorMessage(raw, lang) {
   const lower = txt.toLowerCase();
   if (/\b429\b/.test(lower) || lower.includes("email rate limit exceeded")) {
     return lang === "TR"
-      ? "Cok kisa surede fazla dogrulama e-postasi gonderildi. Lutfen birkac dakika sonra tekrar dene."
+      ? "Çok kısa sürede fazla doğrulama e-postası gönderildi. Lütfen birkaç dakika sonra tekrar dene."
       : "Too many verification emails were sent. Please try again in a few minutes.";
   }
   if (RAW_PARSE_FAIL_RE.test(txt)) return translations[lang]?.sanitizeParsingFailed || txt;
   if (RAW_TECH_ERROR_RE.test(txt)) return translations[lang]?.sanitizeGenericError || txt;
   return txt;
+}
+
+function authUserErrorMessage(error, lang, context = "login") {
+  const tr = lang === "TR";
+  const raw = String(error?.message || error || "").trim();
+  const lower = raw.toLowerCase();
+
+  if (context === "restoration" && isSupabaseStaleSessionError(error)) {
+    return tr
+      ? "Oturumun doğrulanamadı. Lütfen yeniden giriş yap."
+      : "Your session could not be verified. Please sign in again.";
+  }
+
+  if (!isSupabaseConfigured || isSupabaseNetworkError(error) || isSupabaseSessionFailure(error)) {
+    if (context === "login") {
+      return tr
+        ? "Giriş sırasında bağlantı sorunu oluştu. Lütfen kısa süre sonra tekrar deneyin."
+        : "A connection problem occurred while signing in. Please try again shortly.";
+    }
+    if (context === "signup") {
+      return tr
+        ? "Kayıt sırasında bağlantı sorunu oluştu. Lütfen kısa süre sonra tekrar deneyin."
+        : "A connection problem occurred during registration. Please try again shortly.";
+    }
+    return tr
+      ? "Bağlantı geçici olarak kurulamadı. Lütfen tekrar deneyin."
+      : "The connection could not be established temporarily. Please try again.";
+  }
+
+  if (/invalid login credentials|invalid credentials|email or password|wrong password/.test(lower)) {
+    return tr ? "E-posta veya şifre hatalı." : "The email or password is incorrect.";
+  }
+  if (/email not confirmed|email_not_confirmed|not confirmed/.test(lower)) {
+    return tr
+      ? "E-posta adresin henüz doğrulanmadı. Gelen kutunu kontrol et."
+      : "Your email address has not been verified yet. Check your inbox.";
+  }
+  if (/\b429\b/.test(lower) || lower.includes("email rate limit exceeded")) {
+    return tr
+      ? "Çok kısa sürede fazla doğrulama e-postası gönderildi. Lütfen birkaç dakika sonra tekrar dene."
+      : "Too many verification emails were sent. Please try again in a few minutes.";
+  }
+  if (/already registered|user already exists/.test(lower)) {
+    return tr
+      ? "Bu e-posta ile zaten bir hesabın var. Giriş yap veya şifremi unuttum seçeneğini kullan."
+      : "An account already exists with this email. Sign in or use forgot password.";
+  }
+
+  if (context === "signup") {
+    return tr ? "Kayıt tamamlanamadı. Lütfen tekrar deneyin." : "Registration could not be completed. Please try again.";
+  }
+  return tr ? "Giriş tamamlanamadı. Lütfen tekrar deneyin." : "Sign-in could not be completed. Please try again.";
+}
+
+function profileLoadErrorMessage(lang) {
+  return lang === "TR"
+    ? "Hesab\u0131na giri\u015f yap\u0131ld\u0131 ancak kariyer profilin y\u00fcklenemedi."
+    : "You are signed in, but your career profile could not be loaded.";
+}
+
+function authRestorationMessage(lang) {
+  return lang === "TR"
+    ? "Oturumun kontrol ediliyor\u2026"
+    : "Checking your session\u2026";
+}
+
+function getSafeAuthNext(search = "") {
+  const raw = new URLSearchParams(search || "").get("next");
+  if (!raw) return "";
+  try {
+    const decoded = decodeURIComponent(raw);
+    if (!decoded.startsWith("/") || decoded.startsWith("//")) return "";
+    if (/^\/(?:login|verify-email)(?:$|[/?#])/.test(decoded)) return "";
+    return decoded;
+  } catch {
+    return "";
+  }
+}
+
+function buildSignupPathForNext(nextPath = "") {
+  const safeNext = getSafeAuthNext(`?next=${encodeURIComponent(nextPath)}`) || "/";
+  return `/login?mode=signup&next=${encodeURIComponent(safeNext)}`;
 }
 
 function hasMeaningfulText(v) {
@@ -256,7 +392,7 @@ function hasMeaningfulText(v) {
 function normalizeRoleLabel(rawRole, lang) {
   const fallback = "Analist";
   const raw = String(rawRole || "")
-    .replace(/[\u2022•]+/g, " ")
+    .replace(/[\u2022â€¢]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
   if (!raw) return fallback;
@@ -310,7 +446,7 @@ function buildRoleSuggestionsFromCv(cvText, _lang = "TR") {
     {
       role: "Veri Analisti",
       patterns: [/sql\b/i, /python\b/i, /tableau|power\s?bi/i, /dashboard/i, /veri|data/i, /analiz|analysis/i],
-      reason: "Veri analizi ve raporlama sinyalleri bu rolle güçlü örtüşüyor.",
+      reason: "Veri analizi ve raporlama tarafın bu rolle güçlü örtüşüyor.",
     },
     {
       role: "İş Analisti",
@@ -320,22 +456,22 @@ function buildRoleSuggestionsFromCv(cvText, _lang = "TR") {
     {
       role: "Ürün Analisti",
       patterns: [/ürün|product/i, /kpi|metric/i, /a\/b|ab\s?test/i, /funnel|dönüşüm|conversion/i, /kullanıcı|user/i],
-      reason: "Ürün metrikleri ve kullanıcı davranışı odaklı sinyal bu role uyuyor.",
+      reason: "Ürün metrikleri ve kullanıcı davranışı tarafın bu role yakın.",
     },
     {
       role: "Ürün Yöneticisi",
       patterns: [/product\s?manager|ürün\s?yönetic/i, /roadmap/i, /önceliklendirme|prioritization/i, /paydaş|stakeholder/i, /go-to-market|gtm/i],
-      reason: "Önceliklendirme ve ürün sahipliği sinyalleri bu role yakın.",
+      reason: "Önceliklendirme ve ürün sahipliği tarafın bu role yakın.",
     },
     {
       role: "Yazılım Geliştirici",
       patterns: [/react|node|javascript|typescript|java|c#|go|python/i, /api/i, /backend|frontend/i, /deploy|aws|docker/i, /yazılım|software/i],
-      reason: "Kod, sistem ve teslimat odaklı teknik sinyaller bu role uyuyor.",
+      reason: "Kod, sistem ve teslimat odaklı teknik tarafın bu role uyuyor.",
     },
     {
       role: "Pazarlama Uzmanı",
       patterns: [/pazarlama|marketing/i, /seo|sem/i, /kampanya|campaign/i, /ga4|google\sanalytics/i, /lead|growth/i],
-      reason: "Kampanya, büyüme ve performans pazarlaması sinyalleri bu role uygun.",
+      reason: "Kampanya, büyüme ve performans pazarlaması tarafın bu role uygun.",
     },
     {
       role: "Finans Analisti",
@@ -345,7 +481,7 @@ function buildRoleSuggestionsFromCv(cvText, _lang = "TR") {
     {
       role: "Operasyon Uzmanı",
       patterns: [/operasyon|operations/i, /verimlilik|efficiency/i, /süreç|process/i, /koordinasyon|coordination/i, /lojistik|logistics/i],
-      reason: "Operasyon ve süreç iyileştirme sinyalleri bu role güçlü uyuyor.",
+      reason: "Operasyon ve süreç iyileştirme tarafın bu role güçlü uyuyor.",
     },
   ];
 
@@ -368,7 +504,7 @@ function buildRoleSuggestionsFromCv(cvText, _lang = "TR") {
     ? (hasMetrics
       ? "Mevcut yönün dağınık; CV bir role net odak vermiyor."
       : "Mevcut yönün zayıf; CV görev yazıyor ama sonuç kanıtı vermiyor.")
-    : "Mevcut yönün zayıf; CV sinyalleri hedef role net bağlanmıyor.";
+    : "Mevcut yönün zayıf; CV'deki örnekler hedef role net bağlanmıyor.";
 
   return {
     current_direction_problem: currentDirectionProblem,
@@ -452,12 +588,12 @@ function getFallbackAnalysis(cvText, jobDescription, lang = "EN") {
 
   const verdict = score < 55 ? "Stop" : "Improve";
   const keyGap = !hasMetrics
-    ? "CV’n gerçek sonuçlar göstermiyor."
+    ? "CVâ€™n gerçek sonuçlar göstermiyor."
     : visibleTools.length === 0
-      ? (tr ? "Görünür araç seti sinyali yok" : "No visible tools stack")
+      ? (tr ? "CV'de görünür araç seti zayıf" : "No visible tools stack")
       : mismatch
         ? (tr ? "Rol hedefleme uyumsuzluğu" : "Role targeting mismatch")
-        : (tr ? "Recruiter için okunabilir kanıt düşük" : "Low recruiter-readable proof");
+        : (tr ? "CVâ€™de bu role özel kanıt net değil" : "Role-specific proof is not clear on the CV");
 
   const fixes = !hasMetrics
     ? [
@@ -493,8 +629,8 @@ function getFallbackAnalysis(cvText, jobDescription, lang = "EN") {
     delta: bump,
     narrative:
       tr
-        ? `Bu iyileştirmelerle skorun ${score} → ${Math.min(100, score + bump)} (+${bump}) olabilir.`
-        : `With these fixes your score can move ${score} → ${Math.min(100, score + bump)} (+${bump}).`,
+        ? "Bu adımlar recruiter tarafında daha güçlü görünmeni sağlar; tam puan vaadi yok."
+        : "These moves make you read stronger to a recruiterâ€”no exact score promise.",
   };
 
   return {
@@ -502,8 +638,8 @@ function getFallbackAnalysis(cvText, jobDescription, lang = "EN") {
     verdict,
     summary:
       lang === "TR"
-        ? "Yapılandırılmış çıktı eksik olsa da mevcut sinyallere göre CV'nizin işe alım filtresindeki konumu analiz edildi."
-        : "Structured output was incomplete, so we analyzed your CV using available signals.",
+        ? "Yapılandırılmış çıktı eksik olsa da mevcut metne göre CV'nizin ilk turdaki konumu analiz edildi."
+        : "Structured output was incomplete, so we analyzed your CV from the text we could read.",
     keyGap,
     fixes,
     impactProjection,
@@ -550,7 +686,7 @@ function buildFailSafeV2FromFallback(fb, cvText, jobDescription, lang) {
     },
     Recruiter: {
       reasoning: fb.summary,
-      strengths: [tr ? "Temel deneyim sinyali var" : "Foundational experience signal is present"],
+      strengths: [tr ? "Temel geçmişin role giriş için yeterli" : "Your baseline background is enough to enter the conversation"],
       weaknesses: [fb.keyGap],
     },
     RoleFit: {
@@ -568,7 +704,7 @@ function buildFailSafeV2FromFallback(fb, cvText, jobDescription, lang) {
 function ensureFailSafeV2(rawV2, cvText, jobDescription, lang) {
   const fromFinal = Number(rawV2?.["Final Alignment Score"]);
   const baseScore = Number.isFinite(fromFinal) ? fromFinal : Number(rawV2?.score);
-  /* Free tier (applyTierGate) often sends rejection_reasons: [] when the gap list was empty —
+  /* Free tier (applyTierGate) often sends rejection_reasons: [] when the gap list was empty â€”
      we must still trust the pipeline score + verdict or every run falls back to getFallbackAnalysis (~40). */
   const hasCore =
     Number.isFinite(baseScore) && Boolean(String(rawV2?.Decision?.final_verdict || "").trim());
@@ -615,7 +751,7 @@ function ensureFailSafeV2(rawV2, cvText, jobDescription, lang) {
 }
 
 /**
- * Deterministic score lift (5–20) from prioritized gaps / missing signals — not random.
+ * Deterministic score lift (5â€“20) from prioritized gaps / missing signals â€” not random.
  */
 function computeImpactProjection(currentScore, ctx, lang) {
   const cur = Math.min(100, Math.max(0, Math.round(Number(currentScore) || 0)));
@@ -659,13 +795,71 @@ function computeImpactProjection(currentScore, ctx, lang) {
 
   const narrative =
     lang === "TR"
-      ? `Üst ${topN} boşluğu kapatırsan skorun ${cur} → ${projected} (+${delta}) seviyesine çıkabilir.`
-      : `By fixing the top ${topN} gap${topN > 1 ? "s" : ""}, your score can increase from ${cur} → ${projected} (+${delta}).`;
+      ? "Bu adım seni daha güçlü gösterir. Recruiter tarafındaki soru işareti azalır. Bu role daha net bağlanırsın."
+      : "This step makes you read stronger, shrinks recruiter hesitation, and ties you clearer to this role.";
 
   return { current: cur, projected, delta, narrative, topN };
 }
 
-/** Rejection risk derived from alignment score (not AI-detection score) — avoids “low score + high AI %” confusion. */
+/** Softer score display (reduces fake-precision feel in UI only). */
+function roundScoreSoftDisplay(score) {
+  const n = Math.min(100, Math.max(0, Math.round(Number(score) || 0)));
+  return Math.round(n / 5) * 5;
+}
+
+function recruiterUyumBucketTr(score) {
+  const n = Math.round(Number(score) || 0);
+  if (n >= 82) return "Guclu";
+  if (n >= 68) return "Ust orta";
+  if (n >= 55) return "Orta";
+  return "Zayif";
+}
+
+function recruiterUyumBucketEn(score) {
+  const n = Math.round(Number(score) || 0);
+  if (n >= 82) return "Strong";
+  if (n >= 68) return "Upper mid";
+  if (n >= 55) return "Mid";
+  return "Weak";
+}
+
+/** Visible likelihood band (avoids headline %). */
+function interviewLikelihoodBandFromPct(pct, lang) {
+  const n = Math.min(100, Math.max(0, Math.round(Number(pct) || 0)));
+  const tr = String(lang || "").toUpperCase() === "TR";
+  if (tr) {
+    if (n >= 70) return "Güçlü olasılık";
+    if (n >= 43) return "Orta olasılık";
+    return "Düşük olasılık";
+  }
+  if (n >= 70) return "Strong likelihood";
+  if (n >= 43) return "Medium likelihood";
+  return "Low likelihood";
+}
+
+/** Qualitative band only â€” removes leaked "N% alignment" style labels from model/cache copy. */
+function matchReadBandLabelFromScore(rawPct, lang) {
+  const tr = String(lang || "").toUpperCase() === "TR";
+  const pct = Math.min(100, Math.max(0, Math.round(Number(rawPct) || 0)));
+  if (tr) {
+    if (pct < 55) return "Eşleşme: düşük";
+    if (pct < 68) return "Eşleşme: orta";
+    if (pct < 82) return "Eşleşme: üst orta";
+    return "Eşleşme: güçlü";
+  }
+  if (pct < 55) return "Match read: weak";
+  if (pct < 68) return "Match read: mid";
+  if (pct < 82) return "Match read: upper mid";
+  return "Match read: strong";
+}
+
+function roleProximityLabel(score, lang) {
+  const tr = String(lang || "").toUpperCase() === "TR";
+  const b = tr ? recruiterUyumBucketTr(score) : recruiterUyumBucketEn(score);
+  return tr ? `Role yakınlık: ${b.toLowerCase()}` : `Role fit read: ${b.toLowerCase()}`;
+}
+
+/** Rejection risk derived from alignment score (not AI-detection score) â€” avoids â€œlow score + high AI %â€ confusion. */
 function getRejectionRiskFromAlignmentScore(rawScore, lang) {
   const s = Math.min(100, Math.max(0, Math.round(Number(rawScore) || 0)));
   let tier;
@@ -690,16 +884,16 @@ function getRejectionRiskFromAlignmentScore(rawScore, lang) {
   if (lang === "TR") {
     const main =
       tier === "high"
-        ? `Yüksek (${pct}% elenme riski)`
+        ? "Elenme riski: yüksek"
         : tier === "medium"
-          ? `Orta (${pct}% elenme riski)`
-          : `Düşük (${pct}% elenme riski)`;
+          ? "Elenme riski: orta"
+          : "Elenme riski: düşük";
     const sub =
       tier === "high"
         ? "Bu ilan için ilk turda çoğu recruiter bu CV'yi ilerletmez."
         : tier === "medium"
-          ? "Mülakat alabilirsin; ama varsayılan ‘evet’ adayı henüz sen değilsin."
-          : "Uyum sinyali güçlü — elenme riski anlamlı şekilde düşük.";
+          ? "Mülakat alabilirsin; ama varsayılan â€˜evetâ€™ adayı henüz sen değilsin."
+          : "Role yakınlığın güçlü â€” elenme riski anlamlı şekilde düşük.";
     return {
       tier,
       pct,
@@ -710,22 +904,22 @@ function getRejectionRiskFromAlignmentScore(rawScore, lang) {
       bg,
       border,
       levelWord: levelWordTr,
-      metricsLine: `${levelWordTr} — ${pct}%`,
+      metricsLine: `${levelWordTr} düzey`,
     };
   }
 
   const main =
     tier === "high"
-      ? `High (${pct}% rejection risk)`
+      ? "Screen-out risk: high"
       : tier === "medium"
-        ? `Medium (${pct}% rejection risk)`
-        : `Low (${pct}% rejection risk)`;
+        ? "Screen-out risk: medium"
+        : "Screen-out risk: low";
   const sub =
     tier === "high"
       ? "For this posting, most recruiters would not move this CV past the first screen."
       : tier === "medium"
-        ? "You might still get interviews — you are not the default hire yet."
-        : "Strong enough fit signal that first-round rejection risk drops meaningfully.";
+        ? "You might still get interviews â€” you are not the default hire yet."
+        : "Strong enough role match that first-round rejection risk drops meaningfully.";
 
   return {
     tier,
@@ -737,8 +931,60 @@ function getRejectionRiskFromAlignmentScore(rawScore, lang) {
     bg,
     border,
     levelWord: levelWordEn,
-    metricsLine: `${levelWordEn} — ${pct}%`,
+    metricsLine: `${levelWordEn} tier`,
   };
+}
+
+/** Recruiter-oriented metrics on top of the same alignment score (labels only). */
+function buildRecruiterDecisionMetrics(rawScore, lang) {
+  const riskPack = getRejectionRiskFromAlignmentScore(rawScore, lang);
+  const s = Math.min(100, Math.max(0, Math.round(Number(rawScore) || 0)));
+  const interviewChance = Math.max(8, Math.min(92, Math.round(100 - riskPack.pct)));
+  const recruiterConfidence = Math.max(14, Math.min(96, Math.round(12 + s * 0.86)));
+  const signalStrength = roundScoreSoftDisplay(s);
+  return {
+    interviewChance,
+    recruiterConfidence,
+    rejectionPct: riskPack.pct,
+    signalStrength,
+    riskPack,
+  };
+}
+
+function collectAnalyzerPositiveBullets({ engineV2, analysisData, lang }, limit = 3) {
+  const out = [];
+  const add = (x) => {
+    const s = visibleRecruiterCopy(String(x || "").trim(), lang, { maxSentences: 1 });
+    if (s.length >= 3 && !out.includes(s)) out.push(s);
+  };
+  const strengths = Array.isArray(engineV2?.Recruiter?.strengths) ? engineV2.Recruiter.strengths : [];
+  const matched = Array.isArray(engineV2?.ATS?.matched_skills) ? engineV2.ATS.matched_skills : [];
+  const fromAnalysis = Array.isArray(analysisData?.matched_skills) ? analysisData.matched_skills : [];
+  strengths.forEach(add);
+  matched.forEach(add);
+  fromAnalysis.forEach(add);
+  return out.slice(0, limit);
+}
+
+function collectAnalyzerGapBullets({ engineV2, analysisData, missingSkills, lang }, limit = 4) {
+  const out = [];
+  const add = (x) => {
+    const s = visibleRecruiterCopy(String(x || "").trim(), lang, { maxSentences: 1 });
+    if (s.length >= 3 && !out.includes(s)) out.push(s);
+  };
+  const reasons = Array.isArray(engineV2?.Gaps?.rejection_reasons) ? engineV2.Gaps.rejection_reasons : [];
+  for (const r of reasons) {
+    const issue = String(r?.issue ?? r ?? "").trim();
+    if (issue.length >= 3) add(issue);
+  }
+  const analysisHigh = Array.isArray(analysisData?.rejection_reasons?.high) ? analysisData.rejection_reasons.high : [];
+  analysisHigh.forEach(add);
+  const missKw = Array.isArray(engineV2?.ATS?.missing_keywords) ? engineV2.ATS.missing_keywords : [];
+  const missSk = Array.isArray(engineV2?.ATS?.missing_skills) ? engineV2.ATS.missing_skills : [];
+  missKw.forEach(add);
+  missSk.forEach(add);
+  if (Array.isArray(missingSkills)) missingSkills.forEach((x) => add(String(x || "")));
+  return out.slice(0, limit);
 }
 
 function RejectionRiskPanel({ score, lang }) {
@@ -746,7 +992,7 @@ function RejectionRiskPanel({ score, lang }) {
   return (
     <div style={{ marginBottom: 16, padding: "14px 16px", background: risk.bg, border: `1px solid ${risk.border}`, borderRadius: 12 }}>
       <div style={{ fontSize: 10, fontWeight: 800, color: risk.color, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8 }}>{risk.title}</div>
-      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: risk.color, marginBottom: 6 }}>{risk.mainLine}</div>
+      <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 800, color: risk.color, marginBottom: 6 }}>{risk.mainLine}</div>
       <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.55 }}>{risk.sub}</div>
     </div>
   );
@@ -760,7 +1006,7 @@ function CriticalSkillsGapBlock({ skills, lang }) {
       <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 17, color: "#a3a3a3", lineHeight: 1.55, marginBottom: 14 }}>
         {lang === "TR"
           ? "İlanla net örtüşen eksik beceri listesi çıkmadı. CV'ni ilanın diline ve araçlarına göre yeniden tarayın."
-          : "We could not surface a concrete missing-skill list. Re-scan your CV against the job’s tools and must-haves."}
+          : "We could not surface a concrete missing-skill list. Re-scan your CV against the jobâ€™s tools and must-haves."}
       </div>
     );
   }
@@ -768,7 +1014,7 @@ function CriticalSkillsGapBlock({ skills, lang }) {
     <>
       <div style={{ fontFamily: "'Instrument Serif', serif", fontSize: 20, fontWeight: 700, color: "#e8e8e8", marginBottom: 12, lineHeight: 1.35 }}>
         {lang === "TR"
-          ? `Bu rol için ${n} kritik beceride eksik görünüyorsun — recruiter bunları arıyor:`
+          ? `Bu rol için ${n} kritik beceride eksik görünüyorsun â€” recruiter bunları arıyor:`
           : `You are missing ${n} critical skills recruiters expect for this role:`}
       </div>
       <ul style={{ margin: "0 0 16px", paddingLeft: 18, color: "#c4c4c4", fontSize: 14, lineHeight: 1.75 }}>
@@ -778,8 +1024,8 @@ function CriticalSkillsGapBlock({ skills, lang }) {
       </ul>
       <div style={{ fontSize: 12, color: "#7a7a7a", lineHeight: 1.5, marginBottom: 8 }}>
         {lang === "TR"
-          ? "Yüzde yerine net liste: önce bunları kanıtla veya öğren — sonra başvur."
-          : "Skip abstract gaps — close these with proof or training, then apply."}
+          ? "Yüzde yerine net liste: önce bunları kanıtla veya öğren â€” sonra başvur."
+          : "Skip abstract gaps â€” close these with proof or training, then apply."}
       </div>
     </>
   );
@@ -787,60 +1033,21 @@ function CriticalSkillsGapBlock({ skills, lang }) {
 
 function ImpactProjectionPanel({ projection, lang }) {
   if (!projection) return null;
-  const t = translations[lang];
-  const { current, projected, delta, narrative } = projection;
+  const tr = String(lang || "").toUpperCase() === "TR";
   return (
     <div
       style={{
         marginTop: 18,
-        padding: "22px 22px",
+        padding: "18px 20px",
         borderRadius: 18,
-        border: "1px solid rgba(52,211,153,0.4)",
-        background: "linear-gradient(135deg, rgba(16,185,129,0.18), rgba(59,130,246,0.1), rgba(212,175,55,0.08))",
-        boxShadow: "0 0 40px rgba(52,211,153,0.16)",
+        border: "1px solid rgba(52,211,153,0.35)",
+        background: "linear-gradient(135deg, rgba(16,185,129,0.12), rgba(15,23,42,0.92))",
+        boxShadow: "0 0 28px rgba(52,211,153,0.1)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <TrendingUp size={20} color="#34d399" />
-        <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.16em", color: "#6ee7b7" }}>{t.impactProjection}</div>
-      </div>
-      <div style={{ fontSize: 15, fontWeight: 900, color: "#fef08a", marginBottom: 8, letterSpacing: "-0.01em" }}>
-        {t.impactFixUnlock.replace("{pts}", String(delta))}
-      </div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "#cbd5e1", marginBottom: 14, lineHeight: 1.5 }}>{t.impactMovesCloser.replace("{pts}", String(delta))}</div>
-      <div style={{ fontSize: 10, fontWeight: 800, color: "#a7f3d0", letterSpacing: "0.08em", marginBottom: 10 }}>{t.nowAfter}</div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap", marginBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" }}>{t.currentScore}</div>
-          <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 38, fontWeight: 800, color: "#fca5a5" }}>{current}</div>
-        </div>
-        <motion.div
-          animate={{ x: [0, 6, 0], opacity: [0.7, 1, 0.7] }}
-          transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-          style={{ fontSize: 28, color: "#94a3b8", fontWeight: 300, padding: "0 6px" }}
-        >
-          →
-        </motion.div>
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" }}>{t.projectedScore}</div>
-          <div style={{ fontFamily: "'Syne',sans-serif", fontSize: 38, fontWeight: 800, color: "#6ee7b7" }}>{projected}</div>
-        </div>
-        <div
-          style={{
-            padding: "12px 20px",
-            borderRadius: 999,
-            background: "linear-gradient(90deg, #d4af37, #f0d060)",
-            color: "#0a0a0a",
-            fontWeight: 900,
-            fontSize: 17,
-            boxShadow: "0 4px 24px rgba(212,175,55,0.45)",
-          }}
-        >
-          +{delta}
-        </div>
-      </div>
-      <div style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>{t.scoreIncrease}</div>
-      <p style={{ margin: 0, fontSize: 14, color: "#e2e8f0", lineHeight: 1.65, fontWeight: 600 }}>{narrative}</p>
+      <p style={{ margin: 0, fontSize: 14, color: "#e2e8f0", lineHeight: 1.65, fontWeight: 600 }}>
+        {tr ? "Bu adım seni daha güçlü gösterir." : "This step makes you read stronger."}
+      </p>
     </div>
   );
 }
@@ -855,8 +1062,8 @@ function getScoreFinalVerdict(score, lang) {
   const s = Number(score);
   if (Number.isNaN(s)) {
     return {
-      icon: "—",
-      verdictIcon: "—",
+      icon: "â€”",
+      verdictIcon: "â€”",
       verdictColor: RS.textMuted,
       title: tr ? "Skor bekleniyor" : "Score pending",
       explanation:
@@ -870,8 +1077,8 @@ function getScoreFinalVerdict(score, lang) {
   }
   if (s < 60) {
     return {
-      icon: "✕",
-      verdictIcon: "🚫",
+      icon: "âœ•",
+      verdictIcon: "ğŸš«",
       verdictColor: RS.red,
       title: tk.verdictBadTitle,
       explanation: tk.verdictBadSub,
@@ -882,8 +1089,8 @@ function getScoreFinalVerdict(score, lang) {
   }
   if (s < 75) {
     return {
-      icon: "⚠",
-      verdictIcon: "⚠️",
+      icon: "âš ",
+      verdictIcon: "âš ï¸",
       verdictColor: RS.amber,
       title: tk.verdictRiskyTitle,
       explanation: tk.verdictRiskySub,
@@ -894,8 +1101,8 @@ function getScoreFinalVerdict(score, lang) {
   }
   if (s < 85) {
     return {
-      icon: "✓",
-      verdictIcon: "⚡",
+      icon: "âœ“",
+      verdictIcon: "âš¡",
       verdictColor: RS.green,
       title: tk.verdictCloseTitle,
       explanation: tk.verdictCloseSub,
@@ -905,8 +1112,8 @@ function getScoreFinalVerdict(score, lang) {
     };
   }
   return {
-    icon: "✓",
-    verdictIcon: "✅",
+    icon: "âœ“",
+    verdictIcon: "âœ…",
     verdictColor: RS.green,
     title: tk.verdictStrongTitle,
     explanation: tk.verdictStrongSub,
@@ -938,9 +1145,9 @@ function normalizeShareVerdictLabel(verdictLabel, lang) {
   const s = String(verdictLabel || "").trim();
   if (!s) return s;
   if (/application\s+not\s+recommended/i.test(s)) return "Başvurma";
-  if (/you will likely get rejected/i.test(s)) return "🚫 Büyük ihtimalle elenirsin";
-  if (/strong match/i.test(s)) return "✅ Güçlü eşleşme";
-  if (/competitive.*tighten/i.test(s) || /tighten proof/i.test(s)) return "⚡ Rekabetçi — kanıtı sıkılaştır";
+  if (/you will likely get rejected/i.test(s)) return "ğŸš« Büyük ihtimalle elenirsin";
+  if (/strong match/i.test(s)) return "âœ… Güçlü eşleşme";
+  if (/competitive.*tighten/i.test(s) || /tighten proof/i.test(s)) return "âš¡ Rekabetçi â€” kanıtı sıkılaştır";
   if (/^do\s*not\s*apply$/i.test(s)) return "Başvurma";
   if (/risky\s*apply/i.test(s)) return "Riskli başvuru";
   if (/apply\s+with\s+(fixes|risk)/i.test(s)) return s.toLowerCase().includes("risk") ? "Riskli başvuru" : "Düzeltmelerle başvur";
@@ -1023,7 +1230,7 @@ Karar: ${v}
 Kritik boşluk: ${mistake}
 
 Başvurmadan önce denemeye değer.
-→ hirefit.ai`
+â†’ hirefit.ai`
     : `Just ran my CV through HireFit.
 
 Score: ${score}
@@ -1031,7 +1238,7 @@ Verdict: ${v}
 Key gap: ${mistake}
 
 Worth trying before you apply.
-→ hirefit.ai`;
+â†’ hirefit.ai`;
 }
 
 function buildLinkedInShareUrl(shareText) {
@@ -1056,29 +1263,36 @@ const HF_HERO_WORD_REVEAL_MS = 420;
 function HeroStaggeredHeadline({ lang }) {
   const line1 =
     lang === "TR"
-      ? "Başvurmadan önce reddedilecek misin bil.".split(/\s+/).filter(Boolean)
-      : "Know if you'll get rejected — before you apply.".split(/\s+/).filter(Boolean);
+      ? "Kariyerinde sonraki doğru adımı gör.".split(/\s+/).filter(Boolean)
+      : "See the right next move in your career.".split(/\s+/).filter(Boolean);
   const line2 =
     lang === "TR"
-      ? "Karar, skor değil. Net aksiyon.".split(/\s+/).filter(Boolean)
-      : "Decisions, not scores. Clear next steps.".split(/\s+/).filter(Boolean);
+      ? "Rol yönünü, kanıt açıklarını ve en yüksek etkili hamleni netleştir.".split(/\s+/).filter(Boolean)
+      : "Clarify your role direction, proof gaps, and highest-impact next move.".split(/\s+/).filter(Boolean);
   const totalWords = line1.length + line2.length;
   const pulseDelayMs = (totalWords - 1) * HF_HERO_WORD_DELAY_MS + HF_HERO_WORD_REVEAL_MS;
 
   return (
     <>
       {line1.map((w, i) => (
-        <span key={`h1-${i}`} className="hf-hero-word" style={{ animationDelay: `${i * HF_HERO_WORD_DELAY_MS}ms` }}>
-          {w}
+        <span key={`h1-wrap-${i}`}>
+          <span className="hf-hero-word" style={{ animationDelay: `${i * HF_HERO_WORD_DELAY_MS}ms` }}>
+            {w}
+          </span>
+          {i < line1.length - 1 ? " " : ""}
         </span>
       ))}
+      {" "}
       <br />
       <span className="hf-hero-line2-wrap" style={{ ["--hf-hero-pulse-delay"]: `${pulseDelayMs}ms` }}>
         {line2.map((w, j) => {
           const idx = line1.length + j;
           return (
-            <span key={`h2-${j}`} className="hf-hero-word" style={{ animationDelay: `${idx * HF_HERO_WORD_DELAY_MS}ms` }}>
-              {w}
+            <span key={`h2-wrap-${j}`}>
+              <span className="hf-hero-word" style={{ animationDelay: `${idx * HF_HERO_WORD_DELAY_MS}ms` }}>
+                {w}
+              </span>
+              {j < line2.length - 1 ? " " : ""}
             </span>
           );
         })}
@@ -1128,14 +1342,14 @@ function AnimatedAlignmentScore({ alignmentScore, fontSize = "clamp(48px, 11vw, 
   return (
     <span
       className={`hf-score-animated${pop ? " hf-score-animated--pop" : ""}`}
-      style={{ fontFamily: "'Syne', sans-serif", fontSize, fontWeight: 800, color, lineHeight: 1 }}
+      style={{ fontFamily: "var(--font-display)", fontSize, fontWeight: 800, color, lineHeight: 1 }}
     >
       {n}
     </span>
   );
 }
 
-/** Full-screen loading overlay only while `loading` — same step labels as the former in-page pipeline. */
+/** Full-screen loading overlay only while `loading` â€” same step labels as the former in-page pipeline. */
 function AnalysisThinkingOverlay({ lang, loading, loadingMessage }) {
   const [step, setStep] = useState(0);
   useEffect(() => {
@@ -1152,13 +1366,13 @@ function AnalysisThinkingOverlay({ lang, loading, loadingMessage }) {
     lang === "TR"
       ? [
           { key: "cv", label: "CV analiz ediliyor" },
-          { key: "ats", label: "ATS kontrolü yapılıyor" },
+          { key: "ats", label: "Ilana gore okuma" },
           { key: "rec", label: "Recruiter değerlendirmesi" },
           { key: "dec", label: "Karar oluşturuluyor" },
         ]
       : [
           { key: "cv", label: "Analyzing CV" },
-          { key: "ats", label: "Running ATS checks" },
+          { key: "ats", label: "Reading you against the posting" },
           { key: "rec", label: "Recruiter evaluation" },
           { key: "dec", label: "Building decision" },
         ];
@@ -1256,44 +1470,419 @@ function AnalysisThinkingOverlay({ lang, loading, loadingMessage }) {
   );
 }
 
-/** Replace underscores in model strings for UI (snake_case tokens → readable words). */
+/** Replace underscores in model strings for UI (snake_case tokens â†’ readable words). */
 function cleanDisplayText(text) {
   if (text == null) return "";
   return String(text).replace(/_/g, " ").trim();
 }
 
+/** Result screen: qualitative match band (no %, no â€œalignmentâ€). */
+function resultPrimaryMatchBand(score, lang) {
+  const n = Math.round(Number(score) || 0);
+  const tr = String(lang || "").toUpperCase() === "TR";
+  if (tr) {
+    if (n < 50) return "Riskli eşleşme";
+    if (n < 60) return "Düşük olasılık";
+    if (n < 70) return "Orta seviye yakınlık";
+    if (n < 82) return "Güçlü ihtimal";
+    return "Güçlü eşleşme";
+  }
+  if (n < 50) return "Risky application";
+  if (n < 60) return "Low probability";
+  if (n < 70) return "Medium potential";
+  if (n < 82) return "Strong potential";
+  return "Strong fit";
+}
+
+/** Result screen: interview / shortlist read (no %). */
+function resultOutcomeBand(score, lang) {
+  const n = Math.round(Number(score) || 0);
+  const tr = String(lang || "").toUpperCase() === "TR";
+  if (tr) {
+    if (n < 50) return "Düşük olasılık";
+    if (n < 60) return "Riskli başvuru";
+    if (n < 70) return "Orta ihtimal";
+    if (n < 82) return "Güçlü ihtimal";
+    if (n < 90) return "Kısa listeye yakın";
+    return "Güçlü eşleşme";
+  }
+  if (n < 50) return "Low probability";
+  if (n < 60) return "Risky application";
+  if (n < 70) return "Medium potential";
+  if (n < 82) return "Strong potential";
+  if (n < 90) return "Near shortlist";
+  return "Strong fit";
+}
+
+/** Role suggestion cards: human fit band (no %). */
+function resultRoleSuggestionFitBand(score, lang) {
+  const n = Math.round(Number(score) || 0);
+  const tr = String(lang || "").toUpperCase() === "TR";
+  if (n >= 78) return tr ? "Güçlü yakınlık" : "Strong proximity";
+  if (n >= 65) return tr ? "Daha doğal eşleşme" : "More natural fit";
+  if (n >= 52) return tr ? "Transfer edilebilir profil" : "Transferable profile";
+  return tr ? "Potansiyel geçiş" : "Potential pivot";
+}
+
+function resultProximityLevelBand(score, lang) {
+  const n = Math.round(Number(score) || 0);
+  const tr = String(lang || "").toUpperCase() === "TR";
+  if (tr) {
+    if (n < 55) return "Zayıf role yakınlığı";
+    if (n < 70) return "Orta yakınlık seviyesi";
+    if (n < 82) return "İyi role yakınlık";
+    return "Güçlü role yakınlığı";
+  }
+  if (n < 55) return "Weak role fit";
+  if (n < 70) return "Mid match level";
+  if (n < 82) return "Solid role fit";
+  return "Strong role fit";
+}
+
+function visibleAlignmentBandFromScore(score, lang) {
+  return resultPrimaryMatchBand(score, lang);
+}
+
+function analyzerFirstActionLooksPoison(t) {
+  const s = String(t || "");
+  return (
+    /CV[''\u2019\u2018]?\s*ne\s+şu\s+formatta|CV[''\u2019\u2018]?\s*ne\s+su\s+formatta|şu\s+formatta\s+1\s*cümle|1\s*cümle\s*ekle/i.test(s) ||
+    /X\s*sürecini|X\s*surecini/i.test(s) ||
+    /%\s*Y\b|\b%Y\b/i.test(s) ||
+    /sonuç\s+elde\s+ettim|sonuc\s+elde\s+ettim/i.test(s) ||
+    /Örn\s*:\s*%|%\s*artırdım|%\s*artirdim/i.test(s) ||
+    /Bu\s+adımı\s+uygularsan|Bu\s+adimi\s+uygularsan/i.test(s) ||
+    /Mevcut\s+uyum\s+skoru|Düzeltme\s+sonrası|Düzeltme\s+sonrasi/i.test(s) ||
+    /uyumun\s*%?\s*\d{1,3}/i.test(s)
+  );
+}
+
+function formatAnalyzerVisibleCopy(raw, lang, opts = {}) {
+  let t = cleanDisplayText(String(raw ?? ""));
+  const tr = String(lang || "").toUpperCase() === "TR";
+  const maxS = opts.maxSentences;
+
+  t = t.replace(/Mevcut\s+uyum\s+skoru[\s:]*%?\s*\d{1,3}/gi, " ");
+  t = t.replace(/Düzeltme\s+sonrası[\s:]*%?\s*\d{1,3}/gi, " ");
+  t = t.replace(/Düzeltme\s+sonrasi[\s:]*%?\s*\d{1,3}/gi, " ");
+  t = t.replace(/Bu\s+adımı\s+uygularsan[\s\S]{0,220}?/gi, " ");
+  t = t.replace(/Bu\s+adimi\s+uygularsan[\s\S]{0,220}?/gi, " ");
+
+  t = t.replace(/(\d{1,3})\s*%\s*align[a-z]*/gi, (_, n) => resultPrimaryMatchBand(n, lang));
+  t = t.replace(/align[a-z]*\s*:?\s*(\d{1,3})\s*%/gi, (_, n) => resultPrimaryMatchBand(n, lang));
+  t = t.replace(/\brole\s+alignment\b/gi, tr ? "role yakınlığı" : "role fit");
+  t = t.replace(/\balignment\s+score\b/gi, tr ? "yakınlık seviyesi" : "match level");
+  t = t.replace(/\balignments?\b/gi, tr ? "eşleşme" : "match");
+  t = t.replace(/\balignment\b/gi, tr ? "eşleşme" : "match");
+
+  t = t.replace(/analitik\s+sinyal\s+veriyor/gi, tr ? "Analitik tarafın görünür" : "Your analytical side shows");
+  t = t.replace(/temel\s+analitik\s+sinyal/gi, tr ? "Analitik tarafın görünür" : "Your analytical side shows");
+  t = t.replace(/net\s+sinyal\s+yoğunluğu|net\s+sinyal\s+yogunlugu/gi, tr ? "Uzmanlık netliği" : "Expertise clarity");
+  t = t.replace(/kapsam\s+sinyalleri/gi, tr ? "Somut örnekler" : "Concrete examples");
+  t = t.replace(/kapsam\s+sinyali/gi, tr ? "Somut örnek" : "Concrete example");
+  t = t.replace(/role\s*özgü\s+sinyal|rol\s*ozgu\s*sinyal/gi, tr ? "Bu role bağlanan somut örnek eksik" : "Missing concrete proof for this role");
+  t = t.replace(/olumlu\s+bir\s+sinyal/gi, tr ? "Olumlu bir nokta" : "A clear positive");
+  t = t.replace(/ürün\s+sinyali|urun\s+sinyali/gi, tr ? "Ürün tarafı" : "Product side");
+  t = t.replace(/\bproduct\s+signal\b/gi, tr ? "Ürün tarafı" : "Product side");
+  t = t.replace(/\bproduct\s+sinyali\b/gi, tr ? "Ürün tarafı" : "Product side");
+  t = t.replace(/\b\d{1,3}\s*%/g, "");
+  t = t.replace(/%\s*\d{1,3}/g, "");
+  t = t.replace(/[â€”â€“-]\s*\d{1,3}\s*%/g, "");
+  t = t.replace(/\d{1,3}\s*%\s*[â€”â€“-]/g, "");
+  t = t.replace(/Mevcut\s+uyum\s+skoru[\s:]*[^\n.]*/gi, "");
+  t = t.replace(/Düzeltme\s+sonrası[\s:]*[^\n.]*/gi, "");
+  t = t.replace(/Düzeltme\s+sonrasi[\s:]*[^\n.]*/gi, "");
+  t = t.replace(/uyumun\s*['']?\s*\d{1,3}['']?\s*[ae]?\s*çıkar/gi, "");
+  t = t.replace(/uyumun\s*['']?\s*\d{1,3}/gi, "");
+  t = t.replace(/Match:\s*(low|medium|strong|düşük|orta|güçlü|mid)\b/gi, "");
+  t = t.replace(/Eşleşme:\s*(düşük|orta|güçlü|üst orta)\b/gi, "");
+  t = t.replace(/signal\s+density/gi, tr ? "netlik" : "clarity");
+  t = t.replace(/role\s+signal/gi, tr ? "role örneği" : "role proof");
+  t = t.replace(/\bsinyalleri\b/gi, "güçlü tarafları");
+  t = t.replace(/\bsinyali\b/gi, "tarafı");
+  t = t.replace(/\bsinyaller\b/gi, "güçlü taraflar");
+  t = t.replace(/\bsinyal\b/gi, "taraf");
+
+  if (!tr) {
+    t = t.replace(/\bsignals\b/gi, "reads");
+    t = t.replace(/\bsignal\b/gi, "read");
+  }
+
+  t = t.replace(/role-fit|role\s*-\s*fit/gi, tr ? "role daha uygun" : "closer role fit");
+  t = t.replace(/role\s+özgü\s+çıktı|role\s+ozgu\s+cikti/gi, tr ? "role özel somut örnek" : "role-specific proof");
+
+  t = t.replace(/CV[''\u2019\u2018]?\s*ne\s+şu\s+formatta[\s\S]{0,900}?sonuç\s+elde\s+ettim\.?/gi, " ");
+  t = t.replace(/CV[''\u2019\u2018]?\s*ne\s+su\s+formatta[\s\S]{0,900}?sonuc\s+elde\s+ettim\.?/gi, " ");
+  t = t.replace(/X\s*sürecini\s+iyileştirerek\s*%?\s*Y\s*sonuç\s+elde\s+ettim\.?/gi, " ");
+  t = t.replace(/X\s*surecini\s+iyilestirerek\s*%?\s*Y\s*sonuc\s+elde\s+ettim\.?/gi, " ");
+
+  t = t.replace(/\s{2,}/g, " ").trim();
+
+  if (maxS != null && Number.isFinite(maxS) && maxS > 0) {
+    const parts = t.split(/(?<=[.!?â€¦])\s+/).map((x) => x.trim()).filter(Boolean);
+    t = parts.slice(0, maxS).join(" ");
+  }
+  return t;
+}
+
+/** Unified visible copy pipeline â€” every result-screen string should use this. */
+function visibleRecruiterCopy(raw, lang, opts = {}) {
+  return formatAnalyzerVisibleCopy(raw, lang, opts);
+}
+
+/** Result screen: 3-row recruiter verdict (no paragraph wall). */
+function RecruiterVerdictThreeRows({ verdict, lang }) {
+  const tr = lang === "TR";
+  const rows = [
+    {
+      key: "strength",
+      icon: "ğŸŸ¢",
+      title: tr ? "Güçlü taraf" : "Strong side",
+      text: verdict.strength,
+      border: "rgba(52,211,153,0.28)",
+      bg: "rgba(16,185,129,0.08)",
+      titleColor: "#86efac",
+      textColor: "#d1fae5",
+    },
+    {
+      key: "gap",
+      icon: "ğŸŸ ",
+      title: tr ? "Eksik taraf" : "Missing side",
+      text: verdict.gap,
+      border: "rgba(245,158,11,0.28)",
+      bg: "rgba(245,158,11,0.08)",
+      titleColor: "#fbbf24",
+      textColor: "#fde68a",
+    },
+    {
+      key: "decision",
+      icon: "ğŸ”´",
+      title: tr ? "Karar" : "Decision",
+      text: verdict.decision,
+      border: "rgba(248,113,113,0.28)",
+      bg: "rgba(239,68,68,0.08)",
+      titleColor: "#fda4af",
+      textColor: "#fecaca",
+    },
+  ];
+  return (
+    <motion.div style={{ display: "grid", gap: 8 }}>
+      {rows.map((row) => (
+        <motion.div
+          key={row.key}
+          style={{
+            borderRadius: 10,
+            border: `1px solid ${row.border}`,
+            background: row.bg,
+            padding: "10px 11px",
+          }}
+        >
+          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", color: row.titleColor, marginBottom: 4 }}>
+            {row.icon} {row.title}
+          </div>
+          <div style={{ fontSize: 14, lineHeight: 1.45, color: row.textColor, fontWeight: row.key === "decision" ? 700 : 600 }}>
+            {row.text}
+          </div>
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+}
+
+function buildRecruiterGapNudgeSentence(lang, concern, rawModelMerged, displayLine) {
+  const tr = String(lang || "").toUpperCase() === "TR";
+  const disp = String(displayLine || "").trim();
+  const raw = String(rawModelMerged || "").trim();
+  const concernLine = formatAnalyzerVisibleCopy(String(concern || "").trim(), lang, { maxSentences: 1 });
+  if (analyzerFirstActionLooksPoison(raw) || analyzerFirstActionLooksPoison(disp)) {
+    return (
+      concernLine ||
+      (tr
+        ? "Bu role bağlanan somut execution örnekleri eksik."
+        : "Concrete execution proof tied to this role is missing.")
+    );
+  }
+  const out = formatAnalyzerVisibleCopy(disp, lang, { maxSentences: 1 });
+  return (
+    out ||
+    concernLine ||
+    (tr
+      ? "Bu role bağlanan somut execution örnekleri eksik."
+      : "Concrete execution proof tied to this role is missing.")
+  );
+}
+
+/** Bump when display sanitizer rules change â€” old API/DB/local text still flows through sanitize at render. */
+export const VISIBLE_MODEL_COPY_SAN_VERSION = 6;
+
+/** Last-mile strips for LLM phrases that slip past scrub maps (incl. cached analyses). */
+function stripHardBannedUiPhrases(s, lang) {
+  const tr = String(lang || "").toUpperCase() === "TR";
+  let t = String(s || "").replace(/\s+/g, " ").trim();
+  if (!t) return "";
+  t = t.replace(
+    /\bbu\s+adımı\s+uygularsan\b[\s\S]{0,220}?\bu?yumun(?:uz)?\b[\s\S]{0,45}?(?:çıkar|cikar)/gi,
+    tr ? "Bu adım seni daha güçlü gösterir." : "This step makes you read stronger."
+  );
+  t = t.replace(/\bbu\s+adımı\s+uygularsan\b[\s\S]{0,240}?%\s*\d{1,3}/gi, tr ? "Bu adım seni daha güçlü gösterir." : "This step makes you read stronger.");
+  t = t.replace(/\bthis\s+(?:change|step|fix)\b[\s\S]{0,240}?(?:to\s+)?~?\s*\d{1,3}\s*%/gi, "");
+  t = t.replace(/\bfinal\s+alignment\s+score\s*:?\s*\d*/gi, "");
+  t = t.replace(/(\d{1,3})\s*%\s*align[a-z]*/gi, (_, n) => matchReadBandLabelFromScore(n, lang));
+  t = t.replace(/(\d{1,3})\s*align[a-z]*\s*%/gi, (_, n) => matchReadBandLabelFromScore(n, lang));
+  t = t.replace(
+    /([a-zçğıöşü0-9]+)\s+sürecini\s+iyileş?tirir?ek\b[\s\S]{0,100}?(?:%|yüzde|yuzde|sonuç\s+elde)/gi,
+    ""
+  );
+  t = t.replace(/\balignment\s+scores?\b/gi, tr ? "rol yakınlığı" : "role match");
+  t = t.replace(/\balignments?\b/gi, tr ? "eşleşme" : "match");
+  t = t.replace(/\balignment\s+score\b/gi, tr ? "rol yakınlığı" : "role match");
+  t = t.replace(/\balignment\b/gi, tr ? "eşleşme" : "match");
+  t = t.replace(/x\s*süreci|x\s*sureci|%y|%x/gi, "");
+  t = t.replace(/\bu?yumun(?:uz)?\b[\s\S]{0,80}?(?:çıkar|cikar|yuksel|yüksel|olur|olacak)/gi, "");
+  t = t.replace(/\bfit\b[\s\S]{0,60}?\d{1,3}\s*%/gi, "");
+  t = t.replace(/\bATS\s*açısından\b|\bATS\s*acisindan\b/gi, "");
+  t = t.replace(/\bAI\s+analysis\s+says\b|\bYapay\s+zeka\s+analizi\b/gi, "");
+  t = t.replace(/\bstrong\s+candidate\b|\bhigh\s+potential\b|\bcandidate\s+demonstrates\b/gi, "");
+  t = t.replace(/\s{2,}/g, " ").trim();
+  return stripResidualConsultantWords(t, lang);
+}
+
+/** Last pass: no visible alignment/sinyal/signal tokens (incl. model leaks beside scrub map). */
+function stripResidualConsultantWords(s, lang) {
+  const tr = String(lang || "").toUpperCase() === "TR";
+  let t = String(s || "").replace(/\s+/g, " ").trim();
+  if (!t) return t;
+  if (tr) {
+    t = t.replace(/güçlü\s+bir\s+sinyal/gi, "güçlü kanıt");
+    t = t.replace(/zayıf\s+bir\s+sinyal/gi, "zayıf görünüyor");
+    t = t.replace(/bir\s+sinyal/gi, "bir net vurgu");
+    t = t.replace(/product\s+sinyali/gi, "Ürün tarafı");
+    t = t.replace(/kapsam\s+sinyalleri?/gi, "somut örnekler");
+    t = t.replace(/net\s+sinyal\s+yoğunluğu|net\s+sinyal\s+yogunlugu/gi, "uzmanlık netliği");
+    t = t.replace(/\bsinyallerden\b/gi, "örneklerden");
+    t = t.replace(/\bsinyalleri\b/gi, "örnekleri");
+    t = t.replace(/\bsinyaller\b/gi, "örnekler");
+    t = t.replace(/\bsinyali\b/gi, "tarafı");
+    t = t.replace(/\bsinyalin\b/gi, "tarafın");
+    t = t.replace(/\bsinyale\b/gi, "vurguya");
+    t = t.replace(/\bsinyal\b/gi, "vurgu");
+  } else {
+    t = t.replace(/\bweak\s+signals?\b/gi, "weak read");
+    t = t.replace(/\bstrong\s+signals?\b/gi, "strong read");
+    t = t.replace(/\bproduct\s+signals?\b/gi, "product experience");
+    t = t.replace(/\bsignals?\b(?!\w)/gi, (m) => (/signals/i.test(m) ? "reads" : "read"));
+  }
+  t = t.replace(/\balignments?\b/gi, tr ? "eşleşme" : "match");
+  t = t.replace(/\balignment\s+scores?\b/gi, tr ? "rol yakınlığı" : "role match");
+  t = t.replace(/(\d{1,3})\s*%\s*align[a-z]*/gi, (_, n) => matchReadBandLabelFromScore(n, lang));
+  t = t.replace(/(\d{1,3})\s*align[a-z]*\s*%/gi, (_, n) => matchReadBandLabelFromScore(n, lang));
+  return t.replace(/\s{2,}/g, " ").trim();
+}
+
+/** All user-visible model lines: underscore cleanup + jargon strip + banned-phrase strip (safe for old saved payloads). */
+function sanitizeVisibleCopy(text, lang) {
+  return scrubRecruiterJargon(cleanDisplayText(text), lang);
+}
+
+/** Hard replacements at render time (after sanitize) for model phrases that still leak into JSX. */
+function hardReplaceVisibleCopy(text, lang = "TR") {
+  let t = String(text || "");
+  const tr = String(lang || "").toUpperCase() === "TR";
+  t = t.replace(/\d{1,3}%\s*Alignment/gi, tr ? "Eşleşme: düşük" : "Match: low");
+  t = t.replace(/\bAlignment\b/gi, tr ? "Eşleşme" : "Match");
+  t = t.replace(/ürün sinyali/gi, "ürün tarafı");
+  t = t.replace(/Product sinyali/gi, "Ürün tarafı");
+  t = t.replace(/olumlu bir sinyal/gi, "olumlu bir nokta");
+  t = t.replace(/güzel sinyaller/gi, "güçlü taraflar");
+  t = t.replace(/net sinyal yoğunluğu/gi, "uzmanlık netliği");
+  t = t.replace(/kapsam sinyalleri/gi, "somut örnekler");
+  t = t.replace(/temel analitik sinyal/gi, "analitik taraf");
+  t = t.replace(/analitik sinyal/gi, "analitik taraf");
+  t = t.replace(/\bsinyal\b/gi, "taraf");
+  t = t.replace(/\bsinyali\b/gi, "tarafı");
+  t = t.replace(/\bsinyaller\b/gi, "güçlü taraflar");
+  t = t.replace(/\bsinyalleri\b/gi, "güçlü tarafları");
+  t = t.replace(/\bsignal\b/gi, "read");
+  t = t.replace(/\bsignals\b/gi, "reads");
+  t = t.replace(/role-fit/gi, "role daha uygun");
+  t = t.replace(/role özgü çıktı/gi, "role özel somut örnek");
+  t = t.replace(/Mevcut uyum skoru:\s*%?\d+/gi, "");
+  t = t.replace(/Düzeltme sonrası:\s*%?\d+/gi, "");
+  t = t.replace(/Bu adımı uygularsan uyumun\s*%?\d+['â€™]?[ae]?\s*çıkar/gi, "Bu adım seni daha güçlü gösterir.");
+  t = t.replace(/CV[â€™']ne şu formatta 1 cümle ekle:[\s\S]*?sonuç elde ettim\.?/gi, "Bu role bağlanan somut örnekleri öne çıkar.");
+  t = t.replace(/X sürecini iyileştirerek %Y sonuç elde ettim\.?/gi, "Bu role bağlanan somut örnekleri öne çıkar.");
+  t = t.replace(/Örn:\s*%X artırdım,\s*X sürede tamamladım/gi, "");
+  return t.replace(/\s{2,}/g, " ").trim();
+}
+
+function pipeVisibleCopy(text, lang) {
+  return hardReplaceVisibleCopy(sanitizeVisibleCopy(text, lang), lang);
+}
+
+function trEşleşmeChipFromAnalyzerScore(score) {
+  const n = Math.round(Number(score) || 0);
+  if (n < 50) return "Eşleşme: düşük";
+  if (n < 70) return "Eşleşme: orta";
+  return "Eşleşme: güçlü";
+}
+
+function enMatchChipFromAnalyzerScore(score) {
+  const n = Math.round(Number(score) || 0);
+  if (n < 50) return "Match: low";
+  if (n < 70) return "Match: medium";
+  return "Match: strong";
+}
+
+/** Chips that echo â€œ46% Alignmentâ€ from model â€” replace with score bands. */
+function pipeVerdictChipText(text, lang, analyzerScore) {
+  const raw = String(text || "");
+  if (/\d{1,3}\s*%\s*alignment/i.test(raw) || (/\d{1,3}\s*%/.test(raw) && /\balignment\b/i.test(raw))) {
+    return String(lang || "").toUpperCase() === "TR" ? trEşleşmeChipFromAnalyzerScore(analyzerScore) : enMatchChipFromAnalyzerScore(analyzerScore);
+  }
+  return hardReplaceVisibleCopy(sanitizeVisibleCopy(raw, lang), lang);
+}
+
+function clampRecruiterVisibleSentences(text, lang, maxSentences = 3) {
+  const s = sanitizeVisibleCopy(String(text || ""), lang);
+  if (!s) return "";
+  const parts = s.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean).slice(0, maxSentences);
+  return parts.join(" ");
+}
+
 function pickLeadInsight(engineV2, analysisData, lang) {
   const fb =
     lang === "TR"
-      ? "CV sinyalin rol beklentisine göre zayıf kalıyor."
-      : "Your CV signal looks weak versus what this role expects.";
+      ? "Ilk turda kopru zayif; gercek teslimi net goremiyorum."
+      : "The bridge to this JD still looks thinâ€”I need clearer proof of what you shipped.";
   const insight =
     engineV2?.Gaps?.biggest_gap ||
     engineV2?.Gaps?.rejection_reasons?.[0]?.issue ||
     analysisData?.rejection_reasons?.high?.[0] ||
     analysisData?.fit_summary ||
     fb;
-  return cleanDisplayText(String(insight || "").trim());
+  return visibleRecruiterCopy(String(insight || "").trim(), lang, { maxSentences: 2 });
 }
 
 function pickLeadSuggestion(engineV2, analysisData, lang) {
   const fb =
     lang === "TR"
-      ? "Her ana deneyime ölçülebilir etki ekle."
-      : "Add measurable impact to each major experience line.";
+      ? "Tek somut teslim satiri ekle; recruiter guveni artabilir."
+      : "Add one concrete ship lineâ€”recruiter trust usually follows.";
   const suggestion =
     engineV2?.Decision?.what_to_fix_first?.[0] ||
     analysisData?.improvements?.[0] ||
     analysisData?.missing_skills?.[0] ||
     fb;
-  return cleanDisplayText(String(suggestion || "").trim());
+  return visibleRecruiterCopy(String(suggestion || "").trim(), lang, { maxSentences: 1 });
 }
 
 function UnlockReportGateCard({
-  lang: _lang,
+  lang,
   score,
   insight,
   suggestion,
+  cvText: gateCvText = "",
+  jdText: gateJdText = "",
   previewFixResult,
   previewFixBusy,
   previewReanalyzing,
@@ -1315,29 +1904,27 @@ function UnlockReportGateCard({
   onUnlockSubmit,
 }) {
   const [showFixConfirmation, setShowFixConfirmation] = useState(false);
+  const tr = isUiTurkish(lang);
   const scoreNow = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
   const verdictText =
     scoreNow < 50
-      ? "Büyük ihtimalle eleneceksin."
+      ? (tr ? "Büyük ihtimalle eleneceksin." : "You would likely get screened out.")
       : scoreNow <= 70
-        ? "Sınırdasın — risk altındasın."
-        : "Şansın var — ama garanti değil.";
-  const reasonRaw = String(insight || "").trim();
-  const topReason = reasonRaw || "CV’n gerçek sonuçlar göstermiyor.";
-  const impactDelta = scoreNow < 50 ? 18 : scoreNow <= 70 ? 12 : 8;
-  const scoreAfterFix = Math.min(100, scoreNow + impactDelta);
-  const actionRaw = String(suggestion || "").trim();
-  const actionNorm = actionRaw.toLowerCase();
-  const actionLine = actionRaw
-    ? ((actionNorm.includes("quantified outcome bullets")
-      || actionNorm.includes("before/after impact")
-      || actionNorm.includes("measurable")
-      || actionNorm.includes("metric"))
-      ? "Görev yazmayı bırak, sonuç yaz."
-      : actionRaw)
-    : "Görev yazmayı bırak, sonuç yaz.";
-  const transformOld = String(previewFixResult?.old || "CV’n gerçek sonuçlar göstermiyor").trim();
-  const transformNew = String(previewFixResult?.new || "Operasyonlarda verimliliği %23 artırdım").trim();
+        ? (tr ? "Sınırdasın â€” risk altındasın." : "You are borderline â€” elevated risk.")
+        : (tr ? "Şansın var â€” ama garanti değil." : "You have a shot â€” still not a guarantee.");
+  const topReason =
+    String(insight || "").trim() ||
+    (tr ? "Bu role bağlanan somut execution örnekleri eksik." : "Concrete execution proof tied to this role is missing.");
+  const actionLineForUi =
+    String(suggestion || "").trim() ||
+    topReason;
+  const transformOld = String(previewFixResult?.old || (tr ? "CVâ€™nde savunabileceğin somut sonuçlar daha net görünmüyor." : "Concrete outcomes are not sharp enough on the CV.")).trim();
+  const transformNew = String(
+    previewFixResult?.new
+    || (tr
+      ? "Operasyonlarda hız ve müşteri etkisini tek satırda, uydurma rakam olmadan yaz."
+      : "Summarize speed and customer impact in one lineâ€”no invented numbers.")
+  ).trim();
 
   useEffect(() => {
     if (!previewFixResult?.new) {
@@ -1371,11 +1958,11 @@ function UnlockReportGateCard({
             padding: "12px 13px",
           }}
         >
-          <div style={{ fontSize: 25, fontWeight: 900, color: "#fee2e2", lineHeight: 1.15, marginBottom: 6 }}>
+          <div style={{ fontSize: 25, fontWeight: 800, color: "#fee2e2", lineHeight: 1.15, marginBottom: 6 }}>
             {verdictText}
           </div>
           <div style={{ fontSize: 13, color: "#fecaca", lineHeight: 1.45 }}>
-            {"Bu başvuru şu haliyle güçlü görünmüyor."}
+            {tr ? "Bu başvuru şu haliyle güçlü görünmüyor." : "This application does not read strong as-is."}
           </div>
         </div>
 
@@ -1388,7 +1975,7 @@ function UnlockReportGateCard({
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 800, color: "#fca5a5", marginBottom: 5 }}>
-            {"Seni eleyen asıl şey:"}
+            {tr ? "Seni eleyen asıl şey:" : "What would screen you out:"}
           </div>
           <div style={{ fontSize: 14, color: "#fee2e2", lineHeight: 1.45, fontWeight: 700 }}>
             {topReason}
@@ -1404,16 +1991,18 @@ function UnlockReportGateCard({
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 800, color: "#86efac", marginBottom: 5 }}>
-            {"Bunu düzeltirsen:"}
+            {tr ? "Bugünkü okuma" : "How you read today"}
           </div>
-          <div style={{ fontSize: 14, color: "#f8fafc", lineHeight: 1.35, fontWeight: 800, marginBottom: 4 }}>
-            {`Mevcut uyum skoru: %${scoreNow}`}
+          <div style={{ fontSize: 15, color: "#f8fafc", lineHeight: 1.35, fontWeight: 800, marginBottom: 6 }}>
+            {roleProximityLabel(scoreNow, lang)}
           </div>
-          <div style={{ fontSize: 16, color: "#86efac", lineHeight: 1.35, fontWeight: 900, marginBottom: 4 }}>
-            {`Düzeltme sonrası: %${scoreAfterFix}`}
+          <div style={{ fontSize: 13, color: "#bbf7d0", lineHeight: 1.4, fontWeight: 600 }}>
+            {tr ? "Bu adım seni daha güçlü gösterir." : "This step makes you read stronger."}
           </div>
-          <div style={{ fontSize: 12, color: "#bbf7d0", lineHeight: 1.35 }}>
-            {"Recruiter beklentilerine göre hesaplandı"}
+          <div style={{ fontSize: 12, color: "#bbf7d0", lineHeight: 1.35, marginTop: 6, opacity: 0.92 }}>
+            {tr
+              ? "Bu kutu recruiter beklentilerine göre özetlenir; hukuki garanti değildir."
+              : "This panel summarizes recruiter-style reads; not a guarantee."}
           </div>
         </div>
 
@@ -1426,16 +2015,13 @@ function UnlockReportGateCard({
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 800, color: "#cbd5e1", marginBottom: 5 }}>
-            {"Şimdi ne yapmalısın?"}
+            {tr ? "Şimdi ne yapmalısın?" : "What to do now"}
           </div>
           <div style={{ fontSize: 14, color: "#e2e8f0", lineHeight: 1.45, fontWeight: 700 }}>
-            {actionLine}
+            {actionLineForUi}
           </div>
           <div style={{ marginTop: 4, fontSize: 11, color: "#94a3b8", opacity: 0.8 }}>
-            {"Recruiter sonuç görmek ister."}
-          </div>
-          <div style={{ marginTop: 4, fontSize: 12, color: "#94a3b8", lineHeight: 1.35 }}>
-            {"Örn: Satış sürecini optimize ederek dönüşümü %18 artırdım"}
+            {tr ? "Recruiter somut satır ister." : "Recruiters want one concrete line."}
           </div>
           <button
             type="button"
@@ -1460,7 +2046,7 @@ function UnlockReportGateCard({
               opacity: previewFixBusy ? 0.8 : 1,
             }}
           >
-            {previewFixBusy ? "Düzeltiliyor..." : "Bu sorunu düzelt"}
+            {previewFixBusy ? (tr ? "Düzeltiliyor..." : "Fixing...") : (tr ? "Bu sorunu düzelt" : "Fix this gap")}
           </button>
           <button
             type="button"
@@ -1491,10 +2077,10 @@ function UnlockReportGateCard({
             }}
           >
             <Lock size={13} />
-            {"Bu role uygun CV oluştur"}
+            {tr ? "Bu role uygun CV oluştur" : "Shape CV toward this role"}
           </button>
           <div style={{ marginTop: 4, fontSize: 11, color: "#facc15", opacity: 0.82 }}>
-            {"Recruiter beklentilerine göre hesaplandı"}
+            {tr ? "Bu özet recruiter tarzı okumadır." : "This summary is a recruiter-style read."}
           </div>
         </div>
         <AnimatePresence initial={false}>
@@ -1513,7 +2099,7 @@ function UnlockReportGateCard({
               }}
             >
               <div style={{ fontSize: 14, fontWeight: 800, color: "#e0f2fe" }}>
-                {"CV'in yeniden yazılıyor..."}
+                {tr ? "CV satırın netleştiriliyor..." : "Sharpening your CV line..."}
               </div>
             </motion.div>
           ) : null}
@@ -1539,7 +2125,7 @@ function UnlockReportGateCard({
                 transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
                 style={{ fontSize: 16, color: "#7dd3fc", fontWeight: 800, marginBottom: 6 }}
               >
-                {"→"}
+                {"â†’"}
               </motion.div>
               <div style={{ fontSize: 12, color: "#dcfce7", fontWeight: 700 }}>
                 {`Yeni: "${transformNew}"`}
@@ -1590,9 +2176,20 @@ function UnlockReportGateCard({
                 {previewReanalyzing ? "Analiz ediliyor..." : "Yeni sonucu gör"}
               </button>
               {previewScoreDelta ? (
-                <div style={{ marginTop: 8, fontSize: 12, color: "#bae6fd", fontWeight: 700, lineHeight: 1.45 }}>
-                  <div style={{ color: "#e2e8f0" }}>{`Mevcut uyum skoru: %${previewScoreDelta.before}`}</div>
-                  <div style={{ color: "#86efac", marginTop: 4 }}>{`Düzeltme sonrası: %${previewScoreDelta.after}`}</div>
+                <div style={{ marginTop: 8, fontSize: 12, color: "#bae6fd", fontWeight: 600, lineHeight: 1.45 }}>
+                  <div style={{ color: "#e2e8f0" }}>
+                    {tr
+                      ? `Önce: ${recruiterUyumBucketTr(previewScoreDelta.before).toLowerCase()} bandı`
+                      : `Before: ${recruiterUyumBucketEn(previewScoreDelta.before).toLowerCase()} band`}
+                  </div>
+                  <div style={{ color: "#86efac", marginTop: 4 }}>
+                    {tr
+                      ? `Şimdi: ${recruiterUyumBucketTr(previewScoreDelta.after).toLowerCase()} bandı`
+                      : `Now: ${recruiterUyumBucketEn(previewScoreDelta.after).toLowerCase()} band`}
+                  </div>
+                  <div style={{ marginTop: 6, fontSize: 11, color: "#94a3b8" }}>
+                    {tr ? "Bu adım seni daha güçlü gösterir." : "This step makes you read stronger."}
+                  </div>
                 </div>
               ) : null}
               {previewScoreDelta ? (
@@ -1606,22 +2203,18 @@ function UnlockReportGateCard({
                   }}
                 >
                   <div style={{ fontSize: 12, fontWeight: 800, color: "#e2e8f0", marginBottom: 6 }}>
-                    {"İlerlemen"}
+                    {tr ? "Özet" : "Summary"}
                   </div>
                   <div style={{ fontSize: 12, color: "#cbd5e1", lineHeight: 1.45 }}>
-                    {`İlk skor: ${previewScoreDelta.before}`}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#cbd5e1", lineHeight: 1.45 }}>
-                    {`Şu an: ${previewScoreDelta.after}`}
-                  </div>
-                  <div style={{ fontSize: 12, color: "#86efac", fontWeight: 700, lineHeight: 1.45 }}>
-                    {`Toplam gelişim: ${previewScoreDelta.delta >= 0 ? "+" : ""}${previewScoreDelta.delta}`}
+                    {tr
+                      ? "Bu role daha net bağlanırsın; recruiter tarafındaki soru işareti azalır."
+                      : "You tie clearer to the roleâ€”recruiter hesitation tends to shrink."}
                   </div>
                   <div style={{ marginTop: 4, fontSize: 11, color: "#94a3b8", opacity: 0.9 }}>
-                    {"Devam edersen daha da yükseltebilirsin."}
+                    {tr ? "Metin netleştikçe okuma değişebilir." : "As the story tightens, the read can move."}
                   </div>
                   <div style={{ marginTop: 2, fontSize: 10, color: "#94a3b8", opacity: 0.62 }}>
-                    {"Yarın tekrar dene — aynı CV ile daha iyi sonuç yakalayabilirsin."}
+                    {tr ? "İstersen tekrar analiz et â€” aynı CV farklı ilanda farklı okunur." : "Re-run on a new posting; the same CV reads differently per role."}
                   </div>
                 </div>
               ) : null}
@@ -1650,11 +2243,11 @@ function UnlockReportGateCard({
                         fontSize: 12,
                         fontWeight: 800,
                         cursor: optimizing ? "not-allowed" : "pointer",
-                        fontFamily: "'DM Sans', sans-serif",
+                        fontFamily: "var(--font-sans)",
                         opacity: optimizing ? 0.8 : 1,
                       }}
                     >
-                      {"Bu CV'yi bu role göre tamamen yeniden yaz"}
+                      {tr ? "CV'yi bu role daha net hizala (Pro)" : "Sharpen CV for this role (Pro)"}
                     </button>
                     <button
                       type="button"
@@ -1668,7 +2261,7 @@ function UnlockReportGateCard({
                         fontSize: 12,
                         fontWeight: 800,
                         cursor: "pointer",
-                        fontFamily: "'DM Sans', sans-serif",
+                        fontFamily: "var(--font-sans)",
                       }}
                     >
                       {"Bana daha uygun rolleri göster"}
@@ -1685,7 +2278,7 @@ function UnlockReportGateCard({
                         fontSize: 12,
                         fontWeight: 800,
                         cursor: "pointer",
-                        fontFamily: "'DM Sans', sans-serif",
+                        fontFamily: "var(--font-sans)",
                       }}
                     >
                       {"Bu rol piyasada ne kadar güçlü?"}
@@ -1705,7 +2298,7 @@ function UnlockReportGateCard({
           padding: 18,
         }}
       >
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, color: "#f8fafc", marginBottom: 6 }}>
+        <div style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800, color: "#f8fafc", marginBottom: 6 }}>
           {"Tüm analizini gör"}
         </div>
         <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 14 }}>
@@ -1727,7 +2320,7 @@ function UnlockReportGateCard({
               background: "rgba(15,23,42,0.75)",
               color: "#e2e8f0",
               fontSize: 13,
-              fontFamily: "'DM Sans', sans-serif",
+              fontFamily: "var(--font-sans)",
             }}
           />
           <select
@@ -1741,7 +2334,7 @@ function UnlockReportGateCard({
               background: "rgba(15,23,42,0.75)",
               color: "#e2e8f0",
               fontSize: 13,
-              fontFamily: "'DM Sans', sans-serif",
+              fontFamily: "var(--font-sans)",
             }}
           >
             <option value="Student">{"Öğrenci"}</option>
@@ -1812,7 +2405,7 @@ function SharePromptModal({ open, lang, score, verdictLabel, biggestMistake, onC
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.78)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
       <div style={{ width: "min(560px, 96vw)", borderRadius: 16, border: "1px solid rgba(99,102,241,0.28)", background: "linear-gradient(160deg,#0b1220,#05070f)", padding: 20 }}>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, color: "#f1f5f9", marginBottom: 8 }}>{"Bu sonuç seni şaşırttı mı?"}</div>
+        <div style={{ fontFamily: "var(--font-display)", fontSize: 22, color: "#f1f5f9", marginBottom: 8 }}>{"Bu sonuç seni şaşırttı mı?"}</div>
         <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 12 }}>{`Skor: ${score}`}</div>
         <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6, color: "#cbd5e1", padding: "12px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)" }}>{text}</pre>
         <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
@@ -1899,7 +2492,7 @@ function truncatePreviewForFree(lines) {
   const cap = (s, n) => {
     const x = String(s || "").trim();
     if (x.length <= n) return x;
-    return `${x.slice(0, n).trimEnd()}…`;
+    return `${x.slice(0, n).trimEnd()}â€¦`;
   };
   return [cap(lines[0], PREVIEW_FREE_FIRST_MAX), ...lines.slice(1).map((l) => cap(l, PREVIEW_FREE_REST_MAX))];
 }
@@ -1932,7 +2525,7 @@ function explainGapReason(issue, fallback, tr) {
   return String(fallback || "").trim() || tr.previewGapWhyGeneric;
 }
 
-/** Lines for all four preview cards — always derived from this run's CV+JD payload. */
+/** Lines for all four preview cards â€” always derived from this run's CV+JD payload. */
 function buildV2PreviewLines(data, lang, planFixes, tr) {
   const h = (s) => humanizeUserFacingReason(String(s || "").trim(), lang);
   const reqFromGap = String(data?.Gaps?.biggest_gap || data?.Gaps?.rejection_reasons?.[0]?.issue || "").trim();
@@ -1968,7 +2561,7 @@ function buildV2PreviewLines(data, lang, planFixes, tr) {
     dedupReasons.push(h(tr.previewRecruiterRealityLine.replace("{reality}", cvRealityRaw)));
     dedupReasons.push(h(tr.previewRecruiterReqLine.replace("{req}", requirementSignal)));
   }
-  dedupReasons.forEach((r) => recruiterLines.push(`● ${r}`));
+  dedupReasons.forEach((r) => recruiterLines.push(`â— ${r}`));
 
   const roleRowsRaw = Array.isArray(data?.RoleFit?.role_fit) ? data.RoleFit.role_fit : [];
   const sortedRoles = [...roleRowsRaw].sort((a, b) => Number(b?.score || 0) - Number(a?.score || 0));
@@ -1988,7 +2581,7 @@ function buildV2PreviewLines(data, lang, planFixes, tr) {
     }
   }
   recruiterLines.push(h(tr.previewRecruiterAltIntro));
-  altRoles.slice(0, 2).forEach((role) => recruiterLines.push(`● ${role}`));
+  altRoles.slice(0, 2).forEach((role) => recruiterLines.push(`â— ${role}`));
 
   recruiterLines.push(h(tr.previewRecruiterBecauseIntro));
   const becausePool = [];
@@ -2000,14 +2593,14 @@ function buildV2PreviewLines(data, lang, planFixes, tr) {
   }
   const becauseRows = Array.from(new Set(becausePool.map((x) => String(x).trim()).filter(Boolean))).slice(0, 3);
   if (!becauseRows.length) becauseRows.push(h(tr.previewFallbackRecruiterFirst));
-  becauseRows.forEach((r) => recruiterLines.push(`● ${r}`));
+  becauseRows.forEach((r) => recruiterLines.push(`â— ${r}`));
 
   const gapLines = [];
   for (const g of data?.Gaps?.rejection_reasons || []) {
     const imp = gapImpactLabel(g, tr);
-    const issue = h(String(g.issue || "—"));
+    const issue = h(String(g.issue || "â€”"));
     const why = h(explainGapReason(issue, g.explanation, tr));
-    gapLines.push(`● ${issue}${imp ? ` — ${imp}` : ""}`);
+    gapLines.push(`â— ${issue}${imp ? ` â€” ${imp}` : ""}`);
     gapLines.push(why);
   }
   if (!gapLines.length) gapLines.push(h(tr.previewEmptyGapsBrief));
@@ -2047,12 +2640,6 @@ function buildV2PreviewLines(data, lang, planFixes, tr) {
   }
   const weekTasks = rawTasks.slice(0, 3);
   while (weekTasks.length < 3) weekTasks.push(h(tr.previewPlanStrategic3));
-  const impacts = fixes
-    .slice(0, 3)
-    .map((f) => Math.max(1, Math.min(18, Math.round(Number(f?.score_impact) || 0))))
-    .filter((n) => Number.isFinite(n));
-  const impactPoints = impacts.length ? impacts.reduce((a, b) => a + b, 0) : 12;
-  const interviewLiftPct = Math.max(8, Math.min(38, impactPoints * 2));
   const planLines = [
     h(tr.previewWeek1Label),
     `- ${weekTasks[0]}`,
@@ -2061,15 +2648,15 @@ function buildV2PreviewLines(data, lang, planFixes, tr) {
     h(tr.previewWeek3Label),
     `- ${weekTasks[2]}`,
     h(tr.previewExpectedImpactLabel),
-    h(tr.previewInterviewImpactLine.replace("{x}", String(interviewLiftPct))),
-    h(tr.previewProfileStrengthLine.replace("{y}", String(impactPoints))),
+    h(tr.previewInterviewImpactLine),
+    h(tr.previewProfileStrengthLine),
   ];
 
   const ex = data?.CompanyIntel?.extracted || {};
   const companyReport = data?.CompanyIntel?.report || {};
   const companyLine =
     ex.company_name && String(ex.company_name).trim()
-      ? `${String(ex.company_name).trim()}${ex.sector_inferred ? ` · ${ex.sector_inferred}` : ""}`
+      ? `${String(ex.company_name).trim()}${ex.sector_inferred ? ` Â· ${ex.sector_inferred}` : ""}`
       : ex.sector_inferred
         ? String(ex.sector_inferred)
         : "";
@@ -2081,7 +2668,7 @@ function buildV2PreviewLines(data, lang, planFixes, tr) {
   const atsParts = [];
   if (data?.ATS?.ats_score != null) atsParts.push(`${tr.previewAtsScoreShort}: ${data.ATS.ats_score}%`);
   if (data?.ATS?.keyword_match != null) atsParts.push(`${tr.previewKeywordMatchShort}: ${data.ATS.keyword_match}%`);
-  const atsLine = atsParts.length ? atsParts.join(" · ") : tr.previewAtsFallback;
+  const atsLine = atsParts.length ? atsParts.join(" Â· ") : tr.previewAtsFallback;
   const best = data?.RoleFit?.best_role;
   const roles = roleRowsRaw;
   const careerLine = best || roles[0]?.role
@@ -2402,7 +2989,7 @@ function inferTargetTrack(jdText, lang) {
   return lang === "TR" ? "hedef ilan hattı" : "target posting track";
 }
 
-function buildPersonalizedProjectEngine({ lang, biggestGap, missingSkills, topRole, background, jdText, score }) {
+function buildPersonalizedProjectEngine({ lang, biggestGap, missingSkills, topRole, background, jdText, score: _score }) {
   const jd = String(jdText || "").toLowerCase();
   const roleLower = String(topRole || "").toLowerCase();
   const miss = Array.isArray(missingSkills) ? missingSkills.map((x) => String(x).trim()).filter(Boolean) : [];
@@ -2442,8 +3029,8 @@ function buildPersonalizedProjectEngine({ lang, biggestGap, missingSkills, topRo
   }
 
   const why = lang === "TR"
-    ? `${biggestGap || "En kritik boşluğun"} şu an ilk eleme riski yaratıyor. ${background} profilin analitik temel veriyor; bu proje eksik olan gerçek iş çıktısı sinyalini doğrudan üretir.`
-    : `${biggestGap || "Your biggest gap"} currently drives first-screen rejection risk. Your ${background} already gives you analytical foundation; this project directly creates the missing real-world execution signal.`;
+    ? `${biggestGap || "En kritik boşluğun"} şu an ilk eleme riski yaratıyor. ${background} profilin analitik temel veriyor; bu proje eksik olan gerçek iş çıktısını görünür kılar.`
+    : `${biggestGap || "Your biggest gap"} currently drives first-screen rejection risk. Your ${background} already gives you analytical foundation; this project makes missing real-world output visible.`;
 
   const steps = lang === "TR"
     ? [
@@ -2459,11 +3046,10 @@ function buildPersonalizedProjectEngine({ lang, biggestGap, missingSkills, topRo
         "4) Extract 3 business insights and attach a clear action for each.",
       ];
 
-  const projectedGain = Math.max(12, Math.min(22, Math.round((70 - (Number(score) || 50)) / 1.8)));
   const outcome = lang === "TR"
-    ? `Recruiter tarafında “gerçek problem çözümü + ölçülebilir çıktı” sinyali üretir. CV'de somut proje kanıtı açar ve eşleşme skorunu yaklaşık +${projectedGain} puan artırır.`
-    : `Creates a recruiter-visible signal of real problem solving plus measurable output. It adds concrete project proof to your CV and can lift your match score by about +${projectedGain} points.`;
-  const timeEstimate = lang === "TR" ? "Tahmini süre: 5–10 gün" : "Estimated time: 5–10 days";
+    ? "Recruiter tarafında gerçek problem çözümü ve ölçülebilir çıktı daha net görünür. CV'de somut proje kanıtı açar; geri dönüş ihtimalin artar."
+    : "Makes real problem solving and measurable output easier to see for a recruiter. Adds concrete project proof and can improve follow-up odds.";
+  const timeEstimate = lang === "TR" ? "Tahmini süre: 5â€“10 gün" : "Estimated time: 5â€“10 days";
 
   return { title, why, steps, outcome, timeEstimate };
 }
@@ -2486,24 +3072,24 @@ function buildBestPathForwardModel({ data, lang, score, t: _t, cvText, jdText })
     const whySeed = strengths[idx] || matched[idx] || strengths[0] || matched[0] || bigGap;
     const why = whySeed
       ? (lang === "TR"
-        ? `${background} içinde ${whySeed} sinyali güçlü olduğu için bu rolde daha güçlü görünüyorsun.`
-        : `Your ${background} already shows ${whySeed} signal, so this role is a stronger fit.`)
+        ? `${background} içinde ${whySeed} tarafın güçlü; bu rolde daha net duruyorsun.`
+        : `Your ${background} already highlights ${whySeed}, so this role is a stronger fit.`)
       : (lang === "TR"
-        ? `${background} bu role daha yakın sinyal veriyor.`
-        : `Your current ${background} signal is closer to this role.`);
+        ? `${background} bu role daha yakın duruyor.`
+        : `Your current ${background} reads closer to this role.`);
     return { role, score: scoreNum, why };
   });
 
   while (roleCandidates.length < 3) {
     const fallback = lang === "TR"
       ? [
-          { role: "Veri Analisti", score: 72, why: "Analitik düşünme ve yapılandırılmış problem çözme sinyalin güçlü." },
-          { role: "İş Analisti", score: 68, why: "İş ve veri yorumlama arasında köprü kuran bir profilin var." },
-          { role: "Operasyon Analisti", score: 64, why: "Süreç, raporlama ve karar desteği tarafında güçlü temel var." },
+          { role: "Veri Analisti", score: 72, why: "Analitik düşünme ve yapılandırılmış problem çözme tarafın güçlü." },
+          { role: "İş Analisti", score: 68, why: "Ürün ve karar desteği tarafında güçlü bir tarafın var." },
+          { role: "Operasyon Analisti", score: 64, why: "Operasyonel düşünme ve yapı kurma tarafın net." },
         ]
       : [
-          { role: "Data Analyst", score: 72, why: "You already show analytical thinking and structured problem solving." },
-          { role: "Business Analyst", score: 68, why: "Your background aligns with business plus data interpretation." },
+          { role: "Data Analyst", score: 72, why: "Your CV already shows analytical thinking and data strength." },
+          { role: "Business Analyst", score: 68, why: "You show a strong base for product-facing analytical work." },
           { role: "Operations Analyst", score: 64, why: "You have strong process and reporting foundations." },
         ];
     const next = fallback.find((x) => !roleCandidates.some((r) => r.role.toLowerCase() === x.role.toLowerCase()));
@@ -2515,10 +3101,10 @@ function buildBestPathForwardModel({ data, lang, score, t: _t, cvText, jdText })
   const topLower = topRole.toLowerCase();
   const careerPath =
     topLower.includes("data")
-      ? (lang === "TR" ? "Veri Analisti → Ürün Analisti → Ürün Yöneticisi" : "Data Analyst → Product Analyst → Product Manager")
+      ? (lang === "TR" ? "Veri Analisti â†’ Ürün Analisti â†’ Ürün Yöneticisi" : "Data Analyst â†’ Product Analyst â†’ Product Manager")
       : topLower.includes("business")
-        ? (lang === "TR" ? "İş Analisti → Strateji Analisti → Strateji Yöneticisi" : "Business Analyst → Strategy Analyst → Strategy Manager")
-        : (lang === "TR" ? "Analist → Kıdemli Analist → Yönetici" : "Analyst → Senior Analyst → Manager");
+        ? (lang === "TR" ? "İş Analisti â†’ Strateji Analisti â†’ Strateji Yöneticisi" : "Business Analyst â†’ Strategy Analyst â†’ Strategy Manager")
+        : (lang === "TR" ? "Analist â†’ Kıdemli Analist â†’ Yönetici" : "Analyst â†’ Senior Analyst â†’ Manager");
 
   const phaseImmediate = [
     lang === "TR" ? `${topRole} odağını CV özetinin ilk iki satırına taşı.` : `Rewrite your CV summary around ${topRole}.`,
@@ -2532,12 +3118,11 @@ function buildBestPathForwardModel({ data, lang, score, t: _t, cvText, jdText })
   ];
   const phaseApplication = [
     lang === "TR" ? `${topRole} ve yakın rollere odaklan; ${targetTrack} dışındaki rolleri ele.` : `Apply only to ${topRole} and adjacent roles; cut roles outside this ${targetTrack}.`,
-    lang === "TR" ? "İlanlarda analitik araç sinyali olan şirketleri hedefle." : "Target postings with explicit analytics-tool demand.",
+    lang === "TR" ? "SQL/BI/analitik ihtiyacı net olan şirketleri hedefle." : "Target postings with explicit analytics-tool demand.",
     lang === "TR" ? "Her başvuruda özeti ilana göre hızlıca özelleştir." : "Do a quick summary tailoring for each application.",
   ];
 
   const base = Number.isFinite(Number(score)) ? Number(score) : 45;
-  const projected = Math.max(base + 20, 70);
   const project = buildPersonalizedProjectEngine({
     lang,
     biggestGap: bigGap,
@@ -2553,11 +3138,11 @@ function buildBestPathForwardModel({ data, lang, score, t: _t, cvText, jdText })
     originalRole,
     roleFitWhy: [
       lang === "TR"
-        ? `CV sinyalin (${background}) ${targetTrack} için daha güçlü eşleşme üretiyor.`
-        : `Your CV signal (${background}) aligns better with this ${targetTrack}.`,
+        ? `CV'deki örneklerin (${background}) ${targetTrack} için daha güçlü bir eşleşme okutuyor.`
+        : `Your CV (${background}) reads closer to this ${targetTrack}.`,
       lang === "TR"
-        ? `${originalRole} tarafında görülen ana mismatch: ${bigGap || "rol beklentisi ile profil sinyali ayrışıyor"}.`
-        : `Main mismatch with ${originalRole}: ${bigGap || "role expectation and profile signal are not aligned"}.`,
+        ? `${originalRole} tarafında görülen ana uyumsuzluk: ${bigGap || "rol beklentisi ile profil örtüşmüyor"}.`
+        : `Main mismatch with ${originalRole}: ${bigGap || "role expectation and your profile do not line up"}.`,
       lang === "TR"
         ? "Bu yüzden alternatif rollerde daha yüksek kısa liste olasılığı oluşuyor."
         : "That is why these alternative roles create a stronger shortlist probability.",
@@ -2572,8 +3157,8 @@ function buildBestPathForwardModel({ data, lang, score, t: _t, cvText, jdText })
     phases: { immediate: phaseImmediate, strategic: phaseStrategic, application: phaseApplication },
     roadmapTop3: dedupeTextList([phaseImmediate[0], phaseStrategic[0], phaseApplication[0]].filter(Boolean)).slice(0, 3),
     transformation: {
-      fit: `${Math.round(base)} → ${Math.round(projected)}+`,
-      confidence: lang === "TR" ? "Mülakat olasılığı belirgin şekilde artar." : "Interview probability increases significantly.",
+      fit: lang === "TR" ? "Tahmini yön: daha güçlü" : "Estimated direction: stronger",
+      confidence: lang === "TR" ? "Recruiter tarafındaki soru işareti azalabilir." : "Recruiter hesitation tends to shrink.",
     },
   };
 }
@@ -2620,12 +3205,12 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
               <div key={`${r.role}-${i}`} style={{ border: `1px solid ${RS.border}`, borderRadius: 10, padding: "10px 12px", background: rsAlpha(RS.bgSurface, 0.55) }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
                   <div style={{ fontSize: 14, fontWeight: 700, color: RS.textPrimary }}>
-                    {humanizeUserFacingReason(r.role, lang)}
+                    {sanitizeVisibleCopy(humanizeUserFacingReason(r.role, lang), lang)}
                   </div>
-                  <div style={{ fontSize: 12, fontWeight: 800, color: RS.indigo }}>{r.score}%</div>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: RS.indigo }}>{visibleRecruiterCopy(resultRoleSuggestionFitBand(Number(r.score) || 0, lang), lang)}</div>
                 </div>
                 <div style={{ fontSize: 12, color: RS.textSecondary, marginTop: 4 }}>
-                  {clampBullet(humanizeUserFacingReason(r.why, lang), 88)}
+                  {clampBullet(sanitizeVisibleCopy(humanizeUserFacingReason(r.why, lang), lang), 88)}
                 </div>
               </div>
             ))}
@@ -2643,7 +3228,7 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
               </div>
               <div style={{ fontSize: 14, fontWeight: 700, color: RS.indigo, marginBottom: 8 }}>{model.project.title}</div>
               {projectLines.map((line, i) => (
-                <div key={`project-line-${i}`} style={{ marginTop: i === 0 ? 6 : 4, fontSize: 12, color: i === projectLines.length - 1 ? RS.green : RS.textSecondary }}>• {line}</div>
+                <div key={`project-line-${i}`} style={{ marginTop: i === 0 ? 6 : 4, fontSize: 12, color: i === projectLines.length - 1 ? RS.green : RS.textSecondary }}>â€¢ {line}</div>
               ))}
             </div>
             ) : null}
@@ -2655,15 +3240,15 @@ function BestPathForwardBlock({ data, lang, t, isPro, onUpgrade, score, cvText, 
                 {t.bestPathRoadmapTitle}
               </div>
               {hasMeaningfulText(model.careerPath) ? <div style={{ fontSize: 13, fontWeight: 700, color: RS.indigo, marginBottom: 8 }}>{model.careerPath}</div> : null}
-              {roadmapLines.map((x, i) => <div key={`r3-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 5 }}>→ {x}</div>)}
+              {roadmapLines.map((x, i) => <div key={`r3-${i}`} style={{ fontSize: 12, color: RS.textSecondary, marginBottom: 5 }}>â†’ {x}</div>)}
             </div>
             ) : null}
 
             {hasTransformation ? (
             <div style={{ ...cardStyle, minHeight: 140 }}>
               <div style={{ fontSize: 16, fontWeight: 800, color: RS.textPrimary, marginBottom: 10 }}>{t.bestPathTransformTitle}</div>
-              {hasMeaningfulText(model.transformation?.fit) ? <div style={{ fontSize: 12, color: RS.green, marginBottom: 5 }}>→ {t.bestPathTransformFit.replace("{fit}", model.transformation.fit)}</div> : null}
-              {hasMeaningfulText(model.transformation?.confidence) ? <div style={{ fontSize: 12, color: RS.green }}>→ {model.transformation.confidence}</div> : null}
+              {hasMeaningfulText(model.transformation?.fit) ? <div style={{ fontSize: 12, color: RS.green, marginBottom: 5 }}>â†’ {t.bestPathTransformFit.replace("{fit}", sanitizeVisibleCopy(String(model.transformation.fit), lang))}</div> : null}
+              {hasMeaningfulText(model.transformation?.confidence) ? <div style={{ fontSize: 12, color: RS.green }}>â†’ {sanitizeVisibleCopy(String(model.transformation.confidence), lang)}</div> : null}
             </div>
             ) : null}
           </>
@@ -2818,14 +3403,14 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, c
             <div
               style={{
                 fontSize: "clamp(44px, 6vw, 64px)",
-                fontWeight: 900,
+                fontWeight: 800,
                 color: vc,
                 lineHeight: 1,
                 letterSpacing: "-0.03em",
                 fontFamily: RS.fontMono,
               }}
             >
-              {currentInt != null ? currentInt : "—"}
+              {currentInt != null ? currentInt : "â€”"}
             </div>
             <div style={{ ...labelStyle, marginTop: 14, marginBottom: 6 }}>{t.focusOverallStatusLabel}</div>
             <div style={{ fontSize: 15, fontWeight: 700, color: RS.textPrimary, lineHeight: 1.45 }}>{fv.title}</div>
@@ -2868,11 +3453,11 @@ function CareerEngineCard({ data, lang, isPro, onUpgrade, onFixCv, optimizing, c
               letterSpacing: "-0.02em",
             }}
           >
-            {currentInt} → {targetScore}
+            {currentInt} â†’ {targetScore}
             <span style={{ marginLeft: 12, fontSize: "clamp(18px, 2.8vw, 24px)", color: RS.green }}>+{gainPts}</span>
           </div>
           <p style={{ margin: "12px 0 0", fontSize: 14, fontWeight: 500, color: RS.textSecondary, lineHeight: 1.65, maxWidth: 560 }}>
-            {t.focusImpactExpl.replace("{pts}", String(gainPts))}
+            {t.focusImpactExpl}
           </p>
         </div>
       ) : null}
@@ -2945,12 +3530,12 @@ const translations = {
     privacy: "Privacy Policy",
     terms: "Terms of Service",
     cookiePolicy: "Cookie Policy",
-    heroTitle: "Why does your CV keep getting rejected?", 
-    heroDesc: "HireFit analyzes your CV against any job description and tells you exactly what recruiters see — in seconds.",
-    analyzeBtn: "Analyze My CV Free",
+    heroTitle: "See the right next move in your career.",
+    heroDesc: "HireFit shows your career direction, strongest signals, biggest gaps, and next best move.",
+    analyzeBtn: "Start Analysis",
     viewDashboard: "View Dashboard",
     checkFit: "Check My Fit",
-    optimizeCV: "→ Take action on your CV",
+    optimizeCV: "â†’ Take action on your CV",
     learningRoadmap: "Learning Roadmap",
     pasteCv: "Paste your CV text here...",
     pasteJd: "Paste the job description here...",
@@ -2965,13 +3550,13 @@ const translations = {
     noAnalyses: "No analyses yet.",
     previousAnalyses: "Previous Analyses",
     freeLimitWarning: "free analysis remaining",
-    noFreeLeft: "No free analyses left — Upgrade to Pro",
-    upgradeBtn: "Upgrade to Pro — $9.99/mo 🚀",
+    noFreeLeft: "No free analyses left â€” Upgrade to Pro",
+    upgradeBtn: "Upgrade to Pro â€” $9.99/mo ğŸš€",
     maybeLater: "Maybe later",
     paywallTitle: "You've hit your free limit",
     paywallDesc: "You've used your 2 free analyses. Upgrade to Pro for unlimited analyses, CV Rewriter, Recruiter Simulation, and full insights.",
-    cvAnalyzer: "CV Alignment Analyzer",
-    cvAnalyzerDesc: "Paste your CV and job description — get rejection reasons + fix suggestions in seconds.",
+    cvAnalyzer: "CV Match Check",
+    cvAnalyzerDesc: "Paste your CV and job description â€” get rejection reasons + fix suggestions in seconds.",
     extract: "Extract",
     extracting: "Extracting...",
     wordsLoaded: "words loaded",
@@ -2980,15 +3565,15 @@ const translations = {
     copyOptimized: "Copy Optimized",
     originalCV: "Original CV",
     optimizedCV: "Optimized CV",
-    cvComparison: "✦ CV Comparison",
-    learningRoadmapTitle: "✦ Learning Roadmap",
+    cvComparison: "âœ¦ CV Comparison",
+    learningRoadmapTitle: "âœ¦ Learning Roadmap",
     copy: "Copy",
     clear: "Clear",
-    viewReport: "View Report →",
+    viewReport: "View Report â†’",
     signOut: "Sign out",
     login: "Login",
-    welcomeBack: "Welcome back",
-    signInDesc: "Sign in to your HireFit account",
+    welcomeBack: "Welcome back to your Career OS",
+    signInDesc: "Sign in to access your career dashboard.",
     continueBtn: "Continue",
     continueGoogle: "Continue with Google",
     dashboard: "Dashboard",
@@ -3000,12 +3585,15 @@ const translations = {
     productRoadmap: "Product Roadmap",
     openProduct: "Open Product",
     home: "Home",
+    careerDnaNav: "Career Discovery",
+    careerScore: "Profile Potential",
+    thisWeek: "this week",
+    careerOsTagline: "Career Intelligence OS",
     product: "Product",
     recentAnalyses: "Recent Analyses",
-    allSystemsOp: "All systems operational",
-    applyFix: "Take action →",
+    applyFix: "Take action â†’",
     applying: "Applying...",
-    fixApplied: "Fix Applied ✓",
+    fixApplied: "Fix Applied âœ“",
     copyFix: "Copy",
     proOnly: "Pro Only",
     upgradeToSee: "Upgrade to Pro to see all fixes",
@@ -3013,7 +3601,7 @@ const translations = {
     improvement: "improvement",
     latestScore: "Latest",
     careerJourneyTitle: "Your Career Journey",
-    careerJourneyBlurb: "See each milestone from skill gaps to your target role—then take your HireFit analysis to the job market.",
+    careerJourneyBlurb: "See each milestone from skill gaps to your target roleâ€”then take your HireFit analysis to the job market.",
     startApplyingNow: "Start Applying Now",
     roadmapPageEmpty: "Run an analysis in the product and generate a learning roadmap to see your personalized path here.",
     roadmapReadyBanner: "Your learning roadmap is ready.",
@@ -3023,8 +3611,8 @@ const translations = {
     anonSaveCta: "Sign in",
     anonSaveDismiss: "Not now",
     unlockWithPro: "Unlock with Pro",
-    proFeatureRoles: "See which other roles your CV fits — included in Pro.",
-    proFeatureInterview: "Role-specific interview prep — included in Pro.",
+    proFeatureRoles: "See which other roles your CV fits â€” included in Pro.",
+    proFeatureInterview: "Role-specific interview prep â€” included in Pro.",
     rolesEmptyPro: "No alternative roles surfaced for this CV.",
     rolesEmptyGeneric: "No cross-role matches in this report.",
     rolesEmptyGuidance: "We did not get a role matrix for this report yet.",
@@ -3036,21 +3624,21 @@ const translations = {
     confidenceUnavailableLabel: "Not scored this run",
     confidenceUnavailableNext: "Run Check Fit again after both CV and job description finish loading.",
     decisionUnavailable: "Verdict pending",
-    decisionUnavailableNext: "Paste CV and job text, then run Check Fit to see your apply / risk / pass signal.",
+    decisionUnavailableNext: "Paste CV and job text, then run Check Fit to see apply / risk / pass read.",
     analysisFailedTitle: "We couldn't complete the analysis.",
     analysisFailedRecovery: "Check your connection, confirm both CV and job description are pasted (not empty), then press Check Fit again. If you use a VPN, try briefly turning it off.",
     cvOptimizeFailedTitle: "CV optimization didn't finish.",
     cvOptimizeFailedRecovery: "Wait a few seconds and try Fix My CV again. Both CV and JD need enough text for a useful rewrite.",
     roadmapFailedTitle: "Learning roadmap couldn't be generated.",
     roadmapFailedRecovery: "Run Check Fit first so we can read missing skills, then open Learning roadmap again.",
-    roadmapNeedsSkillsTitle: "We need missing-skill signals from an analysis first.",
+    roadmapNeedsSkillsTitle: "We need missing-skill gaps from an analysis first.",
     roadmapNeedsSkillsRecovery: "Run Check Fit on this CV and job, then open Learning roadmap again.",
     pdfReadFailedTitle: "We could not read that PDF.",
     pdfReadFailedRecovery: "Try a smaller file, export PDF as text from Word, or paste the CV text directly.",
     fileReadFailedTitle: "That file could not be read.",
     fileReadFailedRecovery: "Use a .txt export or paste plain text into the CV or JD box.",
-    extractionRecovery: "Paste the job description text manually — full posting text works best.",
-    emptyRecruiterSignals: "Your CV currently sends weak recruiter signals in the first scan.",
+    extractionRecovery: "Paste the job description text manually â€” full posting text works best.",
+    emptyRecruiterSignals: "Your CV reads weak in the first recruiter scan.",
     emptyRecruiterNext: "Show outcomes, tools, and ownership to make your impact readable fast.",
     emptyGapList: "Your biggest blocker is still positioning clarity for this role.",
     emptyGapNextFree: "Upgrade to Pro for the full gap list, or paste a longer job description and re-run.",
@@ -3063,7 +3651,7 @@ const translations = {
     emptySkillsMatchedNext: "Add role-relevant tools and quantified outcomes in each core experience bullet.",
     emptyKeywordsNone: "The job-to-CV keyword bridge is weak right now.",
     emptyKeywordsNext: "Use exact terms from the job posting in your strongest bullet points.",
-    emptyMarketRoles: "We can still identify your strongest role direction from available signals.",
+    emptyMarketRoles: "We can still identify your strongest role direction from what we can read.",
     emptyMarketRolesNext: "Focus one target role first, strengthen proof, then widen applications.",
     ciEmptyOverview: "No company overview text in this bundle.",
     ciEmptyOverviewNext: "Try company analysis again later, or continue with your CV vs JD Action plan.",
@@ -3087,7 +3675,7 @@ const translations = {
     sectorOverrideHint: "Override (optional)",
     orPasteLinkHint: "or paste a job URL below",
     finalVerdict: "Verdict",
-    alignmentScore: "Alignment score",
+    alignmentScore: "Role proximity (read)",
     rejectionRisk: "Rejection Risk",
     confidenceLabel: "Confidence",
     recruiterView: "Recruiter view",
@@ -3102,28 +3690,28 @@ const translations = {
     careerLanes: "Career fit & market context",
     decisionReasoning: "Decision Reasoning",
     impactProjection: "IMPACT PROJECTION",
-    nowAfter: "NOW → AFTER",
+    nowAfter: "NOW â†’ AFTER",
     currentScore: "Current Score",
     projectedScore: "Projected Score",
     scoreIncrease: "Score Increase",
-    strongSignals: "Strong signals",
-    weakSignals: "Weak signals",
+    strongSignals: "Strong reads",
+    weakSignals: "Weak reads",
     simulatedRecruiterPatterns: "Based on simulated recruiter patterns",
-    atsStyleAnalysis: "ATS-style analysis",
+    atsStyleAnalysis: "Structured scan",
     sectorLens: "Sector lens: ",
-    notAvailableForAnalysis: "Limited data for this section — see the suggested next step below.",
+    notAvailableForAnalysis: "Limited data for this section â€” see the suggested next step below.",
     emptyNoneDetectedSkills: "Your CV does not clearly match the posting's keyword language yet.",
     emptyNoneDetectedSkillsNext: "Add the role's core tools and outcomes directly into your strongest bullets.",
     biggestBlockerLead: "Biggest blocker: ",
     missingFromCv: "Missing from your CV",
     detectedInCv: "Detected in your CV",
-    unlockProArrow: "Unlock with Pro →",
+    unlockProArrow: "Unlock with Pro â†’",
     doThisNext: "Do this next",
-    doThisNextLeverage: "Ship proof a recruiter can verify in 10 seconds: numbers, a link, a cert, a repo — not vibes.",
-    fixScoreImpactApprox: "Fixing this can increase your score by about +{pts} points.",
+    doThisNextLeverage: "Ship proof a recruiter can verify in 10 seconds: numbers, a link, a cert, a repo â€” not vibes.",
+    fixScoreImpactApprox: "Fixing this tends to make you read strongerâ€”no exact score promise.",
     scoreVsLastRun: "vs last analysis: {delta} (was {prior})",
-    recruiterBluntBanner: "Cold read: where they stop reading. No pep talk — just the gap.",
-    seeFullPlan: "Start fixing this now →",
+    recruiterBluntBanner: "Cold read: where they stop reading. No pep talk â€” just the gap.",
+    seeFullPlan: "Start fixing this now â†’",
     primaryBlocker: "Primary blocker",
     fixFirst: "Fix first",
     priorityImportant: "Important",
@@ -3131,50 +3719,50 @@ const translations = {
     priorityFixes: "Priority fixes",
     interviewPrepShort: "Interview prep",
     sanitizeParsingFailed:
-      "We analyzed your CV based on available signals.",
+      "We analyzed your CV from the text we could read.",
     sanitizeGenericError:
       "We hit a temporary issue while processing your analysis. Please try again in a moment.",
-    executionProgress: "Execution",
+    executionProgress: "Progress",
     fixesCompletedCount: "{done}/{total} fixes marked done",
-    executionLadder: "Projected alignment if you complete fixes in order",
-    projectedStepHint: "{from} → {to}",
+    executionLadder: "Likely recruiter read if you complete fixes in order",
+    projectedStepHint: "{from} â†’ {to}",
     projectedAfterFixOrder: "After this fix (and all prior in order): {score}",
     progressScoreLive: "Progress score (marked fixes): {score} ({delta})",
     proofPromptWhenDone:
-      "Paste a link (portfolio, PR, cert) or one line of proof — required to mark this fix done:",
+      "Paste a link (portfolio, PR, cert) or one line of proof â€” required to mark this fix done:",
     proofRequiredShort: "Proof cannot be empty. Fix was not marked done.",
     proofStoredLabel: "Proof on file:",
-    proofStepHeading: "Proof — link or upload",
-    proofPasteLinkPlaceholder: "Paste link or short note…",
+    proofStepHeading: "Proof â€” link or upload",
+    proofPasteLinkPlaceholder: "Paste link or short noteâ€¦",
     proofUploadFile: "Upload proof (.txt / PDF / image)",
     proofFileLabel: "File",
     betterRoleAlternatives: "Better role alternatives (CV fit)",
     betterRoleAlternativesSub:
-      "Lanes where your CV evidence scores higher than this posting alignment — use as pivot ideas, not guarantees.",
+      "Lanes where your CV reads stronger than for this posting â€” pivot ideas, not guarantees.",
     reanalysisScoreHint: "Compared with your previous Check Fit in this browser.",
     markFixComplete: "Mark this fix done",
     markFixDoneAria: "Mark fix {n} as done",
-    verdictBadTitle: "🚫 You will likely get rejected",
+    verdictBadTitle: "ğŸš« You will likely get rejected",
     verdictBadSub:
-      "Reality check: this role still filters you out today. Recovery path: close the next 2 signal gaps and rerun.",
-    verdictRiskyTitle: "⚠️ Risky apply",
+      "Reality check: this role still filters you out today. Recovery path: close the next two gaps, then rerun.",
+    verdictRiskyTitle: "âš ï¸ Risky apply",
     verdictRiskySub: "Reality check: still risky on first-pass scan. Recovery path: ship 1-2 proof lines and re-enter range.",
-    verdictCloseTitle: "⚡ Competitive — tighten proof",
+    verdictCloseTitle: "âš¡ Competitive â€” tighten proof",
     verdictCloseSub: "Reality check: you're close, not done. Recovery path: tighten proof, then apply with leverage.",
-    verdictStrongTitle: "✅ Strong match",
+    verdictStrongTitle: "âœ… Strong match",
     verdictStrongSub: "Reality check: this is interview range. Recovery path: keep proof sharp and momentum high.",
-    startFixingNow: "Fix your positioning →",
-    takeActionBtn: "Take action →",
-    startThisStep: "Start mission →",
-    fixPointsIfDone: "🔥 +{pts} points if completed",
-    fixProgressApplied: "✅ Progress applied: +{pts}",
+    startFixingNow: "Fix your positioning â†’",
+    takeActionBtn: "Take action â†’",
+    startThisStep: "Start mission â†’",
+    fixPointsIfDone: "ğŸ”¥ Completing this step usually tightens your story",
+    fixProgressApplied: "âœ… Progress applied: +{pts}",
     proofAddedToast: "Proof added",
-    proofTrustToast: "Recruiter trust signal captured",
+    proofTrustToast: "Recruiter trust note saved",
     proofImpactToast: "+{pts} impact applied to your progress score",
-    fixMyCvRun: "Take action on your CV →",
-    fixMyCvUnlock: "Take action — unlock with Pro →",
+    fixMyCvRun: "Take action on your CV â†’",
+    fixMyCvUnlock: "Take action â€” unlock with Pro â†’",
     heroStopBig: "Stop.",
-    heroStopLine1: "If you apply right now → high chance of rejection.",
+    heroStopLine1: "If you apply right now â†’ high chance of rejection.",
     heroStopLine2: "But you're closer than it looks. Fix 2 key gaps to push into interview range.",
     heroRiskBig: "Not safe yet.",
     heroRiskLine1: "Reality check: still risky for first-pass screening.",
@@ -3186,26 +3774,26 @@ const translations = {
     heroStrongLine1: "Reality check: you're in interview range for this posting.",
     heroStrongLine2: "Recovery path: keep proof loud and apply with confidence.",
     scoreInsightLow: "This is below the usual hiring bar for this posting.",
-    scoreInsightMid: "You're close — but not default-hire competitive yet.",
+    scoreInsightMid: "You're close â€” but not default-hire competitive yet.",
     scoreInsightHigh: "You're in interview range.",
     scoreInsightBench: "Most successful candidates here score above 70.",
     yourProgressTitle: "Your progress",
-    yourProgressPoints: "You've gained +{pts} points so far",
+    yourProgressPoints: "You have made clear progress on the checklist",
     yourProgressNext: "Next best move: {action}",
     yourProgressBarLabel: "Path to interview range (70)",
     yourProgressNudge: "Complete {n} more high-impact step(s) to cross 70.",
-    yourProgressAllDone: "You're past the 70 benchmark — keep shipping proof.",
+    yourProgressAllDone: "You're past the 70 benchmark â€” keep shipping proof.",
     recruiterRealLead: "Here's the real issue:",
     recruiterRealIntro:
       "Your CV doesn't scream what you actually built or shipped. From a recruiter's scan:",
-    recruiterLensLine1: "→ No proof of impact",
-    recruiterLensLine2: "→ No measurable outcomes",
-    recruiterLensLine3: "→ No obvious tools stack",
-    impactFixUnlock: "🔥 Fix your positioning → unlock +{pts} points",
-    impactMovesCloser: "+{pts} moves you closer to interview range.",
-    stepCtaOpenLink: "Open link →",
-    stepCtaGithub: "Open GitHub guide →",
-    stepCtaApply: "Enter target zone →",
+    recruiterLensLine1: "â†’ No proof of impact",
+    recruiterLensLine2: "â†’ No measurable outcomes",
+    recruiterLensLine3: "â†’ No obvious tools stack",
+    impactFixUnlock: "ğŸ”¥ Fix your positioning â€” recruiters read you faster.",
+    impactMovesCloser: "This nudge moves you closer to interview range.",
+    stepCtaOpenLink: "Open link â†’",
+    stepCtaGithub: "Open GitHub guide â†’",
+    stepCtaApply: "Enter target zone â†’",
     impactUnlockedLine: "Impact unlocked",
     focusVerdictKicker: "Verdict",
     focusOverallStatusLabel: "Overall status",
@@ -3213,17 +3801,17 @@ const translations = {
     focusMainProblemKicker: "Main rejection reason",
     focusTrustLine: "Based on CV vs job requirement mismatch analysis",
     focusImpactKicker: "Score impact",
-    focusImpactExpl: "Fixing this gap is worth about +{pts} points toward a stronger profile.",
+    focusImpactExpl: "Closing this gap makes your profile read strongerâ€”no exact score promise.",
     focusActionKicker: "Your one move",
-    focusCtaSeeFull: "See exactly why you get rejected →",
-    focusCtaApplyFix: "Apply this focus to my CV →",
+    focusCtaSeeFull: "See exactly why you get rejected â†’",
+    focusCtaApplyFix: "Apply this focus to my CV â†’",
     focusHiddenGapsTeaser: "There are {n} more gaps still affecting your score. See the full breakdown with Pro.",
     bestPathForward: "YOUR BEST PATH FORWARD",
     bestPathForwardTitle: "YOUR BEST PATH FORWARD",
-    bestPathSignalLine: "Profile signal: {bg} → target track: {track}",
+    bestPathSignalLine: "Profile read: {bg} â†’ target track: {track}",
     bestPathRolesTitle: "Based on your profile, you are a stronger fit for:",
     bestPathWhyRolesTitle: "Why these roles fit",
-    bestPathWrongRoleTitle: "Why this role is wrong",
+    bestPathWrongRoleTitle: "Where this posting is a weaker read for you",
     bestPathFreeHint: "Free preview shows roles and project title only. Unlock Pro for the full project breakdown and roadmap.",
     bestProjectToFix: "Your best project to fix this",
     bestProjectSectionTitle: "Your best project to fix this",
@@ -3232,11 +3820,11 @@ const translations = {
     bestProjectOutcomeTitle: "Expected outcome",
     bestPathCareerTitle: "Best path for you:",
     bestPathRoadmapTitle: "Execution roadmap",
-    bestPathPhaseImmediate: "PHASE 1 — Immediate Fix (0–7 days)",
-    bestPathPhaseStrategic: "PHASE 2 — Strategic Build (2–4 weeks)",
-    bestPathPhaseApplication: "PHASE 3 — Application Strategy",
+    bestPathPhaseImmediate: "PHASE 1 â€” Immediate Fix (0â€“7 days)",
+    bestPathPhaseStrategic: "PHASE 2 â€” Strategic Build (2â€“4 weeks)",
+    bestPathPhaseApplication: "PHASE 3 â€” Application Strategy",
     bestPathTransformTitle: "If you follow this path:",
-    bestPathTransformFit: "Fit score: {fit}",
+    bestPathTransformFit: "Match direction: {fit}",
     doThisFirstTitle: "DO THIS FIRST",
     scanSectionLabel: "Quick decision view",
     scanCriticalGapTitle: "Critical gap",
@@ -3250,7 +3838,7 @@ const translations = {
     focusPreviewSectionTitle: "What's in your full analysis?",
     focusPreviewCtaTitle: "See exactly why you get screened out",
     focusPreviewCtaSubtitle: "Full recruiter read on your CV vs this JD, every gap ranked, fixes ordered by score impact, plus company and ATS context.",
-    focusPreviewUpgradeBtn: "Reveal your full rejection breakdown →",
+    focusPreviewUpgradeBtn: "Reveal your full rejection breakdown â†’",
     focusPreviewCardRecruiter: "Recruiter view",
     focusPreviewCardGaps: "All gaps",
     focusPreviewCardPlan: "Action plan",
@@ -3258,26 +3846,26 @@ const translations = {
     focusProDetailTitle: "Detailed breakdown",
     previewHiddenCountLine: "+{n} more insights hidden",
     previewFallbackRequirement: "role-fit baseline requirement",
-    previewFallbackReality: "Your current CV signal is not yet aligned to this requirement.",
+    previewFallbackReality: "Your current CV read is not yet close enough to this requirement.",
     previewRecruiterDecisionIntro: "If I were the recruiter, I would likely reject you for this role because:",
     previewRecruiterReqLine: "This role requires: {req}",
     previewRecruiterRealityLine: "Your CV currently shows: {reality}",
-    previewRecruiterConsequenceLine: "→ This mismatch creates early rejection risk in first screening.",
-    previewRecruiterMissingKeyword: "Missing keyword signal for this role: {kw}",
+    previewRecruiterConsequenceLine: "â†’ This mismatch creates early rejection risk in first screening.",
+    previewRecruiterMissingKeyword: "Missing keyword coverage for this role: {kw}",
     previewRecruiterAltIntro: "However, you are a stronger fit for:",
     previewRecruiterBecauseIntro: "Because:",
-    previewRecruiterBecauseSkill: "You already show signal in: {skill}",
+    previewRecruiterBecauseSkill: "You already show strength in: {skill}",
     previewFallbackRoleA: "Business Analyst",
     previewFallbackRoleB: "Operations Analyst",
     previewFallbackRoleAData: "Data Analyst",
     previewFallbackRoleBData: "Business Analyst",
-    previewFallbackRecruiterFirst: "Recruiter signals for this CV and job will appear here after Pro.",
+    previewFallbackRecruiterFirst: "Recruiter notes for this CV and job will appear here after Pro.",
     previewEmptyGapsBrief: "Gap list vs this posting is available in the full analysis.",
-    previewGapWhyDegree: "This posting explicitly filters for engineering-aligned education signals.",
+    previewGapWhyDegree: "This posting explicitly filters for engineering-style education proof.",
     previewGapWhyLanguage: "Language proficiency is a hard gate in the shortlisting stage.",
     previewGapWhySector: "Domain context is expected to reduce ramp-up risk.",
     previewGapWhyImpact: "Recruiters need quantified outcomes to trust execution quality.",
-    previewGapWhyPositioning: "Positioning misalignment makes your fit signal weaker than it should be.",
+    previewGapWhyPositioning: "Weak positioning makes your fit read softer than it should.",
     previewGapWhyGeneric: "This gap weakens decision confidence during recruiter screening.",
     previewPlanStrategic1: "1. Stop applying to roles that require strict engineering credentials.",
     previewPlanStrategic2: "2. Reposition your CV toward strategy and analytics-heavy role tracks.",
@@ -3289,15 +3877,15 @@ const translations = {
     previewWeek2Label: "Week 2:",
     previewWeek3Label: "Week 3:",
     previewExpectedImpactLabel: "Expected impact:",
-    previewInterviewImpactLine: "Interview probability: +{x}%",
-    previewProfileStrengthLine: "Profile strength: +{y} points",
+    previewInterviewImpactLine: "Interview odds: likely better with these fixes",
+    previewProfileStrengthLine: "Profile read: stronger with these moves",
     previewCompanyFocusLine: "{company}",
-    previewCompanyFocusFallback: "Company context is detected from your target role and sector signals.",
+    previewCompanyFocusFallback: "Company context is inferred from your target role and sector.",
     previewCompanyValueLine: "What they prioritize: {value}",
     previewCompanyValueFallback: "Technical execution and role-specific delivery proof.",
-    previewCompanyMismatchLine: "→ Your current profile shows a mismatch on: {gap}",
-    previewCompanyMismatchFallback: "→ Your current profile signal is weaker than the role expectation.",
-    previewCompanyDirectionLine: "→ Better fit direction: {direction}",
+    previewCompanyMismatchLine: "â†’ Your current profile shows a mismatch on: {gap}",
+    previewCompanyMismatchFallback: "â†’ Your current profile read is weaker than the role expectation.",
+    previewCompanyDirectionLine: "â†’ Better fit direction: {direction}",
     previewAtsFallback: "ATS fit context will be unlocked with full analysis.",
     previewCareerDirectionFallback: "strategy / analytics / business tracks",
     previewAtsScoreShort: "ATS score",
@@ -3306,22 +3894,22 @@ const translations = {
     previewImpactHigh: "Critical",
     previewImpactMedium: "Major",
     previewImpactLow: "Minor",
-    previewEmptyRecruiter: "No recruiter signals in this run.",
+    previewEmptyRecruiter: "No recruiter notes in this run.",
     previewEmptyGaps: "No gap list in this run.",
     previewEmptyPlan: "No action plan steps in this run.",
     previewEmptyMarket: "No company or market block in this run.",
   },
   TR: {
-    slogan: "HireFit — Kariyer Karar Motoru",
+    slogan: "HireFit â€” Kariyer Karar Motoru",
     privacy: "Gizlilik Politikası",
     terms: "Kullanım Şartları",
     cookiePolicy: "Çerez Politikası",
-    heroTitle: "CV'niz neden sürekli reddediliyor?",
-    heroDesc: "HireFit, CV'nizi iş ilanıyla karşılaştırır ve işe alım uzmanlarının tam olarak ne gördüğünü saniyeler içinde söyler.",
-    analyzeBtn: "CV'mi Ücretsiz Analiz Et",
+    heroTitle: "Kariyerinde sonraki doğru adımı gör.",
+    heroDesc: "HireFit kariyer yönünü, güçlü sinyallerini, en büyük açığını ve sonraki hamleni gösterir.",
+    analyzeBtn: "Analize Başla",
     viewDashboard: "Paneli Görüntüle",
     checkFit: "Uyumu Kontrol Et",
-    optimizeCV: "→ CV'de harekete geç",
+    optimizeCV: "â†’ CV'de harekete geç",
     learningRoadmap: "Öğrenme Yol Haritası",
     pasteCv: "CV metninizi buraya yapıştırın...",
     pasteJd: "İş ilanını buraya yapıştırın...",
@@ -3336,13 +3924,13 @@ const translations = {
     noAnalyses: "Henüz analiz yok.",
     previousAnalyses: "Önceki Analizler",
     freeLimitWarning: "ücretsiz analiz hakkın kaldı",
-    noFreeLeft: "Ücretsiz hakkın bitti — Pro'ya Geç",
-    upgradeBtn: "Pro'ya Geç — $9.99/ay 🚀",
+    noFreeLeft: "Ücretsiz hakkın bitti â€” Pro'ya Geç",
+    upgradeBtn: "Pro'ya Geç â€” $9.99/ay ğŸš€",
     maybeLater: "Belki sonra",
     paywallTitle: "Ücretsiz limitine ulaştın",
     paywallDesc: "2 ücretsiz analizini kullandın. Sınırsız analiz, CV Yazıcı, İşe Alım Simülasyonu ve tam içgörüler için Pro'ya geç.",
     cvAnalyzer: "CV Uyum Analizörü",
-    cvAnalyzerDesc: "CV'nizi ve iş ilanını yapıştırın — saniyeler içinde red nedenleri ve düzeltme önerileri alın.",
+    cvAnalyzerDesc: "CV'nizi ve iş ilanını yapıştırın â€” saniyeler içinde red nedenleri ve düzeltme önerileri alın.",
     extract: "Çıkar",
     extracting: "Çıkarılıyor...",
     wordsLoaded: "kelime yüklendi",
@@ -3351,15 +3939,15 @@ const translations = {
     copyOptimized: "Optimize Edilmişi Kopyala",
     originalCV: "Orijinal CV",
     optimizedCV: "Optimize Edilmiş CV",
-    cvComparison: "✦ CV Karşılaştırması",
-    learningRoadmapTitle: "✦ Öğrenme Yol Haritası",
+    cvComparison: "âœ¦ CV Karşılaştırması",
+    learningRoadmapTitle: "âœ¦ Öğrenme Yol Haritası",
     copy: "Kopyala",
     clear: "Temizle",
-    viewReport: "Raporu Gör →",
+    viewReport: "Raporu Gör â†’",
     signOut: "Çıkış Yap",
     login: "Giriş Yap",
-    welcomeBack: "Tekrar Hoşgeldiniz",
-    signInDesc: "HireFit hesabınıza giriş yapın",
+    welcomeBack: "Kariyer Paneline Dön",
+    signInDesc: "Kariyer paneline erişmek için giriş yap.",
     continueBtn: "Devam Et",
     continueGoogle: "Google ile Devam Et",
     dashboard: "Panel",
@@ -3371,12 +3959,15 @@ const translations = {
     productRoadmap: "Ürün Yol Haritası",
     openProduct: "Ürünü Aç",
     home: "Ana Sayfa",
+    careerDnaNav: "Kariyer Keşfi",
+    careerScore: "Profil Potansiyeli",
+    thisWeek: "bu hafta",
+    careerOsTagline: "Career Intelligence OS",
     product: "Ürün",
     recentAnalyses: "Son Analizler",
-    allSystemsOp: "Tüm sistemler çalışıyor",
-    applyFix: "Harekete geç →",
+    applyFix: "Harekete geç â†’",
     applying: "Uygulanıyor...",
-    fixApplied: "Uygulandı ✓",
+    fixApplied: "Uygulandı âœ“",
     copyFix: "Kopyala",
     proOnly: "Sadece Pro",
     upgradeToSee: "Tüm düzeltmeleri görmek için Pro'ya geç",
@@ -3384,7 +3975,7 @@ const translations = {
     improvement: "iyileşme",
     latestScore: "Son",
     careerJourneyTitle: "Kariyer Yolculuğun",
-    careerJourneyBlurb: "Beceri boşluklarından hedef rolünüze kadar her kilometre taşını görün—ardından HireFit analizinizi işe taşıyın.",
+    careerJourneyBlurb: "Beceri boşluklarından hedef rolünüze kadar her kilometre taşını görünâ€”ardından HireFit analizinizi işe taşıyın.",
     startApplyingNow: "Şimdi Başvurmaya Başla",
     roadmapPageEmpty: "Üründe analiz çalıştırıp öğrenme yol haritası oluşturduğunuzda kişisel rotanız burada görünür.",
     roadmapReadyBanner: "Öğrenme yol haritanız hazır.",
@@ -3394,8 +3985,8 @@ const translations = {
     anonSaveCta: "Giriş yap",
     anonSaveDismiss: "Şimdilik hayır",
     unlockWithPro: "Pro ile aç",
-    proFeatureRoles: "CV'nin uyduğu diğer roller — Pro'da.",
-    proFeatureInterview: "Role özel mülakat soruları — Pro'da.",
+    proFeatureRoles: "CV'nin uyduğu diğer roller â€” Pro'da.",
+    proFeatureInterview: "Role özel mülakat soruları â€” Pro'da.",
     rolesEmptyPro: "Bu CV için ek rol önerisi çıkmadı.",
     rolesEmptyGeneric: "Bu raporda çapraz rol eşleşmesi yok.",
     rolesEmptyGuidance: "Bu rapor için henüz rol matrisi üretilmedi.",
@@ -3407,23 +3998,23 @@ const translations = {
     confidenceUnavailableLabel: "Bu turda skorlanmadı",
     confidenceUnavailableNext: "CV ve ilan metni tam yüklendikten sonra Uyumu Kontrol Et'i tekrar çalıştırın.",
     decisionUnavailable: "Karar bekleniyor",
-    decisionUnavailableNext: "CV ve iş ilanını yapıştırıp Uyumu Kontrol Et ile başvuru / risk sinyalini görün.",
+    decisionUnavailableNext: "CV ve iş ilanını yapıştırıp Uyumu Kontrol Et ile başvuru / risk / geçiş okumasını görün.",
     analysisFailedTitle: "Analizi tamamlayamadık.",
     analysisFailedRecovery: "Bağlantınızı kontrol edin; CV ve iş ilanının yapıştırıldığından emin olun, ardından Uyumu Kontrol Et'e basın. VPN kullanıyorsanız kısa süre kapatıp deneyin.",
     cvOptimizeFailedTitle: "CV optimizasyonu tamamlanmadı.",
     cvOptimizeFailedRecovery: "Birkaç saniye bekleyip CV Optimizasyonu'nu yeniden deneyin. Her iki alanda da yeterli metin olmalı.",
     roadmapFailedTitle: "Öğrenme yol haritası oluşturulamadı.",
     roadmapFailedRecovery: "Önce Uyumu Kontrol Et çalıştırıp eksik becerileri tespit edin, sonra yol haritasını tekrar açın.",
-    roadmapNeedsSkillsTitle: "Önce analizden eksik beceri sinyali gerekiyor.",
+    roadmapNeedsSkillsTitle: "Önce analizden eksik beceri listesi gerekiyor.",
     roadmapNeedsSkillsRecovery: "Bu CV ve ilan için Uyumu Kontrol Et çalıştırın, ardından öğrenme yol haritasını açın.",
     pdfReadFailedTitle: "PDF okunamadı.",
     pdfReadFailedRecovery: "Daha küçük dosya deneyin, Word'den metin olarak dışa aktarın veya CV'yi doğrudan yapıştırın.",
     fileReadFailedTitle: "Dosya okunamadı.",
     fileReadFailedRecovery: "CV veya ilan için .txt kullanın veya düz metin yapıştırın.",
-    extractionRecovery: "İş ilanı metnini elle yapıştırın — tam metin en doğru sonucu verir.",
-    emptyRecruiterSignals: "CV'n ilk taramada zayıf recruiter sinyali veriyor.",
+    extractionRecovery: "İş ilanı metnini elle yapıştırın â€” tam metin en doğru sonucu verir.",
+    emptyRecruiterSignals: "CV'n ilk taramada zayıf recruiter okuması veriyor.",
     emptyRecruiterNext: "Sonuç, araç ve sahiplik kanıtı ekleyerek etkiyi daha okunur yap.",
-    emptyGapList: "Bu rol için en büyük engel hâlâ konumlanma netliği.",
+    emptyGapList: "Bu rol için en büyük engel hÃ¢lÃ¢ konumlanma netliği.",
     emptyGapNextFree: "Tam liste için Pro'ya geçin veya daha uzun ilan metni yapıştırıp yeniden analiz edin.",
     emptyGapNextPro: "CV'yi güncellediyseniz boşlukları yenilemek için Uyumu Kontrol Et'i tekrar çalıştırın.",
     emptyPlanFallback: "Recruiter okunabilirliğini artıracak tek bir yüksek etkili adımla başla.",
@@ -3434,10 +4025,10 @@ const translations = {
     emptySkillsMatchedNext: "Ana deneyim maddelerine rol odaklı araçlar ve nicel sonuçlar ekle.",
     emptyKeywordsNone: "İlan ile CV arasındaki anahtar kelime köprüsü şu an zayıf.",
     emptyKeywordsNext: "İlandaki kritik terimleri en güçlü deneyim maddelerinde tekrar et.",
-    emptyMarketRoles: "Mevcut sinyallerle yine de güçlü rol yönünü çıkarabiliriz.",
+    emptyMarketRoles: "Mevcut metinden yine de güçlü rol yönünü çıkarabiliriz.",
     emptyMarketRolesNext: "Önce tek hedef role odaklan, kanıtı güçlendir, sonra rol yelpazesini genişlet.",
     ciEmptyOverview: "Bu pakette şirket özeti metni yok.",
-    ciEmptyOverviewNext: "Şirket analizini sonra tekrar deneyin veya CV–ilan aksiyon planıyla devam edin.",
+    ciEmptyOverviewNext: "Şirket analizini sonra tekrar deneyin veya CVâ€“ilan aksiyon planıyla devam edin.",
     ciEmptyCareer: "Kariyer fırsatı maddesi henüz yok.",
     ciEmptyCareerNext: "İlanı genişletin veya bildiğiniz şirket adını ekleyin.",
     ciEmptySector: "Sektör konumu özeti henüz yok.",
@@ -3458,7 +4049,7 @@ const translations = {
     sectorOverrideHint: "Manuel düzeltme (isteğe bağlı)",
     orPasteLinkHint: "veya iş ilanı linkini yapıştırın",
     finalVerdict: "Karar",
-    alignmentScore: "Uyum skoru",
+    alignmentScore: "Role yakınlık (okuma)",
     rejectionRisk: "Elenme Riski",
     confidenceLabel: "Güven",
     recruiterView: "Recruiter Görüşü",
@@ -3473,28 +4064,28 @@ const translations = {
     careerLanes: "Kariyer uyumu ve pazar bağlamı",
     decisionReasoning: "Karar Gerekçesi",
     impactProjection: "ETKİ TAHMİNİ",
-    nowAfter: "ŞİMDİ → SONRA",
+    nowAfter: "ŞİMDİ â†’ SONRA",
     currentScore: "Mevcut Skor",
     projectedScore: "Hedef Skor",
     scoreIncrease: "Skor Artışı",
-    strongSignals: "Güçlü sinyaller",
-    weakSignals: "Zayıf sinyaller",
+    strongSignals: "Guclu yanlar",
+    weakSignals: "Zayif yanlar",
     simulatedRecruiterPatterns: "Simüle recruiter paternlerine dayalı",
-    atsStyleAnalysis: "ATS-stili analiz",
+    atsStyleAnalysis: "Yapilandirilmis tarama",
     sectorLens: "Sektör analizi: ",
-    notAvailableForAnalysis: "Bu bölüm için veri sınırlı — aşağıdaki sonraki adıma bakın.",
+    notAvailableForAnalysis: "Bu bölüm için veri sınırlı â€” aşağıdaki sonraki adıma bakın.",
     emptyNoneDetectedSkills: "CV'n şu an ilanın anahtar kelime diliyle net eşleşmiyor.",
     emptyNoneDetectedSkillsNext: "Rolün temel araç ve sonuçlarını en güçlü maddelerine doğrudan ekle.",
     biggestBlockerLead: "En büyük engel: ",
     missingFromCv: "CV'nizde eksik",
     detectedInCv: "CV'nizde tespit edilen",
-    unlockProArrow: "Pro ile aç →",
+    unlockProArrow: "Pro ile aç â†’",
     doThisNext: "Önce bunu yap",
-    doThisNextLeverage: "Recruiter 10 saniyede doğrulayacağı kanıt: rakam, link, sertifika, repo — vibe değil.",
-    fixScoreImpactApprox: "Bunu düzeltmek skorunuza yaklaşık +{pts} puan ekleyebilir.",
+    doThisNextLeverage: "Recruiter 10 saniyede doğrulayacağı kanıt: rakam, link, sertifika, repo â€” vibe değil.",
+    fixScoreImpactApprox: "Bunu düzeltmek recruiter tarafında daha güçlü gösterir; kesin puan vaadi yok.",
     scoreVsLastRun: "Son analize göre: {delta} (önceki: {prior})",
-    recruiterBluntBanner: "Soğuk okuma: nerede okumayı keser. Motivasyon değil — boşluk.",
-    seeFullPlan: "Şimdi düzeltmeye başla →",
+    recruiterBluntBanner: "Soğuk okuma: nerede okumayı keser. Motivasyon değil â€” boşluk.",
+    seeFullPlan: "Şimdi düzeltmeye başla â†’",
     primaryBlocker: "Birincil engel",
     fixFirst: "Önce bunu düzelt",
     priorityImportant: "Önemli",
@@ -3502,53 +4093,53 @@ const translations = {
     priorityFixes: "Öncelikli düzeltmeler",
     interviewPrepShort: "Mülakat hazırlığı",
     sanitizeParsingFailed:
-      "CV'nizi mevcut sinyallere göre analiz ettik.",
+      "CV'nizi elimizdeki metne göre analiz ettik.",
     sanitizeGenericError:
       "Analiz işlenirken geçici bir sorun oluştu. Lütfen kısa süre sonra tekrar deneyin.",
     executionProgress: "İlerleme",
     fixesCompletedCount: "{done}/{total} düzeltme tamamlandı olarak işaretlendi",
-    executionLadder: "Düzeltmeleri sırayla tamamlarsanız tahmini hizalama",
-    projectedStepHint: "{from} → {to}",
+    executionLadder: "Düzeltmeleri sırayla tamamlarsanız recruiter okuması güçlenir",
+    projectedStepHint: "{from} â†’ {to}",
     projectedAfterFixOrder: "Bu düzeltme (ve öncekiler sırayla) sonrası: {score}",
     progressScoreLive: "İlerleme skoru (işaretlenen düzeltmeler): {score} ({delta})",
     proofPromptWhenDone:
-      "Portföy, PR veya sertifika linki ya da tek satır kanıt yapıştırın — düzeltmeyi tamamlamak için gerekli:",
+      "Portföy, PR veya sertifika linki ya da tek satır kanıt yapıştırın â€” düzeltmeyi tamamlamak için gerekli:",
     proofRequiredShort: "Kanıt boş olamaz. Düzeltme tamamlanmadı olarak bırakıldı.",
     proofStoredLabel: "Kayıtlı kanıt:",
-    proofStepHeading: "Kanıt — link veya yükleme",
-    proofPasteLinkPlaceholder: "Link veya kısa not yapıştırın…",
+    proofStepHeading: "Kanıt â€” link veya yükleme",
+    proofPasteLinkPlaceholder: "Link veya kısa not yapıştırınâ€¦",
     proofUploadFile: "Kanıt dosyası yükle (.txt / PDF / görsel)",
     proofFileLabel: "Dosya",
     betterRoleAlternatives: "Daha iyi rol alternatifleri (CV uyumu)",
     betterRoleAlternativesSub:
-      "CV kanıtınıza göre bu ilan hizalamasından daha yüksek skorlanan hatlar — pivot fikri olarak düşünün, garanti değildir.",
+      "CV kanıtınıza göre bu ilan eşleşmesinden daha yüksek skorlanan hatlar â€” pivot fikri olarak düşünün, garanti değildir.",
     reanalysisScoreHint: "Bu tarayıcıdaki önceki Uyumu Kontrol Et ile karşılaştırma.",
     markFixComplete: "Bu düzeltmeyi tamamlandı işaretle",
     markFixDoneAria: "{n}. düzeltmeyi tamamlandı olarak işaretle",
-    verdictBadTitle: "🚫 Büyük ihtimalle elenirsin",
+    verdictBadTitle: "ğŸš« Büyük ihtimalle elenirsin",
     verdictBadSub:
-      "Bu senin potansiyelin değil — bu rolün filtresiyle uyum eksikliği.",
-    verdictRiskyTitle: "⚠️ Riskli başvuru",
-    verdictRiskySub: "Yakınsın — ama recruiter'ın ilk turda aradığı kritik sinyaller eksik.",
-    verdictCloseTitle: "⚡ Rekabetçi — kanıtı sıkılaştır",
+      "Bu senin potansiyelin değil â€” bu rolün filtresiyle uyum eksikliği.",
+    verdictRiskyTitle: "âš ï¸ Riskli başvuru",
+    verdictRiskySub: "Yakınsın â€” ama recruiter'ın ilk turda aradığı kritik kanıtlar eksik.",
+    verdictCloseTitle: "âš¡ Rekabetçi â€” kanıtı sıkılaştır",
     verdictCloseSub: "Bu yığında savaşabilirsin. Her boşluk için tek net kanıt satırı, sonra gönder.",
-    verdictStrongTitle: "✅ Güçlü eşleşme",
+    verdictStrongTitle: "âœ… Güçlü eşleşme",
     verdictStrongSub: "İlk elemeden geçme şansın gerçek.",
-    startFixingNow: "Konumlanmanı düzelt →",
-    takeActionBtn: "Harekete geç →",
-    startThisStep: "Misyona başla →",
-    fixPointsIfDone: "🔥 Tamamlarsan +{pts} puan",
-    fixProgressApplied: "✅ İlerleme işlendi: +{pts}",
+    startFixingNow: "Konumlanmanı düzelt â†’",
+    takeActionBtn: "Harekete geç â†’",
+    startThisStep: "Misyona başla â†’",
+    fixPointsIfDone: "ğŸ”¥ Bu adım hikayeni daha sıkı anlatır",
+    fixProgressApplied: "âœ… İlerleme işlendi: +{pts}",
     proofAddedToast: "Kanıt eklendi",
-    proofTrustToast: "Recruiter güven sinyali kaydedildi",
+    proofTrustToast: "Recruiter güven notu kaydedildi",
     proofImpactToast: "İlerleme skoruna +{pts} etki uygulandı",
-    fixMyCvRun: "CV'de harekete geç →",
-    fixMyCvUnlock: "Harekete geç — Pro ile aç →",
+    fixMyCvRun: "CV'de harekete geç â†’",
+    fixMyCvUnlock: "Harekete geç â€” Pro ile aç â†’",
     heroStopBig: "Dur.",
-    heroStopLine1: "Şu an başvurursan → elenme ihtimali yüksek.",
+    heroStopLine1: "Şu an başvurursan â†’ elenme ihtimali yüksek.",
     heroStopLine2: "Ama sandığından yakınsın. 2 kritik boşluğu kapat, mülakat bandına çık.",
     heroRiskBig: "Henüz güvenli değil.",
-    heroRiskLine1: "Gerçeklik kontrolü: ilk tur için hâlâ riskli.",
+    heroRiskLine1: "Gerçeklik kontrolü: ilk tur için hÃ¢lÃ¢ riskli.",
     heroRiskLine2: "Toparlanma yolu: sonraki 1-2 boşluğu kapat, tekrar aralığa gir.",
     heroCloseBig: "Yakınsın.",
     heroCloseLine1: "Gerçeklik kontrolü: rekabetçisin ama bitmedi.",
@@ -3557,42 +4148,42 @@ const translations = {
     heroStrongLine1: "Gerçeklik kontrolü: bu ilan için mülakat aralığındasın.",
     heroStrongLine2: "Toparlanma yolu: kanıtı güçlü tut ve özgüvenle başvur.",
     scoreInsightLow: "Bu ilan için tipik işe alım barının altında.",
-    scoreInsightMid: "Yakınsın — ama henüz varsayılan aday seviyesinde değilsin.",
+    scoreInsightMid: "Yakınsın â€” ama henüz varsayılan aday seviyesinde değilsin.",
     scoreInsightHigh: "Mülakat aralığındasın.",
     scoreInsightBench: "Burada çoğu güçlü aday 70 üstü skorlar.",
     yourProgressTitle: "İlerlemen",
-    yourProgressPoints: "Şu ana +{pts} puan kazandın",
+    yourProgressPoints: "Kontrol listende net ilerleme var",
     yourProgressNext: "Sıradaki en iyi hamle: {action}",
     yourProgressBarLabel: "Mülakat bandına yol (70)",
     yourProgressNudge: "70'i geçmek için {n} yüksek etkili adım daha.",
-    yourProgressAllDone: "70 barını geçtin — kanıt göndermeye devam.",
+    yourProgressAllDone: "70 barını geçtin â€” kanıt göndermeye devam.",
     recruiterRealLead: "Asıl mesele şu:",
     recruiterRealIntro: "CV'n ne inşa ettiğini veya teslim ettiğini bağırmıyor. Recruiter taramasında:",
-    recruiterLensLine1: "→ Etki kanıtı yok",
-    recruiterLensLine2: "→ Ölçülebilir sonuç yok",
-    recruiterLensLine3: "→ Araç yığını net değil",
-    impactFixUnlock: "🔥 Konumlanmanı düzelt → +{pts} puan aç",
-    impactMovesCloser: "+{pts} seni mülakat bandına yaklaştırır.",
-    stepCtaOpenLink: "Linki aç →",
-    stepCtaGithub: "GitHub rehberi →",
-    stepCtaApply: "Hedef bölgeye gir →",
+    recruiterLensLine1: "â†’ Etki kanıtı yok",
+    recruiterLensLine2: "â†’ Ölçülebilir sonuç yok",
+    recruiterLensLine3: "â†’ Araç yığını net değil",
+    impactFixUnlock: "ğŸ”¥ Konumlanmayı sıkılaştır; ilk okuma daha net oturur.",
+    impactMovesCloser: "Daha net kanıtla mülakat bandına yaklaşırsın.",
+    stepCtaOpenLink: "Linki aç â†’",
+    stepCtaGithub: "GitHub rehberi â†’",
+    stepCtaApply: "Hedef bölgeye gir â†’",
     impactUnlockedLine: "Etki açıldı",
     focusVerdictKicker: "Sonuç",
     focusOverallStatusLabel: "Genel durum",
     focusRiskKicker: "Elenme riski",
     focusMainProblemKicker: "Ana red nedeni",
     focusImpactKicker: "Skor etkisi",
-    focusImpactExpl: "Bu boşluğu kapatmak profil gücün için yaklaşık +{pts} puanlık bir kazanım demek.",
+    focusImpactExpl: "Bu boşluğu kapatmak profilini daha güçlü okutur; kesin puan vaadi yok.",
     focusActionKicker: "Tek hamlen",
-    focusCtaSeeFull: "Tüm analizini gör →",
-    focusCtaApplyFix: "Bu odağı CV'me uygula →",
+    focusCtaSeeFull: "Tüm analizini gör â†’",
+    focusCtaApplyFix: "Bu odağı CV'me uygula â†’",
     focusHiddenGapsTeaser: "Skorunu etkileyen {n} boşluk daha var. Tüm dökümü Pro ile görebilirsin.",
     bestPathForward: "En İyi Kariyer Yolun",
     bestPathForwardTitle: "En İyi Kariyer Yolun",
-    bestPathSignalLine: "Profil sinyali: {bg} → hedef hat: {track}",
+    bestPathSignalLine: "Profil okuması: {bg} â†’ hedef hat: {track}",
     bestPathRolesTitle: "Profiline göre daha güçlü olduğun roller:",
     bestPathWhyRolesTitle: "Bu roller neden daha uygun",
-    bestPathWrongRoleTitle: "Bu rol neden yanlış eşleşme",
+    bestPathWrongRoleTitle: "Profilin başka rollerde daha güçlü görünüyor",
     bestPathFreeHint: "Ücretsiz görünüm sadece roller ve proje başlığını gösterir. Tam proje dökümü ve yol haritası için Pro'yu aç.",
     bestProjectToFix: "Bunu Düzeltecek En İyi Proje",
     bestProjectSectionTitle: "Bunu Düzeltecek En İyi Proje",
@@ -3601,11 +4192,11 @@ const translations = {
     bestProjectOutcomeTitle: "Beklenen çıktı",
     bestPathCareerTitle: "Senin için en iyi yol:",
     bestPathRoadmapTitle: "Yürütme yol haritası",
-    bestPathPhaseImmediate: "Faz 1 — Acil düzeltme (0–7 gün)",
-    bestPathPhaseStrategic: "Faz 2 — Stratejik güçlenme (2–4 hafta)",
-    bestPathPhaseApplication: "Faz 3 — Başvuru stratejisi",
+    bestPathPhaseImmediate: "Faz 1 â€” Acil düzeltme (0â€“7 gün)",
+    bestPathPhaseStrategic: "Faz 2 â€” Stratejik güçlenme (2â€“4 hafta)",
+    bestPathPhaseApplication: "Faz 3 â€” Başvuru stratejisi",
     bestPathTransformTitle: "Bu yolu uygularsan:",
-    bestPathTransformFit: "Fit skoru: {fit}",
+    bestPathTransformFit: "Eşleşme yönü: {fit}",
     doThisFirstTitle: "ÖNCE BUNU YAP",
     scanSectionLabel: "Hızlı karar görünümü",
     scanCriticalGapTitle: "Kritik boşluk",
@@ -3619,7 +4210,7 @@ const translations = {
     focusPreviewSectionTitle: "Pro analizinde neler var?",
     focusPreviewCtaTitle: "Neden elendiğini satır satır gör",
     focusPreviewCtaSubtitle: "Bu ilana göre recruiter taraması, tüm boşluklar, skora göre sıralı düzeltmeler ve şirket ile ATS bağlamı.",
-    focusPreviewUpgradeBtn: "Tüm analizini gör →",
+    focusPreviewUpgradeBtn: "Tüm analizini gör â†’",
     focusPreviewCardRecruiter: "Recruiter görüşü",
     focusPreviewCardGaps: "Tüm boşluklar",
     focusPreviewCardPlan: "Aksiyon planı",
@@ -3627,47 +4218,47 @@ const translations = {
     focusProDetailTitle: "Detaylı döküm",
     focusTrustLine: "CV ve iş gerekliliği uyumsuzluk analizine dayanır",
     previewHiddenCountLine: "+{n} içgörü daha gizli",
-    previewFallbackRequirement: "rol için temel gereklilik sinyali",
-    previewFallbackReality: "Mevcut CV sinyalin bu gereklilikle henüz örtüşmüyor.",
+    previewFallbackRequirement: "rol için temel gereklilik",
+    previewFallbackReality: "Mevcut CV okuman bu gereklilikle henüz örtüşmüyor.",
     previewRecruiterDecisionIntro: "Ben recruiter olsaydım bu rol için seni büyük olasılıkla elerdim, çünkü:",
-    previewRecruiterReqLine: "Bu rolün gerektirdiği sinyal: {req}",
-    previewRecruiterRealityLine: "CV'nde şu sinyal öne çıkıyor: {reality}",
-    previewRecruiterConsequenceLine: "→ Bu uyumsuzluk ilk elemede erken red riskini artırır.",
-    previewRecruiterMissingKeyword: "Bu rol için eksik anahtar kelime sinyali: {kw}",
+    previewRecruiterReqLine: "Bu rolün gerektirdiği özet: {req}",
+    previewRecruiterRealityLine: "CV'nde öne çıkan satır: {reality}",
+    previewRecruiterConsequenceLine: "â†’ Bu uyumsuzluk ilk elemede erken red riskini artırır.",
+    previewRecruiterMissingKeyword: "Bu rol için eksik anahtar kelime vurgusu: {kw}",
     previewRecruiterAltIntro: "Buna karşın daha güçlü uyduğun roller:",
     previewRecruiterBecauseIntro: "Çünkü:",
-    previewRecruiterBecauseSkill: "Zaten güçlü sinyal verdiğin alan: {skill}",
+    previewRecruiterBecauseSkill: "Zaten güçlü durduğun alan: {skill}",
     previewFallbackRoleA: "İş Analisti",
     previewFallbackRoleB: "Operasyon Analisti",
     previewFallbackRoleAData: "Veri Analisti",
     previewFallbackRoleBData: "İş Analisti",
-    previewFallbackRecruiterFirst: "Bu CV ve bu ilan için işe alım uzmanı görüşü Pro’da görünür.",
+    previewFallbackRecruiterFirst: "Bu CV ve bu ilan için işe alım uzmanı görüşü Proâ€™da görünür.",
     previewEmptyGapsBrief: "Bu ilana karşı boşluk listesi tam analizde yer alır.",
-    previewGapWhyDegree: "Bu ilanda mühendislik odaklı eğitim sinyali açık bir eleme filtresi.",
+    previewGapWhyDegree: "Bu ilanda mühendislik odaklı eğitim şartı açık bir eleme filtresi.",
     previewGapWhyLanguage: "Dil seviyesi kısa liste aşamasında doğrudan eşik etkisi yaratır.",
     previewGapWhySector: "Alan deneyimi, adaptasyon riskini düşürmek için beklenir.",
     previewGapWhyImpact: "İşe alım uzmanı, uygulama kalitesini sayısal sonuçlarla doğrular.",
-    previewGapWhyPositioning: "Konumlanma zayıf kalınca rol uyum sinyali düşer.",
+    previewGapWhyPositioning: "Konumlanma zayıf kalınca rol okuması zayıflar.",
     previewGapWhyGeneric: "Bu boşluk, işe alım kararındaki güveni aşağı çeker.",
     previewPlanStrategic1: "1. Mühendislik diploması isteyen rollere başvurmayı durdur.",
-    previewPlanStrategic2: "2. CV'ni strateji ve analitik rol hattına göre yeniden konumlandır.",
+    previewPlanStrategic2: "2. CV'ni strateji ve analitik rol hattına göre daha net çiz.",
     previewPlanStrategic3: "3. Ölçülebilir etkisi olan tek bir proje ekle.",
-    previewPlanStrategic4: "4. Üst maddeleri görev değil, iş sonucu odaklı yeniden yaz.",
+    previewPlanStrategic4: "4. Üst maddeleri görev değil, iş sonucu gibi anlat.",
     previewPlanStrategic5: "5. İlanın anahtar dilini özet ve deneyim bölümüne eşleştir.",
     previewPlanStrategic6: "6. Uyumu tekrar ölç, red riski düşmeden başvuru yapma.",
     previewWeek1Label: "1. Hafta:",
     previewWeek2Label: "2. Hafta:",
     previewWeek3Label: "3. Hafta:",
     previewExpectedImpactLabel: "Beklenen etki:",
-    previewInterviewImpactLine: "Mülakat olasılığı: +%{x}",
-    previewProfileStrengthLine: "Profil gücü: +{y} puan",
+    previewInterviewImpactLine: "Mülakat ihtimali: bu adımlarla genelde daha iyi",
+    previewProfileStrengthLine: "Profil okuması: bu hamlelerle daha güçlü",
     previewCompanyFocusLine: "{company}",
-    previewCompanyFocusFallback: "Şirket bağlamı hedef rol ve sektör sinyallerinden çıkarıldı.",
+    previewCompanyFocusFallback: "Şirket bağlamı hedef rol ve sektörden çıkarıldı.",
     previewCompanyValueLine: "Öncelik verdikleri alan: {value}",
     previewCompanyValueFallback: "Teknik uygulama gücü ve role özgü teslimat kanıtı.",
-    previewCompanyMismatchLine: "→ Profilinde şu alanda uyumsuzluk görünüyor: {gap}",
-    previewCompanyMismatchFallback: "→ Profil sinyalin, rol beklentisinin gerisinde kalıyor.",
-    previewCompanyDirectionLine: "→ Daha uygun yön: {direction}",
+    previewCompanyMismatchLine: "â†’ Profilinde şu alanda uyumsuzluk görünüyor: {gap}",
+    previewCompanyMismatchFallback: "â†’ Profil okuman, rol beklentisinin gerisinde kalıyor.",
+    previewCompanyDirectionLine: "â†’ Daha uygun yön: {direction}",
     previewAtsFallback: "ATS uyum detayları tam analizde açılır.",
     previewCareerDirectionFallback: "strateji / analitik / iş odaklı rol hatları",
     previewAtsScoreShort: "ATS skoru",
@@ -3683,43 +4274,38 @@ const translations = {
   },
 };
 
-translations.EN = { ...translations.TR };
-
 const T = {
-  bg: "#020617",
-  bgCard: "rgba(255,255,255,0.03)",
-  bgCardHover: "rgba(255,255,255,0.06)",
+  bg: "#09090b",
+  bgCard: "#13161c",
+  bgCardHover: "#181c24",
   border: "rgba(255,255,255,0.08)",
   blue: "#3b82f6",
-  blueGlow: "rgba(59,130,246,0.25)",
+  blueGlow: "rgba(59,130,246,0.12)",
   cyan: "#22d3ee",
-  green: "#10b981",
-  text: "#f1f5f9",
+  green: "#22c55e",
+  text: "#f8fafc",
   textMuted: "#64748b",
   textSub: "#94a3b8",
 };
 
 const globalStyles = `
-  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: linear-gradient(165deg, #020617 0%, #0f172a 45%, #0a0f1c 100%); background-attachment: fixed; font-family: 'DM Sans', sans-serif; color: ${T.text}; -webkit-font-smoothing: antialiased; }
-  .hf-btn-primary { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; background: ${T.blue}; border: none; border-radius: 10px; cursor: pointer; color: white; font-weight: 600; font-size: 15px; font-family: 'DM Sans', sans-serif; transition: all 0.2s ease; }
-  .hf-btn-primary:hover { background: #2563eb; box-shadow: 0 0 30px ${T.blueGlow}; transform: translateY(-1px); }
-  .hf-btn-ghost { display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; background: transparent; border: 1px solid ${T.border}; border-radius: 10px; cursor: pointer; color: ${T.textSub}; font-weight: 500; font-size: 14px; font-family: 'DM Sans', sans-serif; transition: all 0.2s ease; }
-  .hf-btn-ghost:hover { border-color: rgba(255,255,255,0.2); color: white; background: rgba(255,255,255,0.04); }
-  .hf-card { background: rgba(17,24,39,0.72); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, background 0.22s ease; box-shadow: 0 18px 50px rgba(0,0,0,0.35); }
-  .hf-card:hover { background: rgba(30,41,59,0.85); border-color: rgba(255,255,255,0.14); transform: translateY(-3px); box-shadow: 0 24px 60px rgba(0,0,0,0.45); }
-  .hf-feature-card { background: ${T.bgCard}; border: 1px solid ${T.border}; border-radius: 20px; padding: 32px; transition: all 0.3s ease; position: relative; overflow: hidden; }
-  .hf-feature-card:hover { background: ${T.bgCardHover}; border-color: rgba(59,130,246,0.2); transform: translateY(-4px); box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 40px ${T.blueGlow}; }
-  .hf-input { width: 100%; padding: 13px 16px; border-radius: 10px; border: 1px solid ${T.border}; background: rgba(255,255,255,0.03); color: white; outline: none; font-family: 'DM Sans', sans-serif; font-size: 14px; transition: border-color 0.2s; }
+  body { background: ${T.bg}; font-family: var(--font-sans); color: ${T.text}; -webkit-font-smoothing: antialiased; }
+  .hf-btn-ghost { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; background: transparent; border: 1px solid ${T.border}; border-radius: 8px; cursor: pointer; color: ${T.textSub}; font-weight: 500; font-size: 13px; font-family: var(--font-sans); transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease; }
+  .hf-btn-ghost:hover { border-color: rgba(255,255,255,0.16); color: white; background: rgba(255,255,255,0.04); }
+  .hf-card { background: ${T.bgCard}; border: 1px solid ${T.border}; border-radius: 10px; transition: border-color 0.15s ease, background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+  .hf-card:hover { background: ${T.bgCardHover}; border-color: rgba(255,255,255,0.12); }
+  .hf-feature-card { background: ${T.bgCard}; border: 1px solid ${T.border}; border-radius: 12px; padding: 28px; transition: border-color 0.15s ease, background 0.15s ease; position: relative; overflow: hidden; }
+  .hf-feature-card:hover { background: ${T.bgCardHover}; border-color: rgba(255,255,255,0.12); }
+  .hf-input { width: 100%; padding: 13px 16px; border-radius: 10px; border: 1px solid ${T.border}; background: rgba(255,255,255,0.03); color: white; outline: none; font-family: var(--font-sans); font-size: 14px; transition: border-color 0.2s; }
   .hf-input:focus { border-color: rgba(59,130,246,0.5); }
   .hf-input::placeholder { color: ${T.textMuted}; }
-  .hf-textarea { width: 100%; padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.2); color: white; resize: none; outline: none; font-family: 'DM Sans', sans-serif; font-size: 13px; line-height: 1.6; transition: border-color 0.2s; flex: 1; min-height: 0; }
+  .hf-textarea { width: 100%; padding: 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.2); color: white; resize: none; outline: none; font-family: var(--font-sans); font-size: 13px; line-height: 1.6; transition: border-color 0.2s; flex: 1; min-height: 0; }
   .hf-textarea:focus { border-color: rgba(59,130,246,0.5); }
   .hf-textarea::placeholder { color: ${T.textMuted}; }
   .pricing-card { border-radius: 20px; padding: 32px; transition: all 0.3s ease; }
   .pricing-card:hover { transform: translateY(-4px); }
-  .nav-link { padding: 8px 14px; border-radius: 8px; color: ${T.textSub}; font-size: 14px; font-weight: 500; cursor: pointer; border: none; background: transparent; font-family: 'DM Sans', sans-serif; transition: all 0.15s ease; }
+  .nav-link { padding: 8px 14px; border-radius: 8px; color: ${T.textSub}; font-size: 14px; font-weight: 500; cursor: pointer; border: none; background: transparent; font-family: var(--font-sans); transition: all 0.15s ease; }
   .nav-link:hover { color: white; background: rgba(255,255,255,0.06); }
   .nav-link.active { color: white; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -3738,13 +4324,13 @@ const styles = {
     maxWidth: "100%",
     margin: 0,
     overflow: "visible",
-    background: "linear-gradient(165deg, #05070f 0%, #0a0f1a 48%, #080d16 100%)",
+    background: "#09090b",
     color: T.text,
-    fontFamily: "'DM Sans', sans-serif",
+    fontFamily: "var(--font-sans)",
     position: "relative",
     isolation: "isolate",
   },
-  container: { maxWidth: "min(1500px, 100%)", margin: "0 auto", padding: "0 24px", width: "100%", boxSizing: "border-box" },
+  container: { maxWidth: "min(1360px, 100%)", margin: "0 auto", padding: "0 clamp(16px, 3vw, 28px)", width: "100%", boxSizing: "border-box" },
 };
 
 if (!document.getElementById("hirefit-styles")) {
@@ -3762,49 +4348,43 @@ function ProgressBar({ value, color = T.blue }) {
   );
 }
 
-function StatCard({ title, value, icon }) {
-  return (
-    <div className="hf-card" style={{ padding: "24px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ color: T.textMuted, fontSize: "13px", fontWeight: 500 }}>{title}</div>
-        {icon}
-      </div>
-      <div style={{ fontSize: "28px", fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>{value}</div>
-    </div>
-  );
-}
-
 function HistoryList({ history, onLoadItem, onClear, compact = false, lang }) {
   const t = translations[lang];
   return (
-    <div className="hf-card" style={{ padding: "24px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <h3 style={{ margin: 0, display: "flex", alignItems: "center", gap: 8, fontSize: compact ? "15px" : "18px", fontWeight: 700 }}>
-          <History size={16} color={T.blue} />
-          {compact ? t.previousAnalyses : t.recentAnalyses}
-        </h3>
-        <button onClick={onClear} style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontWeight: 600, fontSize: "12px", fontFamily: "'DM Sans', sans-serif" }}>
-          <Trash2 size={12} /> {t.clear}
-        </button>
+    <div className="hf-card" style={{ padding: compact ? "16px" : "20px" }}>
+      <RecentAnalysesAccordion
+        history={history}
+        lang={lang}
+        title={compact ? t.previousAnalyses : t.recentAnalyses}
+        clearLabel={t.clear}
+        emptyLabel={t.noAnalyses}
+        onLoadItem={onLoadItem}
+        onClear={onClear}
+        renderRow={(item, idx) => {
+          const row = normalizeHistoryRowForUI(item, lang, buildRoleSuggestionsFromCv);
+          return (
+            <div key={item.id || idx}>
+              <button
+                type="button"
+                className="hf-analyzer-history-item"
+                onClick={() => onLoadItem(item)}
+                style={{ width: "100%", marginBottom: 4 }}
+              >
+                <div className="hf-analyzer-history-item__left">
+                  <div className="hf-analyzer-history-item__text">
+                    <div className="hf-analyzer-history-item__job">{item.role || row.role}</div>
+                    <div style={{ fontSize: 12, color: T.blue }}>{row.verdictBand}</div>
+                    <div className="hf-analyzer-history-item__date">{item.createdAt}</div>
       </div>
-      {history.length === 0 ? (
-        <div style={{ color: T.textMuted, fontSize: "13px", textAlign: "center", padding: "24px 0" }}>{t.noAnalyses}</div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {history.map((item) => (
-            <div key={item.id}>
-              <button onClick={() => onLoadItem(item)} style={{ textAlign: "left", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: 14, cursor: "pointer", color: "white", width: "100%", fontFamily: "'DM Sans', sans-serif" }}>
-                <div style={{ fontWeight: 700, marginBottom: 4, fontSize: "14px" }}>{item.role}</div>
-                <div style={{ fontSize: "12px", color: T.blue, marginBottom: 2 }}>Score: {item.score}/100</div>
-                <div style={{ fontSize: "11px", color: T.textMuted }}>{item.createdAt}</div>
+                </div>
               </button>
-              <a href={`/report/${item.id}`} target="_blank" rel="noreferrer" style={{ fontSize: "11px", color: T.cyan, textDecoration: "none", display: "block", marginTop: 4, marginLeft: 4 }}>
+              <a href={`/report/${item.id}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: T.cyan, textDecoration: "none", marginLeft: 8 }}>
                 {t.viewReport}
               </a>
             </div>
-          ))}
-        </div>
-      )}
+          );
+        }}
+      />
     </div>
   );
 }
@@ -3815,7 +4395,7 @@ function parseBullets(text, sectionName) {
   const regex = new RegExp(`${sectionName}:([\\s\\S]*?)(\\n[A-Z][A-Za-z ]+:|$)`, "i");
   const match = text.match(regex);
   if (!match) return [];
-  return match[1].split("\n").map((l) => l.replace(/^[-•\s*]+/, "").trim()).filter(Boolean);
+  return match[1].split("\n").map((l) => l.replace(/^[-â€¢\s*]+/, "").trim()).filter(Boolean);
 }
 
 function PaywallModal({ onClose, onUpgrade, lang }) {
@@ -3827,20 +4407,20 @@ function PaywallModal({ onClose, onUpgrade, lang }) {
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(8px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <div style={{ background: "#0c0c0c", border: "1px solid rgba(212,175,55,0.3)", borderRadius: 24, padding: 40, maxWidth: 480, width: "100%", position: "relative", textAlign: "center" }}>
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, borderRadius: "24px 24px 0 0", background: "linear-gradient(90deg, #d4af37, #f0d060)" }} />
-        <div style={{ fontSize: 40, marginBottom: 16 }}>🚀</div>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 800, color: "#f1f5f9", marginBottom: 8 }}>{t.paywallTitle}</div>
+        <div style={{ fontSize: 40, marginBottom: 16 }}>ğŸš€</div>
+        <div style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 800, color: "#f1f5f9", marginBottom: 8 }}>{t.paywallTitle}</div>
         <div style={{ fontSize: 14, color: "#7a7a7a", lineHeight: 1.7, marginBottom: 28 }}>{t.paywallDesc}</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 24 }}>
           {features.map(f => (
             <div key={f} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#94a3b8" }}>
-              <span style={{ color: "#d4af37" }}>✓</span> {f}
+              <span style={{ color: "#d4af37" }}>âœ“</span> {f}
             </div>
           ))}
         </div>
-        <button onClick={onUpgrade} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "linear-gradient(135deg, #d4af37, #f0d060)", color: "#000", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginBottom: 10 }}>
+        <button onClick={onUpgrade} style={{ width: "100%", padding: "14px", borderRadius: 12, border: "none", background: "linear-gradient(135deg, #d4af37, #f0d060)", color: "#000", fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "var(--font-sans)", marginBottom: 10 }}>
           {t.upgradeBtn}
         </button>
-        <button onClick={onClose} style={{ width: "100%", padding: "12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: "#475569", fontSize: 14, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+        <button onClick={onClose} style={{ width: "100%", padding: "12px", borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "transparent", color: "#475569", fontSize: 14, cursor: "pointer", fontFamily: "var(--font-sans)" }}>
           {t.maybeLater}
         </button>
       </div>
@@ -3849,6 +4429,10 @@ function PaywallModal({ onClose, onUpgrade, lang }) {
 }
 
 function DecisionCard({ data, loading, lang, alignmentScore }) {
+  const scoreBand =
+    alignmentScore != null && Number.isFinite(Number(alignmentScore))
+      ? resultPrimaryMatchBand(alignmentScore, lang)
+      : null;
   const t = translations[lang];
   if (loading) return (
     <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 20, marginBottom: 16, display: "flex", alignItems: "center", gap: 12 }}>
@@ -3895,7 +4479,7 @@ function DecisionCard({ data, loading, lang, alignmentScore }) {
                     placeItems: "center",
                     flexShrink: 0,
                     fontSize: 28,
-                    fontWeight: 800,
+      fontWeight: 800,
                     color: vc,
                     background: rsAlpha(vc, 0.14),
                     border: `1px solid ${rsAlpha(vc, 0.35)}`,
@@ -3903,31 +4487,31 @@ function DecisionCard({ data, loading, lang, alignmentScore }) {
                   }}
                 >
                   {scoreFv.verdictIcon || scoreFv.icon}
-                </div>
+    </div>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ ...dLbl, marginBottom: 8 }}>{t.finalVerdict}</div>
-                  <div style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 900, color: vc, lineHeight: 1.1, letterSpacing: "-0.02em" }}>{scoreFv.title}</div>
+                  <div style={{ fontSize: "clamp(26px, 3.5vw, 36px)", fontWeight: 800, color: vc, lineHeight: 1.1, letterSpacing: "-0.02em" }}>{scoreFv.title}</div>
                   <p style={{ margin: "12px 0 0", fontSize: 15, lineHeight: 1.7, color: RS.textSecondary, fontWeight: 500 }}>{scoreFv.explanation}</p>
-                </div>
-              </div>
+      </div>
+      </div>
               <div style={{ textAlign: "right", flexShrink: 0, minWidth: 110 }}>
-                <div style={{ ...dLbl, marginBottom: 8 }}>{t.alignmentScore}</div>
+                <div style={{ ...dLbl, marginBottom: 8 }}>{lang === "TR" ? "Yakınlık seviyesi" : "Match level"}</div>
                 <div
                   style={{
                     fontFamily: RS.fontMono,
                     fontSize: "clamp(48px, 6vw, 64px)",
-                    fontWeight: 900,
+                    fontWeight: 800,
                     color: vc,
                     lineHeight: 0.95,
                     letterSpacing: "-0.03em",
                     textShadow: `0 0 40px ${rsAlpha(vc, 0.32)}`,
                   }}
                 >
-                  {alignmentScore}
-                </div>
-              </div>
-            </div>
+                  {scoreBand || "â€”"}
+  </div>
           </div>
+        </div>
+              </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1, background: RS.border, borderBottom: `1px solid ${RS.border}` }}>
             <div style={{ background: RS.bgSurface, padding: "16px 32px" }}>
               <div style={{ ...dLbl, marginBottom: 8 }}>{lang === "TR" ? "Güven seviyesi" : "Confidence level"}</div>
@@ -3936,18 +4520,18 @@ function DecisionCard({ data, loading, lang, alignmentScore }) {
                   <div>
                     <div>{t.confidenceUnavailableLabel}</div>
                     <div style={{ marginTop: 6, fontSize: 13, fontWeight: 500, color: RS.textMuted }}>{t.confidenceUnavailableNext}</div>
-                  </div>
-                )}
-              </div>
             </div>
+          )}
+          </div>
+        </div>
             <div style={{ background: RS.bgSurface, padding: "16px 32px", textAlign: "right" }}>
               <div style={{ ...dLbl, marginBottom: 8 }}>{t.rejectionRisk}</div>
               {rej ? (
                 <div style={{ fontSize: 15, fontWeight: 500, color: rej.color }}>{rej.metricsLine}</div>
               ) : (
-                <div style={{ fontSize: 15, fontWeight: 500, color: RS.textMuted }}>—</div>
-              )}
-            </div>
+                <div style={{ fontSize: 15, fontWeight: 500, color: RS.textMuted }}>â€”</div>
+        )}
+      </div>
           </div>
         </>
       ) : (
@@ -3958,8 +4542,8 @@ function DecisionCard({ data, loading, lang, alignmentScore }) {
               <div>
                 <div>{t.decisionUnavailable}</div>
                 <div style={{ marginTop: 8, fontSize: 14, fontWeight: 500, color: RS.textMuted }}>{t.decisionUnavailableNext}</div>
-              </div>
-            )}
+        </div>
+      )}
           </div>
           {confTier ? <div style={{ marginTop: 12, fontSize: 15, fontWeight: 500, color: confTier.color }}>{confTier.label}</div> : null}
         </div>
@@ -3968,15 +4552,15 @@ function DecisionCard({ data, loading, lang, alignmentScore }) {
         <div style={{ padding: "24px 32px", borderBottom: `1px solid ${RS.border}` }}>
           <div style={{ fontSize: 12, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: RS.textMuted, marginBottom: 10 }}>{lang === "TR" ? "Özet" : "Summary"}</div>
           <div style={{ fontSize: 14, lineHeight: 1.65, color: RS.textSecondary }}>{data.summary}</div>
-        </div>
+          </div>
       ) : null}
       {data.oneAction ? (
         <div style={{ padding: "24px 32px", background: RS.bgSurface }}>
           <div style={{ fontSize: 12, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.08em", color: RS.textMuted, marginBottom: 10 }}>
             {lang === "TR" ? "Şimdi ne yapmalısın?" : "What you should do now"}
-          </div>
+                                </div>
           <div style={{ fontSize: 15, fontWeight: 500, color: RS.textPrimary, lineHeight: 1.45 }}>{data.oneAction}</div>
-        </div>
+                                </div>
       ) : null}
     </motion.div>
   );
@@ -3998,7 +4582,7 @@ function AmbientBackgroundLayer() {
   return (
     <div aria-hidden style={{ position: "fixed", inset: 0, overflow: "hidden", pointerEvents: "none", zIndex: 0 }}>
       <motion.div
-        style={{
+          style={{
           position: "fixed",
           inset: "-20%",
           pointerEvents: "none",
@@ -4074,19 +4658,19 @@ function ScoreProgressCard({ scoreHistory, lang }) {
 
   return (
     <div className="hf-card" style={{ padding: 24 }}>
-      <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: "18px", fontWeight: 700, marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
+      <h3 style={{ fontFamily: "var(--font-display)", fontSize: "18px", fontWeight: 700, marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
         <TrendingUp size={16} color={T.cyan} />
         {t.scoreProgress}
       </h3>
       <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
         <div style={{ flex: 1, background: "rgba(99,102,241,0.06)", border: "1px solid rgba(99,102,241,0.15)", borderRadius: 12, padding: "14px 16px" }}>
           <div style={{ fontSize: 10, color: "#475569", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>{t.latestScore}</div>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, color: latest.score >= 80 ? "#10b981" : latest.score >= 60 ? "#f59e0b" : "#f87171" }}>{latest.score}</div>
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 800, color: latest.score >= 80 ? "#10b981" : latest.score >= 60 ? "#f59e0b" : "#f87171" }}>{latest.score}</div>
           <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{latest.role}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center" }}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 800, color: isUp ? "#10b981" : "#f87171" }}>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 800, color: isUp ? "#10b981" : "#f87171" }}>
               {isUp ? "+" : ""}{diff}
             </div>
             <div style={{ fontSize: 10, color: "#475569" }}>{t.improvement}</div>
@@ -4094,7 +4678,7 @@ function ScoreProgressCard({ scoreHistory, lang }) {
         </div>
         <div style={{ flex: 1, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 12, padding: "14px 16px" }}>
           <div style={{ fontSize: 10, color: "#475569", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 4 }}>Previous</div>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 28, fontWeight: 800, color: "#475569" }}>{previous.score}</div>
+          <div style={{ fontFamily: "var(--font-display)", fontSize: 28, fontWeight: 800, color: "#475569" }}>{previous.score}</div>
           <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>{previous.role}</div>
         </div>
       </div>
@@ -4102,7 +4686,7 @@ function ScoreProgressCard({ scoreHistory, lang }) {
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {scoreHistory.slice(0, 6).map((entry, i) => (
             <div key={i} style={{ padding: "4px 10px", borderRadius: 999, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 11, color: "#475569" }}>
-              {entry.score} <span style={{ color: "#334155" }}>· {entry.date}</span>
+              {entry.score} <span style={{ color: "#334155" }}>Â· {entry.date}</span>
             </div>
           ))}
         </div>
@@ -4133,7 +4717,7 @@ function ProgressStepper({ cvText, jdText, loading, analysisData, lang }) {
               {step.loading
                 ? <div style={{ width: 10, height: 10, borderRadius: "50%", border: "2px solid #3b82f6", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
                 : step.done
-                ? <span style={{ fontSize: 11, color: "white", fontWeight: 700 }}>✓</span>
+                ? <span style={{ fontSize: 11, color: "white", fontWeight: 700 }}>âœ“</span>
                 : <span style={{ fontSize: 11, color: i === activeIndex ? "#a78bfa" : "#334155", fontWeight: 700 }}>{i + 1}</span>}
             </div>
             <span style={{ fontSize: 12, fontWeight: 600, color: step.done ? "#10b981" : step.loading ? "#60a5fa" : i === activeIndex ? "#e2e8f0" : "#334155", whiteSpace: "nowrap" }}>
@@ -4166,19 +4750,19 @@ function extractJobTitleFromJd(jd) {
   const text = String(jd || "").trim();
   if (!text) return "";
   const labeled = text.match(
-    /(?:^|\n)\s*(?:job\s*title|position|role|title|pozisyon|ünvan|iş\s*unvanı)\s*[:：\-–]\s*(.+)/i
+    /(?:^|\n)\s*(?:job\s*title|position|role|title|pozisyon|ünvan|iş\s*unvanı)\s*[:ï¼š\-â€“]\s*(.+)/i
   );
   if (labeled) {
-    const t = labeled[1].trim().split(/\n|;|•|·/)[0].trim();
+    const t = labeled[1].trim().split(/\n|;|â€¢|Â·/)[0].trim();
     if (t.length >= 2 && t.length <= 120) return t;
   }
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   for (const line of lines.slice(0, 22)) {
-    const L = line.replace(/^[-–—*•#]+\s*/, "").replace(/^\d+[.)]\s*/, "");
+    const L = line.replace(/^[-â€“â€”*â€¢#]+\s*/, "").replace(/^\d+[.)]\s*/, "");
     if (L.length < 4 || L.length > 100) continue;
     if (/^https?:/i.test(L)) continue;
     if (/^(about|company|overview|summary|requirements|qualifications|responsibilities|benefits|we\s+are|apply|location|employment\s*type)/i.test(L)) continue;
-    if (/^\d{4}\s*[-–]/.test(L)) continue;
+    if (/^\d{4}\s*[-â€“]/.test(L)) continue;
     if (/^page\s+\d/i.test(L)) continue;
     return L;
   }
@@ -4189,13 +4773,13 @@ function extractCompanyNameFromJd(jd) {
   const text = String(jd || "").trim();
   if (!text) return "";
   const labeled = text.match(
-    /(?:^|\n)\s*(?:company|company\s*name|employer|organization|şirket|şirket\s*adı|firma)\s*[:：\-–]\s*(.+)/i
+    /(?:^|\n)\s*(?:company|company\s*name|employer|organization|şirket|şirket\s*adı|firma)\s*[:ï¼š\-â€“]\s*(.+)/i
   );
   if (labeled) {
-    const c = labeled[1].trim().split(/\n|;|•|·/)[0].trim();
+    const c = labeled[1].trim().split(/\n|;|â€¢|Â·/)[0].trim();
     if (c.length >= 2 && c.length <= 80) return c;
   }
-  const atInline = text.match(/\b(?:at|@)\s+([A-ZÇĞİÖŞÜ][\w&.,'’ -]{1,60})/);
+  const atInline = text.match(/\b(?:at|@)\s+([A-ZÇĞİÖŞÜ][\w&.,'â€™ -]{1,60})/);
   if (atInline) {
     const c = String(atInline[1] || "").trim().replace(/[.,;:]+$/, "");
     if (c.length >= 2 && c.length <= 80) return c;
@@ -4218,7 +4802,7 @@ function jdPreviewTitle(jd, max = 40) {
   return `${clipped}...`;
 }
 
-/** LinkedIn job URLs — server-side extraction is unreliable; users should paste the JD text. */
+/** LinkedIn job URLs â€” server-side extraction is unreliable; users should paste the JD text. */
 function isLinkedInJobUrl(raw) {
   const s = String(raw || "").trim();
   if (!s) return false;
@@ -4235,7 +4819,7 @@ function isLinkedInJobUrl(raw) {
 function resolveSavedAnalysisRole(jdTitle, modelRole, lang, companyName = "", jdText = "", createdAt = new Date()) {
   const company = String(companyName || "").trim();
   const role = String(modelRole || "").trim() || String(jdTitle || "").trim();
-  if (company && role) return `${company.slice(0, 60)} · ${role.slice(0, 80)}`;
+  if (company && role) return `${company.slice(0, 60)} Â· ${role.slice(0, 80)}`;
   if (role && !/^role$/i.test(role)) return role.slice(0, 120);
   const preview = jdPreviewTitle(jdText, 40);
   if (preview) return preview;
@@ -4289,7 +4873,7 @@ function getNavAccountLines(user) {
     return {
       primary: navFirstGivenName(name) || name,
       secondary: email,
-      full: `${name} — ${email}`,
+      full: `${name} â€” ${email}`,
     };
   }
   if (email) {
@@ -4298,11 +4882,11 @@ function getNavAccountLines(user) {
   if (name) {
     return { primary: navFirstGivenName(name) || name, secondary: "", full: name };
   }
-  return { primary: "—", secondary: "", full: "" };
+  return { primary: "â€”", secondary: "", full: "" };
 }
 
 function NavBarFlagEn({ w = 20, h = 14 }) {
-  return (
+              return (
     <svg width={w} height={h} viewBox="0 0 20 14" fill="none" aria-hidden>
       <rect width="20" height="14" fill="#012169" />
       <path d="M0,0 L20,14 M20,0 L0,14" stroke="white" strokeWidth="2.5" />
@@ -4335,101 +4919,97 @@ function HireFitLogoMark({ size = 56, color = "#6366f1" }) {
   );
 }
 
-function NavBar({ pathname, user, logout, navigate, lang }) {
-  const t = translations[lang];
-  const navTab = pathname === "/roadmap" ? "roadmap" : pathname === "/dashboard" ? "dashboard" : pathname === "/" ? "landing" : null;
-  const [scrolled, setScrolled] = useState(false);
-  const [hovered, setHovered] = useState(null);
-  const [navLinkHover, setNavLinkHover] = useState(null);
-  const [navLinkPressed, setNavLinkPressed] = useState(null);
-  const [langMenuOpen, setLangMenuOpen] = useState(false);
-  const [, setLangPopoverPos] = useState(null);
-  const langMenuRef = useRef(null);
-  const langPopoverRef = useRef(null);
-  const langTriggerRef = useRef(null);
-  const navTabsRef = useRef(null);
-  const navButtonRefs = useRef([]);
-  const [activeTabPosition, setActiveTabPosition] = useState({ left: 0, top: 0, width: 0, height: 0, visible: false });
+function getNavCareerScore({ careerProfile, careerGrowth, scoreHistory }) {
+  let score = null;
+  let delta = null;
 
-  const updateActiveTabIndicator = useCallback(() => {
-    const container = navTabsRef.current;
-    if (!container) return;
-    const idx = navTab === "landing" ? 0 : navTab === "roadmap" ? 1 : navTab === "dashboard" ? 2 : -1;
-    if (idx < 0) {
-      setActiveTabPosition((p) => ({ ...p, width: 0, visible: false }));
-      return;
+  if (careerGrowth?.careerScore != null && Number.isFinite(Number(careerGrowth.careerScore))) {
+    score = Math.round(Number(careerGrowth.careerScore));
+    if (careerGrowth.scoreDelta != null && Number.isFinite(Number(careerGrowth.scoreDelta))) {
+      delta = Math.round(Number(careerGrowth.scoreDelta));
     }
-    const btn = navButtonRefs.current[idx];
-    if (!btn) return;
-    const cr = container.getBoundingClientRect();
-    const br = btn.getBoundingClientRect();
-    setActiveTabPosition({
-      left: br.left - cr.left,
-      top: br.top - cr.top,
-      width: br.width,
-      height: br.height,
-      visible: true,
-    });
-  }, [navTab]);
+  }
 
-  useLayoutEffect(() => {
-    updateActiveTabIndicator();
-    const container = navTabsRef.current;
-    const ro = typeof ResizeObserver !== "undefined" && container ? new ResizeObserver(() => updateActiveTabIndicator()) : null;
-    if (container && ro) ro.observe(container);
-    window.addEventListener("resize", updateActiveTabIndicator);
-    return () => {
-      if (container && ro) ro.disconnect();
-      window.removeEventListener("resize", updateActiveTabIndicator);
-    };
-  }, [updateActiveTabIndicator]);
+  if (score == null && careerProfile) {
+    const readiness =
+      careerProfile.career_snapshot?.readinessScore ??
+      careerProfile.career_readiness?.score;
+    if (readiness != null && Number.isFinite(Number(readiness))) {
+      score = Math.round(Number(readiness));
+    }
+  }
+
+  if (delta == null && Array.isArray(scoreHistory) && scoreHistory.length >= 2) {
+    const latest = Number(scoreHistory[0]?.score);
+    const previous = Number(scoreHistory[1]?.score);
+    if (Number.isFinite(latest) && Number.isFinite(previous)) {
+      if (score == null) score = Math.round(latest);
+      delta = Math.round(latest - previous);
+    }
+  } else if (score == null && Array.isArray(scoreHistory) && scoreHistory.length >= 1) {
+    const latest = Number(scoreHistory[0]?.score);
+    if (Number.isFinite(latest)) score = Math.round(latest);
+  }
+
+  return { score, delta: delta && delta !== 0 ? delta : null };
+}
+
+function NavBar({
+  pathname,
+  user,
+  logout,
+  navigate,
+  lang,
+  setLang,
+  careerProfile,
+  careerGrowth,
+  scoreHistory,
+}) {
+  const t = translations[lang];
+  const navTab =
+    pathname.startsWith("/onboarding") || pathname.startsWith("/career-dna")
+      ? careerProfile?.onboarding_completed
+        ? "snapshot"
+        : "careerDna"
+      : pathname === "/analyze"
+        ? "analyze"
+      : pathname === "/dashboard"
+        ? "dashboard"
+        : pathname === "/app"
+          ? "analyze"
+          : pathname === "/"
+            ? "landing"
+            : null;
+  const [scrolled, setScrolled] = useState(false);
+  const [langMenuOpen, setLangMenuOpen] = useState(false);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const langMenuRef = useRef(null);
+  const profileMenuRef = useRef(null);
 
   useEffect(() => {
-    const clearPress = () => setNavLinkPressed(null);
-    window.addEventListener("mouseup", clearPress);
-    return () => window.removeEventListener("mouseup", clearPress);
-  }, []);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
+    const onScroll = () => setScrolled(window.scrollY > 8);
     onScroll();
     window.addEventListener("scroll", onScroll);
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
-    const stale = document.getElementById("navbar-styles-v2");
-    if (stale) stale.remove();
-  }, []);
-
-  const syncLangPopoverRect = useCallback(() => {
-    const el = langTriggerRef.current;
-    if (!el || !langMenuOpen) return;
-    const r = el.getBoundingClientRect();
-    const width = Math.max(r.width, 168);
-    let left = r.right - width;
-    const pad = 10;
-    left = Math.max(pad, Math.min(left, window.innerWidth - width - pad));
-    setLangPopoverPos({ top: r.bottom + 6, left, width });
-  }, [langMenuOpen]);
-
-  useLayoutEffect(() => {
-    if (!langMenuOpen) {
-      setLangPopoverPos(null);
-      return;
-    }
-    syncLangPopoverRect();
-  }, [langMenuOpen, lang, syncLangPopoverRect]);
+    setLangMenuOpen(false);
+    setProfileMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
-    if (!langMenuOpen) return;
     const onDoc = (e) => {
-      const t = e.target;
-      if (langMenuRef.current?.contains(t) || langPopoverRef.current?.contains(t)) return;
+      const target = e.target;
+      if (langMenuRef.current?.contains(target) || profileMenuRef.current?.contains(target)) return;
       setLangMenuOpen(false);
+      setProfileMenuOpen(false);
     };
     const onKey = (e) => {
-      if (e.key === "Escape") setLangMenuOpen(false);
+      if (e.key === "Escape") {
+        setLangMenuOpen(false);
+        setProfileMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
@@ -4437,141 +5017,200 @@ function NavBar({ pathname, user, logout, navigate, lang }) {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
     };
-  }, [langMenuOpen]);
-
-  useEffect(() => {
-    if (!langMenuOpen) return;
-    const on = () => syncLangPopoverRect();
-    window.addEventListener("scroll", on, true);
-    window.addEventListener("resize", on);
-    return () => {
-      window.removeEventListener("scroll", on, true);
-      window.removeEventListener("resize", on);
-    };
-  }, [langMenuOpen, syncLangPopoverRect]);
-
-  useEffect(() => {
-    setLangMenuOpen(false);
-  }, [pathname]);
+  }, []);
 
   const account = useMemo(() => getNavAccountLines(user), [user]);
   const avatarLetter = (user?.email?.[0] || account.primary?.[0] || "?").toUpperCase();
+  const careerScore = useMemo(
+    () => getNavCareerScore({ careerProfile, careerGrowth, scoreHistory }),
+    [careerProfile, careerGrowth, scoreHistory]
+  );
+  const activationState = useMemo(
+    () => resolveActivationState({ user, careerProfile }),
+    [user, careerProfile]
+  );
+
+  const navItems = useMemo(
+    () => buildActivationNavItems({ lang, activationState, careerProfile }),
+    [lang, activationState, careerProfile]
+  );
+
+  const pickLang = (next) => {
+    setLang?.(next);
+    setLangMenuOpen(false);
+  };
+
+  const goToNavItem = (item) => {
+    if (!item.sectionId) {
+      navigate(item.path);
+      return;
+    }
+    const scrollToSection = () => {
+      document.getElementById(item.sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    if (pathname !== "/") {
+      navigate("/");
+      window.setTimeout(scrollToSection, 80);
+      return;
+    }
+    scrollToSection();
+  };
 
   return (
     <nav className={`hf-nav-root${scrolled ? " scrolled" : ""}`} data-scrolled={scrolled ? "true" : "false"}>
       <div className="hf-nav-inner-row">
-        <div className="hf-nav-logo-cluster" style={{ display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }} onClick={() => navigate("/")}>
-          <div
-            className="hf-logo-wrap"
-            style={{
-              width: 56,
-              height: 56,
-              flexShrink: 0,
-              transform: hovered === "logo" ? "scale(1.05)" : "scale(1)",
-              transition: "transform 0.25s ease",
-            }}
-            onMouseEnter={() => setHovered("logo")}
-            onMouseLeave={() => setHovered(null)}
-          >
-            <HireFitLogoMark size={56} />
+        <button
+          type="button"
+          className="hf-nav-logo-cluster"
+          onClick={() => navigate("/")}
+          aria-label="HireFit"
+        >
+          <div className="hf-nav-logo-mark">
+            <HireFitLogoMark size={32} color="#93c5fd" />
           </div>
-          <div>
-            <div className="hf-nav-brand-name">HireFit</div>
-            <div className="hf-nav-brand-tagline">AI CAREER DECISION ENGINE</div>
+          <div className="hf-nav-brand-stack">
+            <span className="hf-nav-brand-name">HireFit</span>
+            <span className="hf-nav-brand-tagline">{t.careerOsTagline}</span>
           </div>
-        </div>
+        </button>
+
         <div className="hf-nav-tabs-center">
-          <div ref={navTabsRef} className="hf-nav-tabs-wrap hf-nav-pill-rail">
-            <div
-              style={{
-                position: "absolute",
-                top: activeTabPosition.top,
-                left: activeTabPosition.left,
-                width: activeTabPosition.width,
-                height: activeTabPosition.height || "100%",
-                borderRadius: 999,
-                background: "linear-gradient(145deg, rgba(99,102,241,0.95) 0%, rgba(59,130,246,0.88) 48%, rgba(56,189,248,0.35) 100%)",
-                transition: "left 0.32s ease, top 0.32s ease, width 0.32s ease, height 0.32s ease, opacity 0.25s ease",
-                boxShadow: "0 0 36px rgba(99,102,241,0.32), 0 0 0 1px rgba(255,255,255,0.12) inset, inset 0 1px 0 rgba(255,255,255,0.18)",
-                pointerEvents: "none",
-                zIndex: 0,
-                opacity: activeTabPosition.visible && activeTabPosition.width > 0 ? 1 : 0,
+          <div className="hf-nav-segment" role="tablist" aria-label={lang === "TR" ? "Ana menü" : "Main menu"}>
+            {navItems.map((item) => {
+              const { label, viewKey } = item;
+              const isActive = navTab === viewKey;
+              return (
+                <button
+                  key={viewKey}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  className={isActive ? "hf-nav-tab hf-nav-tab--active" : "hf-nav-tab"}
+                  onClick={() => goToNavItem(item)}
+                >
+                  {label}
+                </button>
+              );
+            })}
+        </div>
+        </div>
+
+        <div className="hf-nav-right-cluster">
+          {user && careerScore.score != null ? (
+          <button
+              type="button"
+              className="hf-nav-career-score"
+              onClick={() => navigate("/dashboard")}
+              title={t.careerScore}
+            >
+              <span className="hf-nav-career-score__label">{t.careerScore}</span>
+              <span className="hf-nav-career-score__value">{careerScore.score}</span>
+              {careerScore.delta != null ? (
+                <span className={`hf-nav-career-score__delta${careerScore.delta > 0 ? " is-up" : " is-down"}`}>
+                  {careerScore.delta > 0 ? "+" : ""}
+                  {careerScore.delta} {t.thisWeek}
+            </span>
+              ) : null}
+          </button>
+          ) : null}
+
+          <div className="hf-nav-lang-wrap" ref={langMenuRef}>
+            <button
+              type="button"
+              className={`hf-nav-lang-compact${langMenuOpen ? " is-open" : ""}`}
+              aria-expanded={langMenuOpen}
+              aria-haspopup="listbox"
+              onClick={() => {
+                setProfileMenuOpen(false);
+                setLangMenuOpen((o) => !o);
               }}
-            />
-            {[{ label: t.home, path: "/", viewKey: "landing" }, { label: t.product, path: "/roadmap", viewKey: "roadmap" }, { label: t.dashboard, path: "/dashboard", viewKey: "dashboard" }].map(({ label, path, viewKey }, i) => {
-            const isActive = navTab === viewKey;
-            const isHovered = navLinkHover === viewKey;
-            const isPressed = navLinkPressed === viewKey;
-            let scale = 1;
-            if (isPressed) scale = 0.97;
-            else if (isHovered) scale = 1.05;
-            return (
+            >
+              {lang === "TR" ? <NavBarFlagTr w={14} h={10} /> : <NavBarFlagEn w={14} h={10} />}
+              <span>{lang}</span>
+              <ChevronDown size={12} className="hf-nav-lang-chevron" />
+            </button>
+            {langMenuOpen ? (
+              <div className="hf-nav-lang-popover hf-nav-lang-popover--drop" role="listbox">
+                {[
+                  { code: "TR", label: "Türkçe", Flag: NavBarFlagTr },
+                  { code: "EN", label: "English", Flag: NavBarFlagEn },
+                ].map(({ code, label, Flag }) => (
+                  <button
+                    key={code}
+                    type="button"
+                    role="option"
+                    aria-selected={lang === code}
+                    className={`hf-nav-lang-option${lang === code ? " hf-nav-lang-option--active" : ""}`}
+                    onClick={() => pickLang(code)}
+                  >
+                    <span className="hf-nav-lang-option-flag">
+                      <Flag w={16} h={11} />
+                    </span>
+                    <span className="hf-nav-lang-option-text">{label}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          {user ? (
+            <div className="hf-nav-profile-wrap" ref={profileMenuRef}>
               <button
-                key={viewKey}
-                ref={(el) => { navButtonRefs.current[i] = el; }}
                 type="button"
-                className={isActive ? "hf-nav-tab hf-nav-tab--active" : "hf-nav-tab"}
-                onClick={() => navigate(path)}
-                onMouseEnter={() => setNavLinkHover(viewKey)}
-                onMouseLeave={() => {
-                  setNavLinkHover((k) => (k === viewKey ? null : k));
-                  setNavLinkPressed((k) => (k === viewKey ? null : k));
-                }}
-                onMouseDown={() => setNavLinkPressed(viewKey)}
-                onMouseUp={() => setNavLinkPressed((k) => (k === viewKey ? null : k))}
-                style={{
-                  transform: `scale(${scale})`,
+                className={`hf-nav-profile-trigger${profileMenuOpen ? " is-open" : ""}`}
+                aria-expanded={profileMenuOpen}
+                aria-haspopup="menu"
+                onClick={() => {
+                  setLangMenuOpen(false);
+                  setProfileMenuOpen((o) => !o);
                 }}
               >
-                {label}
-              </button>
-            );
-          })}
-          </div>
-        </div>
-        <div className="hf-nav-right-cluster">
-          <div className="hf-nav-lang-wrap">
-            <span
-              className="hf-nav-lang hf-nav-lang-toggle hf-nav-lang--tr"
-              aria-label="Arayüz dili: Türkçe"
-              style={{ cursor: "default", pointerEvents: "none" }}
-            >
-              <NavBarFlagTr />
-              <span className="hf-nav-lang-label">Türkçe</span>
-            </span>
-          </div>
-          <div className="hf-nav-sep" aria-hidden />
-          {user ? (
-            <div className="hf-nav-user-row">
-              <div className="hf-nav-user-cluster">
                 <div className="hf-nav-avatar" aria-hidden>
                   {avatarLetter}
-                </div>
-                <div className="hf-nav-user-text" title={account.full || undefined}>
-                  <div className="hf-nav-user-primary">{account.primary || "—"}</div>
-                  {account.secondary ? <div className="hf-nav-user-secondary">{account.secondary}</div> : null}
-                </div>
               </div>
-              <button type="button" className="hf-btn-ghost hf-nav-signout" onClick={logout} style={{ padding: "9px 18px", fontSize: "13px" }}><LogOut size={13} /> {t.signOut}</button>
+                <span className="hf-nav-profile-name">{account.primary || "â€”"}</span>
+                <ChevronDown size={13} className="hf-nav-profile-chevron" />
+              </button>
+              {profileMenuOpen ? (
+                <div className="hf-nav-profile-menu" role="menu">
+                  {account.secondary || account.full ? (
+                    <div className="hf-nav-profile-email" title={account.full || undefined}>
+                      {account.secondary || account.full}
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="hf-nav-profile-menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      logout?.();
+                    }}
+                  >
+                    <LogOut size={14} />
+                    {t.signOut}
+                  </button>
+                </div>
+              ) : null}
             </div>
           ) : (
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div className="hf-nav-auth-actions">
               <button
-                className="hf-btn-ghost"
-                onClick={() => navigate("/login")}
-                style={{
-                  padding: "9px 16px",
-                  fontSize: "13px",
-                  borderRadius: 999,
-                  border: "1px solid rgba(99,102,241,0.35)",
-                  color: "#c7d2fe",
+                type="button"
+                className="hf-nav-auth-primary"
+                onClick={() => {
+                  trackActivationEvent("landing_cta_clicked", {
+                    source: "navbar",
+                    route: "/analyze",
+                    lang,
+                    beta_cohort: CLOSED_BETA_COHORT,
+                  });
+                  navigate("/analyze");
                 }}
               >
-                {lang === "TR" ? "Kayıt Ol" : "Sign Up"}
-              </button>
-              <button className="hf-btn-primary" onClick={() => navigate("/login")} style={{ padding: "10px 24px", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 24px rgba(99,102,241,0.35), inset 0 1px 0 rgba(255,255,255,0.15)", borderRadius: 999 }}>
-                <LogIn size={14} /> {t.login}
-              </button>
+                <LogIn size={14} />
+                {lang === "TR" ? "Beta'ya Katıl" : "Join Beta"}
+            </button>
             </div>
           )}
         </div>
@@ -4590,7 +5229,7 @@ function LandingPageAmbient() {
       el.id = "hero-styles";
       document.head.appendChild(el);
     }
-    el.textContent = `
+      el.textContent = `
         @keyframes heroFadeUp { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
         @keyframes floatY { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-8px);} }
         @keyframes shimmer { 0%{background-position:-200% 0;} 100%{background-position:200% 0;} }
@@ -4599,7 +5238,7 @@ function LandingPageAmbient() {
         @media (max-width: 900px) {
           .hf-hero-inner { align-items: flex-start !important; padding: 0 clamp(16px, 5vw, 24px) !important; gap: 0 !important; min-height: auto !important; }
           .hf-hero-col-left { max-width: 100% !important; }
-          .hf-hero-headline { font-size: clamp(22px, 5.6vw, 32px) !important; line-height: 1.05 !important; }
+          .hf-hero-headline { font-size: clamp(24px, 6.2vw, 34px) !important; line-height: 1.06 !important; letter-spacing: -0.028em !important; }
         }
         @keyframes hfHeroSheen {
           0% { background-position: 0% 50%; }
@@ -4800,7 +5439,7 @@ function LandingPageAmbient() {
             <div className="hf-ambient-orb hf-ambient-orb--1" />
             <div className="hf-ambient-orb hf-ambient-orb--2" />
             <div className="hf-ambient-orb hf-ambient-orb--3" />
-          </div>
+</div>
           <div
             aria-hidden
             style={{
@@ -4860,6 +5499,54 @@ function LandingPageAmbient() {
           <div className="hf-ambient-noise-film" aria-hidden />
         </>
       )}
+      <div className="hf-hero-transition-field" aria-hidden>
+        <div className="hf-hero-transition-fade" />
+        <div className="hf-hero-particle-field" />
+        <svg className="hf-hero-data-wave" viewBox="0 0 1440 260" preserveAspectRatio="none" focusable="false">
+          <defs>
+            <linearGradient id="hfDataWaveGradient" x1="0%" x2="100%" y1="0%" y2="0%">
+              <stop offset="0%" stopColor="#172A4D" stopOpacity="0" />
+              <stop offset="24%" stopColor="#1E3A5F" stopOpacity="0.24" />
+              <stop offset="52%" stopColor="#67E8F9" stopOpacity="0.46" />
+              <stop offset="78%" stopColor="#2A5FAF" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#172A4D" stopOpacity="0" />
+            </linearGradient>
+            <filter id="hfDataWaveGlow" x="-10%" y="-80%" width="120%" height="260%">
+              <feGaussianBlur stdDeviation="3.2" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <g className="hf-data-wave-track hf-data-wave-track--back">
+            <path
+              className="hf-data-wave-glow"
+              d="M-180 140 C 15 84, 145 196, 322 132 S 668 82, 846 134 S 1120 198, 1278 134 S 1530 94, 1640 142"
+            />
+            <path
+              className="hf-data-wave-thread"
+              d="M-180 158 C 48 126, 210 182, 382 150 S 710 102, 914 154 S 1172 186, 1350 148 S 1580 120, 1640 156"
+            />
+          </g>
+          <g className="hf-data-wave-track hf-data-wave-track--front">
+            <path
+              className="hf-data-wave-core"
+              d="M-180 126 C 18 178, 174 62, 344 126 S 642 190, 826 124 S 1110 66, 1284 122 S 1505 178, 1640 126"
+            />
+            {[70, 188, 322, 468, 630, 782, 946, 1098, 1240, 1374].map((x, index) => (
+              <circle
+                key={x}
+                className="hf-data-wave-node"
+                cx={x}
+                cy={index % 2 === 0 ? 126 : 142}
+                r={index % 3 === 0 ? 2.8 : 2.1}
+              />
+            ))}
+          </g>
+        </svg>
+      </div>
+      <div className="hf-hero-left-contrast" aria-hidden />
     </div>
   );
 }
@@ -4904,14 +5591,34 @@ function HeroSection({ navigate, lang }) {
               alignItems: "flex-start",
             }}
           >
+            <div
+              className="hero-fade"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "7px 14px",
+                borderRadius: 999,
+                background: "rgba(59,130,246,0.11)",
+                border: "1px solid rgba(147,197,253,0.22)",
+                color: "#93c5fd",
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: "0.12em",
+                marginBottom: 16,
+                animationDelay: "0.05s",
+              }}
+            >
+              {lang === "TR" ? "HİREFİT CLOSED BETA · SINIRLI ERİŞİM" : "HIREFIT CLOSED BETA · LIMITED ACCESS"}
+            </div>
             <h1
               className="hf-hero-headline"
               style={{
-                fontFamily: "'Syne', sans-serif",
-                fontSize: "clamp(32px, 4vw, 58px)",
+                fontFamily: "var(--font-display)",
+                fontSize: "clamp(31px, 3.85vw, 54px)",
                 fontWeight: 800,
-                lineHeight: 1.05,
-                letterSpacing: "-0.035em",
+                lineHeight: "var(--leading-display)",
+                letterSpacing: "var(--tracking-display)",
                 margin: 0,
                 color: "#f8fafc",
                 maxWidth: "100%",
@@ -4926,75 +5633,111 @@ function HeroSection({ navigate, lang }) {
                 marginTop: 20,
                 marginBottom: 0,
                 maxWidth: 520,
-                fontSize: "clamp(13.6px, 1.53vw, 15.3px)",
-                lineHeight: 1.55,
-                fontWeight: 500,
+                fontSize: "var(--text-body-md)",
+                lineHeight: "var(--leading-body)",
+                fontWeight: 400,
                 color: "#cbd5e1",
                 animationDelay: "0.35s",
               }}
             >
-              {lang === "TR"
-                ? "CV'ni dakikalar içinde güçlendir; mülakat şansını artır — başvurmadan önce gerçek kararı gör."
-                : "Complete CV Optimization in minutes and increase your interview chances — see the real decision before you apply."}
+            {lang === "TR"
+                ? "HireFit CV'ni, deneyimlerini, projelerini ve kariyer hedeflerini birlikte okuyarak hangi rollere daha yakın olduğunu, profilinde neyin eksik kaldığını ve sırada ne yapman gerektiğini netleştirir."
+                : "HireFit reads your CV, experience, projects, and career goals together to clarify which roles you are closer to, what is missing, and what to do next."}
             </p>
-            <button
-              type="button"
-              className="hf-cta-primary"
-              onClick={() => navigate("/app")}
+            <div
               style={{
                 marginTop: 28,
-                display: "inline-flex",
+                display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                alignSelf: "flex-start",
-                gap: 8,
-                padding: "15px 28px",
-                border: "none",
-                borderRadius: 12,
-                cursor: "pointer",
-                color: "white",
-                fontWeight: 700,
-                fontSize: 15,
-                fontFamily: "'DM Sans', sans-serif",
+                gap: 12,
+                flexWrap: "wrap",
               }}
             >
-              {lang === "TR" ? "Kararını öğren →" : "Get your verdict →"}
-            </button>
+              <button
+                type="button"
+                className="hf-cta-primary"
+                onClick={() => {
+                  trackActivationEvent("landing_cta_clicked", {
+                    source: "hero",
+                    route: "/analyze",
+                    lang,
+                    beta_cohort: CLOSED_BETA_COHORT,
+                  });
+                  navigate("/analyze");
+                }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  alignSelf: "flex-start",
+                  gap: 8,
+                  padding: "15px 28px",
+                  border: "none",
+                  borderRadius: 12,
+                  cursor: "pointer",
+                  color: "white",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
+                {lang === "TR" ? "Ücretsiz Beta'ya Katıl" : "Join Free Beta"} <ArrowRight size={16} />
+              </button>
+              <button
+                type="button"
+                className="hf-btn-ghost"
+                onClick={() => document.getElementById("how-it-works")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  padding: "14px 22px",
+                  borderRadius: 12,
+                  cursor: "pointer",
+                  fontWeight: 700,
+                  fontSize: 15,
+                  fontFamily: "var(--font-sans)",
+                }}
+              >
+                {lang === "TR" ? "Nasıl Çalıştığını Gör" : "See How It Works"}
+              </button>
+            </div>
+            </div>
           </div>
-      </div>
     </motion.section>
   );
 }
 
 function FeatureCards({ lang }) {
   const features = lang === "TR" ? [
-    { icon: "📊", tag: "Temel", tagColor: "#60a5fa", tagBg: "rgba(59,130,246,0.1)", title: "ATS Skor Motoru", desc: "Beceriler, anahtar kelimeler, deneyim ve biçimlendirme üzerinden çok faktörlü puanlama — gerçek ATS yazılımlarının sizi değerlendirdiği şekilde.", accent: "#3b82f6", glow: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.15)", stat: "%87 doğruluk" },
-    { icon: "🚫", tag: "Fark Yaratan", tagColor: "#f87171", tagBg: "rgba(239,68,68,0.1)", title: "Red Motoru", desc: "Sizi sadece puanlamıyoruz — bir işe alım uzmanının CV'nizi geçme nedenlerini ve her birini nasıl düzelteceğinizi tam olarak söylüyoruz.", accent: "#ef4444", glow: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.15)", stat: "En büyük fark" },
-    { icon: "🔍", tag: "AI Destekli", tagColor: "#22d3ee", tagBg: "rgba(34,211,238,0.1)", title: "Anahtar Kelime Zekası", desc: "İşe alım uzmanlarının taradığı tam anahtar kelimeleri çıkarır, ardından CV'nizde hangilerinin eksik olduğunu gösterir.", accent: "#22d3ee", glow: "rgba(34,211,238,0.08)", border: "rgba(34,211,238,0.15)", stat: "50+ anahtar kelime" },
-    { icon: "✨", tag: "Premium", tagColor: "#a78bfa", tagBg: "rgba(139,92,246,0.1)", title: "CV Yeniden Yazıcı", desc: "AI, CV'nizi hedeflediğiniz role göre daha güçlü, daha alakalı ve tamamen optimize edilmiş şekilde yeniden yazar.", accent: "#8b5cf6", glow: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.15)", stat: "Ort. +23 puan artış" },
+    { icon: "01", tag: "Snapshot", tagColor: "#60a5fa", tagBg: "rgba(59,130,246,0.1)", title: "Career Snapshot", desc: "Kariyer kimliğini, hazır oluş seviyeni, güçlü sinyallerini ve en önemli kanıt açığını tek yerde gör.", accent: "#3b82f6", glow: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.15)", stat: "İlk netlik" },
+    { icon: "02", tag: "Yön", tagColor: "#34d399", tagBg: "rgba(52,211,153,0.1)", title: "Rol Yönü", desc: "Hangi rol ailelerinde daha güçlü kanıtların olduğunu ve hangi yönlerin gelişime açık olduğunu gör.", accent: "#34d399", glow: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.15)", stat: "Rol yönleri" },
+    { icon: "03", tag: "Okuma", tagColor: "#a78bfa", tagBg: "rgba(139,92,246,0.1)", title: "Recruiter Okuması", desc: "Profilinin ilk bakışta nasıl algılanabileceğini ve hangi kanıtların güven oluşturduğunu anla.", accent: "#8b5cf6", glow: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.15)", stat: "Kanıt odaklı" },
+    { icon: "04", tag: "Hamle", tagColor: "#fbbf24", tagBg: "rgba(251,191,36,0.1)", title: "Sonraki En İyi Hamle", desc: "Dağınık öneriler yerine, kariyerini en çok ilerletecek tek aksiyona odaklan.", accent: "#fbbf24", glow: "rgba(251,191,36,0.08)", border: "rgba(251,191,36,0.15)", stat: "Tek aksiyon" },
   ] : [
-    { icon: "🎯", tag: "Core", tagColor: "#f87171", tagBg: "rgba(239,68,68,0.1)", title: "Should I apply or not?", desc: "We don't just score you. We give you a clear decision: High chance, Medium chance, or Not likely — with the exact reason why.", accent: "#f87171", glow: "rgba(239,68,68,0.08)", border: "rgba(239,68,68,0.15)", stat: "Top differentiator" },
-{ icon: "🔍", tag: "AI-Powered", tagColor: "#22d3ee", tagBg: "rgba(34,211,238,0.1)", title: "See what recruiters are scanning for", desc: "We extract the exact keywords recruiters look for, then show you which ones are missing. Not guesses — real job description intelligence.", accent: "#22d3ee", glow: "rgba(34,211,238,0.08)", border: "rgba(34,211,238,0.15)", stat: "50+ keywords extracted" },
-{ icon: "💥", tag: "Differentiator", tagColor: "#a78bfa", tagBg: "rgba(139,92,246,0.1)", title: "Generic CV detected", desc: "We flag CVs that sound AI-written or templated. Recruiters reject them in 7 seconds. We tell you exactly which phrases are hurting you.", accent: "#8b5cf6", glow: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.15)", stat: "Key differentiator" },
-{ icon: "✨", tag: "Premium", tagColor: "#d4af37", tagBg: "rgba(212,175,55,0.1)", title: "Turn weak bullets into real impact", desc: "CV Rewriter rewrites your bullets to be specific, metric-driven, and human. Not AI-sounding — recruiter-approved.", accent: "#d4af37", glow: "rgba(212,175,55,0.08)", border: "rgba(212,175,55,0.15)", stat: "+23pts avg. boost" },
+    { icon: "01", tag: "Snapshot", tagColor: "#60a5fa", tagBg: "rgba(59,130,246,0.1)", title: "Career Snapshot", desc: "See your career identity, readiness, strongest signals, and most important proof gap in one place.", accent: "#3b82f6", glow: "rgba(59,130,246,0.08)", border: "rgba(59,130,246,0.15)", stat: "First clarity" },
+    { icon: "02", tag: "Direction", tagColor: "#34d399", tagBg: "rgba(52,211,153,0.1)", title: "Role Direction", desc: "See which role families your evidence supports and which directions still need proof.", accent: "#34d399", glow: "rgba(52,211,153,0.08)", border: "rgba(52,211,153,0.15)", stat: "Role directions" },
+    { icon: "03", tag: "Read", tagColor: "#a78bfa", tagBg: "rgba(139,92,246,0.1)", title: "Recruiter Read", desc: "Understand how your profile may be read at first glance and which proof builds confidence.", accent: "#8b5cf6", glow: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.15)", stat: "Evidence-led" },
+    { icon: "04", tag: "Move", tagColor: "#fbbf24", tagBg: "rgba(251,191,36,0.1)", title: "Next Best Move", desc: "Focus on one action with the highest expected career impact instead of a noisy advice list.", accent: "#fbbf24", glow: "rgba(251,191,36,0.08)", border: "rgba(251,191,36,0.15)", stat: "One action" },
   ];
 
-  const verdictSpotlightIdx = lang === "TR" ? 1 : 0;
+  const verdictSpotlightIdx = 0;
 
   return (
-    <motion.section className="hf-section hf-section--features" style={{ padding: "80px 0" }} {...landingScrollSectionProps}>
+    <motion.section className="hf-section hf-section--features" style={{ padding: "var(--hf-flow-standard, 56px) 0 var(--hf-flow-tight, 48px)" }} {...landingScrollSectionProps}>
       <div style={styles.container}>
         <div style={{ textAlign: "center", marginBottom: 56 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)", fontSize: "11px", fontWeight: 700, color: "#60a5fa", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>
-            {lang === "TR" ? "HireFit Ne Yapar?" : "What HireFit Does"}
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)", fontSize: "11px", fontWeight: 700, color: "#60a5fa", letterSpacing: "0.1em", marginBottom: 16 }}>
+            {lang === "TR" ? "Özellikler" : "Features"}
           </div>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(32px, 4vw, 52px)", fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 14, lineHeight: 1.1 }}>
-            {lang === "TR" ? <>Kariyer hedefine ulaşmak için<br />ihtiyacın olan her şey</> : <>Every tool you need<br />to get hired</>}
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-xl)", fontWeight: 700, letterSpacing: "var(--tracking-heading)", marginBottom: 14, lineHeight: "var(--leading-heading)" }}>
+            {lang === "TR" ? <>CV analizinden fazlası:<br />kariyer karar sistemi</> : <>More than CV analysis:<br />a career decision system</>}
           </h2>
-          <p style={{ color: "#a1b4cf", fontSize: "17px", maxWidth: 520, margin: "0 auto", lineHeight: 1.65 }}>
+          <p style={{ color: "#a1b4cf", fontSize: "var(--text-body-lg)", maxWidth: 520, margin: "0 auto", lineHeight: "var(--leading-body)" }}>
             {lang === "TR"
-              ? "Tek bir skor değil — başvur / risk / vazgeç kararı, red nedenleri ve sıradaki tek hamle."
-              : "Not a single score — an apply / risk / pass decision, rejection reasons, and the one move that moves the needle."}
+              ? "HireFit, CV analizini daha geniş bir kariyer karar akışının parçası olarak kullanır."
+              : "HireFit does not just show what is missing. It shows where to go next and why that direction makes sense."}
           </p>
         </div>
         <div
@@ -5015,7 +5758,7 @@ function FeatureCards({ lang }) {
                 <div style={{ width: 52, height: 52, borderRadius: 16, background: "rgba(255,255,255,0.04)", border: `1px solid ${border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px" }}>{icon}</div>
                 <span style={{ padding: "4px 12px", borderRadius: 999, background: tagBg, color: tagColor, fontSize: "11px", fontWeight: 700, letterSpacing: "0.06em" }}>{tag}</span>
               </div>
-              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: "20px", fontWeight: 700, marginBottom: 10 }}>{title}</h3>
+              <h3 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-md)", fontWeight: 700, marginBottom: 10, lineHeight: "var(--leading-heading)" }}>{title}</h3>
               <p style={{ color: "#a1b4cf", fontSize: "14px", lineHeight: 1.75, marginBottom: 20 }}>{desc}</p>
               <div style={{ display: "flex", alignItems: "center", gap: 8, paddingTop: 16, borderTop: "1px solid rgba(255,255,255,0.05)" }}>
                 <div style={{ width: 6, height: 6, borderRadius: "50%", background: accent, boxShadow: `0 0 8px ${accent}` }} />
@@ -5030,83 +5773,82 @@ function FeatureCards({ lang }) {
 }
 
 function PricingSection({ navigate, lang }) {
-
-  const freeFeatures = lang === "TR"
-  ? ["Ayda 2 karar", "Temel ATS skoru", "En büyük hatanı gör", "Paylaşılabilir rapor"]
-  : ["2 decisions/month", "Basic ATS score", "See your biggest mistake", "Shareable report"];
-
-const proFeatures = lang === "TR"
-  ? ["Her başvuruda karar al", "Tam red analizi", "Zayıf CV'yi interview-ready yap", "Neden reddedildiğini tam anla", "Recruiter'ın ne düşündüğünü gör", "Öncelikli destek"]
-  : ["Know before every application", "Full rejection breakdown", "Turn weak CV into interview-ready", "Understand exactly why you get rejected", "See what the recruiter actually thinks", "Priority support"];
-
-const coachFeatures = lang === "TR"
-  ? ["Pro'daki her şey", "Müşterilerini doğru role yönlendir", "10 müşteri daveti", "Beyaz etiketli raporlar", "Koç paneli"]
-  : ["Everything in Pro", "Guide clients to the right roles", "10 client invites", "White-label reports", "Coach dashboard"];
-  
+  const betaFeatures = lang === "TR"
+    ? [
+        "Career Snapshot",
+        "Rol yönleri",
+        "Kanıt açıkları",
+        "Recruiter okuması",
+        "Haftalık kariyer hamlesi",
+        "İlerleme takibi",
+      ]
+    : [
+        "Career Snapshot",
+        "Role directions",
+        "Proof gaps",
+        "Recruiter read",
+        "Weekly career move",
+        "Progress tracking",
+      ];
 
   return (
-    <motion.section className="hf-section hf-section--pricing" style={{ padding: "80px 0" }} {...landingScrollSectionProps}>
+    <motion.section className="hf-section hf-section--pricing" style={{ padding: "var(--hf-flow-strong, 72px) 0 var(--hf-flow-standard, 56px)" }} {...landingScrollSectionProps}>
       <div style={styles.container}>
         <div style={{ textAlign: "center", marginBottom: 48 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)", fontSize: "11px", fontWeight: 700, color: "#60a5fa", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 16 }}>
-            {lang === "TR" ? "Fiyatlandırma" : "Pricing"}
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 16px", borderRadius: 999, background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)", fontSize: "11px", fontWeight: 700, color: "#60a5fa", letterSpacing: "0.1em", marginBottom: 16 }}>
+            {lang === "TR" ? "Closed Beta" : "Closed Beta"}
           </div>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(32px,4vw,52px)", fontWeight: 800, letterSpacing: "-0.03em", marginBottom: 12, lineHeight: 1.1 }}>
-  {lang === "TR" ? "Ne kadar netlik istiyorsun?" : "How much clarity do you want?"}
-</h2>
-<p style={{ color: "#64748b", fontSize: "16px" }}>
-  {lang === "TR" ? "Ücretsiz başla. Gerçekten hazır olduğunda yükselt." : "Free gets you started. Pro gets you hired."}
-</p>
-</div>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-xl)", fontWeight: 700, letterSpacing: "var(--tracking-heading)", marginBottom: 12, lineHeight: "var(--leading-heading)" }}>
+            {lang === "TR" ? "İlk beta kohortu ücretsiz." : "The first beta cohort is free."}
+          </h2>
+          <p style={{ color: "#64748b", fontSize: "var(--text-body-md)", lineHeight: "var(--leading-body)", maxWidth: 620, margin: "0 auto" }}>
+            {lang === "TR"
+              ? "Cohort 01 için amaç ücretlendirme değil; gerçek kullanıcıların ilk kariyer netliği anına sorunsuz ulaşmasını sağlamak."
+              : "For Cohort 01, the goal is activation, not monetization: helping real users reach their first career clarity moment smoothly."}
+          </p>
+        </div>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gridTemplateColumns: "minmax(0, 1fr)",
             gap: 16,
-            maxWidth: "min(960px, 100%)",
+            maxWidth: "min(520px, 100%)",
             width: "100%",
             margin: "0 auto",
             boxSizing: "border-box",
           }}
         >
-          <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 24, padding: 32 }}>
-            <div style={{ fontSize: "13px", fontWeight: 600, color: "#64748b", marginBottom: 8 }}>Free</div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "48px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, marginBottom: 4 }}>$0</div>
-            <div style={{ color: "#475569", fontSize: "13px", marginBottom: 24 }}>{lang === "TR" ? "Sonsuza kadar ücretsiz" : "Forever free"}</div>
-            <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginBottom: 24 }} />
-            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
-              {freeFeatures.map(f => (<li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#94a3b8" }}><CheckCircle2 size={14} color="#10b981" style={{ flexShrink: 0 }} />{f}</li>))}
-            </ul>
-            <button onClick={() => navigate("/app")} className="hf-btn-ghost" style={{ width: "100%", justifyContent: "center", fontSize: "14px" }}>{lang === "TR" ? "Başla" : "Get Started"}</button>
-          </div>
           <div className="hf-verdict-card-glow" style={{ background: "linear-gradient(145deg, rgba(59,130,246,0.1), rgba(99,102,241,0.07))", border: "1px solid rgba(99,102,241,0.3)", borderRadius: 24, padding: 32, position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(99,102,241,0.6), transparent)" }} />
-            <div style={{ position: "absolute", top: 16, right: -30, background: "linear-gradient(135deg, #3b82f6, #6366f1)", color: "white", fontSize: "10px", fontWeight: 700, letterSpacing: "0.1em", padding: "4px 40px", transform: "rotate(45deg)" }}>POPULAR</div>
-            <div style={{ fontSize: "13px", fontWeight: 600, color: "#93c5fd", marginBottom: 8 }}>Pro</div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "48px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, marginBottom: 4 }}>$9.99</div>
-            <div style={{ color: "#93c5fd", fontSize: "13px", marginBottom: 24 }}> {lang === "TR" ? "Başvurmadan önce net ol" : "Clarity before every application"}
-
+            <div style={{ fontSize: "13px", fontWeight: 700, color: "#93c5fd", marginBottom: 8 }}>{lang === "TR" ? "HireFit Beta" : "HireFit Beta"}</div>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: "42px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, marginBottom: 8 }}>{lang === "TR" ? "Ücretsiz" : "Free"}</div>
+            <div style={{ color: "#94a3b8", fontSize: "13px", marginBottom: 24 }}>
+              {lang === "TR" ? "Sınırlı erişim · Cohort 01" : "Limited access · Cohort 01"}
             </div>
-            <div style={{ height: 1, background: "rgba(99,102,241,0.2)", marginBottom: 24 }} />
-            <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
-              {proFeatures.map(f => (<li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#cbd5e1" }}><Star size={13} color="#818cf8" style={{ flexShrink: 0 }} />{f}</li>))}
-            </ul>
-            <button className="hf-btn-primary" onClick={() => window.open(LEMONSQUEEZY_PRO_CHECKOUT, "_blank")} style={{ width: "100%", justifyContent: "center", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 24px rgba(99,102,241,0.3)" }}>
-              {lang === "TR" ? "Pro'ya Geç" : "Upgrade to Pro"} <ArrowRight size={14} />
-            </button>
-          </div>
-          <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 24, padding: 32 }}>
-            <div style={{ fontSize: "13px", fontWeight: 600, color: "#64748b", marginBottom: 8 }}>Coach</div>
-            <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "48px", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1, marginBottom: 4 }}>$39</div>
-            <div style={{ color: "#475569", fontSize: "13px", marginBottom: 24 }}>{lang === "TR" ? "aylık" : "per month"}</div>
             <div style={{ height: 1, background: "rgba(255,255,255,0.06)", marginBottom: 24 }} />
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 12, marginBottom: 28 }}>
-              {coachFeatures.map(f => (<li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#94a3b8" }}><CheckCircle2 size={14} color="#8b5cf6" style={{ flexShrink: 0 }} />{f}</li>))}
+              {betaFeatures.map(f => (<li key={f} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "14px", color: "#cbd5e1" }}><CheckCircle2 size={14} color="#10b981" style={{ flexShrink: 0 }} />{f}</li>))}
             </ul>
-            <button className="hf-btn-ghost" style={{ width: "100%", justifyContent: "center", fontSize: "14px", borderColor: "rgba(139,92,246,0.3)", color: "#a78bfa" }}>
-              {lang === "TR" ? "Bekleme Listesine Katıl" : "Join Waitlist"} <ArrowRight size={14} />
+            <button
+              className="hf-btn-primary"
+              onClick={() => {
+                trackActivationEvent("landing_cta_clicked", {
+                  source: "pricing",
+                  route: "/analyze",
+                  lang,
+                  beta_cohort: CLOSED_BETA_COHORT,
+                });
+                navigate("/analyze");
+              }}
+              style={{ width: "100%", justifyContent: "center", fontSize: "14px", background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 0 24px rgba(99,102,241,0.3)" }}
+            >
+              {lang === "TR" ? "Closed Beta'ya Katıl" : "Join Closed Beta"} <ArrowRight size={14} />
             </button>
           </div>
+        </div>
+        <div style={{ maxWidth: 760, margin: "18px auto 0", color: "#64748b", fontSize: 13, lineHeight: 1.65, textAlign: "center" }}>
+          {lang === "TR"
+            ? "Pro plan ve ekip akışları beta sonrasında değerlendirilecek; Cohort 01 içinde ücretli ödeme akışı öne çıkarılmıyor."
+            : "Pro plans and team workflows will be evaluated after beta; paid checkout is not emphasized for Cohort 01."}
         </div>
       </div>
     </motion.section>
@@ -5118,7 +5860,7 @@ const LEMONSQUEEZY_PRO_CHECKOUT =
 
 function ProLiveSection({ navigate, lang }) {
   return (
-    <motion.section className="hf-section hf-section--pro" style={{ padding: "80px 0 100px" }} {...landingScrollSectionProps}>
+    <motion.section className="hf-section hf-section--pro" style={{ padding: "var(--hf-flow-pro-top, 64px) 0 var(--hf-flow-pro-bottom, 72px)" }} {...landingScrollSectionProps}>
       <div style={styles.container}>
         <div
           style={{
@@ -5158,28 +5900,27 @@ function ProLiveSection({ navigate, lang }) {
                 color: "#6ee7b7",
                 letterSpacing: "0.06em",
                 marginBottom: 20,
-                textTransform: "uppercase",
               }}
             >
-              <Zap size={12} /> {lang === "TR" ? "Karar odaklı" : "Decision-first"}
+              <Zap size={12} /> {lang === "TR" ? "Closed beta" : "Closed beta"}
             </div>
             <h2
               style={{
-                fontFamily: "'Syne', sans-serif",
-                fontSize: "clamp(28px, 4vw, 40px)",
-                fontWeight: 800,
-                letterSpacing: "-0.02em",
+                fontFamily: "var(--font-display)",
+                fontSize: "var(--text-heading-lg)",
+                fontWeight: 700,
+                letterSpacing: "var(--tracking-heading)",
                 marginBottom: 16,
-                lineHeight: 1.2,
+                lineHeight: "var(--leading-heading)",
               }}
             >
-              {lang === "TR" ? "Rakipler skor verir. Biz karar veririz." : "Competitors give you a score. We give you a decision."}
+              {lang === "TR" ? "İlk kariyer kararını daha net ver." : "Make your first career decision clearer."}
             </h2>
             <p
               style={{
                 color: "#94a3b8",
-                fontSize: "16px",
-                lineHeight: 1.65,
+                fontSize: "var(--text-body-md)",
+                lineHeight: "var(--leading-body)",
                 marginBottom: 28,
                 maxWidth: 480,
                 marginLeft: "auto",
@@ -5187,12 +5928,20 @@ function ProLiveSection({ navigate, lang }) {
               }}
             >
               {lang === "TR"
-                ? "Piyasadaki benzer araçlar ortalama $49/ay. HireFit $9.99."
-                : "Similar tools in the market average around $49/mo. HireFit is $9.99."}
+                ? "Career Snapshot, haftalık hamle ve CV ile doğrulama akışına ücretsiz beta içinde eriş."
+                : "Access Career Snapshot, weekly move, and CV validation inside the free closed beta."}
             </p>
             <button
               type="button"
-              onClick={() => navigate("/app")}
+              onClick={() => {
+                trackActivationEvent("landing_cta_clicked", {
+                  source: "bottom_cta",
+                  route: "/analyze",
+                  lang,
+                  beta_cohort: CLOSED_BETA_COHORT,
+                });
+                navigate("/analyze");
+              }}
               className="hf-btn-primary"
               style={{
                 display: "inline-flex",
@@ -5210,39 +5959,41 @@ function ProLiveSection({ navigate, lang }) {
                 color: "#fff",
               }}
             >
-              {lang === "TR" ? "Ücretsiz dene →" : "Try for free →"}
-            </button>
+              {lang === "TR" ? "Closed Beta'ya Katıl" : "Join Closed Beta"}
+                  </button>
+                </div>
+              </div>
           </div>
-        </div>
-      </div>
     </motion.section>
   );
 }
 
 function Footer({ navigate, lang }) {
   const t = translations[lang];
-  const productLinks = lang === "TR" ? [["CV Analiz Et", "/app"], ["Panel", "/dashboard"], ["Fiyatlandırma", "/"]] : [["Analyze CV", "/app"], ["Dashboard", "/dashboard"], ["Pricing", "/"]];
+  const productLinks = lang === "TR"
+    ? [["Analiz Merkezi", "/analyze"], ["Dashboard", "/dashboard"], ["Fiyatlandırma", "/"]]
+    : [["Analyze Center", "/analyze"], ["Dashboard", "/dashboard"], ["Pricing", "/"]];
 
   return (
-    <motion.footer className="hf-section hf-section--footer" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "48px 0 32px" }} {...landingScrollSectionProps}>
+    <motion.footer className="hf-section hf-section--footer" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "var(--hf-flow-footer-top, 40px) 0 32px" }} {...landingScrollSectionProps}>
       <div style={styles.container}>
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 48, marginBottom: 48 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 32, marginBottom: 48 }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16, cursor: "pointer" }} onClick={() => navigate("/")}>
               <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6)", display: "grid", placeItems: "center", flexShrink: 0 }}>
-                <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "14px", color: "white" }}>HF</span>
+                <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "14px", color: "white" }}>HF</span>
               </div>
-              <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "18px", letterSpacing: "-0.02em" }}>HireFit</span>
+              <span style={{ fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "18px", letterSpacing: "-0.02em" }}>HireFit</span>
             </div>
             <p style={{ color: "#475569", fontSize: "14px", lineHeight: 1.7, maxWidth: 280 }}>
-              {lang === "TR" ? "AI destekli CV analizi — neden reddedildiğinizi ve nasıl düzelteceğinizi tam olarak söyler." : "AI-powered CV analysis that tells you exactly why you're getting rejected — and how to fix it."}
+              {lang === "TR" ? "AI destekli kariyer karar platformu: rol yönünü, kanıt açıklarını ve sonraki hamleni netleştirir." : "AI-supported career decision platform for role direction, proof gaps, and your next move."}
             </p>
             <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
               <a
                 href="https://www.linkedin.com/in/muhammetanilceylan/"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", fontSize: "12px", fontWeight: 600, color: "#64748b", textDecoration: "none", fontFamily: "'DM Sans', sans-serif", transition: "color 0.2s, border-color 0.2s" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", fontSize: "12px", fontWeight: 600, color: "#64748b", textDecoration: "none", fontFamily: "var(--font-sans)", transition: "color 0.2s, border-color 0.2s" }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = "#f1f5f9"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = "#64748b"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
               >
@@ -5253,7 +6004,7 @@ function Footer({ navigate, lang }) {
                 href="https://www.instagram.com/muhammetanilceylann/"
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", fontSize: "12px", fontWeight: 600, color: "#64748b", textDecoration: "none", fontFamily: "'DM Sans', sans-serif", transition: "color 0.2s, border-color 0.2s" }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)", fontSize: "12px", fontWeight: 600, color: "#64748b", textDecoration: "none", fontFamily: "var(--font-sans)", transition: "color 0.2s, border-color 0.2s" }}
                 onMouseEnter={(e) => { e.currentTarget.style.color = "#f1f5f9"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = "#64748b"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
               >
@@ -5265,7 +6016,7 @@ function Footer({ navigate, lang }) {
           <div>
             <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#334155", marginBottom: 16 }}>{lang === "TR" ? "Ürün" : "Product"}</div>
             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
-              {productLinks.map(([label, path]) => (<li key={label}><button onClick={() => navigate(path)} style={{ background: "none", border: "none", color: "#64748b", fontSize: "14px", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", padding: 0 }} onMouseEnter={e => e.currentTarget.style.color = "#f1f5f9"} onMouseLeave={e => e.currentTarget.style.color = "#64748b"}>{label}</button></li>))}
+              {productLinks.map(([label, path]) => (<li key={label}><button onClick={() => navigate(path)} style={{ background: "none", border: "none", color: "#64748b", fontSize: "14px", cursor: "pointer", fontFamily: "var(--font-sans)", padding: 0 }} onMouseEnter={e => e.currentTarget.style.color = "#f1f5f9"} onMouseLeave={e => e.currentTarget.style.color = "#64748b"}>{label}</button></li>))}
             </ul>
           </div>
           <div>
@@ -5274,28 +6025,26 @@ function Footer({ navigate, lang }) {
               {[
                 [t.privacy, "/privacy"],
                 [t.terms, "/terms"],
-                [t.cookiePolicy, "/privacy"],
+                [t.cookiePolicy, "/cookie-policy"],
               ].map(([label, path]) => (
                 <li key={path + label}>
                   <a
                     href={path}
                     onClick={(e) => { e.preventDefault(); navigate(path); }}
-                    style={{ color: "#64748b", fontSize: "14px", cursor: "pointer", textDecoration: "none", fontFamily: "'DM Sans', sans-serif" }}
+                    style={{ color: "#64748b", fontSize: "14px", cursor: "pointer", textDecoration: "none", fontFamily: "var(--font-sans)" }}
                     onMouseEnter={(e) => { e.currentTarget.style.color = "#f1f5f9"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = "#64748b"; }}
                   >
-                    {label}
+      {label}
                   </a>
-                </li>
-              ))}
+  </li>
+))}
             </ul>
           </div>
         </div>
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 24, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-          <div style={{ color: "#334155", fontSize: "13px" }}>© 2026 HireFit. {lang === "TR" ? "Tüm hakları saklıdır." : "All rights reserved."}</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "12px", color: "#334155" }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", display: "inline-block", boxShadow: "0 0 8px #10b981" }} />
-            {lang === "TR" ? "Tüm sistemler çalışıyor" : "All systems operational"}
+        <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 24 }}>
+          <div style={{ color: "#334155", fontSize: "13px", lineHeight: 1.5 }}>
+            © 2026 HireFit. {lang === "TR" ? "Tüm hakları saklıdır." : "All rights reserved."}
           </div>
         </div>
       </div>
@@ -5321,6 +6070,8 @@ function HireFitLayout() {
   }, [location.hash, location.pathname]);
 
   const [user, setUser] = useState(null);
+  const [authStatus, setAuthStatus] = useState("initializing");
+  const [authInitError, setAuthInitError] = useState(null);
   const [isPro, setIsPro] = useState(false);
   const [plan] = useState("Free");
   const [email, setEmail] = useState("");
@@ -5372,9 +6123,20 @@ function HireFitLayout() {
   const [decisionData, setDecisionData] = useState(null);
   const [decisionLoading, setDecisionLoading] = useState(false);
   const [engineV2, setEngineV2] = useState(null);
+  const [careerProfile, setCareerProfile] = useState(() => loadLocalCareerProfile());
+  const [profileStatus, setProfileStatus] = useState("idle");
+  const [profileError, setProfileError] = useState("");
+  const [careerMemoryComparison, setCareerMemoryComparison] = useState(null);
+  const [careerGrowth, setCareerGrowth] = useState(() => {
+    const local = loadLocalCareerProgress();
+    return local.length ? buildCareerGrowthView({ snapshots: local, current: local[0], lang: "TR" }) : null;
+  });
+  const [recommendedJobs, setRecommendedJobs] = useState(null);
+  const [recommendedJobsLoading, setRecommendedJobsLoading] = useState(false);
   const [showSharePrompt, setShowSharePrompt] = useState(false);
   const [reanalysisBaseline, setReanalysisBaseline] = useState(null);
   const [reanalysisResult, setReanalysisResult] = useState(null);
+  const syncedPlanUserRef = useRef(null);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [applyingFix, setApplyingFix] = useState(null);
@@ -5399,7 +6161,8 @@ function HireFitLayout() {
     engineV2 ||
     decisionData ||
     decisionLoading ||
-    (alignmentScore !== null && analysisData)
+    (alignmentScore !== null && analysisData) ||
+    (alignmentScore !== null && String(result || "").trim().length > 0)
   );
   const effectiveCareerArea = careerAreaOverride || detectedCareerArea || "";
 
@@ -5465,54 +6228,63 @@ function HireFitLayout() {
   }, [learningPlan, roleType, seniority]);
 
   const syncUserPlanForUser = useCallback(async (userId) => {
-    if (!userId) return null;
-    const nowIso = new Date().toISOString();
-    let { data: row, error } = await supabase
-      .from("user_plans")
-      .select("id, user_id, plan, analysis_count, last_reset_at")
-      .eq("user_id", userId)
-      .order("id", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (error && error.code !== "PGRST116") {
-      console.error("[user_plans]", error);
-      return null;
-    }
-    if (!row) {
-      const { error: upErr } = await supabase.from("user_plans").upsert(
-        { user_id: userId, plan: "free", analysis_count: 0, last_reset_at: nowIso },
-        { onConflict: "user_id", ignoreDuplicates: true }
-      );
-      if (upErr) {
-        console.error("[user_plans upsert]", upErr);
-        return null;
-      }
-      const { data: fetched, error: fetchErr } = await supabase
+    if (!userId || !isSupabaseConfigured) return null;
+    try {
+      const nowIso = new Date().toISOString();
+      let { data: row, error } = await supabase
         .from("user_plans")
         .select("id, user_id, plan, analysis_count, last_reset_at")
         .eq("user_id", userId)
         .order("id", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (fetchErr || !fetched) {
-        console.error("[user_plans refetch]", fetchErr);
+      if (error && error.code !== "PGRST116") {
+        if (isSupabaseNetworkError(error)) await handleSupabaseAuthFailure(error);
+        else console.error("[user_plans]", error?.message || error);
         return null;
       }
-      row = fetched;
-    }
-    if (!row) return null;
+      if (!row) {
+        const { error: upErr } = await supabase.from("user_plans").upsert(
+          { user_id: userId, plan: "free", analysis_count: 0, last_reset_at: nowIso },
+          { onConflict: "user_id", ignoreDuplicates: true }
+        );
+        if (upErr) {
+          if (isSupabaseNetworkError(upErr)) await handleSupabaseAuthFailure(upErr);
+          else console.error("[user_plans upsert]", upErr?.message || upErr);
+          return null;
+        }
+        const { data: fetched, error: fetchErr } = await supabase
+          .from("user_plans")
+          .select("id, user_id, plan, analysis_count, last_reset_at")
+          .eq("user_id", userId)
+          .order("id", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (fetchErr || !fetched) {
+          if (isSupabaseNetworkError(fetchErr)) await handleSupabaseAuthFailure(fetchErr);
+          else if (fetchErr) console.error("[user_plans refetch]", fetchErr?.message || fetchErr);
+          return null;
+        }
+        row = fetched;
+      }
+      if (!row) return null;
 
-    if (!row.last_reset_at) {
-      await supabase.from("user_plans").update({ last_reset_at: nowIso }).eq("user_id", userId);
-      row = { ...row, last_reset_at: nowIso };
-    } else if (userPlanNeedsReset(row.last_reset_at)) {
-      await supabase.from("user_plans").update({ analysis_count: 0, last_reset_at: nowIso }).eq("user_id", userId);
-      row = { ...row, analysis_count: 0, last_reset_at: nowIso };
-    }
+      if (!row.last_reset_at) {
+        await supabase.from("user_plans").update({ last_reset_at: nowIso }).eq("user_id", userId);
+        row = { ...row, last_reset_at: nowIso };
+      } else if (userPlanNeedsReset(row.last_reset_at)) {
+        await supabase.from("user_plans").update({ analysis_count: 0, last_reset_at: nowIso }).eq("user_id", userId);
+        row = { ...row, analysis_count: 0, last_reset_at: nowIso };
+      }
 
-    setUserPlanRow(row);
-    setIsPro(row.plan === "pro");
-    return row;
+      setUserPlanRow(row);
+      setIsPro(row.plan === "pro");
+      return row;
+    } catch (err) {
+      if (isSupabaseNetworkError(err)) await handleSupabaseAuthFailure(err);
+      else console.error("[user_plans:sync]", err?.message || err);
+      return null;
+    }
   }, []);
 
   const extractDataFromReport = (text) => {
@@ -5525,12 +6297,17 @@ function HireFitLayout() {
     setTopKeywords(parseBullets(text, "Top Keywords"));
   };
 
-  const fetchAnalyses = useCallback(async () => {
+  const fetchAnalyses = useCallback(async (userId = null) => {
     try {
+      if (!isSupabaseConfigured) {
+        setHistory([]);
+        return;
+      }
       const clearedAt = localStorage.getItem("hirefit-cleared-at");
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) { setHistory([]); return; }
-      const { data, error: fetchError } = await supabase.from("analyses").select("*").eq("user_id", currentUser.id).order("created_at", { ascending: false }).limit(10);
+      const session = await getSupabaseSessionSafe();
+      const currentUserId = userId || session?.user?.id;
+      if (!currentUserId) { setHistory([]); return; }
+      const { data, error: fetchError } = await supabase.from("analyses").select("*").eq("user_id", currentUserId).order("created_at", { ascending: false }).limit(10);
       if (fetchError) return;
       const filtered = (data || []).filter(item => !clearedAt || new Date(item.created_at) > new Date(clearedAt));
       setHistory(
@@ -5559,48 +6336,14 @@ function HireFitLayout() {
           };
         })
       );
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      if (isSupabaseNetworkError(err)) await handleSupabaseAuthFailure(err);
+      else console.error(err);
+    }
   }, [lang]);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        syncUserPlanForUser(session.user.id);
-        if (event === "SIGNED_IN" && window.location.pathname === "/login") {
-          const confirmed = Boolean(session.user.email_confirmed_at);
-          if (confirmed) {
-            navigate("/dashboard");
-          } else {
-            const targetEmail = encodeURIComponent(String(session.user.email || "").trim());
-            navigate(`/verify-email?email=${targetEmail}`);
-          }
-        }
-      } else {
-        setUser(null);
-        setIsPro(false);
-        setUserPlanRow(null);
-      }
-    });
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        setUser(session.user);
-        syncUserPlanForUser(session.user.id);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, [syncUserPlanForUser, navigate]);
-
-  useEffect(() => {
-    const savedUser = localStorage.getItem("hirefit-user");
     const savedWaitlist = localStorage.getItem("hirefit-waitlist");
-    if (savedUser) {
-      try {
-        setUser(safeJsonParse(savedUser, null, { label: "hirefit-user-cache" }));
-      } catch {
-        /* ignore invalid cached user JSON */
-      }
-    }
     if (savedWaitlist) {
       try {
         setWaitlist(safeJsonParse(savedWaitlist, [], { label: "hirefit-waitlist-cache" }));
@@ -5608,8 +6351,7 @@ function HireFitLayout() {
         /* ignore invalid cached waitlist JSON */
       }
     }
-    fetchAnalyses();
-  }, [fetchAnalyses]);
+  }, []);
 
   useEffect(() => { localStorage.setItem("hirefit-history", JSON.stringify(history)); }, [history]);
   useEffect(() => { localStorage.setItem("hirefit-waitlist", JSON.stringify(waitlist)); }, [waitlist]);
@@ -5623,9 +6365,11 @@ function HireFitLayout() {
   }, [history]);
 
   const getApiAuthHeaders = useCallback(async ({ requireSession = true } = {}) => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const { session, error: authInitError } = await initializeSupabaseAuth();
+    if (authInitError && (isSupabaseNetworkError(authInitError) || !isSupabaseConfigured)) {
+      if (requireSession) throw new Error(authUserErrorMessage(authInitError, lang, "connection"));
+      return { "Content-Type": "application/json" };
+    }
     const accessToken = session?.access_token;
     if (!accessToken && requireSession) {
       throw new Error(lang === "TR" ? "Devam etmek için giriş yapın." : "Please sign in to continue.");
@@ -5636,6 +6380,183 @@ function HireFitLayout() {
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     return headers;
   }, [lang]);
+
+  useEffect(() => {
+    let active = true;
+    let subscription = null;
+
+    const applySession = (session, event = "INITIAL_SESSION") => {
+      cacheSupabaseSession(session);
+      if (session?.user) {
+        consumeOAuthSessionPersistencePreference();
+        setAuthStatus("authenticated");
+        setAuthInitError(null);
+        setUser(session.user);
+        if (syncedPlanUserRef.current !== session.user.id) {
+          setCareerProfile(null);
+          setProfileStatus("profile_loading");
+          setProfileError("");
+          syncedPlanUserRef.current = session.user.id;
+          syncUserPlanForUser(session.user.id);
+        }
+        if (event === "SIGNED_IN" && window.location.pathname === "/login") {
+          const confirmed = Boolean(session.user.email_confirmed_at);
+          if (confirmed) {
+            const params = new URLSearchParams(window.location.search || "");
+            const next = params.get("next");
+            if (next) {
+              navigate(next, { replace: true });
+            } else {
+              resolvePostLoginPath(HF_API_BASE, getApiAuthHeaders).then((path) => navigate(path, { replace: true }));
+            }
+          } else {
+            const targetEmail = encodeURIComponent(String(session.user.email || "").trim());
+            navigate(`/verify-email?email=${targetEmail}`);
+          }
+        }
+      } else {
+        setAuthStatus("unauthenticated");
+        syncedPlanUserRef.current = null;
+        setUser(null);
+        setIsPro(false);
+        setUserPlanRow(null);
+      }
+    };
+
+    setAuthStatus((status) => (status === "authenticated" ? status : "initializing"));
+    initializeSupabaseAuth().then(({ session, error: initError }) => {
+      if (!active) return;
+      if (initError) {
+        setAuthStatus("unauthenticated");
+        setAuthInitError(initError);
+        syncedPlanUserRef.current = null;
+        setUser(null);
+        setIsPro(false);
+        setUserPlanRow(null);
+        if (window.location.pathname === "/login") {
+          setError(authUserErrorMessage(initError, lang, "restoration"));
+        }
+      } else {
+        applySession(session);
+      }
+      if (!isSupabaseConfigured) return;
+      const result = supabase.auth.onAuthStateChange((event, nextSession) => {
+        if (!active) return;
+        if (event === "INITIAL_SESSION") return;
+        applySession(nextSession, event);
+      });
+      subscription = result?.data?.subscription || null;
+    });
+
+    return () => {
+      active = false;
+      subscription?.unsubscribe();
+    };
+  }, [syncUserPlanForUser, navigate, getApiAuthHeaders, lang]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setHistory([]);
+      return;
+    }
+    fetchAnalyses(user.id);
+  }, [user?.id, fetchAnalyses]);
+
+  const loadAuthenticatedCareerProfile = useCallback(async ({ silent = false } = {}) => {
+    if (!user?.id) return;
+    if (!silent) {
+      setProfileStatus("profile_loading");
+      setProfileError("");
+    }
+    try {
+      const profileState = await fetchCareerProfileStatus(HF_API_BASE, getApiAuthHeaders, {
+        allowLocalFallback: false,
+        lang,
+      });
+      if (profileState.exists === true && profileState.profile) {
+        setCareerProfile(profileState.profile);
+        setProfileStatus("profile_ready");
+        setProfileError("");
+      } else if (profileState.exists === false) {
+        setCareerProfile(null);
+        setProfileStatus("profile_missing");
+        setProfileError("");
+      } else {
+        setProfileStatus("profile_error");
+        setProfileError(profileLoadErrorMessage(lang));
+      }
+
+      try {
+        const progress = await fetchCareerProgress(HF_API_BASE, getApiAuthHeaders, lang, user);
+        setCareerGrowth(progress.growth || null);
+      } catch (progressError) {
+        console.error("[career-progress:load]", progressError?.message || progressError);
+        setCareerGrowth(null);
+      }
+    } catch (e) {
+      console.error("[career-profile:load]", e?.message || e);
+      setProfileStatus("profile_error");
+      setProfileError(profileLoadErrorMessage(lang));
+      setCareerGrowth(null);
+    }
+  }, [user, getApiAuthHeaders, lang]);
+
+  const retryCareerProfileLoad = useCallback(() => {
+    return loadAuthenticatedCareerProfile({ silent: false });
+  }, [loadAuthenticatedCareerProfile]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setProfileStatus("idle");
+      setProfileError("");
+      setCareerProfile(loadLocalCareerProfile());
+      const local = loadLocalCareerProgress();
+      setCareerGrowth(
+        local.length ? buildCareerGrowthView({ snapshots: local, current: local[0], lang }) : null
+      );
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      await loadAuthenticatedCareerProfile({ silent: false });
+      if (cancelled) return;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, loadAuthenticatedCareerProfile, lang]);
+
+  useEffect(() => {
+    const trimmed = cvText.trim();
+    if (trimmed.length < 80) {
+      setRecommendedJobs(null);
+      setRecommendedJobsLoading(false);
+      return undefined;
+    }
+    let cancelled = false;
+    setRecommendedJobsLoading(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await fetchRecommendedJobs({
+          apiBase: HF_API_BASE,
+          getHeaders: getApiAuthHeaders,
+          cvText: trimmed,
+          careerProfile,
+          lang,
+          limit: 5,
+        });
+        if (!cancelled) setRecommendedJobs(data);
+      } catch (e) {
+        console.error("[job-discovery]", e?.message || e);
+      } finally {
+        if (!cancelled) setRecommendedJobsLoading(false);
+      }
+    }, 550);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [cvText, careerProfile, lang, getApiAuthHeaders]);
 
   const extractJobFromUrl = async () => {
     if (!jobUrl.trim()) { setError(lang === "TR" ? "Lütfen önce bir iş URL'si yapıştırın." : "Please paste a job URL first."); return; }
@@ -5772,6 +6693,7 @@ function HireFitLayout() {
           careerArea: effectiveCareerArea || undefined,
           lang: lang === "TR" ? "tr" : "en",
           isPro: hasProAccess,
+          careerMemory: careerProfile || undefined,
         }),
       });
       const responseText = await v2Res.text();
@@ -5854,7 +6776,7 @@ function HireFitLayout() {
         const outputDecision = String(v2?.Output?.decision || v2.Decision?.reasoning || "").trim();
         const outputReasons = Array.isArray(v2?.Output?.reasons) ? v2.Output.reasons.filter(Boolean) : [];
         const reportText = [outputDecision, ...outputReasons.map((r) => `- ${r}`)].filter(Boolean).join("\n");
-        setResult(reportText);
+      setResult(reportText);
         const roleMatchesFromV2 =
           !v2.RoleFit?.locked && Array.isArray(v2.RoleFit?.role_fit) && v2.RoleFit.role_fit.length
             ? v2.RoleFit.role_fit.map((r) => ({
@@ -5896,20 +6818,56 @@ function HireFitLayout() {
         setScoreHistory((prev) =>
           [{ score: fs, role: savedTitle, date: new Date().toLocaleDateString() }, ...prev].slice(0, 10)
         );
-        await supabase.from("analyses").insert({
-          role: savedTitle,
-          alignment_score: fs,
-          cv_text: cvText,
-          job_description: jdText,
-          report: reportText,
-          matched_skills: atsMatchedSkills,
-          missing_skills: v2.ATS?.missing_keywords ?? [],
-          top_keywords: v2.ATS?.top_keywords ?? [],
-          rejection_reasons: { high, medium: med, low },
-          seniority: "",
-          user_id: user?.id ?? null,
-        });
-        await fetchAnalyses();
+        const { data: insertedAnalysis } = await supabase
+          .from("analyses")
+          .insert({
+            role: savedTitle,
+            alignment_score: fs,
+            cv_text: cvText,
+            job_description: jdText,
+            report: reportText,
+            matched_skills: atsMatchedSkills,
+            missing_skills: v2.ATS?.missing_keywords ?? [],
+            top_keywords: v2.ATS?.top_keywords ?? [],
+            rejection_reasons: { high, medium: med, low },
+            seniority: "",
+            user_id: user?.id ?? null,
+          })
+          .select("id")
+          .single();
+      await fetchAnalyses();
+        try {
+          const progressResult = await recordCareerProgressAfterAnalyze({
+            apiBase: HF_API_BASE,
+            getHeaders: getApiAuthHeaders,
+            user,
+            engineV2: v2,
+            score: fs,
+            cvText,
+            role: savedTitle,
+            lang,
+            analysisId: insertedAnalysis?.id || null,
+          });
+          if (progressResult?.growth) setCareerGrowth(progressResult.growth);
+        } catch (progErr) {
+          console.error("[career-progress:record]", progErr?.message || progErr);
+        }
+        try {
+          const memoryResult = await syncCareerMemoryAfterAnalyze({
+            apiBase: HF_API_BASE,
+            getHeaders: getApiAuthHeaders,
+            user,
+            cvText,
+            engineV2: v2,
+            score: fs,
+            roleSuggestions: roleMatchesFromV2,
+            lang,
+          });
+          if (memoryResult?.profile) setCareerProfile(memoryResult.profile);
+          if (memoryResult?.comparison) setCareerMemoryComparison(memoryResult.comparison);
+        } catch (memErr) {
+          console.error("[career-memory:sync]", memErr?.message || memErr);
+        }
         setShowSharePrompt(true);
         creditConsumed = true;
     } catch (e) {
@@ -5980,7 +6938,7 @@ function HireFitLayout() {
       const data = await res.json();
       if (!res.ok) {
         const msg = data?.message || data?.error || t.cvOptimizeFailedTitle;
-        const rec = Array.isArray(data?.recovery) ? data.recovery.join(" · ") : t.cvOptimizeFailedRecovery;
+        const rec = Array.isArray(data?.recovery) ? data.recovery.join(" Â· ") : t.cvOptimizeFailedRecovery;
         setError(`${msg}\n\n${rec}`);
         return;
       }
@@ -6103,65 +7061,139 @@ function HireFitLayout() {
     localStorage.setItem("hirefit-cleared-at", new Date().toISOString());
   };
 
-  const loadHistoryItem = (item) => { setCvText(item.cvText || ""); setJdText(item.jdText || ""); setResult(item.report || ""); extractDataFromReport(item.report || ""); setOptimizedCv(""); setLearningPlan(""); setError(""); setDecisionData(null); setFixResults({}); setEngineV2(null); setReanalysisBaseline(null); setReanalysisResult(null); setShowSharePrompt(false); navigate("/app"); };
+  const loadHistoryItem = (item) => {
+    setCvText(item.cvText || "");
+    setJdText(item.jdText || "");
+    setResult(item.report || "");
+    setAnalysisData(null);
+    extractDataFromReport(item.report || "");
+    setOptimizedCv("");
+    setLearningPlan("");
+    setError("");
+    setDecisionData(null);
+    setFixResults({});
+    setEngineV2(null);
+    setReanalysisBaseline(null);
+    setReanalysisResult(null);
+    setShowSharePrompt(false);
+    navigate("/app");
+  };
 
-  const login = async () => {
+  const login = async ({ keepSignedIn = true } = {}) => {
     if (!email.trim() || !password.trim()) { setError(lang === "TR" ? "Lütfen hem email hem de şifreyi girin." : "Please enter both email and password."); return; }
     try {
+      prepareAuthSessionStorage({ keepSignedIn, clearExistingAuth: true });
       const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError) { setError(sanitizeUserErrorMessage(authError.message, lang)); return; }
+      if (authError) {
+        if (isSupabaseSessionFailure(authError)) await handleSupabaseAuthFailure(authError);
+        setError(authUserErrorMessage(authError, lang, "login"));
+        return;
+      }
+      cacheSupabaseSession(data?.session || null);
       setUser(data.user); setEmail(""); setPassword(""); setError("");
       const confirmed = Boolean(data?.user?.email_confirmed_at);
       if (confirmed) {
-        navigate("/dashboard");
+        const path = getSafeAuthNext(location?.search || "") || await resolvePostLoginPath(HF_API_BASE, getApiAuthHeaders);
+        navigate(path);
       } else {
         const targetEmail = encodeURIComponent(String(data?.user?.email || email || "").trim());
         navigate(`/verify-email?email=${targetEmail}`);
       }
-    } catch { setError(lang === "TR" ? "Giriş başarısız." : "Login failed."); }
+    } catch (loginError) {
+      if (isSupabaseSessionFailure(loginError)) await handleSupabaseAuthFailure(loginError);
+      setError(authUserErrorMessage(loginError, lang, "login"));
+    }
   };
 
-  const loginWithGoogle = async () => {
+  const loginWithGoogle = async (nextPath = "/dashboard", { keepSignedIn = true } = {}) => {
     const authRedirectTo =
       typeof window !== "undefined"
-        ? `${window.location.origin}/dashboard`
+        ? `${window.location.origin}${nextPath}`
         : "https://www.hirefit.co/dashboard";
-    const { error } = await supabase.auth.signInWithOAuth({
+    try {
+      setOAuthSessionPersistencePreference(keepSignedIn);
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: authRedirectTo }
-    });
-    if (error) console.error(error);
+        options: { redirectTo: authRedirectTo }
+      });
+      if (oauthError) {
+        if (isSupabaseSessionFailure(oauthError)) await handleSupabaseAuthFailure(oauthError);
+        setError(authUserErrorMessage(oauthError, lang, "login"));
+      }
+    } catch (oauthError) {
+      if (isSupabaseSessionFailure(oauthError)) await handleSupabaseAuthFailure(oauthError);
+      setError(authUserErrorMessage(oauthError, lang, "login"));
+    }
   };
 
   const signup = async (profile = {}) => {
     if (signupLoading) return;
-    if (!email.trim() || !password.trim()) {
+    trackActivationEvent("signup_started", {
+      mode: "signup",
+      next: getAuthIntentFromNext(getSafeAuthNext(location?.search || "")),
+      lang,
+      beta_cohort: CLOSED_BETA_COHORT,
+    });
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    if (!cleanEmail || !password.trim()) {
       setError(lang === "TR" ? "Kayıt olmak için email ve şifre girin." : "Enter email and password to sign up.");
       return;
     }
     const fullName = String(profile.fullName || "").trim();
-    const careerArea = String(profile.careerArea || "").trim();
-    const currentSituation = String(profile.currentSituation || "").trim();
     if (!fullName) {
       setError(lang === "TR" ? "Lütfen isim soyisim girin." : "Please enter your full name.");
+      return;
+    }
+    if (!isSupabaseConfigured) {
+      setError(authUserErrorMessage(new Error("SUPABASE_UNAVAILABLE"), lang, "signup"));
       return;
     }
     try {
       setSignupLoading(true);
       const authRedirectTo =
         typeof window !== "undefined"
-          ? `${window.location.origin}/dashboard`
-          : "https://www.hirefit.co/dashboard";
+          ? `${window.location.origin}/verify-email?verified=1`
+          : "https://www.hirefit.co/verify-email?verified=1";
+      let signupStatus = {};
+      try {
+        const statusRes = await fetch(`${HF_API_BASE}/api/auth/signup-status`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: cleanEmail }),
+        });
+        signupStatus = statusRes.ok ? await statusRes.json().catch(() => ({})) : {};
+      } catch (statusError) {
+        if (isSupabaseNetworkError(statusError)) {
+          console.error("[signup-status]", statusError?.message || statusError);
+        }
+      }
+      if (signupStatus?.exists && signupStatus?.confirmed) {
+        setError(
+          lang === "TR"
+            ? "Bu e-posta ile zaten bir hesabın var. Giriş yap veya şifremi unuttum seçeneğini kullan."
+            : "An account already exists with this email. Sign in or use forgot password."
+        );
+        return;
+      }
+      if (signupStatus?.exists && !signupStatus?.confirmed) {
+        await supabase.auth.resend({
+          type: "signup",
+          email: cleanEmail,
+          options: { emailRedirectTo: authRedirectTo },
+        });
+        setError("");
+        setPassword("");
+        navigate(`/verify-email?email=${encodeURIComponent(cleanEmail)}&sent=1`, { replace: true });
+        return;
+      }
       const metadata = {
         fullName,
-        ...(careerArea ? { careerArea } : {}),
-        ...(currentSituation ? { currentSituation } : {}),
         full_name: fullName,
-        ...(careerArea ? { career_area: careerArea } : {}),
-        ...(currentSituation ? { current_situation: currentSituation } : {}),
+        lang,
+        preferred_language: lang,
       };
       const { data, error: authError } = await supabase.auth.signUp({
-        email,
+        email: cleanEmail,
         password,
         options: {
           emailRedirectTo: authRedirectTo,
@@ -6174,23 +7206,36 @@ function HireFitLayout() {
         if (status === 429 || /email rate limit exceeded/i.test(rawAuthError)) {
           setError(
             lang === "TR"
-              ? "Cok kisa surede fazla dogrulama e-postasi gonderildi. Lutfen birkac dakika sonra tekrar dene."
+              ? "Çok kısa sürede fazla doğrulama e-postası gönderildi. Lütfen birkaç dakika sonra tekrar dene."
               : "Too many verification emails were sent. Please try again in a few minutes."
           );
         } else {
-          setError(sanitizeUserErrorMessage(rawAuthError, lang));
+          if (isSupabaseSessionFailure(authError)) await handleSupabaseAuthFailure(authError);
+          setError(authUserErrorMessage(authError, lang, "signup"));
         }
         return;
       }
+      cacheSupabaseSession(data?.session || null);
+      trackActivationEvent("signup_completed", {
+        mode: "signup",
+        next: "career_discovery",
+        lang,
+        beta_cohort: CLOSED_BETA_COHORT,
+      });
       setError("");
-      const signupEmail = String(data?.session?.user?.email || data?.user?.email || email || "").trim();
-      // eslint-disable-next-line no-console
-      console.log("SIGNUP SUCCESS REDIRECTING TO VERIFY", signupEmail);
-      const targetEmail = encodeURIComponent(signupEmail);
-      navigate(`/verify-email?email=${targetEmail}`, { replace: true });
+      const signupEmail = String(data?.session?.user?.email || data?.user?.email || cleanEmail || "").trim();
+      setEmail("");
+      setPassword("");
+      if (data?.session?.user) setUser(data.session.user);
+      if (data?.session?.user?.email_confirmed_at) {
+        navigate("/verify-email?verified=1", { replace: true });
+      } else {
+        const targetEmail = encodeURIComponent(signupEmail);
+        navigate(`/verify-email?email=${targetEmail}&sent=1`, { replace: true });
+      }
     } catch (e) {
-      const fallback = lang === "TR" ? "Kayıt başarısız." : "Sign up failed.";
-      setError(sanitizeUserErrorMessage(String(e?.message || fallback), lang) || fallback);
+      if (isSupabaseSessionFailure(e)) await handleSupabaseAuthFailure(e);
+      setError(authUserErrorMessage(e, lang, "signup"));
     } finally {
       setSignupLoading(false);
     }
@@ -6203,19 +7248,30 @@ function HireFitLayout() {
     }
     const authRedirectTo =
       typeof window !== "undefined"
-        ? `${window.location.origin}/dashboard`
-        : "https://www.hirefit.co/dashboard";
+        ? `${window.location.origin}/verify-email?verified=1`
+        : "https://www.hirefit.co/verify-email?verified=1";
     const { error: resendError } = await supabase.auth.resend({
       type: "signup",
       email: cleanEmail,
       options: { emailRedirectTo: authRedirectTo },
     });
-    if (resendError) throw resendError;
+    if (resendError) {
+      if (isSupabaseSessionFailure(resendError)) await handleSupabaseAuthFailure(resendError);
+      throw new Error(authUserErrorMessage(resendError, lang, "connection"));
+    }
   }, [lang]);
 
   const logout = async () => {
+    try {
     await supabase.auth.signOut();
+    } catch {
+      // Local cleanup below is authoritative when Supabase is unreachable.
+    }
+    clearSupabaseAuthStorage();
+    cacheSupabaseSession(null);
     localStorage.removeItem("hirefit-user");
+    setAuthStatus("unauthenticated");
+    setAuthInitError(null);
     setUser(null);
     setIsPro(false);
     setUserPlanRow(null);
@@ -6255,9 +7311,7 @@ function HireFitLayout() {
       setAdminGrantError("");
       setAdminGrantNotice("");
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const session = await getSupabaseSessionSafe();
         const accessToken = session?.access_token;
         if (!accessToken) throw new Error(lang === "TR" ? "Oturum token bulunamadı." : "Missing session token.");
         const res = await fetch(`${HF_API_BASE}/api/admin/pro-access`, {
@@ -6300,6 +7354,8 @@ function HireFitLayout() {
     T,
     t,
     user,
+    authStatus,
+    authInitError,
     logout,
     email,
     setEmail,
@@ -6322,6 +7378,16 @@ function HireFitLayout() {
     clearHistory,
     averageScore,
     scoreHistory,
+    careerGrowth,
+    careerProfile,
+    profileStatus,
+    profileError,
+    retryCareerProfileLoad,
+    setCareerProfile,
+    careerMemoryComparison,
+    recommendedJobs,
+    recommendedJobsLoading,
+    getApiAuthHeaders,
     learningPlan,
     roleType,
     seniority,
@@ -6416,7 +7482,17 @@ function HireFitLayout() {
     <div style={styles.page}>
       <AmbientBackgroundLayer />
       <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: "100%", boxSizing: "border-box", overflow: "visible" }}>
-      <Navbar pathname={location.pathname} user={user} logout={logout} navigate={navigate} lang={lang} />
+      <Navbar
+        pathname={location.pathname}
+        user={user}
+        logout={logout}
+        navigate={navigate}
+        lang={lang}
+        setLang={setLang}
+        careerProfile={careerProfile}
+        careerGrowth={careerGrowth}
+        scoreHistory={scoreHistory}
+      />
 
       {showPaywall && (
         <PaywallModal
@@ -6452,19 +7528,21 @@ export function LandingPage() {
   const { navigate, lang } = useOutletContext();
   return (
     <div
+      className="hf-landing-page-shell"
       style={{
         width: "100%",
         maxWidth: "100%",
         minHeight: "100vh",
         position: "relative",
         isolation: "isolate",
-        background: "transparent",
         boxSizing: "border-box",
-        overflow: "visible",
+        overflowX: "clip",
+        overflowY: "visible",
       }}
     >
       {/* Ambient + video fill hero viewport only (absolute inset matches this shell). */}
       <div
+        className="hf-landing-hero-shell"
         style={{
           position: "relative",
           overflow: "visible",
@@ -6479,18 +7557,227 @@ export function LandingPage() {
           <HeroSection navigate={navigate} lang={lang} />
         </div>
       </div>
-      <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: "100%", boxSizing: "border-box", overflow: "visible" }}>
-        <SocialProofSection lang={lang} />
-        <HowItWorksSection lang={lang} />
-        <FeatureCards lang={lang} />
+      <div className="hf-landing-flow-shell" style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: "100%", boxSizing: "border-box", overflow: "visible" }}>
+        <ProductPreviewSection lang={lang} navigate={navigate} />
+        <div id="how-it-works">
+          <HowItWorksSection lang={lang} />
+        </div>
+        <div id="features">
+          <FeatureCards lang={lang} />
+        </div>
         <DecisionEngineExplainedSection lang={lang} />
         <BeforeAfterSection lang={lang} />
         <HiringLogicQaSection lang={lang} />
-        <PricingSection navigate={navigate} lang={lang} />
+        <div id="pricing">
+          <PricingSection navigate={navigate} lang={lang} />
+        </div>
         <TrustSection lang={lang} />
-        <ComparisonSection lang={lang} />
         <ProLiveSection navigate={navigate} lang={lang} />
         <Footer navigate={navigate} lang={lang} />
+      </div>
+    </div>
+  );
+}
+
+function AnalyzeIntentCard({ item, lang, navigate, user }) {
+  const isAvailable = item.status === "available";
+  const destination = item.requiresAuth && !user ? buildSignupPathForNext(item.path) : item.path;
+  const onSelect = () => {
+    if (!isAvailable) return;
+    trackActivationEvent("analysis_intent_selected", {
+      intent: item.id,
+      route: item.path,
+      lang,
+      state: user ? "authenticated" : "unauthenticated",
+    });
+    if (item.id === "career-discovery") {
+      trackActivationEvent("career_discovery_started", { source: "analyze", lang, state: user ? "authenticated" : "unauthenticated" });
+    }
+    if (item.id === "application-validation") {
+      trackActivationEvent("application_validation_started", { source: "analyze", lang, state: user ? "authenticated" : "unauthenticated" });
+    }
+    navigate(destination);
+  };
+  return (
+    <div
+      className="hf-card"
+      aria-disabled={!isAvailable}
+      style={{
+        padding: 28,
+        minHeight: 280,
+        display: "flex",
+        flexDirection: "column",
+        borderColor: isAvailable ? item.border : "rgba(148,163,184,0.14)",
+        background: isAvailable
+          ? `linear-gradient(160deg, rgba(15,23,42,0.92), ${item.bg})`
+          : "linear-gradient(160deg, rgba(15,23,42,0.72), rgba(2,6,23,0.62))",
+        opacity: isAvailable ? 1 : 0.66,
+      }}
+    >
+      <div
+        style={{
+          width: 42,
+          height: 42,
+          borderRadius: 14,
+          display: "grid",
+          placeItems: "center",
+          color: item.accent,
+          background: item.iconBg,
+          border: `1px solid ${item.border}`,
+          marginBottom: 18,
+        }}
+      >
+        <item.Icon size={21} />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
+        <h2 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "var(--text-heading-md)", lineHeight: "var(--leading-heading)", fontWeight: 700, color: "#f8fafc" }}>
+          {item.title}
+        </h2>
+        {!isAvailable ? (
+          <span style={{ padding: "5px 9px", borderRadius: 999, background: "rgba(148,163,184,0.08)", border: "1px solid rgba(148,163,184,0.16)", color: "#94a3b8", fontSize: 11, fontWeight: 800 }}>
+            {lang === "TR" ? "Yakında" : "Soon"}
+          </span>
+        ) : null}
+      </div>
+      <p style={{ margin: "0 0 18px", color: "#94a3b8", fontSize: 14, lineHeight: 1.65 }}>
+        {item.description}
+      </p>
+      <div style={{ marginTop: "auto", display: "grid", gap: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#cbd5e1", fontSize: 13, fontWeight: 700 }}>
+          <Clock size={14} color={item.accent} />
+          {lang === "TR" ? "Tahmini süre" : "Estimated time"}: {item.time}
+        </div>
+        <button
+          type="button"
+          className={isAvailable ? "hf-btn-primary" : "hf-btn-ghost"}
+          disabled={!isAvailable}
+          onClick={onSelect}
+          style={{
+            justifyContent: "center",
+            width: "100%",
+            cursor: isAvailable ? "pointer" : "not-allowed",
+            opacity: isAvailable ? 1 : 0.72,
+          }}
+        >
+          {item.button}
+          {isAvailable ? <ArrowRight size={16} /> : null}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function AnalyzePage() {
+  const { navigate, lang, user } = useOutletContext();
+  const tr = lang === "TR";
+  useEffect(() => {
+    trackActivationEvent("analyze_viewed", { route: "/analyze", lang, state: user ? "authenticated" : "unauthenticated" });
+  }, [lang, user]);
+  const analysisModes = [
+    {
+      id: "career-discovery",
+      title: tr ? "Kariyer Keşfi" : "Career Discovery",
+      description: tr
+        ? "En güçlü kariyer yönünü, kariyer kimliğini, rol eşleşmelerini ve en büyük kanıt açıklarını keşfet."
+        : "Discover your strongest career direction, career identity, role matches, and biggest evidence gaps.",
+      time: tr ? "3 dakika" : "3 minutes",
+      button: tr ? "Kariyer Keşfine Başla" : "Start Career Discovery",
+      path: "/career-dna",
+      requiresAuth: true,
+      status: "available",
+      Icon: Target,
+      accent: "#60a5fa",
+      bg: "rgba(37,99,235,0.12)",
+      iconBg: "rgba(96,165,250,0.1)",
+      border: "rgba(96,165,250,0.26)",
+    },
+    {
+      id: "application-validation",
+      title: tr ? "Başvuru Doğrulama" : "Application Validation",
+      description: tr
+        ? "Giriş yaptıktan sonra CV'ni gerçek bir iş ilanına karşı doğrula ve recruiter tarafındaki şansını daha net gör."
+        : "Sign in to validate your CV against a real job description and understand your recruiter chances.",
+      time: tr ? "2 dakika" : "2 minutes",
+      button: tr ? "Başvuruyu Doğrula" : "Validate Application",
+      path: "/app",
+      requiresAuth: true,
+      status: "available",
+      Icon: FileText,
+      accent: "#34d399",
+      bg: "rgba(16,185,129,0.1)",
+      iconBg: "rgba(16,185,129,0.1)",
+      border: "rgba(52,211,153,0.24)",
+    },
+    {
+      id: "interview-preparation",
+      title: tr ? "Mülakat Hazırlığı" : "Interview Preparation",
+      description: tr
+        ? "Hedef role göre mülakat risklerini ve cevap kanıtlarını hazırlamaya yönelik gelecek analiz modu."
+        : "A future analysis mode for interview risks and evidence-backed answers by target role.",
+      time: tr ? "Yakında" : "Soon",
+      button: tr ? "Yakında" : "Coming Soon",
+      status: "soon",
+      Icon: Briefcase,
+      accent: "#a78bfa",
+      bg: "rgba(139,92,246,0.08)",
+      iconBg: "rgba(139,92,246,0.1)",
+      border: "rgba(167,139,250,0.2)",
+    },
+    {
+      id: "career-progress",
+      title: tr ? "Kariyer İlerlemesi" : "Career Progress",
+      description: tr
+        ? "Zaman içindeki gelişimini ve sonraki hamleni takip edecek gelecek analiz modu."
+        : "A future analysis mode for tracking progress and your next move over time.",
+      time: tr ? "Yakında" : "Soon",
+      button: tr ? "Yakında" : "Coming Soon",
+      status: "soon",
+      Icon: LineChart,
+      accent: "#fbbf24",
+      bg: "rgba(251,191,36,0.08)",
+      iconBg: "rgba(251,191,36,0.1)",
+      border: "rgba(251,191,36,0.2)",
+    },
+  ];
+  const activeModes = analysisModes.filter((mode) => mode.status === "available");
+  const futureModes = analysisModes.filter((mode) => mode.status !== "available");
+
+  return (
+    <div style={{ width: "100%", minHeight: "calc(100vh - 72px)", padding: "96px clamp(18px, 5vw, 72px) 72px", boxSizing: "border-box" }}>
+      <div style={{ maxWidth: 1120, margin: "0 auto" }}>
+        <div style={{ maxWidth: 760, marginBottom: 34 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "7px 12px", borderRadius: 999, background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.22)", color: "#93c5fd", fontSize: 11, fontWeight: 800, letterSpacing: "0.06em", marginBottom: 16 }}>
+            {tr ? "ANALİZ MERKEZİ" : "ANALYZE CENTER"}
+          </div>
+          <h1 style={{ margin: "0 0 14px", fontFamily: "var(--font-display)", fontSize: "var(--text-display-lg)", lineHeight: "var(--leading-display)", letterSpacing: "var(--tracking-display)", color: "#f8fafc", fontWeight: 800 }}>
+            {tr ? "Bugün hangi kararı netleştirmek istiyorsun?" : "Which decision do you want to clarify today?"}
+          </h1>
+          <p style={{ margin: 0, color: "#94a3b8", fontSize: 16, lineHeight: 1.65 }}>
+            {tr
+              ? "İki ana yol var: kariyer yönünü keşfetmek ya da belirli bir başvuruyu doğrulamak."
+              : "There are two active paths: discover your career direction or validate a specific application."}
+          </p>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 18 }}>
+          {activeModes.map((item) => (
+            <AnalyzeIntentCard key={item.id} item={item} lang={lang} navigate={navigate} user={user} />
+          ))}
+        </div>
+        {futureModes.length ? (
+          <div style={{ marginTop: 30 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, color: "#64748b", fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              <span style={{ flex: 1, height: 1, background: "rgba(148,163,184,0.12)" }} />
+              {tr ? "Yakında" : "Coming soon"}
+              <span style={{ flex: 1, height: 1, background: "rgba(148,163,184,0.12)" }} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 18 }}>
+              {futureModes.map((item) => (
+                <AnalyzeIntentCard key={item.id} item={item} lang={lang} navigate={navigate} user={user} />
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -6500,15 +7787,15 @@ export function TermsPage() {
   const { navigate, lang, t } = useOutletContext();
   return (
         <div style={{ width: "100%", maxWidth: "100%", margin: 0, padding: "60px clamp(20px, 5vw, 80px)", boxSizing: "border-box" }}>
-          <button onClick={() => navigate("/")} style={{ marginBottom: 32, background: "none", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>{lang === "TR" ? "← Geri" : "← Back"}</button>
-          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, marginBottom: 8 }}>{t.terms}</h1>
+          <button onClick={() => navigate("/")} style={{ marginBottom: 32, background: "none", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13 }}>{lang === "TR" ? "← Geri" : "← Back"}</button>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", fontWeight: 700, lineHeight: "var(--leading-heading)", marginBottom: 8 }}>{t.terms}</h1>
           <p style={{ color: "#475569", marginBottom: 40, fontSize: 14 }}>{lang === "TR" ? "Son güncelleme: Nisan 2026" : "Last updated: April 2026"}</p>
           {(lang === "TR"
             ? [
                 ["1. Şartlara Onay", "HireFit'e erişerek veya kullanarak bu Şartlara bağlı kalmayı kabul edersiniz. HireFit, İstanbul, Türkiye'de ikamet eden bireysel geliştirici Muhammet Anıl Ceylan tarafından işletilmektedir."],
-                ["2. Hizmetin Tanımı", "HireFit, yapay zekâ destekli bir CV analiz aracıdır. Kullanıcılar CV'lerini iş ilanlarıyla karşılaştırabilir, ATS puanları alabilir, beceri açıklarını tespit edebilir, optimize edilmiş CV önerileri oluşturabilir ve işe alım simülasyonu içgörülerine erişebilir."],
+                ["2. Hizmetin Tanımı", "HireFit, yapay zekâ destekli bir kariyer karar platformudur. Kullanıcılar kariyer profili oluşturabilir, rol yönlerini, kanıt açıklarını, CV doğrulamasını ve recruiter tarzı geri bildirimleri görebilir."],
                 ["3. Hesaplar", "Doğru bilgi vermeniz, en az 18 yaşında olmanız ve hesabınızın güvenliğini sağlamanız gerekir. Kişi başına bir hesap."],
-                ["4. Abonelik ve Ödemeler", "Ücretsiz Plan: Ayda 2 CV analizi ücretsiz. Pro Plan: 7 günlük ücretsiz deneme ile ayda 9,99 USD. Koç Planı: 39 USD/ay. Ödemeler Lemon Squeezy üzerinden işlenir. Abonelikler iptal edilmedikçe otomatik yenilenir. İade talepleri ücret tahsilinden itibaren 7 gün içinde iletilmelidir."],
+                ["4. Abonelik ve Ödemeler", "Beta döneminde ücretsiz ve/veya ücretli planlar uygulama içinde belirtilen koşullara göre sunulabilir. Ücretli planlar etkinleştirildiğinde ödemeler Lemon Squeezy gibi yetkili ödeme sağlayıcıları üzerinden işlenebilir. Abonelik, iptal ve iade koşulları satın alma akışında belirtilen şartlara tabidir."],
                 ["5. Kabul Edilebilir Kullanım", "Yasadışı veya zararlı içerik yüklememeyi, Hizmeti tersine mühendislik yapmamayı, Hizmete toplu erişim için otomatik araçlar kullanmamayı veya hesap kimlik bilgilerini paylaşmamayı kabul edersiniz."],
                 ["6. Fikri Mülkiyet", "Yüklediğiniz CV ve iş ilanı içeriğinin mülkiyeti size aittir. Yükleme yaparak, Hizmeti sunma amacıyla işlememiz için bize sınırlı bir lisans vermiş olursunuz."],
                 ["7. Yapay Zekâ ile Üretilen İçerik", "HireFit, çıktıları üretmek için üçüncü taraf yapay zekâ modelleri (Anthropic Claude dahil) kullanır. Bunlar yalnızca bilgilendirme amaçlıdır ve profesyonel kariyer danışmanlığının yerini tutmaz. Yapay zekâ çıktıları hatalar içerebilir ve tek başına karar verme amacıyla kullanılmamalıdır."],
@@ -6519,20 +7806,20 @@ export function TermsPage() {
               ]
             : [
                 ["1. Agreement to Terms", "By accessing or using HireFit, you agree to be bound by these Terms. HireFit is operated by Muhammet Anıl Ceylan, an individual developer based in Istanbul, Türkiye."],
-                ["2. Description of Service", "HireFit is an AI-powered CV analysis tool. Users can compare their CV against job descriptions, receive ATS scores, identify skill gaps, generate optimized CV suggestions, and access recruiter simulation insights."],
-                ["3. Accounts", "You must provide accurate information, be at least 18 years old, and maintain the security of your account. One account per person."],
-                ["4. Subscription and Payments", "Free Plan: 2 CV analyses/month at no cost. Pro Plan: $9.99/month with 7-day free trial. Coach Plan: $39/month. Payments processed via Lemon Squeezy. Subscriptions renew automatically unless cancelled. Refund requests must be submitted within 7 days of charge."],
-                ["5. Acceptable Use", "You agree not to upload illegal or harmful content, reverse-engineer the Service, use automated tools to bulk-access the Service, or share account credentials."],
-                ["6. Intellectual Property", "You retain ownership of your uploaded CV and job description content. By uploading, you grant us a limited license to process it for the purpose of providing the Service."],
+            ["2. Description of Service", "HireFit is an AI-supported career decision platform. Users can create a career profile, understand role direction, identify proof gaps, validate CV assumptions, and receive recruiter-style feedback."],
+            ["3. Accounts", "You must provide accurate information, be at least 18 years old, and maintain the security of your account. One account per person."],
+            ["4. Subscription and Payments", "During beta, free and/or paid plans may be offered under the terms shown inside the product. When paid plans are enabled, payments may be processed through authorized payment providers such as Lemon Squeezy. Subscription, cancellation, and refund terms are governed by the terms shown during checkout."],
+            ["5. Acceptable Use", "You agree not to upload illegal or harmful content, reverse-engineer the Service, use automated tools to bulk-access the Service, or share account credentials."],
+            ["6. Intellectual Property", "You retain ownership of your uploaded CV and job description content. By uploading, you grant us a limited license to process it for the purpose of providing the Service."],
                 ["7. AI-Generated Content", "HireFit uses third-party AI models (including Anthropic Claude) to generate outputs. These are for informational purposes only and are not a substitute for professional career advice. AI outputs may contain errors and must not be used as the sole basis for decisions."],
-                ["8. Disclaimers", "The Service is provided \"as is\" without warranties of any kind. We do not guarantee uninterrupted or error-free service, or that analysis will result in job interviews or offers."],
-                ["9. Limitation of Liability", "To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, or consequential damages. Total liability shall not exceed amounts paid in the 3 months preceding the claim."],
+            ["8. Disclaimers", "The Service is provided \"as is\" without warranties of any kind. We do not guarantee uninterrupted or error-free service, or that analysis will result in job interviews or offers."],
+            ["9. Limitation of Liability", "To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, or consequential damages. Total liability shall not exceed amounts paid in the 3 months preceding the claim."],
                 ["10. Governing Law", "These Terms are governed by the laws of the Republic of Türkiye."],
                 ["11. Contact", "muhammetanilceylann@gmail.com — hirefit-ai.vercel.app"],
               ]
           ).map(([title, body]) => (
             <div key={title} style={{ marginBottom: 28, paddingBottom: 28, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 8, color: "#e2e8f0" }}>{title}</h3>
+              <h3 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, marginBottom: 8, color: "#e2e8f0" }}>{title}</h3>
               <p style={{ color: "#94a3b8", fontSize: 14, lineHeight: 1.8 }}>{body}</p>
             </div>
           ))}
@@ -6544,8 +7831,8 @@ export function PrivacyPage() {
   const { navigate, lang, t } = useOutletContext();
   return (
         <div style={{ width: "100%", maxWidth: "100%", margin: 0, padding: "60px clamp(20px, 5vw, 80px)", boxSizing: "border-box" }}>
-          <button onClick={() => navigate("/")} style={{ marginBottom: 32, background: "none", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13 }}>{lang === "TR" ? "← Geri" : "← Back"}</button>
-          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 800, marginBottom: 8 }}>{t.privacy}</h1>
+          <button onClick={() => navigate("/")} style={{ marginBottom: 32, background: "none", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13 }}>{lang === "TR" ? "← Geri" : "← Back"}</button>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", fontWeight: 700, lineHeight: "var(--leading-heading)", marginBottom: 8 }}>{t.privacy}</h1>
           <p style={{ color: "#475569", marginBottom: 40, fontSize: 14 }}>{lang === "TR" ? "Son güncelleme: Nisan 2026" : "Last updated: April 2026"}</p>
           {(lang === "TR"
             ? [
@@ -6564,25 +7851,55 @@ export function PrivacyPage() {
               ]
             : [
                 ["1. Who We Are", "HireFit is operated by Muhammet Anıl Ceylan, an individual developer based in Istanbul, Türkiye. Contact: muhammetanilceylann@gmail.com"],
-                ["2. Data We Collect", "Account info (email, name via Google OAuth), CV content you upload, job descriptions, usage data, and device/session data. Payment details are handled entirely by Lemon Squeezy — we never store card information."],
-                ["3. How We Use Your Data", "To provide the Service, process AI analysis, manage your account and subscription, send transactional emails, and detect fraud. We do not sell your data or use your CV content to train AI models."],
+            ["2. Data We Collect", "Account info (email, name via Google OAuth), CV content you upload, job descriptions, usage data, and device/session data. Payment details are handled entirely by Lemon Squeezy — we never store card information."],
+            ["3. How We Use Your Data", "To provide the Service, process AI analysis, manage your account and subscription, send transactional emails, and detect fraud. We do not sell your data or use your CV content to train AI models."],
                 ["4. Data Storage", "Database: Supabase (EU-hosted). Authentication: Supabase Auth with Google OAuth. Data is retained while your account is active. You may request deletion at any time. When you delete your account, your personal data is permanently deleted or anonymized in our systems."],
                 ["5. Third-Party Services", "Supabase (database/auth), Anthropic (AI analysis), Lemon Squeezy (payments), Vercel (hosting), Railway (backend). Your CV is sent to our AI provider via API for processing — it is not used to train their models by default."],
-                ["6. Cookies", "We use minimal cookies for session management only. No advertising or tracking cookies."],
+            ["6. Cookies", "We use minimal cookies for session management only. No advertising or tracking cookies."],
                 ["7. Your Rights", "You may access, correct, delete, or export your data at any time. Email muhammetanilceylann@gmail.com to make a request."],
                 ["8. GDPR", "For EU/EEA users, we process data under contract performance and legitimate interests. You have the right to lodge a complaint with your local data protection authority. For users in Türkiye, personal data is processed in accordance with Law No. 6698 on the Protection of Personal Data (KVKK)."],
-                ["9. Security", "We use HTTPS/TLS, hashed passwords, and row-level security. No transmission method is 100% secure."],
-                ["10. Children", "HireFit is not intended for users under 18. We do not knowingly collect data from minors."],
+            ["9. Security", "We use HTTPS/TLS, hashed passwords, and row-level security. No transmission method is 100% secure."],
+            ["10. Children", "HireFit is not intended for users under 18. We do not knowingly collect data from minors."],
                 ["11. Contact", "muhammetanilceylann@gmail.com — hirefit-ai.vercel.app — Istanbul, Türkiye"],
                 ["12. Trust", "Your data is processed securely and is not sold to third parties."],
               ]
           ).map(([title, body]) => (
             <div key={title} style={{ marginBottom: 28, paddingBottom: 28, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 8, color: "#e2e8f0" }}>{title}</h3>
+              <h3 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, marginBottom: 8, color: "#e2e8f0" }}>{title}</h3>
               <p style={{ color: "#94a3b8", fontSize: 14, lineHeight: 1.8 }}>{body}</p>
             </div>
           ))}
         </div>
+  );
+}
+
+export function CookiePolicyPage() {
+  const { navigate, lang, t } = useOutletContext();
+  const rows = lang === "TR"
+    ? [
+        ["1. Kullandığımız Çerezler", "HireFit yalnızca oturum yönetimi ve güvenli giriş için gerekli asgari çerezleri kullanır."],
+        ["2. Reklam ve Takip", "Reklam, yeniden hedefleme veya üçüncü taraf pazarlama çerezleri kullanmıyoruz."],
+        ["3. Kontrol", "Tarayıcı ayarların üzerinden çerezleri silebilir veya engelleyebilirsin. Bazı oturum özellikleri bunun ardından tekrar giriş gerektirebilir."],
+        ["4. İletişim", "Çerezlerle ilgili sorular için muhammetanilceylann@gmail.com adresine yazabilirsin."],
+      ]
+    : [
+        ["1. Cookies We Use", "HireFit uses only the minimal cookies required for session management and secure sign-in."],
+        ["2. Advertising and Tracking", "We do not use advertising, retargeting, or third-party marketing cookies."],
+        ["3. Control", "You can delete or block cookies in your browser settings. Some session features may require signing in again afterward."],
+        ["4. Contact", "For cookie questions, contact muhammetanilceylann@gmail.com."],
+      ];
+  return (
+    <div style={{ width: "100%", maxWidth: "100%", margin: 0, padding: "60px clamp(20px, 5vw, 80px)", boxSizing: "border-box" }}>
+      <button onClick={() => navigate("/")} style={{ marginBottom: 32, background: "none", border: "1px solid rgba(255,255,255,0.1)", color: "#94a3b8", padding: "8px 16px", borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-sans)", fontSize: 13 }}>{lang === "TR" ? "← Geri" : "← Back"}</button>
+      <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", fontWeight: 700, lineHeight: "var(--leading-heading)", marginBottom: 8 }}>{t.cookiePolicy}</h1>
+      <p style={{ color: "#475569", marginBottom: 40, fontSize: 14 }}>{lang === "TR" ? "Son güncelleme: Nisan 2026" : "Last updated: April 2026"}</p>
+      {rows.map(([title, body]) => (
+        <div key={title} style={{ marginBottom: 28, paddingBottom: 28, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+          <h3 style={{ fontFamily: "var(--font-display)", fontSize: 16, fontWeight: 700, marginBottom: 8, color: "#e2e8f0" }}>{title}</h3>
+          <p style={{ color: "#94a3b8", fontSize: 14, lineHeight: 1.8 }}>{body}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -6609,36 +7926,33 @@ export function RoadmapRoute() {
 export function LoginPage() {
   const {
     t, T: ctxTheme, lang, email, setEmail, password, setPassword, error, login, signup, loginWithGoogle,
-    location, signupLoading,
+    location, signupLoading, authStatus,
   } = useOutletContext();
   const theme = ctxTheme || T;
-  const [authMode, setAuthMode] = useState("login");
+  const navigate = useNavigate();
+  const authModeFromUrl = useMemo(() => {
+    const mode = new URLSearchParams(location?.search || "").get("mode");
+    return mode === "signup" || mode === "register" ? "signup" : "login";
+  }, [location?.search]);
+  const authNextPath = useMemo(() => getSafeAuthNext(location?.search || ""), [location?.search]);
+  const [authMode, setAuthMode] = useState(authModeFromUrl);
   const [signupFullName, setSignupFullName] = useState("");
-  const [signupCareerArea, setSignupCareerArea] = useState("");
-  const [signupCurrentSituation, setSignupCurrentSituation] = useState("");
-  const signupCareerAreaOptions = [
-    "Yazılım / Software",
-    "Veri & AI",
-    "Product",
-    "Business / Strategy",
-    "Marketing / Growth",
-    "Sales",
-    "Finance",
-    "Design / UX",
-    "Operations",
-    "HR / Recruiting",
-    "Customer Success",
-    "Other",
-  ];
-  const signupCurrentSituationOptions = [
-    "Öğrenci",
-    "Yeni Mezun",
-    "İş Arıyor",
-    "Çalışıyor",
-    "Kariyer Değiştiriyor",
-    "Freelancer",
-    "Staj Arıyor",
-  ];
+  const [keepSignedIn, setKeepSignedIn] = useState(true);
+  const authIntent = useMemo(() => getAuthIntentFromNext(authNextPath), [authNextPath]);
+  const authSubmitLabel = getContextualAuthCta({
+    lang,
+    mode: authMode,
+    nextPath: authNextPath,
+    loading: authMode === "signup" && signupLoading,
+  });
+
+  useEffect(() => {
+    trackActivationEvent("auth_started", { mode: authMode, next: authIntent, lang, route: "/login" });
+  }, [authMode, authIntent, lang]);
+
+  useEffect(() => {
+    setAuthMode(authModeFromUrl);
+  }, [authModeFromUrl]);
 
   useEffect(() => {
     if (String(email || "").trim()) return;
@@ -6651,35 +7965,106 @@ export function LoginPage() {
 
   const handleAuthSubmit = (e) => {
     e.preventDefault();
+    trackActivationEvent("auth_started", { mode: authMode, next: authIntent, lang, source: "submit" });
     if (authMode === "signup") {
       signup({
         fullName: signupFullName,
-        careerArea: signupCareerArea,
-        currentSituation: signupCurrentSituation,
       });
       return;
     }
-    login();
+    login({ keepSignedIn });
   };
+
+  const selectAuthMode = (nextMode) => {
+    setAuthMode(nextMode);
+    const nextQuery = authNextPath ? `next=${encodeURIComponent(authNextPath)}` : "";
+    if (nextMode === "signup") {
+      navigate(`/login?mode=signup${nextQuery ? `&${nextQuery}` : ""}`, { replace: true });
+      return;
+    }
+    navigate(nextQuery ? `/login?${nextQuery}` : "/login", { replace: true });
+  };
+
+  const authValueItems = lang === "TR"
+    ? [
+        "Career Snapshot alırsın",
+        "Career Readiness Score'unu görürsün",
+        "Sana uygun rolleri keşfedersin",
+        "En büyük kariyer açığını öğrenirsin",
+        "Sonraki kariyer adımını görürsün",
+      ]
+    : [
+        "Get your Career Snapshot",
+        "See your Career Readiness Score",
+        "Discover roles that fit you",
+        "Understand your biggest career gap",
+        "See your next career move",
+      ];
+  const authValuePanel = authIntent === "application_validation"
+    ? {
+        eyebrow: lang === "TR" ? "Başvuruya devam" : "Continue your application",
+        title: lang === "TR" ? "Başvurunu kanıtla doğrula." : "Validate this application with proof.",
+        copy: lang === "TR"
+          ? "Hesaptan sonra CV ile Doğrula akışına dönersin; güçlü sinyallerini ve eksik kanıtlarını aynı yerde görürsün."
+          : "After signing in, you return to Validate with CV and see your strongest signals and missing proof in one place.",
+        items: lang === "TR"
+          ? ["CV ve ilanı karşılaştırırsın", "Güçlü sinyallerini görürsün", "Kritik kanıt açığını netleştirirsin", "Sonraki düzeltmeni seçersin"]
+          : ["Compare CV and job post", "See your strongest signals", "Clarify the critical proof gap", "Choose your next fix"],
+      }
+    : {
+        eyebrow: lang === "TR" ? "Başladıktan sonra" : "After you start",
+        title: lang === "TR" ? "İlk değer anın Career Snapshot." : "Your first value moment is the Career Snapshot.",
+        copy: lang === "TR"
+          ? "Hesap oluşturduktan sonra Kariyer Keşfi başlar; sonuçta hangi role yönelmen gerektiğini net görürsün."
+          : "After account creation, Career Discovery starts. The result shows where your career direction is strongest.",
+        items: authValueItems,
+      };
+  const authHeader = authIntent === "application_validation"
+    ? {
+        title: lang === "TR" ? "Başvuru Analizine Devam Et" : "Continue Application Analysis",
+        subtitle: lang === "TR"
+          ? "CV ve ilan karşılaştırmanı kaybetmeden devam etmek için giriş yap."
+          : "Sign in to continue without losing your CV and job comparison flow.",
+      }
+    : authIntent === "career_discovery"
+      ? {
+          title: lang === "TR" ? "Kariyer Keşfine Devam Et" : "Continue Career Discovery",
+          subtitle: lang === "TR"
+            ? "Kariyer profilini oluşturmak veya kaldığın yerden devam etmek için giriş yap."
+            : "Sign in to build your career profile or continue where you left off.",
+        }
+      : {
+          title: authMode === "signup"
+            ? (lang === "TR" ? "Kariyer Yolculuğunu Başlat" : "Create your Career Snapshot")
+            : t.welcomeBack,
+          subtitle: authMode === "signup"
+            ? (lang === "TR" ? "3 dakikada kariyer yönünü, güçlü yanlarını ve en büyük gelişim alanını keşfet." : "In 3 minutes, discover your career direction, strengths, and biggest growth area.")
+            : (lang === "TR" ? "Kariyer paneline erişmek için giriş yap." : "Sign in to access your career dashboard."),
+        };
 
   return (
         <div style={{ ...styles.container, padding: "80px 24px" }}>
-          <div style={{ maxWidth: 440, margin: "0 auto" }}>
+          <div
+            style={{
+              maxWidth: 980,
+              margin: "0 auto",
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+              gap: 20,
+              alignItems: "stretch",
+            }}
+          >
             <div className="hf-card" style={{ padding: 40 }}>
-              <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "28px", fontWeight: 800, marginBottom: 8 }}>
-                {authMode === "signup"
-                  ? (lang === "TR" ? "Hesap Oluştur" : "Create Account")
-                  : t.welcomeBack}
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", fontWeight: 700, lineHeight: "var(--leading-heading)", marginBottom: 8 }}>
+                {authHeader.title}
               </h2>
               <p style={{ color: theme.textSub, fontSize: "14px", marginBottom: 20 }}>
-                {authMode === "signup"
-                  ? (lang === "TR" ? "HireFit'e ücretsiz kayıt ol." : "Sign up to HireFit for free.")
-                  : t.signInDesc}
+                {authHeader.subtitle}
               </p>
               <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
                 <button
                   type="button"
-                  onClick={() => setAuthMode("login")}
+                  onClick={() => selectAuthMode("login")}
                   style={{
                     flex: 1,
                     padding: "9px 10px",
@@ -6695,7 +8080,7 @@ export function LoginPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setAuthMode("signup")}
+                  onClick={() => selectAuthMode("signup")}
                   style={{
                     flex: 1,
                     padding: "9px 10px",
@@ -6721,41 +8106,40 @@ export function LoginPage() {
                 ) : null}
                 <input className="hf-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={lang === "TR" ? "E-posta adresi" : "Email address"} />
                 <input type="password" className="hf-input" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={lang === "TR" ? "Şifre" : "Password"} />
-                {authMode === "signup" ? (
-                  <>
-                    <div style={{ marginTop: 4, marginBottom: -6, fontSize: 12, color: "#94a3b8", fontWeight: 700 }}>
-                      {lang === "TR" ? "Kariyer Alanı" : "Career Area"}
-                    </div>
-                    <select
-                      className="hf-input"
-                      value={signupCareerArea}
-                      onChange={(e) => setSignupCareerArea(e.target.value)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <option value="">{lang === "TR" ? "Kariyer Alanı seçin" : "Select career area"}</option>
-                      {signupCareerAreaOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                    <div style={{ marginTop: 4, marginBottom: -6, fontSize: 12, color: "#94a3b8", fontWeight: 700 }}>
-                      {lang === "TR" ? "Şu anki durumun" : "Current Situation"}
-                    </div>
-                    <select
-                      className="hf-input"
-                      value={signupCurrentSituation}
-                      onChange={(e) => setSignupCurrentSituation(e.target.value)}
-                      style={{ cursor: "pointer" }}
-                    >
-                      <option value="">{lang === "TR" ? "Durumunu seç" : "Select your situation"}</option>
-                      {signupCurrentSituationOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </>
+                {authMode === "login" ? (
+                  <label
+                    className="hf-auth-remember"
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 10,
+                      padding: "10px 12px",
+                      borderRadius: 10,
+                      border: "1px solid rgba(148,163,184,0.18)",
+                      background: "rgba(15,23,42,0.38)",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={keepSignedIn}
+                      onChange={(event) => setKeepSignedIn(event.target.checked)}
+                      style={{ marginTop: 3, accentColor: "#6366f1" }}
+                    />
+                    <span style={{ display: "grid", gap: 3, minWidth: 0 }}>
+                      <span style={{ color: "#e5e7eb", fontSize: 13, fontWeight: 750 }}>
+                        {lang === "TR" ? "Bu cihazda oturumumu a\u00e7\u0131k tut" : "Keep me signed in"}
+                      </span>
+                      <span style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.45 }}>
+                        {lang === "TR" ? "Yaln\u0131zca ki\u015fisel cihazlar\u0131nda kullanman\u0131 \u00f6neririz." : "Recommended only on personal devices."}
+                      </span>
+                    </span>
+                  </label>
+                ) : null}
+                {authStatus === "initializing" ? (
+                  <div role="status" aria-live="polite" style={{ color: "#93c5fd", fontSize: "13px", padding: "10px 14px", background: "rgba(59,130,246,0.1)", borderRadius: 8 }}>
+                    {authRestorationMessage(lang)}
+                  </div>
                 ) : null}
                 {error && <div style={{ color: "#f87171", fontSize: "13px", padding: "10px 14px", background: "rgba(239,68,68,0.1)", borderRadius: 8 }}>{error}</div>}
                 <button
@@ -6765,36 +8149,79 @@ export function LoginPage() {
                   style={{ justifyContent: "center", marginTop: 4, cursor: authMode === "signup" && signupLoading ? "wait" : "pointer", opacity: authMode === "signup" && signupLoading ? 0.78 : 1 }}
                 >
                   <LogIn size={15} />
-                  {authMode === "signup"
-                    ? (signupLoading
-                        ? (lang === "TR" ? "Kayıt oluşturuluyor..." : "Creating account...")
-                        : (lang === "TR" ? "Kayıt Ol" : "Sign Up"))
-                    : t.continueBtn}
+                  {authSubmitLabel}
                 </button>
-                <button type="button" onClick={loginWithGoogle} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", padding: "12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "white", fontSize: "14px", fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif", marginTop: 8 }}>
+                <button type="button" onClick={() => {
+                  trackActivationEvent("auth_started", { mode: authMode, next: authIntent, lang, source: "google" });
+                  loginWithGoogle(authNextPath || (authMode === "signup" ? "/career-dna?welcome=1" : "/dashboard"), { keepSignedIn });
+                }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", padding: "12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "white", fontSize: "14px", fontWeight: 600, cursor: "pointer", fontFamily: "var(--font-sans)", marginTop: 8 }}>
                   <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                   {t.continueGoogle}
                 </button>
               </form>
+              </div>
+              <div
+                className="hf-card"
+                style={{
+                  padding: 40,
+                  borderColor: "rgba(96,165,250,0.22)",
+                  background: "linear-gradient(160deg, rgba(15,23,42,0.86), rgba(2,6,23,0.72))",
+                }}
+              >
+                <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.22)", color: "#93c5fd", fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 18 }}>
+                  {authValuePanel.eyebrow}
+            </div>
+                <h3 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", lineHeight: "var(--leading-heading)", fontWeight: 700, letterSpacing: "var(--tracking-heading)", margin: "0 0 12px", color: "#f8fafc" }}>
+                  {authValuePanel.title}
+                </h3>
+                <p style={{ color: "#94a3b8", fontSize: 14, lineHeight: 1.65, margin: "0 0 22px" }}>
+                  {authValuePanel.copy}
+                </p>
+                <div style={{ display: "grid", gap: 12 }}>
+                  {authValuePanel.items.map((item) => (
+                    <div key={item} style={{ display: "flex", alignItems: "flex-start", gap: 10, color: "#dbeafe", fontSize: 14, lineHeight: 1.45, fontWeight: 650 }}>
+                      <CheckCircle2 size={16} color="#60a5fa" style={{ flexShrink: 0, marginTop: 2 }} />
+                      <span>{item}</span>
+          </div>
+                  ))}
+        </div>
+              </div>
             </div>
           </div>
-        </div>
   );
 }
 
 export function DashboardPage() {
   const {
-    t, lang, T: ctxTheme, history, loadHistoryItem, clearHistory, averageScore, isPro, isAdminUser, plan, waitlist, scoreHistory,
-    user, isUserEmailVerified, navigate,
+    lang, T: ctxTheme, history, loadHistoryItem, clearHistory, isAdminUser, scoreHistory, careerGrowth,
+    careerProfile, user, isUserEmailVerified, navigate, getApiAuthHeaders,
+    authStatus, profileStatus, profileError, retryCareerProfileLoad,
     adminTargetEmail, setAdminTargetEmail, adminGrantBusy, adminGrantError, adminGrantNotice, setUserProAccessByAdmin,
   } = useOutletContext();
   const theme = ctxTheme || T;
+
+  useEffect(() => {
+    if (!user?.id || !isUserEmailVerified) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const path = await resolvePostLoginPath(HF_API_BASE, getApiAuthHeaders);
+        if (!cancelled && path === "/onboarding") navigate("/onboarding");
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, isUserEmailVerified, navigate, getApiAuthHeaders]);
+
   if (user && !isUserEmailVerified) {
     const targetEmail = encodeURIComponent(String(user.email || "").trim());
     return (
       <div style={{ ...styles.container, padding: "80px 24px" }}>
         <div className="hf-card" style={{ maxWidth: 560, margin: "0 auto", padding: 28 }}>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 26, fontWeight: 800, marginBottom: 8 }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", fontWeight: 700, lineHeight: "var(--leading-heading)", marginBottom: 8 }}>
             {"Verify your email"}
           </h2>
           <p style={{ color: theme.textSub, marginBottom: 18 }}>
@@ -6807,77 +8234,118 @@ export function DashboardPage() {
       </div>
     );
   }
+
+  if (authStatus === "initializing") {
+    return (
+      <div style={{ ...styles.container, padding: "80px 24px" }}>
+        <div className="hf-card" role="status" aria-live="polite" style={{ maxWidth: 560, margin: "0 auto", padding: 28 }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", fontWeight: 700, lineHeight: "var(--leading-heading)", marginBottom: 8 }}>
+            {authRestorationMessage(lang)}
+          </h2>
+          <p style={{ color: theme.textSub, margin: 0 }}>
+            {lang === "TR" ? "Kısa bir kontrol sonrası kaldığın yerden devam edeceksin." : "After a quick check, you will continue where you left off."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-        <div style={{ ...styles.container, padding: "48px 24px" }}>
-          <div style={{ marginBottom: 32 }}>
-            <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: "42px", fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 8 }}>{t.dashboard}</h1>
-            <p style={{ color: theme.textSub, fontSize: "16px" }}>{t.dashboardDesc}</p>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
-            <StatCard title={t.totalAnalyses} value={history.length} icon={<History size={16} color={T.blue} />} />
-            <StatCard title={t.averageScore} value={`${averageScore}/100`} icon={<TrendingUp size={16} color={T.cyan} />} />
-            <StatCard title={t.currentPlan} value={isPro ? "Pro ✨" : plan} icon={<Crown size={16} color="#fbbf24" />} />
-            <StatCard title={t.waitlistLeads} value={waitlist.length} icon={<Mail size={16} color={T.green} />} />
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 20 }}>
-            <HistoryList history={history} onLoadItem={loadHistoryItem} onClear={clearHistory} lang={lang} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-              <ScoreProgressCard scoreHistory={scoreHistory} lang={lang} />
-              {isAdminUser ? (
-                <div className="hf-card" style={{ padding: 22 }}>
-                  <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
-                    {lang === "TR" ? "Admin Pro Erişimi" : "Admin Pro Access"}
-                  </h3>
-                  <p style={{ fontSize: 13, color: theme.textSub, margin: "0 0 10px" }}>
-                    {lang === "TR"
-                      ? "Kullanıcıya manuel Pro aç/kapat. Bu kullanıcı için paywall anında güncellenir."
-                      : "Manually toggle Pro for any user. Paywall updates immediately for that user."}
-                  </p>
-                  <input
-                    value={adminTargetEmail}
-                    onChange={(e) => setAdminTargetEmail(e.target.value)}
-                    placeholder={lang === "TR" ? "kullanici@email.com" : "user@email.com"}
-                    style={{
-                      width: "100%",
-                      padding: "10px 12px",
-                      borderRadius: 10,
-                      border: `1px solid ${theme.border}`,
-                      background: "rgba(255,255,255,0.02)",
-                      color: theme.text,
-                      marginBottom: 10,
-                    }}
-                  />
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button className="hf-btn-primary" disabled={adminGrantBusy} onClick={() => setUserProAccessByAdmin(true)} style={{ fontSize: 13 }}>
-                      {lang === "TR" ? "Pro Aç" : "Grant Pro"}
-                    </button>
-                    <button
-                      disabled={adminGrantBusy}
-                      onClick={() => setUserProAccessByAdmin(false)}
-                      style={{
-                        padding: "10px 14px",
-                        borderRadius: 10,
-                        border: `1px solid ${theme.border}`,
-                        background: "transparent",
-                        color: theme.textSub,
-                        fontWeight: 700,
-                        cursor: adminGrantBusy ? "wait" : "pointer",
-                      }}
-                    >
-                      {lang === "TR" ? "Pro Kapat" : "Revoke Pro"}
-                    </button>
-                  </div>
-                  {adminGrantNotice ? <div style={{ marginTop: 10, fontSize: 12, color: "#34d399" }}>{adminGrantNotice}</div> : null}
-                  {adminGrantError ? <div style={{ marginTop: 10, fontSize: 12, color: "#f87171" }}>{adminGrantError}</div> : null}
-                </div>
-              ) : null}
-            </div>
+    <div style={{ ...styles.container, padding: "28px clamp(16px, 3vw, 28px) 48px" }}>
+      {profileStatus === "profile_error" ? (
+        <div className="hf-card" style={{ padding: 20, marginBottom: 18, borderColor: "rgba(248,113,113,0.24)" }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 750, margin: "0 0 6px" }}>
+            {lang === "TR" ? "Kariyer profili yüklenemedi" : "Career profile could not load"}
+          </h2>
+          <p style={{ color: theme.textSub, fontSize: 14, lineHeight: 1.55, margin: "0 0 14px" }}>
+            {profileError || profileLoadErrorMessage(lang)}
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button type="button" className="hf-btn-primary" onClick={retryCareerProfileLoad}>
+              {lang === "TR" ? "Tekrar Dene" : "Try Again"}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/career-dna?edit=1")}
+              style={{ padding: "10px 14px", borderRadius: 10, border: `1px solid ${theme.border}`, background: "transparent", color: theme.textSub, fontWeight: 700, cursor: "pointer" }}
+            >
+              {lang === "TR" ? "Kariyer Profiline Git" : "Go to Career Profile"}
+            </button>
           </div>
         </div>
+      ) : null}
+      <WeeklyDecisionCenter
+        careerProfile={careerProfile}
+        user={user}
+        lang={lang}
+        navigate={navigate}
+        getApiAuthHeaders={getApiAuthHeaders}
+      />
+
+      <details className="hf-card hf-dashboard-secondary">
+        <summary>{lang === "TR" ? "Geçmiş ve detaylar" : "History and details"}</summary>
+        <div className="hf-dashboard-secondary__body">
+          <HistoryList history={history} onLoadItem={loadHistoryItem} onClear={clearHistory} lang={lang} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+            {careerGrowth ? <CareerGrowthCard growth={careerGrowth} lang={lang} /> : <ScoreProgressCard scoreHistory={scoreHistory} lang={lang} />}
+          </div>
+        </div>
+      </details>
+
+      {isAdminUser ? (
+        <div className="hf-card" style={{ padding: 22, marginTop: 20 }}>
+          <h3 style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 700, marginBottom: 12 }}>
+            {lang === "TR" ? "Admin Pro Erişimi" : "Admin Pro Access"}
+          </h3>
+          <p style={{ fontSize: 13, color: theme.textSub, margin: "0 0 10px" }}>
+            {lang === "TR"
+              ? "Kullanıcıya manuel Pro aç/kapat. Bu kullanıcı için paywall anında güncellenir."
+              : "Manually toggle Pro for any user. Paywall updates immediately for that user."}
+          </p>
+          <input
+            value={adminTargetEmail}
+            onChange={(e) => setAdminTargetEmail(e.target.value)}
+            placeholder={lang === "TR" ? "kullanici@email.com" : "user@email.com"}
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: `1px solid ${theme.border}`,
+              background: "rgba(255,255,255,0.02)",
+              color: theme.text,
+              marginBottom: 10,
+            }}
+          />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="hf-btn-primary" disabled={adminGrantBusy} onClick={() => setUserProAccessByAdmin(true)} style={{ fontSize: 13 }}>
+              {lang === "TR" ? "Pro Aç" : "Grant Pro"}
+            </button>
+            <button
+              disabled={adminGrantBusy}
+              onClick={() => setUserProAccessByAdmin(false)}
+              style={{
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: `1px solid ${theme.border}`,
+                background: "transparent",
+                color: theme.textSub,
+                fontWeight: 700,
+                cursor: adminGrantBusy ? "wait" : "pointer",
+              }}
+            >
+              {lang === "TR" ? "Pro Kapat" : "Revoke Pro"}
+            </button>
+          </div>
+          {adminGrantNotice ? <div style={{ marginTop: 10, fontSize: 12, color: "#34d399" }}>{adminGrantNotice}</div> : null}
+          {adminGrantError ? <div style={{ marginTop: 10, fontSize: 12, color: "#f87171" }}>{adminGrantError}</div> : null}
+        </div>
+      ) : null}
+    </div>
   );
+
 }
 
-/** Analyzer /app history list — badge copy + key for styling (reads optional verdict fields only). */
+/** Analyzer /app history list â€” badge copy + key for styling (reads optional verdict fields only). */
 function getAnalyzerHistoryVerdictMeta(item) {
   const raw = item?.verdict ?? item?.final_verdict ?? item?.decision;
   const str = raw != null && String(raw).trim() ? String(raw).toLowerCase().replace(/\s+/g, " ").trim() : "";
@@ -6902,6 +8370,73 @@ function analyzerHistoryScoreColor(score) {
   return "#ef4444";
 }
 
+/** V3 result screen: verdict chip â€” bands only, never raw % or â€œAlignmentâ€. */
+function v3VerdictMatchChipLabel(score, lang) {
+  const n = Math.round(Number(score) || 0);
+  const tr = String(lang || "").toUpperCase() === "TR";
+  if (n < 50) return tr ? "Düşük eşleşme" : "Low match";
+  if (n < 70) return tr ? "Riskli eşleşme" : "Risky match";
+  return tr ? "Güçlü eşleşme" : "Strong match";
+}
+
+function v3RoleCardTitle(role) {
+  return String(role || "")
+    .replace(/\s*[â€”â€“-]\s*%\s*\d+.*$/i, "")
+    .replace(/\s*Â·\s*%\s*\d+.*$/i, "")
+    .replace(/\s*%\s*\d+.*$/i, "")
+    .trim();
+}
+
+function v3RoleProximityBand(fitBand, lang) {
+  const tr = String(lang || "").toUpperCase() === "TR";
+  const fb = String(fitBand || "").toLowerCase();
+  if (/güçlü|strong|yüksek/i.test(fb)) return tr ? "Güçlü yakınlık" : "Strong proximity";
+  if (/orta|medium|kısmen|partly|doğal|natural|transfer|daha|potansiyel/i.test(fb)) {
+    return tr ? "Orta yakınlık" : "Medium proximity";
+  }
+  return tr ? "Düşük yakınlık" : "Low proximity";
+}
+
+function v3VisibleChipLabel(raw, lang) {
+  const tr = String(lang || "").toUpperCase() === "TR";
+  const t = String(raw || "").trim();
+  if (!t || /\d+\s*%|\balignment\b/i.test(t)) return "";
+  const lower = t.toLowerCase();
+  if (/\bproduct\s+sinyali\b/i.test(t) || /ürün\s+sinyali/i.test(t)) {
+    return tr ? "Ürün tarafı" : "Product side";
+  }
+  if (/net\s+sinyal\s+yoğunluğu|net\s+sinyal\s+yogunlugu/i.test(t)) {
+    return tr ? "Uzmanlık netliği" : "Expertise clarity";
+  }
+  if (/kapsam\s+sinyalleri/i.test(t)) return tr ? "Somut örnekler" : "Concrete examples";
+  if (/sinyal/i.test(lower)) return "";
+  return t.length > 48 ? `${t.slice(0, 45).trim()}â€¦` : t;
+}
+
+function v3ProfileChipsFromEngine(engineV2, lang) {
+  const tr = String(lang || "").toUpperCase() === "TR";
+  const tags = Array.isArray(engineV2?.Recruiter?.structured_analysis?.signal_tags)
+    ? engineV2.Recruiter.structured_analysis.signal_tags
+    : [];
+  const chipThemes = [
+    { color: "#93c5fd", bg: "rgba(59,130,246,0.16)", border: "rgba(59,130,246,0.35)" },
+    { color: "#fbbf24", bg: "rgba(245,158,11,0.16)", border: "rgba(245,158,11,0.35)" },
+    { color: "#86efac", bg: "rgba(16,185,129,0.16)", border: "rgba(16,185,129,0.35)" },
+  ];
+  const labels = [...new Set(tags.map((x) => v3VisibleChipLabel(x, lang)).filter(Boolean))].slice(0, 3);
+  const defaults = tr
+    ? [
+        { label: "Net teslim", ...chipThemes[0] },
+        { label: "Somut örnek", ...chipThemes[1] },
+      ]
+    : [
+        { label: "Clear delivery", ...chipThemes[0] },
+        { label: "Concrete proof", ...chipThemes[1] },
+      ];
+  if (!labels.length) return defaults;
+  return labels.map((label, i) => ({ label, ...chipThemes[i % chipThemes.length] }));
+}
+
 export function AnalyzerPage() {
   const {
     navigate, lang, t, activeInput, cvLoaded, uploadingPdf, cvPdfInputRef, cvDragOver, setCvDragOver,
@@ -6912,10 +8447,19 @@ export function AnalyzerPage() {
     isPro, user, userPlanRow, analyze, loading, loadingMessage, error, hasOutput,
     engineV2, alignmentScore, decisionData,
     openUpgrade, optimizeCv, optimizing,
-    applyingFix, setApplyingFix, showAnonSavePrompt, setShowAnonSavePrompt,
+    applyingFix, setApplyingFix, applyFix, showAnonSavePrompt, setShowAnonSavePrompt,
     showSignupPrompt, setShowSignupPrompt,
-    analysisData, missingSkills, roleType,
+    analysisData, missingSkills, roleType, result,
     reanalysisResult, history, clearHistory, loadHistoryItem, setWaitlist, setReanalysisBaseline, setTargetRole,
+    reanalyzeAfterFix,
+    optimizedCv,
+    careerProfile,
+    careerMemoryComparison,
+    careerGrowth,
+    recommendedJobs,
+    recommendedJobsLoading,
+    getApiAuthHeaders,
+    setCareerProfile,
   } = useOutletContext();
   const safeUiError = useMemo(() => sanitizeUserErrorMessage(error, lang), [error, lang]);
   const missingInputsError =
@@ -6932,20 +8476,55 @@ export function AnalyzerPage() {
   const [showCareerSuggestionsModal, setShowCareerSuggestionsModal] = useState(false);
   const [actionCommitChecked, setActionCommitChecked] = useState(false);
   const [decisionLockChoice, setDecisionLockChoice] = useState(null);
+  const [progressBaseline, setProgressBaseline] = useState(null);
+  const [companyIntelOpen, setCompanyIntelOpen] = useState(false);
   const roleSuggestionsRef = useRef(null);
   const PREVIEW_FIX_KEY = "__preview_gate_fix__";
   const [previewFixResult, setPreviewFixResult] = useState(null);
   const [previewReanalyzePending, setPreviewReanalyzePending] = useState(false);
-  const partialScore = Math.max(0, Math.min(100, Math.round(Number(alignmentScore) || 0)));
-  const partialInsight = useMemo(
-    () => pickLeadInsight(engineV2, analysisData, lang),
-    [engineV2, analysisData, lang]
-  );
-  const partialSuggestion = useMemo(
-    () => pickLeadSuggestion(engineV2, analysisData, lang),
-    [engineV2, analysisData, lang]
-  );
-  const shouldShowUnlockGate = hasOutput && !loading && !user && !reportUnlocked;
+  useEffect(() => {
+    trackActivationEvent("application_validation_started", {
+      route: "/app",
+      lang,
+      state: user ? "authenticated" : "unauthenticated",
+    });
+  }, [lang, user]);
+  const decisionScore = useMemo(() => {
+    const toScore = (value) => {
+      const n = Number(value);
+      return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : null;
+    };
+    const parseReportScore = (text) => {
+      const raw = String(text || "");
+      const patterns = [
+        /Final Alignment Score\s*:?\s*(\d{1,3})/i,
+        /(?:Mevcut\s+)?uyum skoru\s*:?\s*(\d{1,3})/i,
+        /(\d{1,3})\s*%\s*(?:Alignment|Uyum)/i,
+        /Alignment(?:\s+Score)?\s*:?\s*(\d{1,3})%?/i,
+      ];
+      for (const pattern of patterns) {
+        const match = raw.match(pattern);
+        const score = toScore(match?.[1]);
+        if (score !== null) return score;
+      }
+      return null;
+    };
+    const candidates = [
+      alignmentScore,
+      analysisData?.score,
+      analysisData?.["Final Alignment Score"],
+      analysisData?.alignment_score,
+      engineV2?.["Final Alignment Score"],
+      parseReportScore(result),
+      hasOutput ? 50 : null,
+    ];
+    for (const candidate of candidates) {
+      const score = toScore(candidate);
+      if (score !== null) return score;
+    }
+    return null;
+  }, [alignmentScore, analysisData, engineV2, result, hasOutput]);
+  const partialScore = Math.max(0, Math.min(100, Math.round(Number(decisionScore) || 0)));
   const careerConfidenceNorm = normalizeCareerConfidence(detectedCareerAreaConfidence);
   const fallbackArea = CAREER_AREA_FALLBACK;
   const closestAreaToShow =
@@ -6967,71 +8546,100 @@ export function AnalyzerPage() {
       analysisData?.rejection_reasons?.high?.[0] ||
       analysisData?.fit_summary ||
       "";
-    return cleanDisplayText(String(issue || "").trim());
-  }, [engineV2, decisionData, analysisData]);
+    return sanitizeVisibleCopy(String(issue || "").trim(), lang);
+  }, [engineV2, decisionData, analysisData, lang]);
   const previewFixBusy = applyingFix === PREVIEW_FIX_KEY;
   const previewScoreDelta = previewReanalyzePending ? null : reanalysisResult;
-  const decisionScore = Number.isFinite(Number(alignmentScore)) ? Math.round(Number(alignmentScore)) : null;
+  const resultViewModel = useMemo(() => {
+    if (decisionScore == null) return null;
+    const vm = normalizeAnalysisForUI({
+      lang,
+      score: decisionScore,
+      engineV2,
+      analysisData,
+      cvText,
+      jdText,
+      roleType,
+      buildRoleSuggestionsFromCv,
+      progressBaseline,
+      careerProfile,
+      careerMemoryComparison,
+      careerGrowth,
+    });
+    assertNoForbiddenVisibleCopy(vm);
+    return vm;
+  }, [
+    lang,
+    decisionScore,
+    engineV2,
+    analysisData,
+    cvText,
+    jdText,
+    roleType,
+    progressBaseline,
+    careerProfile,
+    careerMemoryComparison,
+    careerGrowth,
+  ]);
+  useEffect(() => {
+    setCompanyIntelOpen(false);
+  }, [decisionScore, hasOutput, loading]);
+  const showResultPanel = Boolean(hasOutput && !loading && resultViewModel);
+  const shouldShowUnlockGate = Boolean(hasOutput && !loading && !user && !reportUnlocked && !showResultPanel);
+  const v3ProfileChips = useMemo(
+    () => v3ProfileChipsFromEngine(engineV2, lang),
+    [engineV2, lang]
+  );
+  const partialInsight = resultViewModel?.mainBlocker || "";
+  const partialSuggestion = resultViewModel?.recruiterNudge || "";
   const roleRedirection = useMemo(() => {
     const fromModel = Array.isArray(engineV2?.Output?.role_suggestions) ? engineV2.Output.role_suggestions : [];
     if (fromModel.length) {
       return {
-        current_direction_problem: cleanDisplayText(String(engineV2?.Output?.recruiter_view || "").trim()),
+        current_direction_problem: visibleRecruiterCopy(String(engineV2?.Output?.recruiter_view || "").trim(), lang),
         better_roles: fromModel.slice(0, 3).map((item) => ({
           ...item,
-          role: cleanDisplayText(String(item?.role ?? "")),
-          reason: cleanDisplayText(String(item?.reason ?? "")),
+          role: visibleRecruiterCopy(String(item?.role ?? ""), lang),
+          reason: visibleRecruiterCopy(String(item?.reason ?? ""), lang, { maxSentences: 1 }),
         })),
       };
     }
     const built = buildRoleSuggestionsFromCv(cvText, lang);
     return {
-      current_direction_problem: cleanDisplayText(String(built.current_direction_problem || "").trim()),
+      current_direction_problem: visibleRecruiterCopy(String(built.current_direction_problem || "").trim(), lang),
       better_roles: (built.better_roles || []).map((item) => ({
         ...item,
-        role: cleanDisplayText(String(item?.role ?? "")),
-        reason: cleanDisplayText(String(item?.reason ?? "")),
+        role: visibleRecruiterCopy(String(item?.role ?? ""), lang),
+        reason: visibleRecruiterCopy(String(item?.reason ?? ""), lang, { maxSentences: 1 }),
       })),
     };
   }, [cvText, lang, engineV2]);
   const roleSuggestions = roleRedirection?.better_roles || [];
-  const aiDecisionText = cleanDisplayText(String(engineV2?.Output?.decision || "").trim());
-  const aiRecognitionLine = cleanDisplayText(String(engineV2?.Output?.recognition_line || "").trim());
   const rawCoreProblem = engineV2?.Output?.core_problem;
   const rawFirstAction = engineV2?.Output?.first_action;
-  const aiCoreProblem = cleanDisplayText(String(rawCoreProblem ?? "").trim());
-  const aiImpactStatement = cleanDisplayText(String(engineV2?.Output?.impact_statement || "").trim());
-  const aiPatternSummary = cleanDisplayText(String(engineV2?.Output?.pattern_summary || "").trim());
-  const firstAction = cleanDisplayText(
-    String(rawFirstAction ?? engineV2?.Decision?.what_to_fix_first?.[0] ?? "").trim()
-  );
-  const aiRecruiterView = cleanDisplayText(String(engineV2?.Output?.recruiter_view || "").trim());
+  const firstActionMergedRaw = String(
+    rawFirstAction ?? engineV2?.Decision?.what_to_fix_first?.[0] ?? ""
+  ).trim();
+  const firstActionRawPoison = isRawFirstActionUiPoison(firstActionMergedRaw);
+  const aiDecisionText = visibleRecruiterCopy(String(engineV2?.Output?.decision || "").trim(), lang);
+  const aiCoreProblem = visibleRecruiterCopy(String(rawCoreProblem ?? "").trim(), lang);
+  const _aiPatternSummary = visibleRecruiterCopy(String(engineV2?.Output?.pattern_summary || "").trim(), lang);
+  const firstAction = firstActionRawPoison
+    ? ""
+    : visibleRecruiterCopy(firstActionMergedRaw, lang);
+  const aiRecruiterView = visibleRecruiterCopy(String(engineV2?.Output?.recruiter_view || "").trim(), lang);
   const aiReasons = Array.isArray(engineV2?.Output?.reasons)
     ? engineV2.Output.reasons
-        .map((x) => cleanDisplayText(String(x || "").trim()))
+        .map((x) => visibleRecruiterCopy(String(x || "").trim(), lang, { maxSentences: 1 }))
         .filter(Boolean)
     : [];
   const primaryReason =
     aiCoreProblem
     || aiReasons[0]
-    || cleanDisplayText(String(mainIssue || analysisData?.fit_summary || "").trim());
+    || visibleRecruiterCopy(String(mainIssue || analysisData?.fit_summary || "").trim(), lang);
   const sanitizedPrimaryReason = /^tek bir boşluk izole edilemedi\.?$/i.test(String(primaryReason || "").trim())
     ? ""
     : primaryReason;
-
-  useEffect(() => {
-    if (engineV2 == null) return;
-    // eslint-disable-next-line no-console -- temporary debug for Output.core_problem / first_action wiring
-    console.log("[HireFit debug] core_problem / primaryReason", {
-      "Output.core_problem (raw)": rawCoreProblem,
-      aiCoreProblem,
-      primaryReason,
-      "Output.first_action (raw)": rawFirstAction,
-      "Decision.what_to_fix_first": engineV2?.Decision?.what_to_fix_first,
-      firstAction,
-      tier: engineV2?.tier,
-    });
-  }, [engineV2, rawCoreProblem, aiCoreProblem, primaryReason, rawFirstAction, firstAction]);
 
   const impactProjection = useMemo(() => {
     if (decisionScore == null) return null;
@@ -7053,76 +8661,87 @@ export function AnalyzerPage() {
       current: decisionScore,
       projected: Math.min(100, decisionScore + fallbackDelta),
       delta: fallbackDelta,
-      narrative: lang === "TR" ? "Küçük bir değişiklik, büyük fark yaratır." : "Small change, big difference.",
+      narrative:
+        lang === "TR"
+          ? "Bu adım seni daha güçlü gösterir. Recruiter tarafındaki soru işareti azalır. Bu role daha net bağlanırsın."
+          : "This step makes you read stronger, shrinks recruiter hesitation, and ties you clearer to this role.",
     };
   }, [decisionScore, engineV2, analysisData, missingSkills, lang]);
-  const recruiterConfidence = Number.isFinite(Number(engineV2?.Decision?.confidence))
-    ? Math.round(Number(engineV2?.Decision?.confidence))
-    : 60;
   const recruiterPersuasionTips = useMemo(() => buildRecruiterPersuasionTips({
     lang,
     reasons: aiReasons,
     firstAction,
+    cvText,
     roleSuggestions,
     recruiterView: aiRecruiterView,
     structured: engineV2?.Recruiter?.structured_analysis,
-  }), [lang, aiReasons, firstAction, roleSuggestions, aiRecruiterView, engineV2]);
+  }), [lang, aiReasons, firstAction, cvText, roleSuggestions, aiRecruiterView, engineV2]);
   const recruiterStructured = engineV2?.Recruiter?.structured_analysis || {};
   const finalVerdictRaw = String(engineV2?.Decision?.final_verdict || "").toLowerCase();
   const verdictUi = useMemo(() => {
-    if (finalVerdictRaw === "do_not_apply" || (impactProjection?.current ?? 0) < 55) {
+    const scoreBand = Number.isFinite(Number(decisionScore)) ? Number(decisionScore) : 0;
+    const riskyVerdict =
+      finalVerdictRaw === "apply_with_risk" ||
+      finalVerdictRaw === "apply_with_fixes" ||
+      finalVerdictRaw === "apply_with_fix";
+    if (finalVerdictRaw === "do_not_apply" || scoreBand < 55) {
       return {
-        icon: "❌",
-        badge: lang === "TR" ? "Dusuk Eslesme" : "Low Match",
+        icon: "âŒ",
+        badge: lang === "TR" ? "Bu ilana mesafe var" : "Far from this JD",
         color: "#f87171",
         glow: "0 0 44px rgba(239,68,68,0.28)",
+        emotionalMain: lang === "TR" ? "Büyük ihtimalle elenirsin." : "You will likely get rejected.",
+        emotionalSub: lang === "TR"
+          ? "Bu ilan farklı bir profil arıyor; CV bu JDâ€™ye köprü kurmuyor."
+          : "This posting wants a different profileâ€”your CV does not bridge to this JD.",
         recruiterLine: lang === "TR"
-          ? "Bu rol su anki profilinle yeterince ortusmuyor. Daha dogru role yonelmek daha mantikli olabilir."
-          : "This role does not align enough with your current profile. It may be smarter to target a better-fit role.",
-        riskPill: lang === "TR" ? "Yuksek Red Riski" : "High Rejection Risk",
-        matchPill: lang === "TR" ? "Dusuk Rol Eslesmesi" : "Low Role Match",
+          ? "Bu ilan baska bir profili ariyor; seni burada ilerletmem."
+          : "This posting is hunting a different profileâ€”I would not advance you here.",
+        riskPill: lang === "TR" ? "Red riski acik" : "Screen-out risk is real",
+        matchPill: lang === "TR" ? "Role oturmadi" : "Not a clean role fit",
       };
     }
-    if ((impactProjection?.current ?? 0) < 75) {
+    if (scoreBand < 75 || riskyVerdict) {
       return {
-        icon: "⚠️",
-        badge: lang === "TR" ? "Riskli Basvuru" : "Risky Apply",
+        icon: "âš ï¸",
+        badge: lang === "TR" ? "Risk bandindasin" : "You are in the risk band",
         color: "#f59e0b",
         glow: "0 0 44px rgba(245,158,11,0.24)",
+        emotionalMain: lang === "TR" ? "Riskli başvuru." : "Risky application.",
+        emotionalSub: lang === "TR"
+          ? "Mülakat çıkabilir; ama ilk turda varsayılan â€˜evetâ€™ adayı değilsin."
+          : "You might get interviewsâ€”you are still not the default yes.",
         recruiterLine: lang === "TR"
-          ? "Bu role tamamen uzak degilsin. Ama recruiter'in ilk bakista sorgulayacagi bazi kritik sinyaller eksik."
-          : "You are not far from this role, but a recruiter will likely question a few critical signals at first glance.",
-        riskPill: lang === "TR" ? "Orta-Yuksek Red Riski" : "Elevated Rejection Risk",
-        matchPill: lang === "TR" ? "Kismi Rol Eslesmesi" : "Partial Role Match",
+          ? "Potansiyel goruyorum ama role tam oturmuyor; shortlist garanti degil."
+          : "I see potential, but you are not carrying this JD cleanlyâ€”I would call it risky.",
+        riskPill: lang === "TR" ? "Elenme ihtimali yuksek" : "Odds of a pass are shaky",
+        matchPill: lang === "TR" ? "Kismi oturus" : "Partial fit",
       };
     }
     return {
-      icon: "✅",
-      badge: lang === "TR" ? "Guclu Eslesme" : "Strong Match",
+      icon: "âœ…",
+      badge: lang === "TR" ? "Shortlist civari" : "Near shortlist",
       color: "#34d399",
       glow: "0 0 44px rgba(16,185,129,0.24)",
+      emotionalMain: lang === "TR" ? "Güçlü eşleşme." : "Strong match.",
+      emotionalSub: lang === "TR"
+        ? "İlk turda ilerletme ihtimalin yüksek."
+        : "I would likely move you forward on a quick screen.",
       recruiterLine: lang === "TR"
-        ? "Bu role ciddi sekilde yakinsin. CV sinyallerin recruiter beklentileriyle buyuk olcude ortusuyor."
-        : "You are strongly aligned with this role. Your CV signals mostly match recruiter expectations.",
-      riskPill: lang === "TR" ? "Dusuk Red Riski" : "Low Rejection Risk",
-      matchPill: lang === "TR" ? "Guclu Rol Eslesmesi" : "Strong Role Match",
+        ? "Gercek is uretmis gibi duruyorsun; ilk turda ilerletirim."
+        : "You read like someone who shipped real workâ€”I would move you forward in screening.",
+      riskPill: lang === "TR" ? "Red riski dusuk" : "Low screen-out risk",
+      matchPill: lang === "TR" ? "Role oturuyor" : "Solid role read",
     };
-  }, [finalVerdictRaw, impactProjection?.current, lang]);
-  const recruiterNarrative = useMemo(
-    () => sanitizeRecruiterNarrative(
-      recruiterStructured.internal_monologue || aiRecruiterView || sanitizedPrimaryReason || verdictUi.recruiterLine,
-      lang
-    ),
-    [recruiterStructured.internal_monologue, aiRecruiterView, sanitizedPrimaryReason, verdictUi.recruiterLine, lang]
-  );
+  }, [finalVerdictRaw, decisionScore, lang]);
   const topPerceptionInsight = useMemo(() => buildTopPerceptionInsight({
     lang,
     firstPerception: recruiterStructured.first_perception,
-    fallbackNarrative: recruiterNarrative,
+    fallbackNarrative: recruiterStructured.internal_monologue || aiRecruiterView || sanitizedPrimaryReason || verdictUi.recruiterLine,
     roleSuggestions,
-  }), [lang, recruiterStructured.first_perception, recruiterNarrative, roleSuggestions]);
+  }), [lang, recruiterStructured.first_perception, recruiterStructured.internal_monologue, aiRecruiterView, sanitizedPrimaryReason, verdictUi.recruiterLine, roleSuggestions]);
   const recruiterCoreConcern = useMemo(
-    () => sanitizeRecruiterNarrative(recruiterStructured.core_concern || "", lang),
+    () => enforceLanguagePurity(sanitizeRecruiterNarrative(recruiterStructured.core_concern || "", lang), lang),
     [recruiterStructured.core_concern, lang]
   );
   const recruiterWantedSignal = useMemo(
@@ -7139,6 +8758,106 @@ export function AnalyzerPage() {
     () => normalizeRecruiterSignalTags(recruiterStructured.signal_tags, lang),
     [recruiterStructured.signal_tags, lang]
   );
+  const recruiterCompact = useMemo(() => buildCompactRecruiterBlocks({
+    lang,
+    opening: topPerceptionInsight,
+    concern: recruiterCoreConcern || recruiterWantedSignal || sanitizedPrimaryReason,
+    extraRisk: recruiterStructured?.weaknesses?.[1] || engineV2?.Recruiter?.weaknesses?.[1] || roleRedirection?.current_direction_problem,
+    decision: aiDecisionText || mapDecisionLabel(engineV2?.Decision?.final_verdict, lang),
+    roleSuggestion: roleSuggestions?.[0]?.role,
+    verdict: finalVerdictRaw,
+  }), [
+    lang,
+    topPerceptionInsight,
+    recruiterStructured,
+    engineV2,
+    recruiterSignalTags,
+    recruiterCoreConcern,
+    recruiterWantedSignal,
+    sanitizedPrimaryReason,
+    aiDecisionText,
+    roleSuggestions,
+    finalVerdictRaw,
+  ]);
+  const firstActionDisplay = useMemo(
+    () =>
+      firstActionRawPoison
+        ? enforceLanguagePurity(pickRecruiterFirstActionNudge(lang, cvText, jdText), lang)
+        : enforceLanguagePurity(
+            buildContextAwareFirstAction({
+              lang,
+              firstAction,
+              cvText,
+              jdText,
+              coreProblem: recruiterCompact.concern,
+              roleSuggestion: roleSuggestions?.[0]?.role,
+            }),
+            lang
+          ),
+    [lang, firstAction, firstActionRawPoison, cvText, jdText, recruiterCompact.concern, roleSuggestions]
+  );
+
+  const recruiterMetrics = useMemo(
+    () => (decisionScore == null ? null : buildRecruiterDecisionMetrics(decisionScore, lang)),
+    [decisionScore, lang]
+  );
+  const positiveSignalBullets = useMemo(
+    () => collectAnalyzerPositiveBullets({ engineV2, analysisData, lang }, 3),
+    [engineV2, analysisData, lang]
+  );
+  const missingSignalBullets = useMemo(
+    () => collectAnalyzerGapBullets({ engineV2, analysisData, missingSkills, lang }, 4),
+    [engineV2, analysisData, missingSkills, lang]
+  );
+  const screenOutShort = useMemo(
+    () =>
+      keepShortRecruiterLine(
+        String(recruiterCoreConcern || recruiterWantedSignal || sanitizedPrimaryReason || ""),
+        1,
+        lang,
+        168
+      ),
+    [recruiterCoreConcern, recruiterWantedSignal, sanitizedPrimaryReason, lang]
+  );
+  const finalCallShort = useMemo(
+    () => keepShortRecruiterLine(String(recruiterCompact.decision || ""), 1, lang, 180),
+    [recruiterCompact.decision, lang]
+  );
+  const recruiterVerdictThree = useMemo(() => {
+    const tr = lang === "TR";
+    const strength = visibleRecruiterCopy(
+      positiveSignalBullets[0] ||
+        recruiterCompact.opening ||
+        (tr ? "Profilde net bir güçlü taraf henüz öne çıkmıyor." : "No clear strength pops on a quick scan yet."),
+      lang,
+      { maxSentences: 1 }
+    );
+    const gap = visibleRecruiterCopy(
+      recruiterCompact.concern || screenOutShort || sanitizedPrimaryReason ||
+        (tr ? "Bu rolün aradığı deneyim CV'de yeterince görünmüyor." : "What this role needs does not read clearly on your CV."),
+      lang,
+      { maxSentences: 1 }
+    );
+    const decision = visibleRecruiterCopy(
+      finalCallShort ||
+        verdictUi.recruiterLine ||
+        mapDecisionLabel(engineV2?.Decision?.final_verdict, lang) ||
+        (tr ? "Bu başvuruyu riskli görürdüm." : "I would treat this application as risky."),
+      lang,
+      { maxSentences: 1 }
+    );
+    return { strength, gap, decision };
+  }, [
+    lang,
+    positiveSignalBullets,
+    recruiterCompact.opening,
+    recruiterCompact.concern,
+    screenOutShort,
+    sanitizedPrimaryReason,
+    finalCallShort,
+    verdictUi.recruiterLine,
+    engineV2,
+  ]);
 
   useEffect(() => {
     if (!user?.email) return;
@@ -7217,6 +8936,28 @@ export function AnalyzerPage() {
     if (alignmentScore != null) setReanalysisBaseline(alignmentScore);
     await analyze({ jobDescriptionOverride: syntheticJd });
   };
+  const runRecommendedJobAction = async (job, mode = "apply") => {
+    if (!job?.jdText || !cvText.trim()) return;
+    setTargetRole(job.displayTitle || job.title);
+    setJdText(job.jdText);
+    setRoleType(job.displayTitle || job.title);
+    document.getElementById("hirefit-apply-focus")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (alignmentScore != null) setReanalysisBaseline(alignmentScore);
+    await analyze({ jobDescriptionOverride: job.jdText });
+  };
+  const handleSkipRecommendedJob = async (job) => {
+    if (!job?.id) return;
+    skipJobId(job.id);
+    const data = await fetchRecommendedJobs({
+      apiBase: HF_API_BASE,
+      getHeaders: getApiAuthHeaders,
+      cvText,
+      careerProfile,
+      lang,
+      limit: 5,
+    });
+    setRecommendedJobs(data);
+  };
   const applyPreviewFix = async () => {
     const oldLine = String(partialInsight || "").trim();
     const newLine = String(partialSuggestion || "").trim() || oldLine;
@@ -7238,7 +8979,7 @@ export function AnalyzerPage() {
     if (oldLine && currentCv.includes(oldLine)) {
       updatedCv = currentCv.replace(oldLine, newLine);
     } else if (!currentCv.includes(newLine)) {
-      updatedCv = `${currentCv.trim()}\n• ${newLine}`.trim();
+      updatedCv = `${currentCv.trim()}\nâ€¢ ${newLine}`.trim();
     }
     if (updatedCv !== currentCv) setCvText(updatedCv);
     if (alignmentScore != null) {
@@ -7252,25 +8993,24 @@ export function AnalyzerPage() {
   const analyzerResultsChromeVisible =
     Boolean(
       (showAnonSavePrompt && !user && reportUnlocked) ||
-        (hasOutput && !loading && impactProjection) ||
-        (hasOutput && !loading && roleSuggestions?.length > 0)
+        showResultPanel
     );
 
   return (
-  <div className="hf-analyzer-page" style={{ maxWidth: 1320, margin: "0 auto", padding: "48px 24px", minHeight: "calc(100vh - 80px)" }}>
+  <div className={`hf-analyzer-page${showResultPanel ? " hf-analyzer-page--results" : ""}`} style={{ minHeight: "calc(100vh - 64px)" }}>
     <AnalysisThinkingOverlay lang={lang} loading={loading} loadingMessage={loadingMessage} />
 
     {/* HEADER */}
     <div className="hf-analyzer-hero">
       <div style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 14px", borderRadius: 999, background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)", fontSize: "11px", fontWeight: 700, color: "#a78bfa", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 16 }}>
         <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#8b5cf6", boxShadow: "0 0 6px #8b5cf6", display: "inline-block" }} />
-        {lang === "TR" ? "AI Kariyer Analizi" : "AI Career Analysis"}
+        {lang === "TR" ? "CV İLE DOĞRULA" : "Validate with CV"}
       </div>
-      <h1 className="hf-analyzer-hero-title" style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.1, marginBottom: 12 }}>
-        {lang === "TR" ? "Başvurmadan önce gerçekten şansın var mı öğren." : "Know if you should apply - before you waste time."}
+      <h1 className="hf-analyzer-hero-title" style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", fontWeight: 700, letterSpacing: "var(--tracking-heading)", lineHeight: "var(--leading-heading)", marginBottom: 12 }}>
+        {lang === "TR" ? "Bu başvuruda neyin güçlü, neyin eksik olduğunu gör." : "See what is strong and what is missing in this application."}
       </h1>
       <p className="hf-analyzer-hero-sub">
-        {lang === "TR" ? "Recruiter'ların CV'ni saniyeler içinde nasıl değerlendirdiğini net gör." : "See exactly how recruiters evaluate your CV in seconds."}
+        {lang === "TR" ? "CVâ€™ni gerçek ilan metniyle karşılaştır; güçlü sinyallerini, kritik kanıt açıklarını ve sonraki düzeltmeni netleştir." : "Compare your CV with a real job description; clarify your strongest signals, critical proof gaps, and the next fix."}
       </p>
       {missingInputsError ? (
         <div
@@ -7297,9 +9037,11 @@ export function AnalyzerPage() {
     {shouldShowUnlockGate ? (
       <UnlockReportGateCard
         lang={lang}
-        score={alignmentScore}
+        score={partialScore}
         insight={partialInsight}
         suggestion={partialSuggestion}
+        cvText={cvText}
+        jdText={jdText}
         previewFixResult={previewFixResult}
         previewFixBusy={previewFixBusy}
         previewReanalyzing={previewReanalyzePending}
@@ -7329,7 +9071,7 @@ export function AnalyzerPage() {
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.35 }}
     >
-    {/* CV INPUT — drop zone + paste */}
+    {/* CV INPUT â€” drop zone + paste */}
     <motion.div
       style={{ marginBottom: 20 }}
       animate={cvLoaded ? { boxShadow: ["0 0 0 rgba(34,197,94,0)", "0 0 22px rgba(34,197,94,0.2)", "0 0 0 rgba(34,197,94,0)"] } : {}}
@@ -7341,7 +9083,7 @@ export function AnalyzerPage() {
             <FileText size={12} color="#60a5fa" />
           </div>
           {lang === "TR" ? "CV'n" : "Your CV"}
-        </div>
+      </div>
         <motion.button
           type="button"
           whileHover={{ scale: 1.02 }}
@@ -7378,7 +9120,7 @@ export function AnalyzerPage() {
           </div>
         ) : (
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#6ee7b7", marginBottom: 8 }}>{lang === "TR" ? "✓ CV hazır" : "✓ CV ready"}</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#6ee7b7", marginBottom: 8 }}>{lang === "TR" ? "âœ“ CV hazır" : "âœ“ CV ready"}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: "#94a3b8" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <CheckCircle2 size={14} color="#34d399" /> {lang === "TR" ? "CV yüklendi" : "CV Loaded"}
@@ -7393,17 +9135,17 @@ export function AnalyzerPage() {
           </div>
         )}
 
-        <textarea
+      <textarea
           className="hf-textarea hf-dropzone__textarea hf-analyzer-textarea"
-          placeholder={t.pasteCv}
-          value={cvText}
-          onChange={(e) => setCvText(e.target.value)}
+        placeholder={t.pasteCv}
+        value={cvText}
+        onChange={(e) => setCvText(e.target.value)}
           onFocus={() => setActiveInput("cv")}
           onBlur={() => setActiveInput((v) => (v === "cv" ? null : v))}
           onClick={(e) => e.stopPropagation()}
           readOnly={uploadingPdf}
-        />
-      </div>
+      />
+        </div>
     </motion.div>
     </motion.div>
 
@@ -7413,7 +9155,7 @@ export function AnalyzerPage() {
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.35 }}
     >
-    {/* JD INPUT — drop / paste / link */}
+    {/* JD INPUT â€” drop / paste / link */}
     <motion.div
       id="hirefit-apply-focus"
       style={{ marginBottom: 24, scrollMarginTop: 96 }}
@@ -7422,11 +9164,11 @@ export function AnalyzerPage() {
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
         <label style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 13, color: "#f1f5f9" }}>
-          <div style={{ width: 26, height: 26, borderRadius: 8, background: "rgba(34,211,238,0.15)", border: "1px solid rgba(34,211,238,0.2)", display: "grid", placeItems: "center" }}>
-            <Briefcase size={12} color="#22d3ee" />
-          </div>
+        <div style={{ width: 26, height: 26, borderRadius: 8, background: "rgba(34,211,238,0.15)", border: "1px solid rgba(34,211,238,0.2)", display: "grid", placeItems: "center" }}>
+          <Briefcase size={12} color="#22d3ee" />
+        </div>
           {lang === "TR" ? "İş ilanı" : "Job description"}
-        </label>
+      </label>
         <motion.button
           type="button"
           whileHover={{ scale: 1.02 }}
@@ -7442,8 +9184,8 @@ export function AnalyzerPage() {
       </div>
       <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 10 }}>
         {lang === "TR"
-          ? "İlan metnini yapıştırın veya .txt sürükleyin — tam metin en doğru sonucu verir."
-          : "Paste the job description or drop a .txt file — full text works best."}
+          ? "İlan metnini yapıştırın veya .txt sürükleyin â€” tam metin en doğru sonucu verir."
+          : "Paste the job description or drop a .txt file â€” full text works best."}
       </div>
 
       <div
@@ -7468,7 +9210,7 @@ export function AnalyzerPage() {
           </div>
         ) : (
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: "#67e8f9", marginBottom: 8 }}>{lang === "TR" ? "✓ İlan yüklendi" : "✓ JD loaded"}</div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#67e8f9", marginBottom: 8 }}>{lang === "TR" ? "âœ“ İlan yüklendi" : "âœ“ JD loaded"}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 12, color: "#94a3b8" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <CheckCircle2 size={14} color="#22d3ee" /> {lang === "TR" ? "İş ilanı metni alındı" : "Job description captured"}
@@ -7480,11 +9222,11 @@ export function AnalyzerPage() {
           </div>
         )}
 
-        <textarea
+      <textarea
           className="hf-textarea hf-dropzone__textarea hf-analyzer-textarea"
-          placeholder={t.pasteJd}
-          value={jdText}
-          onChange={(e) => setJdText(e.target.value)}
+        placeholder={t.pasteJd}
+        value={jdText}
+        onChange={(e) => setJdText(e.target.value)}
           onFocus={() => setActiveInput("jd")}
           onBlur={() => setActiveInput((v) => (v === "jd" ? null : v))}
           readOnly={extractingJob}
@@ -7522,7 +9264,7 @@ export function AnalyzerPage() {
                 <Link2 size={12} />
                 {extractingJob ? (lang === "TR" ? "Çekiliyor..." : "Fetching...") : (lang === "TR" ? "Metni getir" : "Fetch text")}
               </motion.button>
-            </div>
+    </div>
             {jobUrlIsLinkedIn ? (
               <div
                 role="status"
@@ -7553,11 +9295,24 @@ export function AnalyzerPage() {
     </motion.div>
     </motion.div>
 
+    {!showResultPanel && (recommendedJobs?.jobs?.length || recommendedJobsLoading) && cvText.trim().length >= 80 ? (
+      <div style={{ marginBottom: 20, marginTop: 4 }}>
+        <RecommendedJobsSection
+          data={recommendedJobs}
+          lang={lang}
+          loading={recommendedJobsLoading}
+          onApply={(job) => runRecommendedJobAction(job, "apply")}
+          onRisky={(job) => runRecommendedJobAction(job, "risky")}
+          onSkip={handleSkipRecommendedJob}
+        />
+      </div>
+    ) : null}
+
     <div className="hf-analyzer-post-grid">
 
     {/* DECISION SUPPORT SETTINGS */}
     <div style={{ marginBottom: 24 }}>
-      <button
+  <button
         onClick={() => setShowAdvanced((v) => !v)}
         style={{
           display: "flex",
@@ -7568,24 +9323,24 @@ export function AnalyzerPage() {
           color: "#94a3b8",
           fontSize: 13,
           cursor: "pointer",
-          fontFamily: "'DM Sans', sans-serif",
+          fontFamily: "var(--font-sans)",
           fontWeight: 700,
           padding: 0,
           marginBottom: showAdvanced ? 16 : 0,
         }}
-      >
-        <span style={{ fontSize: 10, transition: "transform 0.2s", display: "inline-block", transform: showAdvanced ? "rotate(90deg)" : "rotate(0deg)" }}>▶</span>
+  >
+    <span style={{ fontSize: 10, transition: "transform 0.2s", display: "inline-block", transform: showAdvanced ? "rotate(90deg)" : "rotate(0deg)" }}>â–¶</span>
         {"Analizi kendine göre ayarla"}
-      </button>
-      {showAdvanced && (
+  </button>
+  {showAdvanced && (
         <div style={{ padding: "18px 20px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 14, display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ borderRadius: 12, border: "1px solid rgba(99,102,241,0.3)", background: "rgba(99,102,241,0.08)", padding: "12px 14px" }}>
             <div style={{ fontSize: 16, color: "#e2e8f0", fontWeight: 800, marginBottom: 6 }}>
               {`Sana en yakın alan: ${getCareerAreaLabel(closestAreaToShow, "TR")}`}
-            </div>
+        </div>
             <div style={{ fontSize: 13, color: "#cbd5e1", lineHeight: 1.5 }}>
               {"Bu analiz seni bu alandaki gerçek beklentilere göre değerlendirecek."}
-            </div>
+      </div>
           </div>
 
           <div
@@ -7613,18 +9368,18 @@ export function AnalyzerPage() {
                       fontSize: 12,
                       fontWeight: 700,
                       cursor: loading ? "not-allowed" : "pointer",
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     {getCareerAreaLabel(a, "TR")}
-                  </button>
+            </button>
                 );
               })}
-            </div>
-          </div>
         </div>
-      )}
+      </div>
     </div>
+  )}
+</div>  
 
     {/* FREE LIMIT WARNING */}
     {!isPro && (() => {
@@ -7639,7 +9394,7 @@ export function AnalyzerPage() {
       if (remaining >= 2) return null;
       return (
         <div style={{ marginBottom: 16, padding: "8px 14px", borderRadius: 8, background: remaining === 0 ? "rgba(239,68,68,0.08)" : "rgba(245,158,11,0.08)", border: `1px solid ${remaining === 0 ? "rgba(239,68,68,0.15)" : "rgba(245,158,11,0.15)"}`, fontSize: 13, color: remaining === 0 ? "#f87171" : "#fbbf24", fontWeight: 600 }}>
-          {remaining === 0 ? t.noFreeLeft : `⚡ ${remaining} ${t.freeLimitWarning}`}
+          {remaining === 0 ? t.noFreeLeft : `âš¡ ${remaining} ${t.freeLimitWarning}`}
         </div>
       );
     })()}
@@ -7661,7 +9416,7 @@ export function AnalyzerPage() {
         fontSize: 17,
         fontWeight: 700,
         cursor: loading ? "not-allowed" : "pointer",
-        fontFamily: "'DM Sans', sans-serif",
+        fontFamily: "var(--font-sans)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -7675,10 +9430,10 @@ export function AnalyzerPage() {
       {loading ? (
         <>
           <Loader2 size={18} style={{ animation: "spin 0.8s linear infinite" }} />
-          {lang === "TR" ? "Analiz ediliyor…" : "Analyzing…"}
+          {lang === "TR" ? "Analiz ediliyorâ€¦" : "Analyzingâ€¦"}
         </>
       ) : (
-        <>{lang === "TR" ? "Analiz Et →" : "Analyze →"}</>
+        <>{lang === "TR" ? "Analiz Et â†’" : "Analyze â†’"}</>
       )}
     </button>
     <div style={{ marginTop: 8, textAlign: "center", fontSize: 11, color: "#94a3b8", opacity: 0.65 }}>
@@ -7686,7 +9441,7 @@ export function AnalyzerPage() {
     </div>
     </div>
 
-    {/* Static example verdict (mock) — onboarding preview */}
+    {/* Static example verdict (mock) â€” onboarding preview */}
     <div
       className="hf-input-panel hf-analyzer-example-preview"
       style={{
@@ -7723,21 +9478,20 @@ export function AnalyzerPage() {
         >
           Apply
         </span>
-        <div style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 800, color: "#e2e8f0", lineHeight: 1 }}>
-          87%
-          <span style={{ fontSize: 14, fontWeight: 600, color: "#94a3b8", marginLeft: 6 }}>{lang === "TR" ? "uyum" : "match"}</span>
+        <div style={{ fontFamily: "var(--font-display)", fontSize: "clamp(1.1rem, 3.8vw, 1.35rem)", fontWeight: 800, color: "#e2e8f0", lineHeight: 1.2 }}>
+          {roleProximityLabel(87, lang)}
         </div>
       </div>
       <ul style={{ margin: 0, paddingLeft: 18, color: "#cbd5e1", fontSize: 14, lineHeight: 1.55 }}>
         {(lang === "TR"
           ? [
               "İlandaki araçlar (Python, Looker) deneyiminle örtüşüyor.",
-              "İşe alım filtresinden geçme olasılığın güçlü — ölçülebilir çıktılar net.",
+              "İşe alım filtresinden geçme olasılığın güçlü â€” ölçülebilir çıktılar net.",
               "İlk mülakatta hazırlanman için 2 net aksiyon önerisi üretildi.",
             ]
           : [
               "Job tools (Python, Looker) line up with your experience.",
-              "Strong signal you clear the first hiring screen — metrics read clearly.",
+              "Strong enough read that you clear the first hiring screen â€” metrics land clearly.",
               "Two concrete actions surfaced for interview prep.",
             ]
         ).map((line) => (
@@ -7771,7 +9525,6 @@ export function AnalyzerPage() {
     )}
 
     </div>
-    </div>
 
     {analyzerResultsChromeVisible ? (
     <motion.div
@@ -7801,7 +9554,7 @@ export function AnalyzerPage() {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           <button
             type="button"
-            onClick={() => navigate("/login")}
+            onClick={() => navigate("/login?mode=signup")}
             style={{
               padding: "8px 14px",
               borderRadius: 10,
@@ -7834,327 +9587,25 @@ export function AnalyzerPage() {
         </div>
       </div>
     )}
-    {hasOutput && !loading && impactProjection ? (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.24 }}
-        style={{
-          marginBottom: 16,
-          padding: 18,
-          borderRadius: 14,
-          border: "1px solid rgba(99,102,241,0.24)",
-          background: "linear-gradient(180deg, rgba(15,23,42,0.92), rgba(2,6,23,0.96))",
-          display: "grid",
-          gap: 14,
-        }}
-      >
-        <div>
-          <div
-            style={{
-              marginBottom: 12,
-              padding: "12px 14px",
-              borderRadius: 12,
-              border: "1px solid rgba(148,163,184,0.3)",
-              background: "rgba(148,163,184,0.09)",
-            }}
-          >
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#cbd5e1", marginBottom: 6 }}>
-              {lang === "TR" ? "Ilk bakis algisi" : "First-pass perception"}
-            </div>
-            <div style={{ fontSize: 16, color: "#e2e8f0", lineHeight: 1.6, fontWeight: 700 }}>
-              {topPerceptionInsight}
-            </div>
-          </div>
-          <div
-            style={{
-              borderRadius: 18,
-              border: `1px solid ${verdictUi.color}55`,
-              background: "linear-gradient(180deg, rgba(15,23,42,0.95), rgba(2,6,23,0.98))",
-              padding: "16px 14px 14px",
-              boxShadow: verdictUi.glow,
-            }}
-          >
-            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "6px 12px", borderRadius: 999, border: `1px solid ${verdictUi.color}66`, background: `${verdictUi.color}22`, color: verdictUi.color, fontWeight: 900, fontSize: 12, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-              <span>{verdictUi.icon}</span>
-              <span>{verdictUi.badge}</span>
-            </div>
-            <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
-              <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 700, padding: "6px 10px", borderRadius: 999, background: "rgba(15,23,42,0.7)", border: "1px solid rgba(148,163,184,0.26)" }}>
-                {`${impactProjection.current}% Alignment`}
-              </div>
-              <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 700, padding: "6px 10px", borderRadius: 999, background: "rgba(15,23,42,0.7)", border: "1px solid rgba(148,163,184,0.26)" }}>
-                {verdictUi.riskPill}
-              </div>
-              <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 700, padding: "6px 10px", borderRadius: 999, background: "rgba(15,23,42,0.7)", border: "1px solid rgba(148,163,184,0.26)" }}>
-                {verdictUi.matchPill}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            borderRadius: 12,
-            border: "1px solid rgba(239,68,68,0.3)",
-            background: "rgba(239,68,68,0.08)",
-            padding: "16px 18px",
-          }}
-        >
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.08em", textTransform: "uppercase", color: "#fca5a5", marginBottom: 6 }}>
-            {lang === "TR" ? "Recruiter'ın İlk Düşüncesi" : "Recruiter's First Impression"}
-          </div>
-          <div style={{ fontSize: 22, lineHeight: 1.2, fontWeight: 900, color: "#fee2e2", marginBottom: 6 }}>
-            {aiDecisionText || mapDecisionLabel(engineV2?.Decision?.final_verdict, lang)}
-          </div>
-          <div style={{ maxWidth: 620, fontSize: 15, color: "#fecaca", lineHeight: 1.72 }}>
-            {recruiterNarrative}
-          </div>
-          {recruiterSignalTags.length ? (
-            <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {recruiterSignalTags.map((tag) => (
-                <div key={tag.label} style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.02em", color: tag.color, padding: "6px 10px", borderRadius: 999, background: tag.bg, border: `1px solid ${tag.border}` }}>
-                  {tag.label}
-                </div>
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <div
-          style={{
-            borderRadius: 12,
-            border: "1px solid rgba(250,204,21,0.35)",
-            background: "rgba(250,204,21,0.08)",
-            padding: "11px 13px",
-          }}
-        >
-          <div style={{ fontSize: 11, fontWeight: 900, letterSpacing: "0.06em", textTransform: "uppercase", color: "#fde68a", marginBottom: 6 }}>
-            {lang === "TR" ? "Seni aşağı çeken asıl şey" : "The main thing holding you back"}
-          </div>
-          <div style={{ fontSize: 13.5, lineHeight: 1.55, color: "#fef3c7", fontWeight: 700 }}>
-            {recruiterCoreConcern || recruiterWantedSignal}
-          </div>
-        </div>
-
-        <div
-          style={{
-            borderRadius: 12,
-            border: "1px solid rgba(59,130,246,0.32)",
-            background: "linear-gradient(180deg, rgba(30,41,59,0.9), rgba(15,23,42,0.92))",
-            padding: "12px 14px",
-          }}
-        >
-          <div style={{ fontSize: 12, fontWeight: 900, letterSpacing: "0.04em", textTransform: "uppercase", color: "#bfdbfe", marginBottom: 8 }}>
-            {lang === "TR" ? "Recruiter'ı ikna etmek için" : "To strengthen your application"}
-          </div>
-          <div style={{ display: "grid", gap: 6 }}>
-            {recruiterPersuasionTips.map((tip, idx) => (
-              <div key={`persuasion-${idx}`} style={{ fontSize: 13, color: "#dbeafe", lineHeight: 1.6 }}>
-                {`- ${tip}`}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div
-          style={{
-            borderRadius: 10,
-            border: "1px solid rgba(16,185,129,0.28)",
-            background: "rgba(16,185,129,0.08)",
-            padding: "10px 12px",
-          }}
-        >
-          <div style={{ letterSpacing: "-0.01em" }}>
-            <div style={{ fontSize: 15, color: "#f8fafc", fontWeight: 800 }}>
-              {`Mevcut uyum skoru: %${impactProjection.current}`}
-            </div>
-            <div style={{ fontSize: 17, color: "#bbf7d0", fontWeight: 900, marginTop: 6 }}>
-              {`Düzeltme sonrası: %${impactProjection.projected}`}
-            </div>
-          </div>
-        </div>
-
-        <div
-          style={{
-            marginTop: 6,
-            marginBottom: 6,
-            borderRadius: 12,
-            border: "1px solid rgba(99,102,241,0.35)",
-            background: "linear-gradient(180deg, rgba(30,41,59,0.92), rgba(15,23,42,0.95))",
-            padding: "14px 12px",
-          }}
-        >
-          <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 800, marginBottom: 8 }}>
-            {"Şimdi karar ver."}
-          </div>
-          <div style={{ fontSize: 11, color: "#94a3b8", opacity: 0.8, marginBottom: 10 }}>
-            {"Bu seçim sonucu belirler."}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
-            <button
-              type="button"
-              onClick={() => setDecisionLockChoice("continue")}
-              style={{
-                width: "100%",
-                borderRadius: 10,
-                border: decisionLockChoice === "continue" ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(148,163,184,0.35)",
-                background: "rgba(15,23,42,0.28)",
-                padding: "12px 11px",
-                textAlign: "left",
-                cursor: "pointer",
-              }}
-            >
-              <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 800, marginBottom: 3 }}>
-                {"⚠️ Risk alarak başvur"}
-              </div>
-              <div style={{ fontSize: 11, color: "#fca5a5", lineHeight: 1.35 }}>
-                {"Recruiter tarafında soru işaretleri var"}
-              </div>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setDecisionLockChoice("switch");
-                roleSuggestionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-              style={{
-                width: "100%",
-                borderRadius: 10,
-                border: decisionLockChoice === "switch" ? "1px solid rgba(16,185,129,0.6)" : "1px solid rgba(16,185,129,0.4)",
-                background: decisionLockChoice === "switch" ? "linear-gradient(135deg, #10b981, #059669)" : "rgba(16,185,129,0.9)",
-                padding: "12px 11px",
-                textAlign: "left",
-                cursor: "pointer",
-                boxShadow: "0 10px 24px rgba(16,185,129,0.25)",
-              }}
-            >
-              <div style={{ fontSize: 13, color: "#ecfdf5", fontWeight: 900, marginBottom: 3 }}>
-                {"✅ Daha güçlü eşleşmeye yönel"}
-              </div>
-              <div style={{ fontSize: 11, color: "rgba(236,253,245,0.9)", lineHeight: 1.35 }}>
-                {"Daha yüksek geri dönüş ihtimali"}
-              </div>
-            </button>
-          </div>
-        </div>
-
-        <div style={{ marginTop: -2 }}>
-          {aiPatternSummary ? null : null}
-        </div>
-
-        <div>
-          <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 800, marginBottom: 6 }}>
-            {"İlk hamleni yap:"}
-          </div>
-          <div
-            style={{
-              fontSize: 14,
-              color: "#cbd5e1",
-              lineHeight: 1.45,
-              borderRadius: 10,
-              border: "1px solid rgba(56,189,248,0.3)",
-              background: "rgba(56,189,248,0.07)",
-              padding: "10px 12px",
-              fontWeight: 700,
-            }}
-          >
-            {firstAction ? (
-              <div style={{ color: "#e2e8f0" }}>{firstAction}</div>
-            ) : (
-              <>
-                {"CV’ne şu formatta 1 cümle ekle:"}
-                <div style={{ marginTop: 4, color: "#e2e8f0" }}>
-                  {"X sürecini iyileştirerek %Y sonuç elde ettim."}
-                </div>
-              </>
-            )}
-          </div>
-          {!firstAction ? (
-          <div style={{ marginTop: 4, fontSize: 11, color: "#94a3b8", opacity: 0.78 }}>
-            {"Örn: %X artırdım, X sürede tamamladım"}
-          </div>
-          ) : null}
-          <div style={{ marginTop: 8, fontSize: 13, color: "#86efac", fontWeight: 800, lineHeight: 1.45 }}>
-            {(() => {
-              const boosted = Math.min(100, impactProjection.projected + 5);
-              return `Bu adımı uygularsan uyumun %${boosted}\u2019ya çıkar`;
-            })()}
-          </div>
-          <label style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#cbd5e1", cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={actionCommitChecked}
-              onChange={(e) => setActionCommitChecked(e.target.checked)}
-              style={{ accentColor: "#22c55e", cursor: "pointer" }}
-            />
-            {"Bu cümleyi CV'me ekleyeceğim"}
-          </label>
-          <div style={{ marginTop: 2, fontSize: 11, color: "#94a3b8", opacity: 0.86 }}>
-            {"Şimdi bunu CV’ne ekleyecek misin?"}
-          </div>
-        </div>
-      </motion.div>
-    ) : null}
-    {hasOutput && !loading && roleSuggestions.length ? (
-      <div
-        ref={roleSuggestionsRef}
-        style={{
-          marginBottom: 16,
-          padding: 14,
-          borderRadius: 14,
-          border: "1px solid rgba(148,163,184,0.2)",
-          background: "rgba(15,23,42,0.72)",
-        }}
-      >
-        <div style={{ fontSize: 16, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
-          {"Yanlış role başvuruyorsun."}
-        </div>
-        <div style={{ fontSize: 12, color: "#fca5a5", marginBottom: 10, fontWeight: 700 }}>
-          {"Profilin bu role tam uymuyor."}
-        </div>
-        <div style={{ display: "grid", gap: 8 }}>
-          {roleSuggestions.map((r) => (
-            <div
-              key={`${r.role}-${r.score}`}
-              style={{
-                borderRadius: 10,
-                border: "1px solid rgba(148,163,184,0.2)",
-                background: "rgba(15,23,42,0.6)",
-                padding: "10px 11px",
-              }}
-            >
-              <div style={{ fontSize: 14, color: "#e2e8f0", fontWeight: 800, marginBottom: 2 }}>
-                {`${r.role} — %${r.score}`}
-              </div>
-              <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, marginBottom: 8 }}>
-                {r.reason}
-              </div>
-              <button
-                type="button"
-                onClick={() => runRoleSuggestionAnalysis(r.role)}
-                disabled={loading}
-                style={{
-                  width: "100%",
-                  padding: "9px 11px",
-                  borderRadius: 9,
-                  border: "1px solid rgba(99,102,241,0.35)",
-                  background: "rgba(99,102,241,0.14)",
-                  color: "#ddd6fe",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  cursor: loading ? "not-allowed" : "pointer",
-                  fontFamily: "'DM Sans', sans-serif",
-                }}
-              >
-                {"Bu role geç → sonucu gör"}
-              </button>
-            </div>
-          ))}
-        </div>
-      </div>
-    ) : null}
-    </motion.div>
+    {showResultPanel ? (
+      <CareerIntelligenceDashboard
+        vm={resultViewModel}
+        lang={lang}
+        recommendedJobs={recommendedJobs}
+        recommendedJobsLoading={recommendedJobsLoading}
+        careerProfile={careerProfile}
+        careerGrowth={careerGrowth}
+        history={history}
+        onApplyJob={(job) => runRecommendedJobAction(job, "apply")}
+        onRiskyJob={(job) => runRecommendedJobAction(job, "risky")}
+        onSkipJob={handleSkipRecommendedJob}
+        onImproveCv={() => {}}
+        onFix={(fix) => applyFix(fix, fix.id)}
+        onOptimize={optimizeCv}
+        applyingFix={applyingFix}
+        optimizing={optimizing}
+        loading={loading}
+      />
     ) : null}
 
     {showSignupPrompt ? (
@@ -8183,8 +9634,8 @@ export function AnalyzerPage() {
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10 }}>
             <div style={{ fontSize: 19, fontWeight: 800, color: "#e2e8f0" }}>
               {"Sonucunu görmek için ücretsiz kayıt ol"}
-            </div>
-            <button
+          </div>
+          <button
               type="button"
               onClick={() => setShowSignupPrompt(false)}
               aria-label="Kapat"
@@ -8200,9 +9651,9 @@ export function AnalyzerPage() {
                 cursor: "pointer",
               }}
             >
-              {"×"}
-            </button>
-          </div>
+              {"Ã—"}
+          </button>
+        </div>
           <div style={{ display: "grid", gap: 7, fontSize: 14, color: "#cbd5e1", marginBottom: 14 }}>
             {[
               "Tüm analizlerini kaydet",
@@ -8217,7 +9668,7 @@ export function AnalyzerPage() {
           </div>
           <button
             type="button"
-            onClick={() => navigate("/login")}
+            onClick={() => navigate("/login?mode=signup")}
             style={{
               width: "100%",
               padding: "11px 14px",
@@ -8233,7 +9684,7 @@ export function AnalyzerPage() {
             {"Ücretsiz Kayıt Ol"}
           </button>
         </div>
-      </div>
+          </div>
     ) : null}
     {showMarketInsightsModal ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.76)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
@@ -8243,7 +9694,7 @@ export function AnalyzerPage() {
           </div>
           {analysisData?.salary_insight ? (
             <div style={{ fontSize: 14, color: "#cbd5e1", lineHeight: 1.5 }}>
-              {`${analysisData.salary_insight.currency === "TRY" ? "₺" : analysisData.salary_insight.currency === "USD" ? "$" : "€"}${(analysisData.salary_insight.range_min || 0).toLocaleString()} - ${(analysisData.salary_insight.range_max || 0).toLocaleString()}`}
+              {`${analysisData.salary_insight.currency === "TRY" ? "â‚º" : analysisData.salary_insight.currency === "USD" ? "$" : "â‚¬"}${(analysisData.salary_insight.range_min || 0).toLocaleString()} - ${(analysisData.salary_insight.range_max || 0).toLocaleString()}`}
             </div>
           ) : (
             <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.5 }}>
@@ -8258,35 +9709,42 @@ export function AnalyzerPage() {
             {lang === "TR" ? "Kapat" : "Close"}
           </button>
         </div>
-      </div>
+              </div>
     ) : null}
     {showCareerSuggestionsModal ? (
       <div style={{ position: "fixed", inset: 0, background: "rgba(2,6,23,0.76)", zIndex: 1200, display: "grid", placeItems: "center", padding: 16 }}>
         <div style={{ width: "min(560px, 96vw)", borderRadius: 14, border: "1px solid rgba(99,102,241,0.3)", background: "linear-gradient(160deg,#0b1220,#05070f)", padding: 18 }}>
           <div style={{ fontSize: 18, fontWeight: 800, color: "#e2e8f0", marginBottom: 10 }}>
-            {lang === "TR" ? "Yanlış role başvuruyor olabilirsin" : "You may be applying to the wrong role"}
+            {lang === "TR" ? "Profilin bazi rollerde daha guclu" : "Your profile pops more in other lanes"}
           </div>
-          <div style={{ fontSize: 13, color: "#fca5a5", lineHeight: 1.45, marginBottom: 10, fontWeight: 700 }}>
-            {lang === "TR" ? "Profilin bu role tam uymuyor" : "Your profile does not fully match this role"}
+          <div style={{ fontSize: 13, color: "#94a3b8", lineHeight: 1.45, marginBottom: 10, fontWeight: 600 }}>
+            {lang === "TR"
+              ? "Bu rol yerine asagida daha net one cikiyorsun; yonlendirme gibi dusun."
+              : "Below are directions where you read clearer than in this exact postingâ€”think guidance, not a verdict."}
           </div>
-          {roleSuggestions.length ? (
+          {resultViewModel?.roleSuggestions?.length ? (
             <div style={{ display: "grid", gap: 8 }}>
-              {roleSuggestions.map((r) => (
-                <div key={`${r.role}-${r.score}`} style={{ borderRadius: 10, border: "1px solid rgba(148,163,184,0.2)", background: "rgba(15,23,42,0.65)", padding: "8px 10px" }}>
+              {resultViewModel.roleSuggestions.map((r, idx) => (
+                <div key={`modal-role-${idx}-${r.role}-${r.fitBand}-${r.reason || ""}`} style={{ borderRadius: 10, border: "1px solid rgba(148,163,184,0.2)", background: "rgba(15,23,42,0.65)", padding: "8px 10px" }}>
                   <div style={{ fontSize: 13, color: "#e2e8f0", fontWeight: 800, marginBottom: 2 }}>
-                    {`${r.role} (${r.score}%)`}
+                    {v3RoleCardTitle(r.role)}
                   </div>
-                  <div style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4 }}>
-                    {r.reason}
+                  <div style={{ fontSize: 11, color: "#a78bfa", fontWeight: 700, marginBottom: 4 }}>
+                    {v3RoleProximityBand(r.fitBand, lang)}
                   </div>
-                </div>
-              ))}
+                  {(r.lines?.length ? r.lines : r.reason ? [r.reason] : []).map((line, li) => (
+                    <div key={`modal-role-line-${idx}-${li}`} style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.4, marginBottom: li === 0 ? 4 : 0 }}>
+                      {line}
             </div>
+          ))}
+        </div>
+              ))}
+      </div>
           ) : (
             <div style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.5 }}>
               {lang === "TR" ? "Bu analizde rol önerisi bulunamadı." : "No role suggestions found in this analysis."}
-            </div>
-          )}
+  </div>
+)}
           <button
             type="button"
             onClick={() => setShowCareerSuggestionsModal(false)}
@@ -8298,101 +9756,336 @@ export function AnalyzerPage() {
       </div>
     ) : null}
 
-    {/* HISTORY — compact, en altta */}
     <div className="hf-analyzer-history-section">
-      <div className="hf-analyzer-history-header">
-        <div className="hf-analyzer-history-title">
-          <History size={14} aria-hidden /> {t.previousAnalyses}
-        </div>
-        {history.length > 0 ? (
-          <button type="button" className="hf-analyzer-history-clear" onClick={clearHistory}>
-            <Trash2 size={11} aria-hidden /> {t.clear}
-          </button>
-        ) : null}
-      </div>
-      {history.length === 0 ? (
-        <div className="hf-analyzer-history-empty">
-          <Clock size={22} aria-hidden className="hf-analyzer-history-empty__icon" />
-          <span>{lang === "TR" ? "Henüz analiz yapılmadı" : "No analyses yet"}</span>
-        </div>
-      ) : (
-        <div className="hf-analyzer-history-list">
-          {history.slice(0, 3).map((item) => {
-            const verdict = getAnalyzerHistoryVerdictMeta(item);
-            const pct = Math.round(Number(item.score));
-            const scoreNum = Number.isFinite(pct) ? pct : 0;
-            return (
-              <button
-                type="button"
-                key={item.id}
-                className="hf-analyzer-history-item"
-                onClick={() => loadHistoryItem(item)}
-              >
-                <div className="hf-analyzer-history-item__left">
-                  <span className={`hf-analyzer-history-verdict hf-analyzer-history-verdict--${verdict.key}`}>{verdict.label}</span>
-                  <div className="hf-analyzer-history-item__text">
-                    <div className="hf-analyzer-history-item__job">{item.role}</div>
-                    <div className="hf-analyzer-history-item__date">{item.createdAt}</div>
-                  </div>
+      <RecentAnalysesAccordion
+        history={history}
+        lang={lang}
+        title={t.previousAnalyses}
+        clearLabel={t.clear}
+        emptyLabel={lang === "TR" ? "Henüz analiz yapılmadı" : "No analyses yet"}
+        onLoadItem={loadHistoryItem}
+        onClear={clearHistory}
+        renderRow={(item, idx) => {
+          const row = normalizeHistoryRowForUI(item, lang, buildRoleSuggestionsFromCv);
+          const verdict = getAnalyzerHistoryVerdictMeta(item);
+          return (
+            <button
+              type="button"
+              key={item.id || `history-${idx}-${item.createdAt || ""}-${row.role || ""}`}
+              className="hf-analyzer-history-item"
+              onClick={() => loadHistoryItem(item)}
+            >
+              <div className="hf-analyzer-history-item__left">
+                <span className={`hf-analyzer-history-verdict hf-analyzer-history-verdict--${verdict.key}`}>{row.verdictBand}</span>
+                <div className="hf-analyzer-history-item__text">
+                  <div className="hf-analyzer-history-item__job">{row.role || (lang === "TR" ? "Analiz" : "Analysis")}</div>
+                  <div className="hf-analyzer-history-item__date">{item.createdAt}</div>
                 </div>
-                <div className="hf-analyzer-history-item__right">
-                  <span className="hf-analyzer-history-score" style={{ color: analyzerHistoryScoreColor(scoreNum) }}>
-                    {scoreNum}%
-                  </span>
-                  <ChevronRight size={18} className="hf-analyzer-history-chevron" aria-hidden />
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
+              </div>
+              <div className="hf-analyzer-history-item__right">
+                <span className="hf-analyzer-history-score" style={{ color: "#94a3b8" }}>{row.matchBand || ""}</span>
+                <ChevronRight size={18} className="hf-analyzer-history-chevron" aria-hidden />
+              </div>
+            </button>
+          );
+        }}
+      />
     </div>
-
-  </div>
+    </motion.div>
+    ) : null}
+    </div>
+</div>
   );
 }
 
-function buildRecruiterPersuasionTips({ lang, reasons, firstAction, roleSuggestions, recruiterView, structured }) {
+/**
+ * Centralized jargon strip (replacement map). Used by humanizeRecruiterVoice.
+ */
+function scrubRecruiterJargon(text, lang) {
+  const tr = lang === "TR";
+  let s = String(text || "").replace(/\s+/g, " ").trim();
+  if (!s) return "";
+  const patterns = [
+    [/execution\s+örnekleriyle\s+konumlandır/gi, tr ? "Execution tarafını daha somut göster." : "Show shipping proof more clearly."],
+    [/örnekleriyle\s+konumlandır/gi, tr ? "Örneklerini bu role daha net oturt." : "Anchor your examples to this role more clearly."],
+    [/ön\s*koşul\s+karşılanmıyor|on\s*kosul\s+karsilanmiyor/gi, tr ? "İlanın aradığı temel şart burada eksik kalıyor." : "The posting's must-have bar reads missing here."],
+    [/hibrit\s+staj\w*\s+müsaitlik\w*|hibrit\s+staj\w*\s+musaitlik\w*/gi, tr ? "Tam zamanlı uygunluk tarafında soru işareti oluşuyor." : "Full-time availability reads as an open question."],
+    [/güçlü\s+bir\s+sinyal/gi, tr ? "güçlü görünüyor" : "reads strong"],
+    [/analitik\s+sinyal(?:\s*veriyor|\s*var)?/gi, tr ? "analitik tarafın görünüyor" : "your analytical side shows"],
+    [/role\s*özgü\s+sinyal\s*eksik|rol\s*ozgu\s*sinyal\s*eksik/gi, tr ? "bu role bağlanan somut örnek eksik" : "concrete proof tied to this role is missing"],
+    [/role[-\s]?fit(?:\s*signal)?/gi, tr ? "rol uyumu" : "role fit"],
+    [/\bproduct\s+sinyali\b/gi, tr ? "Ürün tarafı" : "Product side"],
+    [/\bproduct\s+signal\b/gi, tr ? "Ürün tarafı" : "Product side"],
+    [/\bfit\s+signal\b/gi, tr ? "rol okuması" : "role match read"],
+    [/\bweak\s+signal\b/gi, tr ? "zayıf görünüyor" : "weak read"],
+    [/\bstrong\s+signal\b/gi, tr ? "güçlü görünüyor" : "strong read"],
+    [/\balignment\b|alignment\s*deficit|uyum\s*eksikliği|uyum\s*eksikligi/gi, tr ? "eşleşme" : "match"],
+    [/net\s+sinyal\s+yoğunluğu|net\s+sinyal\s+yogunlugu/gi, tr ? "role bağlanan somut örnekler" : "concrete examples tied to this role"],
+    [/signal\s*density|sinyal\s*yoğunluğu|sinyal\s*yogunlugu/gi, tr ? "netlik" : "clarity"],
+    [/output\s*intensity|çıktı\s*yoğunluğu|cikti\s*yogunlugu/gi, tr ? "somut cikti" : "tangible output"],
+    [/role[-\s]*specific\s*output|role\s*özgü\s*çıktı|role\s*ozgu\s*cikti|rol\s*ozg[uü]\s*cikti/gi, tr ? "bu role baglanan somut is" : "concrete work tied to this role"],
+    [/kapsam\s*sinyali/gi, tr ? "role özel örnekler" : "role-specific examples"],
+    [/kapsam\s+sinyalleri?\b/gi, tr ? "role özel örnekler" : "role-specific examples"],
+    [/execution\s*signal|execution\s*sinyali|execution\s*kanıtı|execution\s*kanit/gi, tr ? "net teslim" : "clear delivery"],
+    [/güçlü\s*sinyal|guclu\s*sinyal/gi, tr ? "guclu yan" : "strong side"],
+    [/zayıf\s*sinyal|zayif\s*sinyal/gi, tr ? "zayif yan" : "weak spot"],
+    [/teknik\s*sinyaller|teknik\s*sinyal/gi, tr ? "teknik taraf" : "technical side"],
+    [/Profilinde\s+guclu\s+sinyaller|Profilinde\s+güçlü\s+sinyaller/gi, tr ? "Guclu yanlarin" : "Clear strengths in your profile"],
+    [/dikkat\s+ceken\s+sinyaller/gi, tr ? "dikkat ceken yanlar" : "noticeable strengths"],
+    [/recruiter\s+sinyali/gi, tr ? "recruiter izlenimi" : "recruiter read"],
+    [/eleme\s*sinyali/gi, tr ? "eleme riski" : "screen-out risk"],
+    [/ATS\b|ats\s*[- ]style/gi, ""],
+    [/optimize|optimise|leverage|enhance|\bimprove\b/gi, tr ? "netlestir" : "tighten"],
+    [/stakeholder\s*alignment/gi, tr ? "ekiple netlesen kararlar" : "clear decisions with the team"],
+    [/\bshortlist\b/gi, tr ? "kisa liste" : "shortlist"],
+    [/structured\s+analysis|keyword\s*matrix/gi, tr ? "" : ""],
+    [/\bkpi\b/gi, tr ? "sonuc" : "result"],
+    [/\bstrong\s+candidate\b|\bhigh\s+potential\b|\bcandidate\s+demonstrates\b/gi, ""],
+    [/\bscope\s*signal\b/gi, tr ? "is kapsami" : "scope"],
+    [/\bsinyaller\b/gi, tr ? "yanlar" : "lines"],
+    [/\bsinyal\b/gi, tr ? "izlenim" : "read"],
+    [/\bkeyword\b/gi, tr ? "ilan dili" : "posting language"],
+  ];
+  for (const [re, rep] of patterns) s = s.replace(re, rep);
+  s = s.replace(/\s{2,}/g, " ").trim();
+  return stripHardBannedUiPhrases(s, lang);
+}
+
+/** If still present after scrub, line sounds like consultant/ATS â€” replace with short honest recruiter voice. */
+function recruiterLineStillSynthetic(s, lang) {
+  const t = String(s || "").trim();
+  if (!t) return false;
+  if (lang === "TR") {
+    return /\b(alignment|leverage|optimize|improve|enhance|ATS|signal\s+density|output\s+intensity|keyword)\b/i.test(t)
+      || /\bsignal\b/i.test(t)
+      || /sinyal/i.test(t)
+      || /(özgü\s*çıktı|ozgu\s*cikti|kapsam\s*sinyali|execution\s+sinyal|role[-\s]?fit)/i.test(t)
+      || /şu\s+formatta|su\s+formatta|placeholder|template\s+rewrite|cv['']?ye\s+ekle|cv['']?ne\s+ekle|daha\s+gorunur\s+yap:|one\s+cikart/i.test(t);
+  }
+  return /\b(leverage|optimize|improve|enhance|signal\s+density|output\s+intensity|ATS|keyword)\b/i.test(t)
+    || /\bsignal\b/i.test(t)
+    || /role[- ]specific|role[- ]fit|template\s+rewrite|make\s+this\s+line\s+pop|lift\s+this/i.test(t);
+}
+
+function humanizeRecruiterVoice(text, lang) {
+  const s = scrubRecruiterJargon(text, lang);
+  if (!s) return "";
+  if (recruiterLineStillSynthetic(s, lang)) {
+    return lang === "TR"
+      ? "Burayi tek gercek teslim cumlesiyle bagla; kafamda soru kalmasin."
+      : "Tie this chunk to one real ship lineâ€”leave me with no guesswork.";
+  }
+  return s;
+}
+
+function isTrEnHybridCorrupt(text) {
+  const s = String(text || "");
+  const hasTr = /[ığüşöçİĞÜŞÖÇ]|\b(ve|ama|bu|için|ilan|yazdiriyor|goremiyorum|degil|taraf|kafamda|bunu|su)\b/i.test(s);
+  const hasBadEn = /\b(I\s|my\s|owned|every|with\s|the\s|and\s|but\s|alignment|signal\s+density|output\s+intensity|leverage|optimize|improve|enhance)\b/i.test(s);
+  return Boolean(hasTr && hasBadEn);
+}
+
+function isEnTrHybridCorrupt(text) {
+  const s = String(text || "");
+  const hasEn = /\b(the|and|with|your|this|role|recruiter|posting)\b/i.test(s);
+  const hasTr = /[ığüşöçİĞÜŞÖÇ]|\b(ve|ama|bu|için|ilan|degil)\b/i.test(s);
+  return Boolean(hasEn && hasTr);
+}
+
+/** Strict single-language output; on corruption return short clean fallback (never hybrid). */
+function enforceLanguagePurity(text, lang) {
+  const s = humanizeRecruiterVoice(String(text || "").trim(), lang);
+  if (!s) return "";
+  if (lang === "TR" && isTrEnHybridCorrupt(s)) {
+    return "Burada iki dil birbirine girdi; net tek satir kuramadim.";
+  }
+  if (lang !== "TR" && isEnTrHybridCorrupt(s)) {
+    return "Languages got tangled here; I cannot give you one clean line.";
+  }
+  return s;
+}
+
+function actionLooksLikeFabricatedMetric(action, cvText) {
+  if (!/\d{1,3}\s*%/.test(String(action || ""))) return false;
+  const pool = String(cvText || "");
+  const rx = /(\d{1,3})\s*%/g;
+  let m;
+  while ((m = rx.exec(action)) !== null) {
+    const n = m[1];
+    if (!pool.includes(`${n}%`) && !pool.includes(`%${n}`)) return true;
+  }
+  return false;
+}
+
+/** CV rewrite / fake-metric templates from model or cached payloads â€” never show in UI. */
+function isRawFirstActionUiPoison(raw) {
+  const s = String(raw || "");
+  if (!s.trim()) return false;
+  const t = s.toLowerCase();
+  if (/[%ï¼…]/.test(s)) return true;
+  if (/uyumun/i.test(t)) return true;
+  if (/(dönüşüm|donusum)/i.test(t) && /(artış|artis|%|yüzde|yuzde|\d\s*%)/i.test(s)) return true;
+  if (/sonuç\s*elde|sonuc\s*elde/i.test(t)) return true;
+  if (/cv[''\u2019\u2018â€²`]inde/i.test(s)) return true;
+  if (/şu\s+şekilde|su\s+sekilde/i.test(t)) return true;
+  if (/yeniden\s*yaz/i.test(t)) return true;
+  if (/cv[''\u2019\u2018â€²`]?ne\s+(şu|su)/i.test(s)) return true;
+  if (/şu\s+formatta|su\s+formatta/i.test(t)) return true;
+  if (/bu\s+adımı\s+uygularsan/i.test(t)) return true;
+  if (/\b\d\s*cümle\b|\b1\s*cümle\b|\bcümle\s+ekle|\bcumle\s+ekle/i.test(t)) return true;
+  if (/x\s*süreci|x\s*sureci|%y|%x|%18\b/i.test(t)) return true;
+  if (/(?:sürecini|surecini)\s+iyileş?tirir?ek/i.test(t)) return true;
+  if (/iyileş?tirir?ek/i.test(t) && /(sonuç\s+elde|sonuc\s+elde|%|yüzde|yuzde)/i.test(s)) return true;
+  if (/şu\s+formatta[\s\S]{0,48}?\d?\s*cümle|cümle\s+ekle[\s\S]{0,40}?formatta|cv[''\u2019\u2018â€²`]?ne\s+şu\s+formatta[\s\S]{0,30}?cümle/i.test(s)) return true;
+  if (/dönüşüm\s+artışı|donusum\s+artisi/i.test(t)) return true;
+  if (/sonuç\s*elde\s*ettim|sonuc\s*elde\s*ettim/i.test(t)) return true;
+  if (/fake\s*metric/i.test(t)) return true;
+  if (/"/.test(s) && (/yeniden|%|\d{1,3}\s*%/.test(s))) return true;
+  if (/(yeniden\s*yaz|şu\s+şekilde|cv[''\u2019\u2018â€²`]inde)/i.test(s) && /\d{1,3}\s*%/.test(s)) return true;
+  return false;
+}
+
+/** Single safe recruiter nudge when model first_action is suppressed (no quotes, no metrics). */
+function pickRecruiterFirstActionNudge(lang, cvText, jdText) {
+  const c = String(cvText || "");
+  const jd = String(jdText || "").toLowerCase();
+  const tr = isUiTurkish(lang);
+  if (tr) {
+    if (/finans|banka|yatırım|aracı\s*kurum/i.test(jd) && !/finans|banka|yatırım/i.test(c))
+      return "Finans tarafında deneyim yoksa bu role başvuru riskli kalır.";
+    if (/pazarlama|growth|demand|performance\s*marketing/i.test(jd) && !/pazarlama|marketing/i.test(c))
+      return "Bu ilana değil, ürün veya pazarlama tarafındaki rollere yönel.";
+    if (/ürün\s*analist|product\s*analyst|ürün\s*yönetici/i.test(jd) && /hirefit/i.test(c))
+      return "HireFit'i ürün/proje çıktısı olarak daha net konumlandır.";
+    if (/hirefit/i.test(c)) return "HireFit'te çözdüğün problemi daha açık anlat.";
+    if (/founder|kurucu|co[-\s]?founder/i.test(c)) return "Founder tarafını tek satırda daha net ver.";
+    if (/enerji|energy|power\s+plant|utilities|şebeke|sebeke/i.test(jd)) return "Enerji sektörüne neden yakın olduğunu daha açık anlat.";
+    return "Bu role bağlanan somut örnekleri öne çıkar.";
+  }
+  if (/finance|banking|brokerage|investment\s+bank/i.test(jd) && !/finance|banking|investment/i.test(c.toLowerCase()))
+    return "If you lack finance-sector proof, this application stays risky.";
+  if (/marketing|growth|demand\s*gen|performance\s*marketing/i.test(jd) && !/marketing/i.test(c.toLowerCase()))
+    return "This posting may be the wrong laneâ€”lean toward product or marketing roles instead.";
+  if (/product\s*analyst|product\s*manager/i.test(jd) && /hirefit/i.test(c.toLowerCase()))
+    return "Position HireFit as a clearer product/project output on your CV.";
+  if (/energi|energy|utilities|power\s+plant|grid/i.test(jd)) return "Spell out why your energy-sector fit is believableâ€”in plain language.";
+  if (/founder|co[-\s]?founder/i.test(c)) return "State your founder lane in one crisp line.";
+  if (/hirefit/i.test(c.toLowerCase())) return "Explain the problem you solved with HireFit more clearly.";
+  if (/product|ownership/i.test(c.toLowerCase())) return "Make your product ownership clearer in the CV.";
+  if (/growth|marketing|conversion/i.test(c.toLowerCase())) return "Make the outcomes tied to this role easier to spot.";
+  return "Bring one concrete, role-tied example to the top of your CV.";
+}
+
+/** GPT-style rewrite / â€œadd in this formatâ€ lines break recruiter trust. */
+function firstActionLooksTemplatey(s) {
+  const raw = String(s || "");
+  if (isRawFirstActionUiPoison(raw)) return true;
+  const t = raw.toLowerCase();
+  if (!t) return true;
+  return (
+    /cv['']?ye\s+ekle|cv['']?ne\s+ekle|cv['']?ye\s+yaz|şu\s+formatta|su\s+formatta|bir\s*cümle|1\s*cümle|template|placeholder|%y|%x|x\s*y\s*sürec|rewrite\s+as|add\s+this\s+format|^add:\s*"/i.test(
+      t
+    )
+    || /daha\s+gorünür\s+yap:|daha\s+gorunur\s+yap:|one\s+cikart:|make\s+this\s+line\s+pop|lift\s+this\s+cv|tie\s+it\s+once|nudge\s+"/i.test(
+      t
+    )
+    || /yeniden\s*yaz|şu\s+şekilde|su\s+sekilde|dönüşüm\s+artışı|donusum\s+artisi|sonuç\s*elde\s*ettim|sonuc\s*elde\s*ettim|cv['â€²']?inde|bu\s+adımı\s+uygularsan/i.test(t)
+    || /(?:sürecini|surecini)\s+iyileş?tirir?ek|iyileş?tirir?ek[\s\S]{0,90}?(?:%|sonuç\s+elde|sonuc\s+elde)/i.test(t)
+    || /cv['']?ne\s+şu\s+formatta[\s\S]{0,40}?cümle|cv['']?ne\s+su\s+formatta[\s\S]{0,40}?cümle/i.test(t)
+  );
+}
+
+function inferRecruiterStyleHint(cvText, lang) {
+  const c = String(cvText || "");
+  if (lang !== "TR") {
+    if (/hirefit/i.test(c)) return "Say what you shipped at HireFit in one line this posting cares about.";
+    if (/product|ownership/i.test(c)) return "Make product ownership easier to spot on your CV.";
+    if (/market|marketing|growth|seo|demand gen/i.test(c))
+      return "Marketing reads strongâ€”pull one concrete win forward for this role.";
+    if (/engineer|developer|software|k8s|aws|typescript/i.test(c))
+      return "Surface the technical examples that best match this posting.";
+    return "";
+  }
+  if (/hirefit/i.test(c)) return "HireFit'te ustlendigin isi bu role baglayan tek somut satir yaz.";
+  if (/ürün|urun|product|sahiplik/i.test(c)) return "Urun sahipligi tarafini CV'de daha gorunur anlat.";
+  if (/pazarlama|marketing|growth|performance/i.test(c))
+    return "Pazarlama deneyimin guclu; bu role yakin ornekleri daha one cikart.";
+  if (/engineer|developer|yazilim|kod|teknik/i.test(c)) return "Bu role yakin teknik orneklerini daha one cikart.";
+  return "";
+}
+
+/** One sentence from model first_action without sanitizeRecruiterNarrative (avoids bogus long fallback on short input). */
+function clipModelFirstActionLine(raw, lang) {
+  const scrubbed = scrubRecruiterJargon(String(raw || "").trim(), lang);
+  if (!scrubbed) return "";
+  const cleaned = cleanTemplateAction(scrubbed, lang);
+  if (!cleaned) return "";
+  const parts = cleaned.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean);
+  const first = parts[0] || cleaned;
+  let out = first.trim();
+  if (out.length > 170) out = `${out.slice(0, 167).trim()}...`;
+  if (firstActionLooksTemplatey(out)) return "";
+  return out;
+}
+
+function buildRecruiterPersuasionTips({ lang, reasons, firstAction, cvText, roleSuggestions, recruiterView, structured }) {
   const tr = lang === "TR";
   const tips = [];
   const reasonText = (reasons || []).map((r) => String(r || "").toLowerCase()).join(" ");
   const rv = `${String(recruiterView || "").toLowerCase()} ${String(structured?.internal_monologue || "").toLowerCase()} ${String(structured?.core_concern || "").toLowerCase()}`;
   if (/(seo|icerik|content)/i.test(`${reasonText} ${rv}`)) {
     tips.push(tr
-      ? "Ön yazında SEO ve içerik execution tarafına hızlı adapte olabileceğini net anlat."
-      : "In your cover note, explicitly show how quickly you can adapt to SEO and content execution.");
+      ? "Icerik tarafini tek cumleyle sahiplen; bu adim seni daha guclu gosterir."
+      : "Own the content angle in one lineâ€”this step makes you read stronger.");
   }
   if (/(kpi|metric|metrik|growth|conversion|donusum)/i.test(`${reasonText} ${rv}`)) {
     tips.push(tr
-      ? "KPI ve growth çıktını tek satırda görünür hale getir; karar anında güven verir."
-      : "Surface KPI and growth outcomes in one clear line to reduce hesitation in hiring decisions.");
+      ? "Zaten savunabilecegin bir sonucu tek satira indir; uydurma rakam koyma."
+      : "Shrink one outcome you can defend to a single lineâ€”skip invented metrics.");
   }
   if (/(founder|product|urun|ownership)/i.test(`${reasonText} ${rv}`)) {
     tips.push(tr
-      ? "Founder/ürün sahipliği deneyimini execution örnekleriyle konumlandır."
-      : "Position your founder/product ownership experience with concrete execution examples.");
+      ? "Ne urettin, kime gittiâ€”tek net teslim cumlesi koy; daha guclu gorunursun."
+      : "Say what shipped and for whom in one crisp lineâ€”you read sharper.");
   }
   if (firstAction) {
-    tips.push(tr ? `Öncelikli CV hamleni uygulayıp bu sinyali görünür kıl: ${firstAction}` : `Apply your first CV fix to make this signal explicit: ${firstAction}`);
+    const cand = clipModelFirstActionLine(firstAction, lang);
+    const safe = cand ? enforceLanguagePurity(cand, lang) : "";
+    const badHybrid = tr ? isTrEnHybridCorrupt(safe) : isEnTrHybridCorrupt(safe);
+    const isPurityFallback = /birbirine girdi|got tangled/i.test(safe);
+    if (
+      safe
+      && !firstActionLooksTemplatey(safe)
+      && !isPurityFallback
+      && !badHybrid
+      && !actionLooksLikeFabricatedMetric(safe, cvText)
+    ) {
+      tips.push(tr ? `Ilk duzeltme: ${safe}` : `First fix: ${safe}`);
+    }
   }
   if (!tips.length && Array.isArray(roleSuggestions) && roleSuggestions.length) {
-    tips.push(tr ? "Daha güçlü role-fit görünen pozisyona dönüp hikayeni o role göre keskinleştir." : "Pivot to the role with stronger fit and sharpen your narrative for that target.");
+    tips.push(tr
+      ? "Bu ilan yerine sana daha dogal oturan role CVâ€™yi o perspektiften keskinlestir."
+      : "Tighten your CV toward the lane below where you already read strongerâ€”not this exact posting.");
   }
   if (!tips.length) {
     tips.push(tr
-      ? "Bu rolün aradığı sinyali CV'de tek satırda netleştir; recruiter kararını hızlandır."
-      : "Make the key role signal explicit in one CV line to speed up recruiter confidence.");
+      ? "Ilanin aradigi seyi CV'de tek satirda goster; kafamda soru birakma."
+      : "Spell out what this posting wants in one CV lineâ€”no guesswork for me.");
   }
-  return [...new Set(tips)].slice(0, 2);
+  return semanticDedupLines(tips, 2, lang);
 }
 
 function sanitizeRecruiterNarrative(text, lang) {
   const tr = lang === "TR";
-  let s = String(text || "").replace(/\s+/g, " ").trim();
+  let s = scrubRecruiterJargon(String(text || "").replace(/\s+/g, " ").trim(), lang);
   if (!s || s.length < 24) {
-    return tr
-      ? "Profilinde guclu sinyaller var ama recruiter tarafinda bazi kritik soru isaretleri olusabilir."
-      : "There are clear strengths in your profile, but recruiters may still hold key question marks.";
+    return enforceLanguagePurity(
+      tr
+        ? "Potansiyel goruyorum; bu ilan icin kopru hala tam net degil."
+        : "I see something real here, but the bridge to this posting is still fuzzy for me.",
+      lang
+    );
   }
   const banned = [
     /keyword/gi,
@@ -8402,65 +10095,282 @@ function sanitizeRecruiterNarrative(text, lang) {
     /gerekçe dönmedi/gi,
     /structured analysis/gi,
     /jd\s*[a-zçğıöşü]+ gereksinimi karşılanmıyor/gi,
+    /\bATS\s*açısından\b|\bATS\s*acisindan\b/gi,
+    /\bprofile\s+optimization\b|\boptimizasyon\s+gerek\b/gi,
+    /\bAI\s+analysis\b|\byapay\s+zeka\s+analizi\b/gi,
   ];
   for (const re of banned) s = s.replace(re, "");
   s = s.replace(/\s{2,}/g, " ").trim();
   if (!s || s.length < 24) {
-    return tr
-      ? "Profilinde guclu sinyaller var ama recruiter tarafinda bazi kritik soru isaretleri olusabilir."
-      : "There are clear strengths in your profile, but recruiters may still hold key question marks.";
+    return enforceLanguagePurity(
+      tr
+        ? "Potansiyel goruyorum; bu ilan icin kopru hala tam net degil."
+        : "I see something real here, but the bridge to this posting is still fuzzy for me.",
+      lang
+    );
   }
-  return s;
+  return enforceLanguagePurity(s, lang);
+}
+
+function buildCompactRecruiterBlocks({ lang, opening, concern, extraRisk, decision, roleSuggestion, verdict }) {
+  const tr = lang === "TR";
+  const used = [];
+  const openingLine = scrubRecruiterJargon(
+    keepShortRecruiterLine(opening, 1, lang, 78)
+    || (tr ? "Ilk bakista daginik degil ama hala netlesmemis." : "Not messy, but not crisp enough for a fast yes yet."),
+    lang
+  );
+  const concernLine = humanizeMainWeakness(keepShortRecruiterLine(concern, 1, lang, 78), lang)
+    || (tr ? "Bu rol teknik gecmis istiyor; CV'de bunu net goremiyorum." : "This role wants technical depth I cannot clearly see on your CV.");
+  const riskLine = scrubRecruiterJargon(keepShortRecruiterLine(extraRisk, 1, lang, 78), lang);
+  const decisionLine = scrubRecruiterJargon(
+    keepShortRecruiterLine(
+      decisionDirectionFromVerdict({ lang, verdict, roleSuggestion, rawDecision: decision }),
+      1,
+      lang,
+      78
+    ),
+    lang
+  );
+  return {
+    opening: ensureUniqueLine(openingLine, used, tr ? "Ilk izlenim kararsiz." : "Initial impression is uncertain.", lang),
+    concern: ensureUniqueLine(concernLine, used, tr ? "Bu role baglanan proje satirini goremiyorum." : "I do not see a project line that ties you to this role.", lang),
+    extraRisk: riskLine && !isSemanticallyDuplicate(riskLine, used) ? ensureUniqueLine(riskLine, used, "", lang) : "",
+    decision: ensureUniqueLine(decisionLine, used, tr ? "Bu role temkinli yaklasirim." : "I would stay cautious for this role.", lang),
+  };
+}
+
+function decisionDirectionFromVerdict({ lang, verdict, roleSuggestion, rawDecision }) {
+  const tr = lang === "TR";
+  const raw = keepShortRecruiterLine(rawDecision, 1, lang, 78);
+  if (raw) return raw;
+  if (verdict === "do_not_apply") {
+    return roleSuggestion
+      ? (tr ? `Bu role tam oturtmuyorum; ${roleSuggestion} daha yakin.` : `I would not advance you here; ${roleSuggestion} is a closer match.`)
+      : (tr ? "Bu role ilerletmem; baska bir profile daha yakinsin." : "I would not move you forward for this role.");
+  }
+  if (verdict === "apply_now") {
+    return tr ? "Bu role gorusmeye alirim; risk dusuk." : "I would interview you here; risk is low.";
+  }
+  return tr ? "Bu role temkinli bakarim; once net kanit isterim." : "I would stay cautious until the proof is sharper.";
+}
+
+function buildContextAwareFirstAction({ lang, firstAction, cvText, jdText: _jdText, coreProblem: _coreProblem, roleSuggestion: _roleSuggestion }) {
+  const tr = lang === "TR";
+  const candidate = clipModelFirstActionLine(firstAction, lang);
+  const fromModel = candidate ? enforceLanguagePurity(candidate, lang) : "";
+  if (
+    fromModel
+    && !firstActionLooksTemplatey(fromModel)
+    && !actionLooksLikeFabricatedMetric(fromModel, cvText)
+    && !(tr && isTrEnHybridCorrupt(fromModel))
+    && !(!tr && isEnTrHybridCorrupt(fromModel))
+    && !recruiterLineStillSynthetic(fromModel, lang)
+  ) {
+    return fromModel;
+  }
+  const cv = String(cvText || "");
+  const styleHint = inferRecruiterStyleHint(cvText, lang);
+  if (styleHint && !firstActionLooksTemplatey(styleHint)) {
+    return enforceLanguagePurity(styleHint, lang);
+  }
+  if (tr) {
+    if (/hirefit/i.test(cv)) return enforceLanguagePurity("HireFit'te çözdüğün problemi bu role daha net bağla.", lang);
+    if (/ürün|urun|product/i.test(cv)) return enforceLanguagePurity("Ürün tarafını CV'de daha görünür anlat.", lang);
+    if (/pazarlama|marketing|growth/i.test(cv)) return enforceLanguagePurity("Pazarlama tarafındaki deneyimini daha açık göster.", lang);
+    if (/engineer|developer|yazilim|yazılım|kod|teknik/i.test(cv)) return enforceLanguagePurity("Bu role yakın teknik örnekleri üst kısma taşı.", lang);
+    return enforceLanguagePurity("Bu role bağlanan somut örnekleri öne çıkar.", lang);
+  }
+  if (/hirefit/i.test(cv)) return enforceLanguagePurity("Say what you shipped at HireFit in one line this posting cares about.", lang);
+  if (/product|ownership/i.test(cv)) return enforceLanguagePurity("Make product ownership easier to spot on your CV.", lang);
+  if (/market|marketing|growth|seo/i.test(cv)) return enforceLanguagePurity("Pull your clearest marketing win forward for this role.", lang);
+  if (/engineer|developer|software|typescript|aws/i.test(cv)) return enforceLanguagePurity("Move your strongest technical proof above the fold for this role.", lang);
+  return enforceLanguagePurity("Tie one concrete example to this postingâ€”no fluff.", lang);
+}
+
+function cleanTemplateAction(text, lang) {
+  const s = String(text || "").trim();
+  if (!s) return "";
+  if (isRawFirstActionUiPoison(s)) return "";
+  if (/\d{1,3}\s*%/.test(s)) return "";
+  if (/bu\s+adımı\s+uygularsan|uyumun(?:uz)?\s*%/i.test(s)) return "";
+  if (/cv['â€²']?inde/i.test(s)) return "";
+  if (/(?:sürecini|surecini)\s+iyileş?tirir?ek/i.test(s)) return "";
+  if (/iyileş?tirir?ek/i.test(s) && /(sonuç\s+elde|sonuc\s+elde|%)/i.test(s)) return "";
+  if (/(x\s*sürec|%y|placeholder|improved process|iyileştirerek\s*%|iyilestirerek\s*%|drove an?\s*\d+%|%x|\b\d{1,2}%\s*(art|increase|düş|dus))/i.test(s)) return "";
+  if (/yeniden\s*yaz:.*%/i.test(s)) return "";
+  if (/yeniden\s*yaz|şu\s+şekilde|su\s+sekilde/i.test(s)) return "";
+  if (/^(cv[â€™']?ne\s+şu\s+formatta|cv[â€™']?ne\s+su\s+formatta|add\s+this\s+format|rewrite\s+this\s+as)/i.test(s)) return "";
+  if (/(şu\s+formatta|su\s+formatta|\d+\s*cümle\s*ekle|bir\s*cümle\s*ekle|cv['']?ye\s+ekle|cv['']?ne\s+ekle)/i.test(s)) return "";
+  if (/daha\s+gorünür\s+yap:|daha\s+gorunur\s+yap:|one\s+cikart:|make\s+this\s+line\s+pop|lift\s+this/i.test(s)) return "";
+  if (/(sonuç\s*elde\s*ettim|sonuc\s*elde\s*ettim).*%/i.test(s)) return "";
+  if (/\b(kpi|KPI)\b.*(geliştirdim|iyileştirdim|arttirdim|artırdım)/i.test(s)) return "";
+  return scrubRecruiterJargon(s, lang);
+}
+
+function humanizeMainWeakness(text, lang) {
+  const tr = lang === "TR";
+  let s = scrubRecruiterJargon(String(text || "").trim(), lang);
+  if (!s) {
+    return enforceLanguagePurity(
+      tr
+        ? "Seni durduran şey: Bu rol teknik gecmis istiyor; CV'de bunu net goremiyorum."
+        : "What holds you back: I need clearer technical proof for this role on your CV.",
+      lang
+    );
+  }
+  s = scrubRecruiterJargon(s, lang);
+  if (tr && !/^seni durduran şey:/i.test(s)) return enforceLanguagePurity(`Seni durduran şey: ${s}`, lang);
+  if (!tr && !/^what holds you back:/i.test(s)) return enforceLanguagePurity(`What holds you back: ${s}`, lang);
+  return enforceLanguagePurity(s, lang);
+}
+
+function semanticDedupLines(lines, limit = 2, lang = "TR") {
+  const out = [];
+  const seen = [];
+  for (const raw of lines || []) {
+    const line = keepShortRecruiterLine(raw, 1, lang, 88);
+    if (!line) continue;
+    if (isSemanticallyDuplicate(line, seen)) continue;
+    out.push(line);
+    seen.push(line);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
+function ensureUniqueLine(line, used, fallback, lang = "TR") {
+  const normalized = keepShortRecruiterLine(line, 1, lang, 78) || fallback;
+  const safeNorm = enforceLanguagePurity(String(normalized || "").trim(), lang);
+  const safeFb = fallback ? enforceLanguagePurity(String(fallback).trim(), lang) : "";
+  if (isSemanticallyDuplicate(safeNorm, used)) {
+    if (safeFb && !isSemanticallyDuplicate(safeFb, used)) {
+      used.push(safeFb);
+      return safeFb;
+    }
+    return safeNorm;
+  }
+  used.push(safeNorm);
+  return safeNorm;
+}
+
+function isSemanticallyDuplicate(line, previousLines) {
+  const current = similarityTokens(line);
+  if (!current.length) return false;
+  return (previousLines || []).some((prev) => tokenOverlapRatio(current, similarityTokens(prev)) >= 0.58);
+}
+
+function similarityTokens(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/["'.,:;!?()[\]{}]/g, " ")
+    .split(/\s+/)
+    .filter((t) => t && t.length > 2 && !/^(this|that|with|from|icin|gibi|daha|very|role|rol|candidate|profil)$/.test(t));
+}
+
+function tokenOverlapRatio(a, b) {
+  if (!a.length || !b.length) return 0;
+  const sa = new Set(a);
+  const sb = new Set(b);
+  let inter = 0;
+  for (const t of sa) if (sb.has(t)) inter += 1;
+  return inter / Math.min(sa.size, sb.size);
+}
+
+function keepShortRecruiterLine(text, maxSentences = 1, lang = "TR", maxChars = 100) {
+  const cleaned = sanitizeRecruiterNarrative(text, lang).replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+  const sentences = cleaned
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, Math.max(1, maxSentences));
+  let joined = sentences.join(" ").trim();
+  if (joined.length > maxChars) joined = `${joined.slice(0, maxChars - 3).trim()}...`;
+  return enforceLanguagePurity(joined, lang);
 }
 
 function buildTopPerceptionInsight({ lang, firstPerception, fallbackNarrative, roleSuggestions }) {
   const tr = lang === "TR";
   const fp = String(firstPerception || "").trim();
-  if (fp) return sanitizeRecruiterNarrative(fp, lang);
+  if (fp) return keepShortRecruiterLine(scrubRecruiterJargon(sanitizeRecruiterNarrative(fp, lang), lang), 2, lang, 200);
   const n = String(fallbackNarrative || "").trim();
   if (tr) {
-    if (/product|growth|urun/i.test(n)) return "Recruiter seni daha cok growth/product tarafina konumlandiriyor.";
-    if (/risk|tereddut|soru isareti|emin olamad/i.test(n)) return "Ilk bakista potansiyel var ama kafada soru isareti birakiyor.";
-    if (Array.isArray(roleSuggestions) && roleSuggestions.length) return "Seni tamamen disari atmiyor ama daha guclu role-fit ariyor.";
-    return "Ilk bakista seni maybe tarafinda konumlandiriyor.";
+    if (/product|growth|urun/i.test(n)) return enforceLanguagePurity(scrubRecruiterJargon("Builder enerjisi var; ilk bakista dikkat cekiyor.", lang), lang);
+    if (/risk|tereddut|soru isareti|emin olamad/i.test(n)) return enforceLanguagePurity(scrubRecruiterJargon("Ilk bakista kafamda soru isareti var.", lang), lang);
+    if (Array.isArray(roleSuggestions) && roleSuggestions.length) return enforceLanguagePurity(scrubRecruiterJargon("Guclu taraflarin baska rollerde daha gorunur; bu ilanda tam oturmuyor.", lang), lang);
+    return enforceLanguagePurity(scrubRecruiterJargon("Daginik degil ama hala netlesmemis.", lang), lang);
   }
-  if (/product|growth/i.test(n)) return "A recruiter is likely to position you closer to growth/product.";
-  if (/risk|hesitation|question/i.test(n)) return "At first glance, there is potential but still a visible question mark.";
-  if (Array.isArray(roleSuggestions) && roleSuggestions.length) return "You are not fully out, but the recruiter may prefer a stronger role fit.";
-  return "At first glance, the recruiter likely keeps you in the maybe range.";
+  if (/product|growth/i.test(n)) return enforceLanguagePurity(scrubRecruiterJargon("You give builder energyâ€”it pops on a quick scan.", lang), lang);
+  if (/risk|hesitation|question/i.test(n)) return enforceLanguagePurity(scrubRecruiterJargon("First pass still leaves a question mark for me.", lang), lang);
+  if (Array.isArray(roleSuggestions) && roleSuggestions.length) return enforceLanguagePurity(scrubRecruiterJargon("Your strong side shows up more in other lanes than in this exact posting.", lang), lang);
+  return enforceLanguagePurity(scrubRecruiterJargon("Not messy, but not crisp enough for a fast yes yet.", lang), lang);
 }
 function buildRecruiterWantedSignal({ lang, reasons, recruiterView, firstAction, structured }) {
   const tr = lang === "TR";
   const structuredConcern = String(structured?.core_concern || "").trim();
-  if (structuredConcern) return sanitizeRecruiterNarrative(structuredConcern, lang);
+  if (structuredConcern) {
+    return enforceLanguagePurity(
+      scrubRecruiterJargon(sanitizeRecruiterNarrative(structuredConcern, lang), lang),
+      lang
+    );
+  }
   const text = `${(reasons || []).join(" ")} ${String(recruiterView || "")} ${String(firstAction || "")} ${String(structured?.internal_monologue || "")}`.toLowerCase();
   if (/(seo|icerik|content)/i.test(text)) {
-    return tr
-      ? "SEO ve icerik tarafinda dogrudan execution ornegi."
-      : "A direct execution example in SEO/content work.";
+    return enforceLanguagePurity(
+      tr
+        ? scrubRecruiterJargon("Bu ilanin SEO/icerik tarafinda somut bir ornek gormek istiyorum.", lang)
+        : scrubRecruiterJargon("I want one concrete example on the SEO/content side this posting cares about.", lang),
+      lang
+    );
   }
   if (/(kpi|metric|metrik|growth|conversion|donusum)/i.test(text)) {
-    return tr
-      ? "Role ozel KPI etkisini gosteren somut sonuc satiri."
-      : "A role-specific KPI impact line with concrete outcomes.";
+    return enforceLanguagePurity(
+      tr
+        ? scrubRecruiterJargon("Sayi uydurmadan, CV'de savunabilecegin bir sonuc satiri yaz.", lang)
+        : scrubRecruiterJargon("Add one outcome line you can defendâ€”no invented numbers.", lang),
+      lang
+    );
   }
   if (/(teknik|technical|depth|derinlik|ownership)/i.test(text)) {
-    return tr
-      ? "Role ozel teknik derinlik ve ownership gostergesi."
-      : "A clear signal of role-specific technical depth and ownership.";
+    return enforceLanguagePurity(
+      tr
+        ? scrubRecruiterJargon("Muhendislik/teknik tarafta CV'de kopruyu net goremiyorum.", lang)
+        : scrubRecruiterJargon("I cannot see a clear technical bridge on the CV for this posting.", lang),
+      lang
+    );
   }
-  if (tr) return "Bu rolun beklentisine dogrudan baglanan somut execution sinyali.";
-  return "A concrete execution signal directly tied to this role’s expectation.";
+  if (tr) return enforceLanguagePurity(scrubRecruiterJargon("Bu role baglanan proje satirini goremiyorum.", lang), lang);
+  return enforceLanguagePurity(scrubRecruiterJargon("I do not see a project line that ties you to this role.", lang), lang);
+}
+
+function mapHumanRecruiterBadge(label, lang) {
+  const tr = String(lang || "").toUpperCase() === "TR";
+  const t = String(label || "").toLowerCase();
+  if (/ürün|urun|product|pdm|\bpm\b/.test(t)) return tr ? "Urun odakli profil" : "Product-led profile";
+  if (/founder|kurucu|co[- ]?founder/.test(t)) return tr ? "Founder enerjisi" : "Founder energy";
+  if (/kpi|metrik|metric|growth|conversion|donusum/.test(t)) return tr ? "Sonuc gecmisi" : "Results track record";
+  if (/builder|ship|teslim|delivery|launch|yayin|release/.test(t)) return tr ? "Builder profili" : "Builder profile";
+  if (/owner|sahiplen|ownership/.test(t)) return tr ? "Guclu ownership" : "Strong ownership";
+  if (/proje|project/.test(t)) return tr ? "Gercek proje deneyimi" : "Real project depth";
+  if (/execution|uygulama|operasyon|operations/.test(t)) return tr ? "Teslim gecmisi" : "Shipping track";
+  if (/data|analyst|sql|\bbi\b/.test(t)) return tr ? "Veri taraflı okuma" : "Data-side read";
+  return String(label || "").trim();
+}
+
+function polishRecruiterChipLabel(label, lang) {
+  let s = mapHumanRecruiterBadge(String(label || "").trim(), lang);
+  return visibleRecruiterCopy(s, lang, { maxSentences: 1 });
 }
 
 function normalizeRecruiterSignalTags(tags, lang) {
   const tr = lang === "TR";
   const raw = Array.isArray(tags) ? tags.map((x) => String(x || "").trim()).filter(Boolean) : [];
-  const picked = [...new Set(raw)].slice(0, 4);
+  const picked = [...new Set(raw.map((x) => polishRecruiterChipLabel(x, lang)).filter(Boolean))].slice(0, 4);
   if (picked.length) {
     return picked.map((label, i) => withSignalTheme(label, i));
   }
-  const fallback = tr ? ["Role-fit sinyali"] : ["Role-fit signal"];
+  const fallback = tr ? ["Net teslim", "Somut örnek"] : ["Clear delivery", "Concrete proof"];
   return fallback.map((label, i) => withSignalTheme(label, i));
 }
 
@@ -8475,3 +10385,7 @@ function withSignalTheme(label, i) {
 }
 
 export default HireFitLayout;
+
+
+
+

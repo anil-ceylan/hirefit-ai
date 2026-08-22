@@ -56,13 +56,13 @@ body::-webkit-scrollbar-thumb:hover,
 }
 
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.5;
   font-weight: 400;
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: dark;
+  color: #f8fafc;
+  background-color: #09090b;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -103,8 +103,10 @@ svg {
 }
 
 h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+  font-family: var(--font-display);
+  font-size: var(--text-heading-xl);
+  line-height: var(--leading-heading);
+  letter-spacing: var(--tracking-heading);
 }
 
 button {
@@ -284,3 +286,10 @@ button:focus-visible {
   place-items: center;
   animation: hfPipelineCheckPop 0.38s cubic-bezier(0.34, 1.45, 0.64, 1) both;
 }
+
+
+.hf-auth-remember:focus-within {
+  outline: 2px solid rgba(96, 165, 250, 0.85);
+  outline-offset: 3px;
+}
+

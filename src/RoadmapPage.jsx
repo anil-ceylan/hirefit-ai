@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronUp, Copy, ArrowRight, Download, Linkedin, Loader2, Share2 } from "lucide-react";
 import { parseLearningRoadmapToSteps, parseRoadmapStepDescription } from "./roadmapUtils";
 import { parseLocalStorageJson } from "./utils/safeJson";
@@ -211,7 +211,7 @@ function serializeHirefitRoadmapSvg(p) {
       const mid = +(x + w / 2).toFixed(2);
       const ty = +(y + Math.min(26, h * 0.22)).toFixed(2);
       const cfid = c.cardFilterId || "hirefit-card-shadow";
-      return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="${c.fill}" stroke="${c.stroke}" stroke-width="1.5" filter="url(#${cfid})"/><text x="${mid}" y="${ty}" text-anchor="middle" fill="#f1f5f9" font-family="DM Sans,system-ui,sans-serif" font-size="13" font-weight="700">${t}</text></g>`;
+      return `<g><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="${c.fill}" stroke="${c.stroke}" stroke-width="1.5" filter="url(#${cfid})"/><text x="${mid}" y="${ty}" text-anchor="middle" fill="#f1f5f9" font-family="Geist,system-ui,sans-serif" font-size="13" font-weight="700">${t}</text></g>`;
     })
     .join("");
 
@@ -227,22 +227,22 @@ function serializeHirefitRoadmapSvg(p) {
   if (yah) {
     youSvg = `<g>
       <rect x="${+yah.pillX.toFixed(2)}" y="${+yah.pillY.toFixed(2)}" width="${+yah.pillW.toFixed(2)}" height="${+yah.pillH.toFixed(2)}" rx="12" fill="rgba(30,27,75,0.95)" stroke="rgba(186,198,255,0.55)" stroke-width="1.5" filter="url(#hirefit-pill-glow)"/>
-      <text x="${+yah.tx.toFixed(2)}" y="${+yah.ty.toFixed(2)}" text-anchor="middle" fill="#eef2ff" font-family="DM Sans,system-ui,sans-serif" font-size="13" font-weight="800" letter-spacing="0.06em">${escapeXmlText(youLabel)}</text>
+      <text x="${+yah.tx.toFixed(2)}" y="${+yah.ty.toFixed(2)}" text-anchor="middle" fill="#eef2ff" font-family="Geist,system-ui,sans-serif" font-size="13" font-weight="800" letter-spacing="0.06em">${escapeXmlText(youLabel)}</text>
     </g>`;
   }
 
   const identity = identityLine
-    ? `<text x="${hw}" y="68" text-anchor="middle" fill="#a5b4fc" font-family="DM Sans,system-ui,sans-serif" font-size="12" font-weight="700">${escapeXmlText(identityLine)}</text>`
+    ? `<text x="${hw}" y="68" text-anchor="middle" fill="#a5b4fc" font-family="Geist,system-ui,sans-serif" font-size="12" font-weight="700">${escapeXmlText(identityLine)}</text>`
     : "";
   const progY = progressLine ? (identityLine ? 94 : 84) : 0;
   const prog = progressLine
-    ? `<text x="${hw}" y="${progY}" text-anchor="middle" fill="#94a3b8" font-family="DM Sans,system-ui,sans-serif" font-size="13" font-weight="600">${escapeXmlText(progressLine)}</text>`
+    ? `<text x="${hw}" y="${progY}" text-anchor="middle" fill="#94a3b8" font-family="Geist,system-ui,sans-serif" font-size="13" font-weight="600">${escapeXmlText(progressLine)}</text>`
     : "";
   const footerH = 46;
   const mapMidYrel = (totalH - headerH - footerH) / 2;
   const mw =
     mapWatermark && mapMidYrel > 40
-      ? `<text x="${hw}" y="${(mapMidYrel + 18).toFixed(0)}" text-anchor="middle" fill="#e2e8f0" opacity="0.07" font-family="Syne,DM Sans,system-ui,sans-serif" font-size="38" font-weight="800" letter-spacing="0.2em">${escapeXmlText(mapWatermark)}</text>`
+      ? `<text x="${hw}" y="${(mapMidYrel + 18).toFixed(0)}" text-anchor="middle" fill="#e2e8f0" opacity="0.07" font-family="Manrope,Geist,system-ui,sans-serif" font-size="38" font-weight="800" letter-spacing="0.2em">${escapeXmlText(mapWatermark)}</text>`
       : "";
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -354,8 +354,8 @@ function serializeHirefitRoadmapSvg(p) {
   </radialGradient>
 </defs>
 <rect width="${totalW}" height="${totalH}" fill="#070b12"/>
-<text x="${hw}" y="22" text-anchor="middle" fill="#64748b" font-family="DM Sans,system-ui,sans-serif" font-size="11" font-weight="700" letter-spacing="0.18em">${escapeXmlText(kicker)}</text>
-<text x="${hw}" y="54" text-anchor="middle" fill="#f1f5f9" font-family="Syne,DM Sans,system-ui,sans-serif" font-size="22" font-weight="800">${escapeXmlText(headline)}</text>
+<text x="${hw}" y="22" text-anchor="middle" fill="#64748b" font-family="Geist,system-ui,sans-serif" font-size="11" font-weight="700" letter-spacing="0.18em">${escapeXmlText(kicker)}</text>
+<text x="${hw}" y="54" text-anchor="middle" fill="#f1f5f9" font-family="Manrope,Geist,system-ui,sans-serif" font-size="22" font-weight="800">${escapeXmlText(headline)}</text>
 ${identity}
 ${prog}
 <g transform="translate(0,${dy})">
@@ -366,8 +366,8 @@ ${prog}
   ${nodeEls}
   ${youSvg}
 </g>
-<text x="${hw}" y="${totalH - 24}" text-anchor="middle" fill="#94a3b8" font-family="Syne,DM Sans,system-ui,sans-serif" font-size="12" font-weight="800" letter-spacing="0.14em">${escapeXmlText(footerBrand)}</text>
-<text x="${hw}" y="${totalH - 8}" text-anchor="middle" fill="#64748b" font-family="DM Sans,system-ui,sans-serif" font-size="11" font-weight="600">${escapeXmlText(footerWatermark)}</text>
+<text x="${hw}" y="${totalH - 24}" text-anchor="middle" fill="#94a3b8" font-family="Manrope,Geist,system-ui,sans-serif" font-size="12" font-weight="800" letter-spacing="0.14em">${escapeXmlText(footerBrand)}</text>
+<text x="${hw}" y="${totalH - 8}" text-anchor="middle" fill="#64748b" font-family="Geist,system-ui,sans-serif" font-size="11" font-weight="600">${escapeXmlText(footerWatermark)}</text>
 </svg>`;
 }
 
@@ -607,7 +607,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
         padding: 20px 26px;
         border-radius: 18px;
         text-align: center;
-        font-family: 'DM Sans', sans-serif;
+        font-family: var(--font-sans);
         font-size: clamp(17px, 4vw, 20px);
         font-weight: 800;
         line-height: 1.45;
@@ -676,7 +676,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
         background: linear-gradient(135deg, rgba(15,23,42,0.94), rgba(30,27,75,0.92));
         border: 1px solid rgba(129,140,248,0.38);
         box-shadow: 0 12px 40px rgba(0,0,0,0.5), 0 0 36px rgba(99,102,241,0.25);
-        font-family: 'DM Sans', sans-serif;
+        font-family: var(--font-sans);
         text-align: center;
         pointer-events: none;
         animation: roadmapCelebrateBarIn 0.42s cubic-bezier(0.22,1,0.36,1) forwards;
@@ -725,7 +725,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
         animation: roadmapFocusXpPillOut 0.52s ease forwards;
       }
       .roadmap-focus-xp-pill-line1 {
-        font-family: 'DM Sans', sans-serif;
+        font-family: var(--font-sans);
         font-size: 11px;
         font-weight: 800;
         color: #ecfccb;
@@ -734,7 +734,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
         text-shadow: 0 0 12px rgba(190,242,100,0.35);
       }
       .roadmap-focus-xp-pill-line2 {
-        font-family: 'DM Sans', sans-serif;
+        font-family: var(--font-sans);
         font-size: 10px;
         font-weight: 700;
         color: #a5f3fc;
@@ -758,7 +758,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
         margin-bottom: 2px;
         transform: translateX(-50%);
         font-size: 11px;
-        font-weight: 900;
+        font-weight: 800;
         color: #4ade80;
         white-space: nowrap;
         text-shadow: 0 0 12px rgba(74,222,128,0.55);
@@ -1612,7 +1612,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
       textTransform: "uppercase",
       letterSpacing: "0.1em",
       fontWeight: 600,
-      fontFamily: "'DM Sans', sans-serif",
+      fontFamily: "var(--font-sans)",
       color: "#64748b",
       marginBottom: 8,
     };
@@ -1621,7 +1621,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
       fontWeight: 600,
       lineHeight: 1.85,
       color: futureJourney && !isFocused ? "#94a3b8" : "#cbd5e1",
-      fontFamily: "'DM Sans', sans-serif",
+      fontFamily: "var(--font-sans)",
     };
 
     const lpaKindsMeta = [
@@ -1813,7 +1813,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                 fontSize: 9,
                 fontWeight: 800,
                 letterSpacing: "0.12em",
-                fontFamily: "'DM Sans', sans-serif",
+                fontFamily: "var(--font-sans)",
                 color: "#e0e7ff",
                 background: "linear-gradient(135deg, rgba(79,70,229,0.95), rgba(59,130,246,0.92))",
                 border: "1px solid rgba(165,180,252,0.55)",
@@ -1828,7 +1828,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
           <div
             style={{
               fontWeight: 700,
-              fontFamily: "'DM Sans', sans-serif",
+              fontFamily: "var(--font-sans)",
               fontSize: 15,
               color: futureJourney && !isFocused ? "#94a3b8" : "#f1f5f9",
               marginBottom: 14,
@@ -1891,7 +1891,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 6,
-                  fontFamily: "'DM Sans', sans-serif",
+                  fontFamily: "var(--font-sans)",
                 }}
               >
                 <ChevronDown size={14} aria-hidden />
@@ -1949,7 +1949,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       fontSize: 12,
                       fontWeight: 700,
                       cursor: "pointer",
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     {isExpanded ? showLessLabel : showMoreLabel}
@@ -1992,7 +1992,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       fontSize: 12,
                       fontWeight: 700,
                       cursor: "pointer",
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     {isExpanded ? showLessLabel : showMoreLabel}
@@ -2022,7 +2022,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                   alignItems: "center",
                   gap: 6,
                   alignSelf: "flex-start",
-                  fontFamily: "'DM Sans', sans-serif",
+                  fontFamily: "var(--font-sans)",
                   color: "#94a3b8",
                 }}
               >
@@ -2152,7 +2152,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
               letterSpacing: "0.08em",
               textTransform: "uppercase",
               color: "#fde68a",
-              fontFamily: "'DM Sans', sans-serif",
+              fontFamily: "var(--font-sans)",
               textAlign: "center",
               lineHeight: 1.25,
               maxWidth: 88,
@@ -2191,10 +2191,10 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
           }}
         >
           <div style={{ fontSize: 20, marginBottom: 6, lineHeight: 1, filter: "drop-shadow(0 0 8px rgba(250,204,21,0.5))" }}>★</div>
-          <div style={{ fontWeight: 800, fontFamily: "'DM Sans', sans-serif", fontSize: 17, color: "#f8fafc", marginBottom: 8, letterSpacing: "0.06em" }}>
+          <div style={{ fontWeight: 800, fontFamily: "var(--font-sans)", fontSize: 17, color: "#f8fafc", marginBottom: 8, letterSpacing: "0.06em" }}>
             {lang === "TR" ? "HEDEF ROL" : "TARGET ROLE"}
           </div>
-          <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6, fontFamily: "'DM Sans', sans-serif" }}>
+          <div style={{ color: "#e2e8f0", fontSize: 13, lineHeight: 1.6, fontFamily: "var(--font-sans)" }}>
             {effectiveRole || (lang === "TR" ? "Hedeflediğiniz rol ve seviye" : "Your target role and seniority")}
             {effectiveSeniority ? ` · ${effectiveSeniority}` : ""}
           </div>
@@ -2470,12 +2470,12 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 20px 56px", minHeight: "calc(100vh - 80px)" }}>
       <header style={{ marginBottom: isMobile ? 22 : 28, textAlign: isMobile ? "left" : "center" }}>
-        <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: "clamp(26px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-0.03em", color: "#f1f5f9", marginBottom: 8 }}>
+        <h1 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(26px, 4vw, 40px)", fontWeight: 800, letterSpacing: "-0.03em", color: "#f1f5f9", marginBottom: 8 }}>
           {t.careerJourneyTitle}
         </h1>
-        <p style={{ fontSize: "clamp(15px, 2vw, 18px)", fontWeight: 600, color: "#93c5fd", marginBottom: isMobile ? 0 : 10, fontFamily: "'DM Sans', sans-serif" }}>{roleLine}</p>
+        <p style={{ fontSize: "clamp(15px, 2vw, 18px)", fontWeight: 600, color: "#93c5fd", marginBottom: isMobile ? 0 : 10, fontFamily: "var(--font-sans)" }}>{roleLine}</p>
         {!isMobile ? (
-          <p style={{ fontSize: 14, color: "#64748b", lineHeight: 1.65, maxWidth: 560, margin: "0 auto", fontFamily: "'DM Sans', sans-serif" }}>{t.careerJourneyBlurb}</p>
+          <p style={{ fontSize: 14, color: "#64748b", lineHeight: 1.65, maxWidth: 560, margin: "0 auto", fontFamily: "var(--font-sans)" }}>{t.careerJourneyBlurb}</p>
         ) : null}
       </header>
 
@@ -2498,7 +2498,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
               letterSpacing: "0.22em",
               textTransform: "uppercase",
               color: "#64748b",
-              fontFamily: "'DM Sans', sans-serif",
+              fontFamily: "var(--font-sans)",
               margin: "0 0 16px",
             }}
           >
@@ -2571,7 +2571,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                     letterSpacing: "0.2em",
                     color: "#e0e7ff",
                     marginBottom: 20,
-                    fontFamily: "'DM Sans', sans-serif",
+                    fontFamily: "var(--font-sans)",
                   }}
                 >
                   {lang === "TR" ? "SIRADAKİ ZAFERİN" : "YOUR NEXT WIN"}
@@ -2629,7 +2629,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                             fontWeight: 800,
                             color: "#f8fafc",
                             lineHeight: 1.4,
-                            fontFamily: "'DM Sans', sans-serif",
+                            fontFamily: "var(--font-sans)",
                           }}
                         >
                           {body}
@@ -2649,7 +2649,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                                 fontWeight: 800,
                                 letterSpacing: "0.06em",
                                 color: "#6ee7b7",
-                                fontFamily: "'DM Sans', sans-serif",
+                                fontFamily: "var(--font-sans)",
                                 marginBottom: 8,
                               }}
                             >
@@ -2667,7 +2667,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                                   textDecoration: "underline",
                                   textUnderlineOffset: 3,
                                   wordBreak: "break-word",
-                                  fontFamily: "'DM Sans', sans-serif",
+                                  fontFamily: "var(--font-sans)",
                                 }}
                               >
                                 {focusJob.jobTitle}
@@ -2685,7 +2685,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                                   fontWeight: 700,
                                   color: "#86efac",
                                   lineHeight: 1.45,
-                                  fontFamily: "'DM Sans', sans-serif",
+                                  fontFamily: "var(--font-sans)",
                                   textShadow: "0 0 14px rgba(52,211,153,0.35)",
                                 }}
                               >
@@ -2700,7 +2700,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                                   fontWeight: 600,
                                   color: "rgba(167,243,208,0.92)",
                                   lineHeight: 1.45,
-                                  fontFamily: "'DM Sans', sans-serif",
+                                  fontFamily: "var(--font-sans)",
                                 }}
                               >
                                 {lang === "TR"
@@ -2717,7 +2717,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                                   fontWeight: 700,
                                   color: "rgba(251,191,36,0.92)",
                                   lineHeight: 1.45,
-                                  fontFamily: "'DM Sans', sans-serif",
+                                  fontFamily: "var(--font-sans)",
                                 }}
                               >
                                 {lang === "TR"
@@ -2731,7 +2731,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                                   fontWeight: 600,
                                   color: "rgba(245,158,11,0.78)",
                                   lineHeight: 1.45,
-                                  fontFamily: "'DM Sans', sans-serif",
+                                  fontFamily: "var(--font-sans)",
                                 }}
                               >
                                 {lang === "TR"
@@ -2748,7 +2748,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                               fontSize: 14,
                               fontWeight: 600,
                               color: "#94a3b8",
-                              fontFamily: "'DM Sans', sans-serif",
+                              fontFamily: "var(--font-sans)",
                             }}
                           >
                             {lang === "TR" ? `≈ ${timeLabel}` : `~ ${timeLabel}`}
@@ -2771,7 +2771,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                                 letterSpacing: "0.14em",
                                 color: "#94a3b8",
                                 marginBottom: 8,
-                                fontFamily: "'DM Sans', sans-serif",
+                                fontFamily: "var(--font-sans)",
                               }}
                             >
                               {lang === "TR" ? "İLAN LİNKİNİ YAPIŞTIR" : "PASTE JOB LINK"}
@@ -2799,7 +2799,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                                   background: "rgba(15,23,42,0.75)",
                                   color: "#e2e8f0",
                                   fontSize: 14,
-                                  fontFamily: "'DM Sans', sans-serif",
+                                  fontFamily: "var(--font-sans)",
                                   outline: "none",
                                 }}
                               />
@@ -2812,7 +2812,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                                   borderRadius: 10,
                                   fontWeight: 800,
                                   fontSize: 13,
-                                  fontFamily: "'DM Sans', sans-serif",
+                                  fontFamily: "var(--font-sans)",
                                   whiteSpace: "nowrap",
                                 }}
                               >
@@ -2832,7 +2832,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                                   fontSize: 12,
                                   fontWeight: 600,
                                   cursor: "pointer",
-                                  fontFamily: "'DM Sans', sans-serif",
+                                  fontFamily: "var(--font-sans)",
                                   textDecoration: "underline",
                                 }}
                               >
@@ -2858,7 +2858,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       borderRadius: 14,
                       fontWeight: 800,
                       cursor: focusTaskSubmitting ? "wait" : "pointer",
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                       opacity: focusTaskSubmitting ? 0.9 : 1,
                       display: "inline-flex",
                       alignItems: "center",
@@ -2901,12 +2901,12 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                         letterSpacing: "0.16em",
                         color: "#818cf8",
                         marginBottom: 6,
-                        fontFamily: "'DM Sans', sans-serif",
+                        fontFamily: "var(--font-sans)",
                       }}
                     >
                       {lang === "TR" ? "SIRADA:" : "UP NEXT:"}
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", lineHeight: 1.45, fontFamily: "'DM Sans', sans-serif" }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", lineHeight: 1.45, fontFamily: "var(--font-sans)" }}>
                       {nextTaskPreview}
                     </div>
                   </div>
@@ -2923,7 +2923,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                   fontSize: 15,
                   fontWeight: 700,
                   color: "#a7f3d0",
-                  fontFamily: "'DM Sans', sans-serif",
+                  fontFamily: "var(--font-sans)",
                 }}
               >
                 {lang === "TR"
@@ -2968,14 +2968,14 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       letterSpacing: "0.14em",
                       color: "#64748b",
                       marginBottom: 6,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     {lang === "TR" ? "İLERLEME" : "PROGRESS"}
                   </div>
                   <div
                     className="roadmap-progress-pct-wrap"
-                    style={{ position: "relative", display: "inline-block", fontFamily: "'DM Sans', sans-serif" }}
+                    style={{ position: "relative", display: "inline-block", fontFamily: "var(--font-sans)" }}
                   >
                     {floatingProgressDelta ? (
                       <span className="roadmap-delta-float" key={`hero-${progressGlowNonce}`}>
@@ -3005,7 +3005,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       fontWeight: 600,
                       color: "rgba(148,163,184,0.95)",
                       lineHeight: 1.35,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     {lang === "TR" ? "İvme kazanıyorsun." : "You're building momentum."}
@@ -3029,7 +3029,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       letterSpacing: "0.14em",
                       color: "#64748b",
                       marginBottom: 6,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     {lang === "TR" ? "SERİ" : "STREAK"}
@@ -3042,7 +3042,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       fontSize: "clamp(20px, 3.5vw, 26px)",
                       fontWeight: 800,
                       color: "#fdba74",
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                       animation: "roadmapPercentPop 0.5s cubic-bezier(0.34,1.3,0.64,1)",
                     }}
                   >
@@ -3055,7 +3055,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       fontWeight: 600,
                       color: "rgba(253,224,200,0.75)",
                       marginTop: 4,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     {lang === "TR" ? "gün" : streak.count === 1 ? "day" : "days"}
@@ -3080,7 +3080,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       letterSpacing: "0.14em",
                       color: "#64748b",
                       marginBottom: 6,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     {lang === "TR" ? "KARŞILAŞTIRMA" : "VS OTHERS"}
@@ -3093,7 +3093,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       fontWeight: 700,
                       color: "#86efac",
                       lineHeight: 1.35,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     {lang === "TR"
@@ -3138,18 +3138,18 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                 letterSpacing: "0.2em",
                 color: "#475569",
                 marginBottom: 6,
-                fontFamily: "'DM Sans', sans-serif",
+                fontFamily: "var(--font-sans)",
               }}
             >
               {lang === "TR" ? "YOLCULUK HARİTASI" : "BACKGROUND JOURNEY"}
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#64748b", fontFamily: "'DM Sans', sans-serif" }}>{exportRoleHeadline}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#64748b", fontFamily: "var(--font-sans)" }}>{exportRoleHeadline}</div>
           </div>
 
           <div
             style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 12, marginBottom: 20, alignItems: "center" }}
           >
-            <div style={{ fontSize: 13, fontWeight: 700, color: T.green, fontFamily: "'DM Sans', sans-serif", marginRight: "auto" }}>{t.learningRoadmapTitle}</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: T.green, fontFamily: "var(--font-sans)", marginRight: "auto" }}>{t.learningRoadmapTitle}</div>
             <button type="button" className="hf-btn-ghost" onClick={() => navigator.clipboard.writeText(effectivePlan)} style={{ fontSize: 12, padding: "8px 14px", borderRadius: 8, display: "inline-flex", alignItems: "center", gap: 6 }}>
               <Copy size={12} />
               {t.copy}
@@ -3286,7 +3286,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       fontWeight: 800,
                       letterSpacing: "0.06em",
                       color: "#eef2ff",
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                       whiteSpace: "nowrap",
                     }}
                   >
@@ -3318,7 +3318,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                 letterSpacing: "0.14em",
                 textTransform: "uppercase",
                 color: "rgba(148,163,184,0.75)",
-                fontFamily: "'Syne', sans-serif",
+                fontFamily: "var(--font-display)",
                 marginBottom: 6,
               }}
             >
@@ -3330,7 +3330,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                 fontWeight: 600,
                 letterSpacing: "0.06em",
                 color: "rgba(148,163,184,0.5)",
-                fontFamily: "'DM Sans', sans-serif",
+                fontFamily: "var(--font-sans)",
               }}
             >
               {exportWatermark}
@@ -3358,14 +3358,14 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
               color: "#e2e8f0",
               fontSize: 20,
               fontWeight: 800,
-              fontFamily: "'Syne', sans-serif",
+              fontFamily: "var(--font-display)",
               marginBottom: 12,
               lineHeight: 1.35,
             }}
           >
             {lang === "TR" ? "Kariyer yol haritanızı saniyeler içinde oluşturun" : "Generate your career roadmap in seconds"}
           </p>
-          <p style={{ color: "#94a3b8", fontSize: 15, lineHeight: 1.65, fontFamily: "'DM Sans', sans-serif", marginBottom: 24 }}>
+          <p style={{ color: "#94a3b8", fontSize: 15, lineHeight: 1.65, fontFamily: "var(--font-sans)", marginBottom: 24 }}>
             {t.roadmapPageEmpty}
           </p>
           <button
@@ -3439,7 +3439,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
             color: "#f8fafc",
             fontSize: 14,
             fontWeight: 700,
-            fontFamily: "'DM Sans', sans-serif",
+            fontFamily: "var(--font-sans)",
             boxShadow: "0 16px 48px rgba(0,0,0,0.45)",
             animation: "roadmapToastIn 0.35s ease",
             maxWidth: "min(440px, 94vw)",
@@ -3488,7 +3488,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                 <h2
                   id="roadmap-share-title"
                   style={{
-                    fontFamily: "'Syne', sans-serif",
+                    fontFamily: "var(--font-display)",
                     fontSize: 22,
                     fontWeight: 800,
                     color: "#f8fafc",
@@ -3498,7 +3498,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                 >
                   {lang === "TR" ? "🚀 Çoğu adayın önündesin" : "You're ahead of most candidates 🚀"}
                 </h2>
-                <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.6, fontFamily: "'DM Sans', sans-serif", marginBottom: 22 }}>
+                <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.6, fontFamily: "var(--font-sans)", marginBottom: 22 }}>
                   {lang === "TR" ? "Kariyer yolunu inşa etmeye başladın." : "You've started building your career path."}
                 </p>
                 {shareFeedback ? (
@@ -3508,7 +3508,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       fontWeight: 700,
                       color: "#4ade80",
                       marginBottom: 14,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     {shareFeedback === "linkedin"
@@ -3537,7 +3537,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       alignItems: "center",
                       justifyContent: "center",
                       gap: 10,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     <Linkedin size={18} />
@@ -3557,7 +3557,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       alignItems: "center",
                       justifyContent: "center",
                       gap: 10,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     <Copy size={18} />
@@ -3575,7 +3575,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       fontSize: 13,
                       fontWeight: 600,
                       cursor: "pointer",
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     {lang === "TR" ? "Kapat" : "Close"}
@@ -3587,7 +3587,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                 <h2
                   id="roadmap-share-title"
                   style={{
-                    fontFamily: "'Syne', sans-serif",
+                    fontFamily: "var(--font-display)",
                     fontSize: 22,
                     fontWeight: 800,
                     color: "#f8fafc",
@@ -3597,7 +3597,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                 >
                   {lang === "TR" ? "🚀 Kariyer yolun hazır" : "🚀 Your Career Path is Ready"}
                 </h2>
-                <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.6, fontFamily: "'DM Sans', sans-serif", marginBottom: 22 }}>
+                <p style={{ fontSize: 14, color: "#94a3b8", lineHeight: 1.6, fontFamily: "var(--font-sans)", marginBottom: 22 }}>
                   {lang === "TR"
                     ? "Yol haritanızı paylaşın ve gelişim yolculuğunuzu gösterin."
                     : "Share your roadmap and show your journey."}
@@ -3609,7 +3609,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       fontWeight: 700,
                       color: "#4ade80",
                       marginBottom: 14,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     {shareFeedback === "linkedin"
@@ -3648,7 +3648,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       alignItems: "center",
                       justifyContent: "center",
                       gap: 10,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     <Share2 size={18} />
@@ -3668,7 +3668,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       alignItems: "center",
                       justifyContent: "center",
                       gap: 10,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     <Linkedin size={18} />
@@ -3690,7 +3690,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       justifyContent: "center",
                       gap: 10,
                       opacity: downloading ? 0.65 : 1,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     <Download size={18} />
@@ -3712,7 +3712,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       justifyContent: "center",
                       gap: 10,
                       opacity: downloading ? 0.65 : 1,
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     <Download size={18} />
@@ -3730,7 +3730,7 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
                       fontSize: 13,
                       fontWeight: 600,
                       cursor: "pointer",
-                      fontFamily: "'DM Sans', sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}
                   >
                     {lang === "TR" ? "Kapat" : "Close"}
@@ -3744,3 +3744,5 @@ export default function RoadmapPage({ navigate, lang, t, learningPlan, roleType,
     </div>
   );
 }
+
+

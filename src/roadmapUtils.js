@@ -1,4 +1,4 @@
-export function cleanRoadmapTitle(line) {
+﻿export function cleanRoadmapTitle(line) {
   return line.replace(/^#+\s*/, "").replace(/\*\*/g, "").trim();
 }
 
@@ -134,3 +134,4 @@ export function parseRoadmapStepDescription(raw) {
   const description = descriptionLines.join("\n").trim();
   return { resource, hours, description, tasks };
 }
+

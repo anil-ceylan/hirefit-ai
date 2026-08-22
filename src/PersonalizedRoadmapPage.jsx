@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { parseLocalStorageJson } from "./utils/safeJson";
 
@@ -46,8 +46,8 @@ function detectRoleCandidates({ engineV2, analysisData, cvText, lang }) {
   const pushInf = (role, score, why) => inferred.push({ role, score, why });
   if (/sql|python|power bi|tableau|analytics|analysis|veri/i.test(cv)) {
     pushInf(lang === "TR" ? "Veri Analisti" : "Data Analyst", 72, lang === "TR"
-      ? "CV'nde analitik düşünme ve veriyle çalışma sinyali var."
-      : "Your CV already shows analytical thinking and data signal.");
+      ? "CV'nde analitik düşünme ve veriyle çalışma tarafın güçlü."
+      : "Your CV already shows analytical thinking and data work.");
   }
   if (/business|stakeholder|report|excel|process|iş/i.test(cv)) {
     pushInf(lang === "TR" ? "İş Analisti" : "Business Analyst", 68, lang === "TR"
@@ -56,19 +56,19 @@ function detectRoleCandidates({ engineV2, analysisData, cvText, lang }) {
   }
   if (/product|roadmap|feature|user|ux/i.test(cv)) {
     pushInf(lang === "TR" ? "Ürün Analisti" : "Product Analyst", 64, lang === "TR"
-      ? "Ürün ve karar desteği tarafında güçlü sinyallerin var."
-      : "You show good signal for product-facing analytical work.");
+      ? "Ürün ve karar desteği tarafında güçlü bir geçmişin var."
+      : "You show strong product-facing analytical work.");
   }
   if (/operations|operasyon|planning|forecast/i.test(cv)) {
     pushInf(lang === "TR" ? "Operasyon Analisti" : "Operations Analyst", 62, lang === "TR"
-      ? "Operasyonel düşünme ve yapı kurma sinyalin net."
+      ? "Operasyonel düşünme ve yapı kurma tarafın net."
       : "You show operational structure and process thinking.");
   }
 
   rows = uniqByRole([...rows, ...inferred]).sort((a, b) => b.score - a.score);
   const fallback = lang === "TR"
     ? [
-        { role: "Veri Analisti", score: 70, why: "Analitik düşünme ve yapılandırılmış problem çözme sinyalin güçlü." },
+        { role: "Veri Analisti", score: 70, why: "Analitik düşünme ve yapılandırılmış problem çözme tarafın güçlü." },
         { role: "İş Analisti", score: 66, why: "İş hedefi ve veri yorumlama tarafına doğal bir geçişin var." },
         { role: "Operasyon Analisti", score: 62, why: "Süreç, raporlama ve karar desteği tarafında güçlü temelin var." },
       ]
@@ -109,11 +109,11 @@ function buildProjectIdea({ topRole, biggestGap, missingSkills, lang }) {
       ? `Bu proje, ${gap} boşluğunu kapatırken mevcut analitik yönünü görünür hale getirir.`
       : `This project closes your ${gap} gap while making your existing analytical strength visible.`,
     dataSource: lang === "TR"
-      ? `Kaggle veya World Bank verisi kullan; odağı ${keySkill} sinyaline bağla.`
-      : `Use Kaggle or World Bank data and tie the output to ${keySkill} signal.`,
+      ? `Kaggle veya World Bank verisi kullan; odağı ${keySkill} ile bağla.`
+      : `Use Kaggle or World Bank data and tie the output to ${keySkill}.`,
     outcome: lang === "TR"
-      ? "Analitik + iş etkisi sinyalini aynı anda kanıtlar ve fit skorunu doğrudan güçlendirir."
-      : "Proves analytical + business impact in one asset and directly strengthens your fit signal.",
+      ? "Analitik + iş etkisini aynı anda kanıtlar; role okunan güçlenir."
+      : "Proves analytical and business impact in one asset and strengthens how you read for the role.",
   };
 }
 
@@ -126,7 +126,7 @@ function roadmapPhases({ topRole, biggestGap, missingSkills, lang }) {
   return {
     p1: [
       lang === "TR" ? `${role} odağını CV özetinin ilk 2 satırına taşı.` : `Rewrite your CV summary around ${role} in first 2 lines.`,
-      lang === "TR" ? `${gap} ile ilgili bölümü net bir cümleyle düzelt.` : `Fix the ${gap} signal with one explicit positioning line.`,
+      lang === "TR" ? `${gap} ile ilgili bölümü tek net cümleyle toparla.` : `Tighten the ${gap} section with one clear positioning line.`,
       lang === "TR" ? "Deneyim kısmına 2 ölçülebilir sonuç (%, zaman, gelir) ekle." : "Add 2 measurable outcomes (%) to your experience bullets.",
     ],
     p2: [
@@ -136,7 +136,7 @@ function roadmapPhases({ topRole, biggestGap, missingSkills, lang }) {
     ],
     p3: [
       lang === "TR" ? `${role} ve yakın rollere odaklan; alakasız ilanları ele.` : `Apply only to ${role} and adjacent tracks; cut mismatch roles.`,
-      lang === "TR" ? `İlanlarda SQL/BI/analitik sinyali olan şirketleri hedefle.` : `Target companies with clear SQL/BI/analytics demand.`,
+      lang === "TR" ? `İlanlarda SQL/BI/analitik beklentisi net yazan şirketleri hedefle.` : `Target companies with clear SQL/BI/analytics demand.`,
       lang === "TR" ? `Her başvuruda özeti ilana göre 3 dakikada mikro düzenle.` : `Do a 3-minute role-tailored summary tweak before each application.`,
     ],
   };
@@ -220,11 +220,11 @@ function CareerNavigationMap({
     : statusByStep[Math.min(currentStepIndex, statusByStep.length - 1)];
   const isExecutionPhase = activeStep.id === "apply";
   const urgencyLine = tr
-    ? "Her beklediğin gün, daha güçlü sinyalle biri senden önce başvuruyor."
-    : "Every day you wait, someone else applies with a stronger signal.";
+    ? "Her beklediğin gün, daha hazır bir profille biri senden önce başvuruyor."
+    : "Every day you wait, someone else applies with a sharper story.";
   const altUrgencyLine = tr
-    ? "Fırsatlar zaman hassastır. Sinyalin tazeyken harekete geç."
-    : "Opportunities are time-sensitive. Act while your signal is fresh.";
+    ? "Fırsatlar zaman hassastır; hazırken harekete geç."
+    : "Opportunities are time-sensitive. Move while your story is fresh.";
 
   const applyTargets = useMemo(() => {
     const p = String(pathLabel || "").toLowerCase();
@@ -260,8 +260,8 @@ function CareerNavigationMap({
     const n = Number(points) || 0;
     if (n >= 15) {
       return tr
-        ? "Top-tier aday sinyaline yaklaştın."
-        : "You're now showing top-tier candidate signal.";
+        ? "Üst lig aday profiline yaklaştın."
+        : "You are now reading closer to a top-tier candidate.";
     }
     if (n === 12) {
       return tr
@@ -311,8 +311,8 @@ function CareerNavigationMap({
   const launchShare = () => {
     if (typeof window === "undefined") return;
     const shareText = tr
-      ? `HireFit ile CV sinyalimi optimize ettim.\nSkor: ${Math.round(scoreBefore || 0)} → ${Math.round(scoreAfter || 0)}\nDüzelttiğim ana hata: ${biggestFix || "Ölçülebilir etki eksikliği"}\nHedef yol: ${pathLabel || "Veri Analisti → Ürün Yöneticisi"}`
-      : `I just optimized my CV with HireFit.\nScore: ${Math.round(scoreBefore || 0)} → ${Math.round(scoreAfter || 0)}\nBiggest mistake fixed: ${biggestFix || "No measurable impact"}\nRole path: ${pathLabel || "Data Analyst → Product Manager"}`;
+      ? `HireFit ile CV'mi sadeleştirdim.\nÖnceki okuma: zayıf → şimdi: daha net\nAna düzeltme: ${biggestFix || "Ölçülebilir etki eksikliği"}\nHedef yol: ${pathLabel || "Veri Analisti → Ürün Yöneticisi"}`
+      : `I tightened my CV with HireFit.\nRead before: weak → now: clearer\nBiggest fix: ${biggestFix || "No measurable impact"}\nRole path: ${pathLabel || "Data Analyst → Product Manager"}`;
     const url = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent("https://hirefit-ai.vercel.app")}&summary=${encodeURIComponent(shareText)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
@@ -584,13 +584,13 @@ function CareerNavigationMap({
           </div>
           <div style={{ fontSize: 12, color: "#bbf7d0", marginTop: 2 }}>
             {tr
-              ? "Artık çoğu adayda olmayan şeye sahipsin: sinyal."
-              : "You now have what most candidates don’t: signal."}
+              ? "Artık çoğu adayda olmayan şeye sahipsin: net bir hikâye."
+              : "You now have what most candidates don’t: a clear story."}
           </div>
           <div style={{ fontSize: 12, color: "#bbf7d0", marginTop: 2 }}>
             {tr
               ? "Belirsizliği yapılandırılmış, işe alınabilir bir profile çevirdin."
-              : "You turned uncertainty into a structured, hireable signal."}
+              : "You turned uncertainty into a structured, hireable profile read."}
           </div>
 
           <div
@@ -1067,7 +1067,7 @@ function CareerNavigationMap({
             </div>
           </div>
           <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 7, lineHeight: 1.6 }}>
-            <div>• {tr ? "Sinyal uyumun olan rollere başvur" : "Apply only where you have signal fit"}</div>
+            <div>• {tr ? "Okuman güçlü olduğu rollere başvur" : "Apply where your story clearly fits"}</div>
             <div>• {tr ? "Kalite > adet" : "Quality > quantity"}</div>
             <div>• {tr ? "Her başvuru bilinçli olmalı" : "Each application should feel intentional"}</div>
           </div>
@@ -1242,7 +1242,7 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
         <button onClick={() => navigate("/app")} style={{ marginBottom: 14, background: "none", border: "1px solid rgba(255,255,255,0.12)", color: "#94a3b8", padding: "7px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>
           {lang === "TR" ? "← Analize dön" : "← Back to analysis"}
         </button>
-        <h1 style={{ margin: 0, fontFamily: "'Syne', sans-serif", fontSize: "clamp(28px,4vw,38px)", color: "#f8fafc", letterSpacing: "-0.02em" }}>
+        <h1 style={{ margin: 0, fontFamily: "var(--font-display)", fontSize: "clamp(28px,4vw,38px)", color: "#f8fafc", letterSpacing: "-0.02em" }}>
           {t.bestPathForward}
         </h1>
       </div>
@@ -1282,7 +1282,7 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.28, ease: "easeInOut" }}
               >
-                <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, color: "#f8fafc", fontWeight: 800, marginBottom: 8 }}>
+                <div style={{ fontFamily: "var(--font-display)", fontSize: 24, color: "#f8fafc", fontWeight: 800, marginBottom: 8 }}>
                   {selectedStep.label}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
@@ -1336,8 +1336,8 @@ export default function PersonalizedRoadmapPage({ navigate, lang, t, isPro, open
             </div>
             {roleRows.map((r, i) => (
               <div key={`${r.role}-${i}`} style={{ padding: "10px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", marginBottom: 8, background: "rgba(15,23,42,0.45)" }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{r.role} ({Math.round(r.score)}%)</div>
-                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>{r.why || (lang === "TR" ? "Mevcut CV sinyalin bu role daha yakın." : "Your current CV signal aligns better with this role.")}</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#f8fafc" }}>{r.role}</div>
+                <div style={{ fontSize: 12, color: "#94a3b8", marginTop: 4 }}>{r.why || (lang === "TR" ? "Mevcut CV okuman bu role daha yakın." : "Your current CV reads closer to this role.")}</div>
               </div>
             ))}
           </div>

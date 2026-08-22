@@ -18,6 +18,13 @@ import {
   requiredResponseLanguageDirective,
 } from "../lib/analyze-v2/lang.js";
 import { callClaudeHaiku } from "../lib/analyze-v2/openaiClient.js";
+import { registerCareerMemoryRoutes } from "../lib/careerMemory/careerMemoryRoutes.js";
+import { registerCareerProgressRoutes } from "../lib/careerProgress/careerProgressRoutes.js";
+import { registerJobDiscoveryRoutes } from "../lib/jobDiscovery/jobDiscoveryRoutes.js";
+import { registerOnboardingRoutes } from "../lib/careerOnboarding/onboardingRoutes.js";
+import { registerCareerIntelligenceRoutes } from "../lib/careerIntelligence/routes.js";
+import { registerCareerActionLoopRoutes } from "../lib/careerActionLoop/index.js";
+import { loadCareerProfile } from "../lib/careerMemory/persistence.js";
 
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err.message, err.stack);
@@ -56,7 +63,7 @@ const corsOptions = {
     }
     callback(new Error("Not allowed by CORS"));
   },
-  methods: ["GET", "POST", "OPTIONS"],
+  methods: ["GET", "POST", "PATCH", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "x-user-id", "x-requested-with"],
   credentials: true,
   optionsSuccessStatus: 204,
@@ -73,7 +80,7 @@ app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", origin);
     res.header("Access-Control-Allow-Credentials", "true");
   }
-  res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, x-user-id, x-requested-with");
   if (req.method === "OPTIONS") {
     return res.sendStatus(204);
@@ -88,9 +95,9 @@ app.use((req, res, next) => {
   return jsonParser(req, res, next);
 });
 
-if (!process.env.ANTHROPIC_API_KEY) {
-  console.error("❌ ANTHROPIC_API_KEY missing!");
-}
+console.log(
+  `[env] ANTHROPIC_API_KEY ${process.env.ANTHROPIC_API_KEY ? "loaded" : "missing"}`
+);
 
 function responseLanguageLabel(langNorm) {
   return langNorm === "tr" ? "Turkish" : "English";
@@ -121,7 +128,9 @@ app.get("/test", (_req, res) => {
 
 app.post("/api/analyze-v2", requireAuthExpress, async (req, res) => {
   try {
-    const { cvText, jobDescription, cv, jd, isPro, sector, careerArea, lang } = req.body || {};
+    // eslint-disable-next-line no-console -- production stability tracing
+    console.log("[STEP] analyze-v2:start");
+    const { cvText, jobDescription, cv, jd, isPro, sector, careerArea, lang, careerMemory } = req.body || {};
     const c = String(cvText ?? cv ?? "").trim();
     const j = String(jobDescription ?? jd ?? "").trim();
     if (!c || !j) {
@@ -129,6 +138,16 @@ app.post("/api/analyze-v2", requireAuthExpress, async (req, res) => {
         .status(400)
         .json({ error: "Missing cvText or jobDescription" });
     }
+    let effectiveCareerMemory = careerMemory || null;
+    if (!effectiveCareerMemory && req.authUser?.id) {
+      try {
+        effectiveCareerMemory = await loadCareerProfile(req.authUser.id);
+      } catch (memErr) {
+        console.error("[analyze-v2:career-memory]", memErr?.message || memErr);
+      }
+    }
+    // eslint-disable-next-line no-console -- production stability tracing
+    console.log("[STEP] analyze-v2:pipeline:start");
     const payload = await runAnalyzeV2WithCompanyIntel({
       cvText: c,
       jobDescription: j,
@@ -136,12 +155,55 @@ app.post("/api/analyze-v2", requireAuthExpress, async (req, res) => {
       sector,
       careerArea,
       lang,
+      careerMemory: effectiveCareerMemory,
     });
+    // eslint-disable-next-line no-console -- production stability tracing
+    console.log("[STEP] analyze-v2:pipeline:done");
+    // eslint-disable-next-line no-console -- production stability tracing
+    console.log("[STEP] analyze-v2:response:done");
     return res.status(200).json(payload);
   } catch (e) {
-    console.error("[/api/analyze-v2]", e?.message || e);
-    return res.status(500).json({
-      error: "analysis_failed",
+    console.error("[ANALYZE_V2_FATAL]", e?.message || e, e?.stack || "");
+    const fallbackRecruiter = {
+      first_perception: "Profil tamamen disarida degil; ilk bakista bazi soru isaretleri var.",
+      internal_monologue: "Guclu yanlarin var ama bu ilanin net actigi beklentiyle tam oturmuyor.",
+      core_concern: "Bu role baglanan somut teslimi CV'de yeterince net goremiyorum.",
+      persuasion_tip: "Bu role baglanan bir is satirini CV'de daha gorunur yaz.",
+      signal_tags: ["Fallback"],
+    };
+    return res.status(200).json({
+      success: false,
+      degraded: true,
+      error: "Analysis temporarily degraded.",
+      recruiter: fallbackRecruiter,
+      Recruiter: {
+        recruiter_verdict: "maybe",
+        reasoning: fallbackRecruiter.internal_monologue,
+        strengths: [],
+        weaknesses: [],
+        red_flags: [],
+        structured_analysis: fallbackRecruiter,
+      },
+      Output: {
+        verdict: "MAYBE",
+        tier: "free",
+        score_label: "MAYBE",
+        confidence_label: "MEDIUM",
+        confidence_pct: 50,
+        confidence_delta: 0,
+        confidence_icon: "⚖️",
+        confidence_text: "Analysis temporarily degraded.",
+        one_sentence: fallbackRecruiter.first_perception,
+        why: [fallbackRecruiter.core_concern],
+        what_to_fix_first: [fallbackRecruiter.persuasion_tip],
+        role_suggestions: [],
+        role_suggestion_reason: "",
+        role_suggestion_signal: "",
+        role_suggestion_recruiter_view: "",
+        role_suggestion_tension: "",
+        core_problem: fallbackRecruiter.core_concern,
+        first_action: fallbackRecruiter.persuasion_tip,
+      },
     });
   }
 });
@@ -454,6 +516,43 @@ const isAdminEmail = (email) => {
   return Boolean(adminEmail) && normalizeEmail(email) === adminEmail;
 };
 
+const findAuthUserByEmail = async (targetEmail) => {
+  if (!process.env.VITE_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("Supabase environment variables are missing");
+  }
+  const { createClient } = await import("@supabase/supabase-js");
+  const adminClient = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+  let page = 1;
+  const perPage = 1000;
+  while (page <= 20) {
+    const { data, error } = await adminClient.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const users = data?.users || [];
+    const user = users.find((u) => normalizeEmail(u.email) === targetEmail);
+    if (user) return user;
+    if (users.length < perPage) break;
+    page += 1;
+  }
+  return null;
+};
+
+app.post("/api/auth/signup-status", async (req, res) => {
+  try {
+    const targetEmail = normalizeEmail(req.body?.email);
+    if (!targetEmail || !targetEmail.includes("@")) {
+      return res.status(400).json({ error: "email is required" });
+    }
+    const user = await findAuthUserByEmail(targetEmail);
+    return res.json({
+      exists: Boolean(user),
+      confirmed: Boolean(user?.email_confirmed_at || user?.confirmed_at),
+    });
+  } catch (e) {
+    console.error("[signup-status]", e?.message || e);
+    return res.status(200).json({ exists: false, confirmed: false, unavailable: true });
+  }
+});
+
 app.post("/api/admin/pro-access", async (req, res) => {
   try {
     const adminEmail = normalizeEmail(process.env.ADMIN_EMAIL);
@@ -601,7 +700,14 @@ const lemonWebhookHandler = async (req, res) => {
 app.post("/api/webhook", express.raw({ type: "application/json" }), lemonWebhookHandler);
 app.post("/webhook", express.raw({ type: "application/json" }), lemonWebhookHandler);
 
-const PORT = 3000;
+registerCareerMemoryRoutes(app);
+registerCareerProgressRoutes(app);
+registerJobDiscoveryRoutes(app);
+registerOnboardingRoutes(app);
+registerCareerIntelligenceRoutes(app);
+registerCareerActionLoopRoutes(app);
+
+const PORT = Number(process.env.PORT) || 3000;
 
 try {
   const server = app.listen(PORT, "0.0.0.0", () => {

@@ -1,4 +1,4 @@
-function logParseIssue(label, error) {
+﻿function logParseIssue(label, error) {
   console.error(`[${label}] JSON parse failed:`, error?.message || error);
 }
 
@@ -25,3 +25,4 @@ export function parseLocalStorageJson(key, fallback) {
     return fallback;
   }
 }
+
