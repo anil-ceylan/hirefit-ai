@@ -1,10 +1,8 @@
 ﻿/**
  * Central API base URL for HireFit frontend.
  * Dev: empty string → Vite proxies `/api` to localhost:3000 (see vite.config.js).
- * Prod: VITE_API_URL or Railway default.
+ * Prod: VITE_API_URL or same-origin Vercel functions.
  */
-
-const PROD_DEFAULT = "https://hirefit-ai-production.up.railway.app";
 
 export function getApiBase() {
   const raw =
@@ -18,7 +16,9 @@ export function getApiBase() {
     return raw.replace(/\/$/, "");
   }
 
-  return raw ? raw.replace(/\/$/, "") : PROD_DEFAULT;
+  if (!raw) return "";
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?\/?$/i.test(raw)) return "";
+  return raw.replace(/\/$/, "");
 }
 
 export function isNetworkError(err) {
