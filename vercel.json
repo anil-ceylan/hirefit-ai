@@ -1,7 +1,6 @@
 {
   "rewrites": [
     { "source": "/health", "destination": "/api/health" },
-    { "source": "/api/report/:id", "destination": "/api/report/[id]" },
     { "source": "/optimize", "destination": "/api/optimize" },
     { "source": "/roadmap", "destination": "/api/roadmap" },
     { "source": "/apply-fix", "destination": "/api/apply-fix" },
