@@ -83,6 +83,7 @@ const DRAFT_KEY = "hirefit-onboarding-draft-v10";
 const LEGACY_DRAFT_KEYS = ["hirefit-onboarding-draft-v9", "hirefit-onboarding-draft-v8"];
 const INITIAL_ROLE_VISIBLE = 10;
 const GENERATION_STEP_MS = 0;
+const GOALS_PANEL_ORDER = ["target", "environment", "roles"];
 
 function waitForGenerationStep(ms = GENERATION_STEP_MS) {
   if (!ms) return Promise.resolve();
@@ -350,6 +351,7 @@ function OnboardingSubnav({ tabs, active, onChange, ariaLabel }) {
           aria-selected={active === tab.id}
           aria-controls={`hf-onboard-panel-${tab.id}`}
           className={`hf-onboard-subnav__tab${active === tab.id ? " is-active" : ""}`}
+          aria-disabled={tab.disabled ? "true" : undefined}
           onClick={() => onChange(tab.id)}
         >
           <span>{tab.label}</span>
@@ -795,8 +797,8 @@ export default function CareerOnboardingPage() {
       if (!isSelected && (g.companyIndustries || []).length >= MAX_TARGET_ROLES) {
         setCompanyIndustryLimitNotice(
           lang === "TR"
-            ? "Daha doğru öneriler için en fazla 3 şirket sektörü seçebilirsin."
-            : "For more accurate recommendations you can select up to 3 company industries."
+            ? "Daha doğru öneriler için en fazla 3 odak alanı seçebilirsin."
+            : "For more accurate recommendations you can select up to 3 focus areas."
         );
         return g;
       }
@@ -980,8 +982,13 @@ export default function CareerOnboardingPage() {
   const goalsTabs = useMemo(
     () => [
       { id: "target", label: tr ? "Hedefin" : "Goal", hint: tr ? "Ne arıyorsun?" : "Intent" },
-      { id: "roles", label: tr ? "Roller" : "Roles", hint: tr ? `${goals.targetRoles.length}/${MAX_TARGET_ROLES}` : `${goals.targetRoles.length}/${MAX_TARGET_ROLES}` },
       { id: "environment", label: tr ? "Sektör ve Çalışma Biçimi" : "Sector & Work Style", hint: tr ? `${selectedIndustries.length}/${MAX_TARGET_ROLES}` : `${selectedIndustries.length}/${MAX_TARGET_ROLES}` },
+      {
+        id: "roles",
+        label: tr ? "Roller" : "Roles",
+        hint: tr ? `${goals.targetRoles.length}/${MAX_TARGET_ROLES}` : `${goals.targetRoles.length}/${MAX_TARGET_ROLES}`,
+        disabled: !selectedIndustries.length,
+      },
     ],
     [tr, goals.targetRoles.length, selectedIndustries.length]
   );
@@ -994,6 +1001,32 @@ export default function CareerOnboardingPage() {
     ],
     [tr]
   );
+
+  const handleGoalsPanelChange = useCallback((panelId) => {
+    if (panelId === "roles" && !selectedIndustries.length) {
+      setGoalsPanel("environment");
+      setError(tr ? "Rolleri görmek için önce en az bir sektör seç." : "Select at least one sector before choosing roles.");
+      return;
+    }
+    setError("");
+    setGoalsPanel(panelId);
+  }, [selectedIndustries.length, tr]);
+
+  const moveGoalsPanel = async (direction) => {
+    const currentIndex = GOALS_PANEL_ORDER.indexOf(goalsPanel);
+    const nextPanel = GOALS_PANEL_ORDER[currentIndex + direction];
+    if (!nextPanel) return false;
+    if (nextPanel === "roles" && !selectedIndustries.length) {
+      setGoalsPanel("environment");
+      setError(tr ? "Rolleri görmek için önce en az bir sektör seç." : "Select at least one sector before choosing roles.");
+      return true;
+    }
+    setSaving(true);
+    await persistDraft(2);
+    setGoalsPanel(nextPanel);
+    setSaving(false);
+    return true;
+  };
 
   useEffect(() => {
     if (!selectedIndustries.length) return;
@@ -1014,6 +1047,12 @@ export default function CareerOnboardingPage() {
     });
     setShowAllRoles(false);
   }, [selectedIndustries]);
+
+  useEffect(() => {
+    if (goalsPanel === "roles" && !selectedIndustries.length) {
+      setGoalsPanel("environment");
+    }
+  }, [goalsPanel, selectedIndustries.length]);
   const careerPreview = useMemo(() => {
     return buildCareerPreview({ basic, goals, dnaAnswers, readinessAnswers, cv, lang });
   }, [basic, goals, dnaAnswers, readinessAnswers, cv, lang]);
@@ -1323,28 +1362,37 @@ export default function CareerOnboardingPage() {
         return;
       }
     }
-    if (step === 2 && !selectedIndustries.length) {
-      setError(tr ? "En az bir sektör seç." : "Select at least one sector.");
-      return;
-    }
-    if (step === 2 && !lookingForList.length) {
-      setError(tr ? "En az bir hedef türü seç (Ne arıyorsun?)." : "Select at least one goal type.");
-      return;
-    }
-    if (step === 2 && !goals.targetRoles.length) {
-      setError(tr ? "En az bir hedef rol seç." : "Select at least one target role.");
-      return;
-    }
-    if (step === 2 && !goals.primaryRole) {
-      setError(tr ? "Birincil hedef rolünü seç." : "Select your primary target role.");
-      return;
-    }
-    if (
-      step === 2 &&
-      !(goals.experienceLevels?.length || goals.experienceLevel || goals.seniority)
-    ) {
-      setError(tr ? "En az bir deneyim seviyesi seç." : "Select at least one experience level.");
-      return;
+    if (step === 2) {
+      if (goalsPanel === "target") {
+        if (!lookingForList.length) {
+          setError(tr ? "En az bir hedef türü seç (Ne arıyorsun?)." : "Select at least one goal type.");
+          return;
+        }
+        if (!(goals.experienceLevels?.length || goals.experienceLevel || goals.seniority)) {
+          setError(tr ? "En az bir deneyim seviyesi seç." : "Select at least one experience level.");
+          return;
+        }
+        await moveGoalsPanel(1);
+        return;
+      }
+      if (goalsPanel === "environment") {
+        if (!selectedIndustries.length) {
+          setError(tr ? "Rolleri görmek için önce en az bir sektör seç." : "Select at least one sector before choosing roles.");
+          return;
+        }
+        await moveGoalsPanel(1);
+        return;
+      }
+      if (goalsPanel === "roles") {
+        if (!goals.targetRoles.length) {
+          setError(tr ? "En az bir hedef rol seç." : "Select at least one target role.");
+          return;
+        }
+        if (!goals.primaryRole) {
+          setError(tr ? "Birincil hedef rolünü seç." : "Select your primary target role.");
+          return;
+        }
+      }
     }
     if (step === 3 && !isDnaComplete(dnaAnswers, lang)) {
       setError(tr ? "DNA testi için 10 soruyu tamamla (1-5 arası)." : "Complete all 10 DNA questions (1-5).");
@@ -1899,7 +1947,7 @@ export default function CareerOnboardingPage() {
             <OnboardingSubnav
               tabs={goalsTabs}
               active={goalsPanel}
-              onChange={setGoalsPanel}
+              onChange={handleGoalsPanelChange}
               ariaLabel={tr ? "Kariyer hedefi bölümleri" : "Career goal sections"}
             />
             <div
@@ -1910,7 +1958,7 @@ export default function CareerOnboardingPage() {
             <div className="hf-onboard-group-grid">
               {goalsPanel === "environment" ? (
               <div className="hf-onboard-sector-block">
-                <span className="hf-onboard-step-badge">1. {tr ? "Önce sektör" : "Sector first"}</span>
+                <span className="hf-onboard-step-badge">2. {tr ? "Sektör ve çalışma biçimi" : "Sector and work style"}</span>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 4 }}>{tr ? "Sektör seç *" : "Select sector *"}</div>
                 <p className="hf-onboard-helper">
                   {tr
@@ -2124,9 +2172,9 @@ export default function CareerOnboardingPage() {
               </div>
               ) : null}
 
-              {goalsPanel === "roles" ? (
+              {goalsPanel === "roles" && selectedIndustries.length ? (
               <div className="hf-onboard-role-block">
-                <span className="hf-onboard-step-badge">2. {tr ? "Sonra hedef rol" : "Then target role"}</span>
+                <span className="hf-onboard-step-badge">3. {tr ? "Sonra hedef rol" : "Then target role"}</span>
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 4 }}>
                   {tr ? "Hangi rolleri hedefliyorsun? *" : "Which roles are you targeting? *"}
                 </div>
@@ -2135,64 +2183,56 @@ export default function CareerOnboardingPage() {
                     ? "Seçtiğin tüm sektörlerin rolleri birleştirilir. İlk 10 rolü gösteriyoruz."
                     : "Roles from all selected sectors are merged. We show the top 10 first."}
                 </p>
-                {selectedIndustries.length ? (
-                  <>
-                    <div id="career-role-options" className="hf-onboard-looking-chips" style={{ marginTop: 8 }}>
-                      {visibleRoleOptions.map((role) => (
-                        <RoleChip
-                          key={role}
-                          role={role}
-                          active={goals.targetRoles.includes(role)}
-                          lang={lang}
-                          onClick={() => toggleTargetRole(role)}
-                          disabled={
-                            goals.targetRoles.length >= MAX_TARGET_ROLES &&
-                            !goals.targetRoles.includes(role)
-                          }
-                        />
-                      ))}
-                    </div>
-                    <div className="hf-onboard-role-limit" aria-live="polite">
-                      <span>{goals.targetRoles.length}/{MAX_TARGET_ROLES}</span>
-                      <p>
-                        {roleLimitNotice ||
-                          (tr
-                            ? "Birincil, ikincil ve keşif rolünü seç."
-                            : "Choose a primary, secondary, and exploration role.")}
-                      </p>
-                    </div>
-                    {extraRoleOptions.length > 0 ? (
-                      <button
-                        type="button"
-                        className="hf-onboard-show-more-roles"
-                        aria-expanded={showAllRoles}
-                        aria-controls="career-role-options"
-                        onClick={() => setShowAllRoles((v) => !v)}
-                      >
-                        {showAllRoles
-                          ? tr
-                            ? "Daha az rol göster"
-                            : "Show fewer roles"
-                          : tr
-                            ? "+ Daha Fazla Rol Göster"
-                            : "+ Show more roles"}
-                      </button>
-                    ) : null}
-                    {goals.targetRoles.length > 0 ? (
-                      <RankedPriorityList
-                        items={goals.targetRoles}
-                        getItemLabel={(role) => getRoleLabel(role, lang)}
-                        onMove={moveRankedRole}
-                        lang={lang}
-                        kind="role"
-                      />
-                    ) : null}
-                  </>
-                ) : (
-                  <div className="hf-onboard-role-placeholder">
-                    {tr ? "Önce sektör seç - roller sektörüne göre hazırlanır." : "Select a sector first - roles are tailored to your industry."}
-                  </div>
-                )}
+                <div id="career-role-options" className="hf-onboard-looking-chips" style={{ marginTop: 8 }}>
+                  {visibleRoleOptions.map((role) => (
+                    <RoleChip
+                      key={role}
+                      role={role}
+                      active={goals.targetRoles.includes(role)}
+                      lang={lang}
+                      onClick={() => toggleTargetRole(role)}
+                      disabled={
+                        goals.targetRoles.length >= MAX_TARGET_ROLES &&
+                        !goals.targetRoles.includes(role)
+                      }
+                    />
+                  ))}
+                </div>
+                <div className="hf-onboard-role-limit" aria-live="polite">
+                  <span>{goals.targetRoles.length}/{MAX_TARGET_ROLES}</span>
+                  <p>
+                    {roleLimitNotice ||
+                      (tr
+                        ? "Birincil, ikincil ve keşif rolünü seç."
+                        : "Choose a primary, secondary, and exploration role.")}
+                  </p>
+                </div>
+                {extraRoleOptions.length > 0 ? (
+                  <button
+                    type="button"
+                    className="hf-onboard-show-more-roles"
+                    aria-expanded={showAllRoles}
+                    aria-controls="career-role-options"
+                    onClick={() => setShowAllRoles((v) => !v)}
+                  >
+                    {showAllRoles
+                      ? tr
+                        ? "Daha az rol göster"
+                        : "Show fewer roles"
+                      : tr
+                        ? "+ Daha Fazla Rol Göster"
+                        : "+ Show more roles"}
+                  </button>
+                ) : null}
+                {goals.targetRoles.length > 0 ? (
+                  <RankedPriorityList
+                    items={goals.targetRoles}
+                    getItemLabel={(role) => getRoleLabel(role, lang)}
+                    onMove={moveRankedRole}
+                    lang={lang}
+                    kind="role"
+                  />
+                ) : null}
               </div>
               ) : null}
 
@@ -2263,7 +2303,7 @@ export default function CareerOnboardingPage() {
               {goalsPanel === "environment" ? (
               <div className="hf-company-preference">
                 <div className="hf-company-preference__head">
-                  <strong>{tr ? "Şirket sektörü" : "Company Industry"}</strong>
+                  <strong>{tr ? "Alt sektör / ürün alanı" : "Company Focus Area"}</strong>
                   <RecommendedBadge lang={lang} />
                 </div>
                 <p className="hf-onboard-helper" style={{ marginBottom: 8 }}>
@@ -2287,8 +2327,8 @@ export default function CareerOnboardingPage() {
                         (goals.companyIndustries || []).length >= MAX_TARGET_ROLES &&
                         !(goals.companyIndustries || []).includes(option.id)
                           ? tr
-                            ? "En fazla 3 şirket sektörü"
-                            : "Maximum 3 company industries"
+                            ? "En fazla 3 odak alanı"
+                            : "Maximum 3 focus areas"
                           : ""
                       }
                     />
@@ -2301,8 +2341,8 @@ export default function CareerOnboardingPage() {
                       <p>
                         {companyIndustryLimitNotice ||
                           (tr
-                            ? "Birincil, ikincil ve keşif sektörünü seç."
-                            : "Choose a primary, secondary, and exploration industry.")}
+                            ? "Birincil, ikincil ve keşif odak alanını seç."
+                            : "Choose a primary, secondary, and exploration focus area.")}
                       </p>
                     </div>
                     <RankedPriorityList
@@ -2657,7 +2697,13 @@ export default function CareerOnboardingPage() {
             <button
               type="button"
               disabled={step === 1 || saving}
-              onClick={() => setStep((s) => Math.max(1, s - 1))}
+              onClick={async () => {
+                if (step === 2 && goalsPanel !== "target") {
+                  await moveGoalsPanel(-1);
+                  return;
+                }
+                setStep((s) => Math.max(1, s - 1));
+              }}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
