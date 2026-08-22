@@ -30,20 +30,27 @@ export function buildActivationNavItems({ lang = "TR", activationState, careerPr
   if (activationState === ACTIVATION_STATES.UNAUTHENTICATED) {
     return [
       { label: tr ? "Analiz" : "Analyze", path: "/analyze", viewKey: "analyze" },
-      { label: tr ? "Fiyatlandırma" : "Pricing", sectionId: "pricing", viewKey: "pricing" },
+      { label: tr ? "Fiyatlandırma" : "Pricing", path: "/", hash: "#pricing", sectionId: "pricing", viewKey: "pricing" },
     ];
   }
 
   return [
     { label: tr ? "Bugünkü Hamle" : "Today's Move", path: "/dashboard", viewKey: "dashboard" },
     { label: tr ? "Analiz" : "Analyze", path: "/analyze", viewKey: "analyze" },
-    { label: tr ? "Fiyatlandırma" : "Pricing", sectionId: "pricing", viewKey: "pricing" },
+    { label: tr ? "Fiyatlandırma" : "Pricing", path: "/", hash: "#pricing", sectionId: "pricing", viewKey: "pricing" },
     {
       label: tr ? "Profil" : "Profile",
       path: profileComplete ? "/career-dna?snapshot=1" : "/career-dna",
       viewKey: profileComplete ? "snapshot" : "careerDna",
     },
   ];
+}
+
+export function getActivationNavHref(item = {}) {
+  const path = item.path || "/";
+  if (item.hash) return `${path}${item.hash}`;
+  if (item.sectionId && path === "/") return `${path}#${item.sectionId}`;
+  return path;
 }
 
 export function getAuthIntentFromNext(nextPath = "") {

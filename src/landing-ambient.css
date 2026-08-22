@@ -992,7 +992,8 @@
   position: sticky;
   width: 100%;
   top: 0;
-  z-index: 100;
+  z-index: 5000;
+  pointer-events: auto;
   max-width: 100%;
   overflow: visible;
   box-sizing: border-box;
@@ -1124,6 +1125,9 @@
 
 .hf-nav-tab {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 7px 14px;
   border-radius: 8px;
   font-weight: 500;
@@ -1133,6 +1137,7 @@
   cursor: pointer;
   color: #94a3b8;
   background: transparent;
+  text-decoration: none;
   transition: color 0.15s ease, background 0.15s ease;
   white-space: nowrap;
 }

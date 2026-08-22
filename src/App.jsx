@@ -24,7 +24,7 @@ import {
   HiringLogicQaSection,
   YourNextMovePanel,
 } from "./HireFitSections";
-import { useNavigate, useLocation, Outlet, useOutletContext } from "react-router-dom";
+import { Link, useNavigate, useLocation, Outlet, useOutletContext } from "react-router-dom";
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { parseLocalStorageJson, safeJsonParse } from "./utils/safeJson";
@@ -66,6 +66,7 @@ import { resolvePostLoginPath } from "./utils/careerOnboardingClient.js";
 import { getApiBase } from "./utils/apiBase.js";
 import {
   buildActivationNavItems,
+  getActivationNavHref,
   getContextualAuthCta,
   getAuthIntentFromNext,
   resolveActivationState,
@@ -4961,6 +4962,7 @@ function getNavCareerScore({ careerProfile, careerGrowth, scoreHistory }) {
 
 function NavBar({
   pathname,
+  locationHash = "",
   user,
   logout,
   navigate,
@@ -4980,9 +4982,11 @@ function NavBar({
         ? "analyze"
       : pathname === "/dashboard"
         ? "dashboard"
-        : pathname === "/app"
+      : pathname === "/app"
           ? "analyze"
-          : pathname === "/"
+      : pathname === "/" && locationHash === "#pricing"
+        ? "pricing"
+      : pathname === "/"
             ? "landing"
             : null;
   const [scrolled, setScrolled] = useState(false);
@@ -5045,7 +5049,8 @@ function NavBar({
     setLangMenuOpen(false);
   };
 
-  const goToNavItem = (item) => {
+  const goToNavItem = (event, item) => {
+    event?.preventDefault?.();
     if (!item.sectionId) {
       navigate(item.path);
       return;
@@ -5054,9 +5059,12 @@ function NavBar({
       document.getElementById(item.sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
     };
     if (pathname !== "/") {
-      navigate("/");
+      navigate({ pathname: item.path || "/", hash: item.hash || `#${item.sectionId}` });
       window.setTimeout(scrollToSection, 80);
       return;
+    }
+    if (locationHash !== (item.hash || `#${item.sectionId}`)) {
+      navigate({ pathname: item.path || "/", hash: item.hash || `#${item.sectionId}` }, { replace: false });
     }
     scrollToSection();
   };
@@ -5085,16 +5093,16 @@ function NavBar({
               const { label, viewKey } = item;
               const isActive = navTab === viewKey;
               return (
-                <button
+                <Link
                   key={viewKey}
-                  type="button"
+                  to={getActivationNavHref(item)}
                   role="tab"
                   aria-selected={isActive}
                   className={isActive ? "hf-nav-tab hf-nav-tab--active" : "hf-nav-tab"}
-                  onClick={() => goToNavItem(item)}
+                  onClick={(event) => goToNavItem(event, item)}
                 >
                   {label}
-                </button>
+                </Link>
               );
             })}
         </div>
@@ -7489,6 +7497,7 @@ function HireFitLayout() {
       <div style={{ position: "relative", zIndex: 1, width: "100%", maxWidth: "100%", boxSizing: "border-box", overflow: "visible" }}>
       <Navbar
         pathname={location.pathname}
+        locationHash={location.hash}
         user={user}
         logout={logout}
         navigate={navigate}

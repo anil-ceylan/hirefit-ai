@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import {
   ACTIVATION_STATES,
   buildActivationNavItems,
+  getActivationNavHref,
   getAuthIntentFromNext,
   getCareerDiscoveryLoadingCopy,
   getContextualAuthCta,
@@ -36,7 +37,34 @@ function testNavigation() {
     careerProfile: { onboarding_completed: true },
   });
   assert.deepEqual(signedIn.map((item) => item.label), ["Bugünkü Hamle", "Analiz", "Fiyatlandırma", "Profil"]);
-  assert.equal(signedIn.find((item) => item.label === "Profil").path, "/career-dna?snapshot=1");
+  assert.equal(getActivationNavHref(signedIn.find((item) => item.label === "Bugünkü Hamle")), "/dashboard");
+  assert.equal(getActivationNavHref(signedIn.find((item) => item.label === "Analiz")), "/analyze");
+  assert.equal(getActivationNavHref(signedIn.find((item) => item.label === "Fiyatlandırma")), "/#pricing");
+  assert.equal(getActivationNavHref(signedIn.find((item) => item.label === "Profil")), "/career-dna?snapshot=1");
+
+  const incompleteProfileNav = buildActivationNavItems({
+    lang: "TR",
+    activationState: ACTIVATION_STATES.CAREER_PROFILE_IN_PROGRESS,
+    careerProfile: { onboarding_completed: false },
+  });
+  assert.equal(getActivationNavHref(incompleteProfileNav.find((item) => item.label === "Profil")), "/career-dna");
+
+  const routesFromProfile = {
+    profileToToday: getActivationNavHref(signedIn.find((item) => item.viewKey === "dashboard")),
+    profileToAnalyze: getActivationNavHref(signedIn.find((item) => item.viewKey === "analyze")),
+    profileToPricing: getActivationNavHref(signedIn.find((item) => item.viewKey === "pricing")),
+    analyzeToProfile: getActivationNavHref(signedIn.find((item) => item.viewKey === "snapshot")),
+    dashboardToProfile: getActivationNavHref(signedIn.find((item) => item.viewKey === "snapshot")),
+    pricingToProfile: getActivationNavHref(signedIn.find((item) => item.viewKey === "snapshot")),
+  };
+  assert.deepEqual(routesFromProfile, {
+    profileToToday: "/dashboard",
+    profileToAnalyze: "/analyze",
+    profileToPricing: "/#pricing",
+    analyzeToProfile: "/career-dna?snapshot=1",
+    dashboardToProfile: "/career-dna?snapshot=1",
+    pricingToProfile: "/career-dna?snapshot=1",
+  });
 }
 
 function testAuthCtas() {
