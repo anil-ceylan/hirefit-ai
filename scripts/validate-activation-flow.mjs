@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import {
   ACTIVATION_STATES,
+  DASHBOARD_ROUTE_STATES,
   buildActivationNavItems,
   getActivationNavHref,
   getAuthIntentFromNext,
   getCareerDiscoveryLoadingCopy,
   getContextualAuthCta,
   resolveActivationState,
+  resolveDashboardRouteState,
 } from "../src/utils/activationFlow.js";
 
 function testActivationStates() {
@@ -96,9 +98,75 @@ function testLoadingCopy() {
   );
 }
 
+function testDashboardRouteGuard() {
+  const completedUser = { id: "u1", email_confirmed_at: "2026-01-01T00:00:00.000Z" };
+  const completedProfile = { onboarding_completed: true, career_snapshot: { summary: "ready" } };
+
+  assert.deepEqual(
+    resolveDashboardRouteState({
+      authStatus: "authenticated",
+      user: completedUser,
+      isUserEmailVerified: true,
+      profileStatus: "profile_loading",
+      careerProfile: null,
+    }),
+    { state: DASHBOARD_ROUTE_STATES.LOADING },
+    "Dashboard must not redirect completed users while profile completion is unresolved"
+  );
+
+  assert.deepEqual(
+    resolveDashboardRouteState({
+      authStatus: "authenticated",
+      user: completedUser,
+      isUserEmailVerified: true,
+      profileStatus: "profile_ready",
+      careerProfile: completedProfile,
+    }),
+    { state: DASHBOARD_ROUTE_STATES.READY },
+    "Completed Career DNA users must remain on /dashboard after hydration"
+  );
+
+  assert.deepEqual(
+    resolveDashboardRouteState({
+      authStatus: "authenticated",
+      user: completedUser,
+      isUserEmailVerified: true,
+      profileStatus: "profile_missing",
+      careerProfile: null,
+    }),
+    { state: DASHBOARD_ROUTE_STATES.REDIRECT_PROFILE, path: "/career-dna" },
+    "Only an authoritative missing profile should redirect to Career DNA"
+  );
+
+  assert.deepEqual(
+    resolveDashboardRouteState({
+      authStatus: "authenticated",
+      user: completedUser,
+      isUserEmailVerified: true,
+      profileStatus: "profile_ready",
+      careerProfile: { onboarding_completed: false },
+    }),
+    { state: DASHBOARD_ROUTE_STATES.REDIRECT_PROFILE, path: "/career-dna" },
+    "Existing incomplete drafts should still be protected from Dashboard"
+  );
+
+  assert.deepEqual(
+    resolveDashboardRouteState({
+      authStatus: "unauthenticated",
+      user: null,
+      isUserEmailVerified: false,
+      profileStatus: "idle",
+      careerProfile: null,
+    }),
+    { state: DASHBOARD_ROUTE_STATES.REDIRECT_LOGIN, path: "/login?next=%2Fdashboard" },
+    "Unauthenticated Dashboard access should preserve the existing login guard"
+  );
+}
+
 testActivationStates();
 testNavigation();
 testAuthCtas();
 testLoadingCopy();
+testDashboardRouteGuard();
 
 process.stdout.write("Activation flow regression checks passed.\n");

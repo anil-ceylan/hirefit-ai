@@ -6,6 +6,15 @@ export const ACTIVATION_STATES = Object.freeze({
   ACTIVATED: "activated",
 });
 
+export const DASHBOARD_ROUTE_STATES = Object.freeze({
+  LOADING: "loading",
+  READY: "ready",
+  REDIRECT_LOGIN: "redirect_login",
+  REDIRECT_VERIFY_EMAIL: "redirect_verify_email",
+  REDIRECT_PROFILE: "redirect_profile",
+  ERROR: "error",
+});
+
 export function resolveActivationState({ user, careerProfile } = {}) {
   if (!user) return ACTIVATION_STATES.UNAUTHENTICATED;
   const profile = careerProfile && typeof careerProfile === "object" ? careerProfile : {};
@@ -22,6 +31,31 @@ export function resolveActivationState({ user, careerProfile } = {}) {
   if (completed) return ACTIVATION_STATES.SNAPSHOT_READY;
   if (hasDraft) return ACTIVATION_STATES.CAREER_PROFILE_IN_PROGRESS;
   return ACTIVATION_STATES.AUTHENTICATED_UNACTIVATED;
+}
+
+export function resolveDashboardRouteState({
+  authStatus = "idle",
+  user = null,
+  isUserEmailVerified = false,
+  profileStatus = "idle",
+  careerProfile = null,
+} = {}) {
+  if (authStatus === "initializing") return { state: DASHBOARD_ROUTE_STATES.LOADING };
+  if (!user) return { state: DASHBOARD_ROUTE_STATES.REDIRECT_LOGIN, path: "/login?next=%2Fdashboard" };
+  if (!isUserEmailVerified) return { state: DASHBOARD_ROUTE_STATES.REDIRECT_VERIFY_EMAIL };
+
+  if (profileStatus === "idle" || profileStatus === "profile_loading") {
+    return { state: DASHBOARD_ROUTE_STATES.LOADING };
+  }
+  if (profileStatus === "profile_error") return { state: DASHBOARD_ROUTE_STATES.ERROR };
+  if (profileStatus === "profile_missing") {
+    return { state: DASHBOARD_ROUTE_STATES.REDIRECT_PROFILE, path: "/career-dna" };
+  }
+  if (profileStatus === "profile_ready" && !careerProfile?.onboarding_completed) {
+    return { state: DASHBOARD_ROUTE_STATES.REDIRECT_PROFILE, path: "/career-dna" };
+  }
+
+  return { state: DASHBOARD_ROUTE_STATES.READY };
 }
 
 export function buildActivationNavItems({ lang = "TR", activationState, careerProfile } = {}) {

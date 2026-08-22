@@ -66,10 +66,12 @@ import { resolvePostLoginPath } from "./utils/careerOnboardingClient.js";
 import { getApiBase } from "./utils/apiBase.js";
 import {
   buildActivationNavItems,
+  DASHBOARD_ROUTE_STATES,
   getActivationNavHref,
   getContextualAuthCta,
   getAuthIntentFromNext,
   resolveActivationState,
+  resolveDashboardRouteState,
 } from "./utils/activationFlow.js";
 import { trackActivationEvent } from "./utils/activationEvents.js";
 import { buildCareerGrowthView } from "../lib/careerProgress/index.js";
@@ -8213,22 +8215,50 @@ export function DashboardPage() {
     adminTargetEmail, setAdminTargetEmail, adminGrantBusy, adminGrantError, adminGrantNotice, setUserProAccessByAdmin,
   } = useOutletContext();
   const theme = ctxTheme || T;
+  const dashboardRouteState = resolveDashboardRouteState({
+    authStatus,
+    user,
+    isUserEmailVerified,
+    profileStatus,
+    careerProfile,
+  });
 
   useEffect(() => {
-    if (!user?.id || !isUserEmailVerified) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const path = await resolvePostLoginPath(HF_API_BASE, getApiAuthHeaders);
-        if (!cancelled && path === "/onboarding") navigate("/onboarding");
-      } catch {
-        /* ignore */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [user?.id, isUserEmailVerified, navigate, getApiAuthHeaders]);
+    if (dashboardRouteState.state === DASHBOARD_ROUTE_STATES.REDIRECT_LOGIN) {
+      navigate(dashboardRouteState.path, { replace: true });
+      return;
+    }
+    if (dashboardRouteState.state === DASHBOARD_ROUTE_STATES.REDIRECT_PROFILE) {
+      navigate(dashboardRouteState.path, { replace: true });
+    }
+  }, [dashboardRouteState.state, dashboardRouteState.path, navigate]);
+
+  if (dashboardRouteState.state === DASHBOARD_ROUTE_STATES.LOADING) {
+    return (
+      <div style={{ ...styles.container, padding: "80px 24px" }}>
+        <div className="hf-card" role="status" aria-live="polite" style={{ maxWidth: 560, margin: "0 auto", padding: 28 }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", fontWeight: 700, lineHeight: "var(--leading-heading)", marginBottom: 8 }}>
+            {authRestorationMessage(lang)}
+          </h2>
+          <p style={{ color: theme.textSub, margin: 0 }}>
+            {lang === "TR" ? "Profilini ve haftalık kariyer hamleni güvenli şekilde hazırlıyoruz." : "We are safely preparing your profile and weekly career move."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (dashboardRouteState.state === DASHBOARD_ROUTE_STATES.REDIRECT_LOGIN) {
+    return (
+      <div style={{ ...styles.container, padding: "80px 24px" }}>
+        <div className="hf-card" role="status" aria-live="polite" style={{ maxWidth: 560, margin: "0 auto", padding: 28 }}>
+          <h2 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", fontWeight: 700, lineHeight: "var(--leading-heading)", marginBottom: 8 }}>
+            {lang === "TR" ? "Giriş sayfasına yönlendiriliyorsun..." : "Redirecting to sign in..."}
+          </h2>
+        </div>
+      </div>
+    );
+  }
 
   if (user && !isUserEmailVerified) {
     const targetEmail = encodeURIComponent(String(user.email || "").trim());
@@ -8249,15 +8279,15 @@ export function DashboardPage() {
     );
   }
 
-  if (authStatus === "initializing") {
+  if (dashboardRouteState.state === DASHBOARD_ROUTE_STATES.REDIRECT_PROFILE) {
     return (
       <div style={{ ...styles.container, padding: "80px 24px" }}>
         <div className="hf-card" role="status" aria-live="polite" style={{ maxWidth: 560, margin: "0 auto", padding: 28 }}>
           <h2 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", fontWeight: 700, lineHeight: "var(--leading-heading)", marginBottom: 8 }}>
-            {authRestorationMessage(lang)}
+            {lang === "TR" ? "Kariyer profiline yönlendiriliyorsun..." : "Redirecting to your career profile..."}
           </h2>
           <p style={{ color: theme.textSub, margin: 0 }}>
-            {lang === "TR" ? "Kısa bir kontrol sonrası kaldığın yerden devam edeceksin." : "After a quick check, you will continue where you left off."}
+            {lang === "TR" ? "Dashboard için önce Career DNA profilinin tamamlanması gerekiyor." : "The dashboard requires a completed Career DNA profile first."}
           </p>
         </div>
       </div>
