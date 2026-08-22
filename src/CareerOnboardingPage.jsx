@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOutletContext, useSearchParams } from "react-router-dom";
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Info, Sparkles, Shield } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, History, Info, Pencil, PlusCircle, Sparkles, Shield } from "lucide-react";
 import {
   INDUSTRIES,
   getRolesForIndustries,
@@ -69,6 +69,7 @@ import HFMultiSignalSelect from "./components/onboarding/HFMultiSignalSelect.jsx
 import CareerSignalLinks from "./components/onboarding/CareerSignalLinks.jsx";
 import CareerIdentityBuilder from "./components/onboarding/CareerIdentityBuilder.jsx";
 import { buildCareerPreview } from "../lib/careerOnboarding/careerSnapshot.js";
+import { getRecentProfileProgress } from "../lib/careerOnboarding/profileProgress.js";
 import {
   getCountryLabel,
   resolveCountryCode,
@@ -570,6 +571,91 @@ function CareerPreviewPanel({ preview, lang }) {
   );
 }
 
+function ProfileProgressPanel({ profile, lang, navigate, onEdit }) {
+  const tr = lang === "TR";
+  const history = Array.isArray(profile?.career_gps?.profile_history)
+    ? profile.career_gps.profile_history
+    : [];
+  const recent = getRecentProfileProgress(profile, { days: 30 });
+  const loop = profile?.career_gps?.decision_loop || {};
+  const completedActions = Array.isArray(loop.actions)
+    ? loop.actions.filter((action) => action?.status === "completed").length
+    : 0;
+  const outcomes = Array.isArray(loop.outcomes) ? loop.outcomes.length : 0;
+  const candidates = Array.isArray(loop.evidence_candidates) ? loop.evidence_candidates.length : 0;
+  const visibleHistory = history.slice(0, 5);
+  const statCards = [
+    { label: tr ? "Son 30 gün değişiklik" : "Changes in 30 days", value: recent.length },
+    { label: tr ? "Tamamlanan hamle" : "Completed moves", value: completedActions },
+    { label: tr ? "Kaydedilen sonuç" : "Captured outcomes", value: outcomes },
+    { label: tr ? "Kanıt adayı" : "Evidence candidates", value: candidates },
+  ];
+
+  return (
+    <section className="hf-card" style={{ padding: 20, margin: "0 0 18px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#93c5fd", fontSize: 12, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 8 }}>
+            <History size={14} /> {tr ? "Kariyer İlerlemesi" : "Career Progress"}
+          </div>
+          <h2 style={{ fontFamily: "var(--font-display)", color: "#f8fafc", fontSize: 22, lineHeight: 1.15, margin: "0 0 8px" }}>
+            {tr ? "Profilin yaşayan bir kayıt olarak tutuluyor." : "Your profile is kept as a living record."}
+          </h2>
+          <p style={{ color: "#94a3b8", fontSize: 14, lineHeight: 1.55, margin: 0, maxWidth: 680 }}>
+            {tr
+              ? "Burada yalnızca kaydedilmiş gerçek değişiklikleri gösteriyoruz. Skorlar, sadece altta yatan kanıtlar gerçekten değiştiğinde güncellenir."
+              : "Only saved real changes appear here. Scores update only when the underlying evidence truly changes."}
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <button type="button" className="hf-btn-secondary" onClick={onEdit} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <Pencil size={15} /> {tr ? "Profili Düzenle" : "Edit Profile"}
+          </button>
+          <button type="button" className="hf-btn-primary" onClick={() => navigate?.("/dashboard")} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <PlusCircle size={15} /> {tr ? "Yeni Gelişme Ekle" : "Add New Development"}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10, marginTop: 18 }}>
+        {statCards.map((item) => (
+          <div key={item.label} style={{ border: "1px solid rgba(148,163,184,0.14)", borderRadius: 12, padding: 12, background: "rgba(15,23,42,0.48)" }}>
+            <div style={{ color: "#e2e8f0", fontSize: 22, fontWeight: 800 }}>{item.value}</div>
+            <div style={{ color: "#94a3b8", fontSize: 12, lineHeight: 1.35 }}>{item.label}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 18 }}>
+        <h3 style={{ color: "#e2e8f0", fontSize: 14, fontWeight: 800, margin: "0 0 10px" }}>
+          {tr ? "Son değişiklikler" : "Recent changes"}
+        </h3>
+        {visibleHistory.length ? (
+          <div style={{ display: "grid", gap: 8 }}>
+            {visibleHistory.map((event) => (
+              <div key={event.event_id || `${event.field}-${event.timestamp}`} style={{ display: "grid", gridTemplateColumns: "minmax(86px, 120px) 1fr", gap: 10, alignItems: "baseline", color: "#cbd5e1", fontSize: 13 }}>
+                <span style={{ color: "#64748b", fontWeight: 700 }}>
+                  {event.timestamp ? new Date(event.timestamp).toLocaleDateString(tr ? "tr-TR" : "en-US", { month: "short", day: "2-digit" }) : ""}
+                </span>
+                <span>
+                  <strong style={{ color: "#f8fafc" }}>{event.label || event.field}</strong>
+                  {event.old_value || event.new_value ? `: ${event.old_value || "-"} → ${event.new_value || "-"}` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: "#94a3b8", fontSize: 13, lineHeight: 1.5, margin: 0 }}>
+            {tr
+              ? "Henüz kaydedilmiş profil değişikliği yok. Profilini güncellediğinde burada görünecek."
+              : "No saved profile changes yet. Updates will appear here after you edit your profile."}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function CareerOnboardingPage() {
   const { lang, navigate, getApiAuthHeaders, setCareerProfile, user, isUserEmailVerified, authStatus } = useOutletContext();
   const [searchParams] = useSearchParams();
@@ -952,17 +1038,25 @@ export default function CareerOnboardingPage() {
   );
   const labels = useMemo(
     () => ({
-      title: tr ? "Kariyer Profili" : "Career Profile",
-      subtitle: tr
-        ? "3 dakika içinde rol yönünü, en büyük kanıt açığını ve sonraki en iyi hamleni netleştir."
-        : "Clarify your role direction, biggest proof gap, and next best move in 3 minutes.",
+      title: editMode ? (tr ? "Kariyer Profilini Düzenle" : "Edit Career Profile") : (tr ? "Kariyer Profili" : "Career Profile"),
+      subtitle: editMode
+        ? (tr
+            ? "Kayıtlı bilgilerini güncelle; mevcut kanıtların, sonuçların ve haftalık hamlen korunur."
+            : "Update your saved information while preserving evidence, outcomes, and your weekly move.")
+        : (tr
+            ? "3 dakika içinde rol yönünü, en büyük kanıt açığını ve sonraki en iyi hamleni netleştir."
+            : "Clarify your role direction, biggest proof gap, and next best move in 3 minutes."),
       step1: tr ? "Profil" : "Profile",
       step2: tr ? "Hedefin ve rol yönlerin" : "Career goals",
       step3: tr ? "DNA testi" : "DNA assessment",
       step4: tr ? "Kariyer hazırlığı" : "Career readiness",
       next: tr ? "İleri" : "Next",
       back: tr ? "Geri" : "Back",
-      finish: profileExists
+      finish: editMode
+        ? tr
+          ? "Değişiklikleri Kaydet"
+          : "Save Changes"
+        : profileExists
         ? tr
           ? "Kariyer Profilini Güncelle"
           : "Update Career Profile"
@@ -974,7 +1068,7 @@ export default function CareerOnboardingPage() {
         ? "Verilerin yalnızca kariyer önerileri ve OS modülleri için kullanılır; üçüncü taraflarla paylaşılmaz."
         : "Your data powers career recommendations and OS modules only — never sold to third parties.",
     }),
-    [tr, profileExists]
+    [tr, profileExists, editMode]
   );
 
   const hydrate = useCallback((draft, profile) => {
@@ -1101,13 +1195,11 @@ export default function CareerOnboardingPage() {
         setQuestions(data.questions || []);
         setOfflineMode(Boolean(data.offline));
         setProfileExists(Boolean(data.profile?.onboarding_completed));
-        const hydrationDraft = data.profile?.onboarding_completed && !editMode ? null : local;
+        const hydrationDraft = data.profile?.onboarding_completed ? null : local;
         hydrate(hydrationDraft, data.profile);
-        if (data.profile?.onboarding_completed && snapshotMode) {
+        if (data.profile?.onboarding_completed && (snapshotMode || !editMode)) {
           setSummary(data.profile);
           setStep(5);
-        } else if (data.profile?.onboarding_completed && !editMode) {
-          navigate("/dashboard");
         }
       } catch {
         if (local) hydrate(local, null);
@@ -1173,6 +1265,16 @@ export default function CareerOnboardingPage() {
     }, 250);
     return () => window.clearTimeout(handle);
   }, [basic, goals, dnaAnswers, readinessAnswers, cv, mbtiAnswers, showMbti, showAllRoles, goalsPanel, readinessPanel, step, loading, draftHydrated, user?.id]);
+
+  useEffect(() => {
+    if (!editMode || loading || step >= 5) return undefined;
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [editMode, loading, step]);
 
   const onNext = async () => {
     setError("");
@@ -2526,43 +2628,71 @@ export default function CareerOnboardingPage() {
         ) : null}
 
         {step === 5 && summary ? (
-          <FirstCareerAnalysisFlow
-            profile={summary}
-            user={user}
-            lang={lang}
-            navigate={navigate}
-            getApiAuthHeaders={getApiAuthHeaders}
-            initialCvFile={pendingCvFile}
-            onProfileUpdate={(p) => {
-              setSummary(p);
-              setCareerProfile?.(p);
-            }}
-          />
+          <>
+            <ProfileProgressPanel
+              profile={summary}
+              lang={lang}
+              navigate={navigate}
+              onEdit={() => navigate("/career-dna?edit=1")}
+            />
+            <FirstCareerAnalysisFlow
+              profile={summary}
+              user={user}
+              lang={lang}
+              navigate={navigate}
+              getApiAuthHeaders={getApiAuthHeaders}
+              initialCvFile={pendingCvFile}
+              onProfileUpdate={(p) => {
+                setSummary(p);
+                setCareerProfile?.(p);
+              }}
+            />
+          </>
         ) : null}
       </AnimatePresence>
 
       {step < 5 ? (
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 24, gap: 10 }}>
-          <button
-            type="button"
-            disabled={step === 1 || saving}
-            onClick={() => setStep((s) => Math.max(1, s - 1))}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: "1px solid rgba(148,163,184,0.2)",
-              background: "transparent",
-              color: "#94a3b8",
-              fontWeight: 700,
-              cursor: step === 1 ? "not-allowed" : "pointer",
-              opacity: step === 1 ? 0.4 : 1,
-            }}
-          >
-            <ChevronLeft size={14} /> {labels.back}
-          </button>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              disabled={step === 1 || saving}
+              onClick={() => setStep((s) => Math.max(1, s - 1))}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: "1px solid rgba(148,163,184,0.2)",
+                background: "transparent",
+                color: "#94a3b8",
+                fontWeight: 700,
+                cursor: step === 1 ? "not-allowed" : "pointer",
+                opacity: step === 1 ? 0.4 : 1,
+              }}
+            >
+              <ChevronLeft size={14} /> {labels.back}
+            </button>
+            {editMode ? (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => navigate("/career-dna?snapshot=1")}
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(148,163,184,0.2)",
+                  background: "transparent",
+                  color: "#cbd5e1",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {tr ? "Vazgeç" : "Cancel"}
+              </button>
+            ) : null}
+          </div>
           {step < 4 ? (
             <button type="button" className="hf-btn-primary" disabled={saving} onClick={onNext} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
               {labels.next} <ChevronRight size={14} />
