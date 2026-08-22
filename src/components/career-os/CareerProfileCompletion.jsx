@@ -1,18 +1,16 @@
-﻿import { buildCareerProfileCompletion } from "../../../lib/careerOnboarding/careerProfileCompletion.js";
+import { buildCareerProfileCompletion } from "../../../lib/careerOnboarding/careerProfileCompletion.js";
+import { getCvProcessingLabel, resolveCvProcessingState } from "../../../lib/careerOnboarding/cvOptions.js";
 
 export function CareerProfileCompletion({ profile, lang = "TR", className = "" }) {
   const tr = lang === "TR";
   const completion = buildCareerProfileCompletion(profile, lang);
   const incompleteByImpact = [...completion.incomplete].sort((a, b) => Number(b.weight || 0) - Number(a.weight || 0));
-  const basic = profile?.basic_profile || profile?.basic || {};
-  const cv = profile?.cv || {};
-  const cvUploaded = Boolean(cv.cvUploaded || cv.cvFileName || basic.cvUploaded || basic.cvFileName);
-  const cvAnalyzed = Number(profile?.first_analysis?.cvSignalCount || basic.cvSignalCount || cv.cvSignalCount || 0) > 0;
+  const cvState = resolveCvProcessingState(profile);
   const statusForItem = (item) => {
-    if (item.id === "cv" && cvUploaded && !cvAnalyzed) return tr ? "Yüklendi, analiz bekliyor" : "Uploaded, analysis pending";
+    if (item.id === "cv") return getCvProcessingLabel(cvState, lang);
     if (item.id === "recruiter_analysis" || item.id === "ats_analysis") return tr ? "Bekliyor" : "Pending";
     if (item.listGroup === "core") return tr ? "Kısmi" : "Partial";
-    return tr ? "Tamamlandı" : "Done";
+    return tr ? "Tamamlandı" : "Completed";
   };
 
   return (
@@ -46,7 +44,7 @@ export function CareerProfileCompletion({ profile, lang = "TR", className = "" }
         {completion.incomplete.length ? (
           <div>
             <span className="hf-profile-completion__list-label">
-              {tr ? "Beklenen tamamlama kazanımı" : "Expected completion gain"}
+              {tr ? "Tahmini tamamlama etkisi" : "Estimated completion impact"}
             </span>
             <ul className="hf-profile-completion__list hf-profile-completion__list--todo">
               {incompleteByImpact.map((item) => (
@@ -64,4 +62,3 @@ export function CareerProfileCompletion({ profile, lang = "TR", className = "" }
 }
 
 export default CareerProfileCompletion;
-

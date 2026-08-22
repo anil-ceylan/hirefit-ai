@@ -6,12 +6,13 @@ import { buildCareerSnapshot } from "../../lib/careerOnboarding/careerSnapshot.j
 import { friendlyApiMessage, isNetworkError, apiUrl } from "./apiBase.js";
 import { loadLocalCareerProfile } from "./careerMemoryClient.js";
 import {
-  EXPERIENCE_SIGNAL_OPTIONS,
-  LEADERSHIP_SIGNAL_OPTIONS,
-  normalizeSignalSelection,
   normalizePortfolioLinks,
   buildAnalysisSources,
 } from "../../lib/careerOnboarding/careerSignalSchema.js";
+import {
+  resolveExperienceSignalsForPersistence,
+  resolveLeadershipSignalsForPersistence,
+} from "../../lib/careerOnboarding/stateIntegrity.js";
 
 async function parseJsonSafe(res) {
   try {
@@ -213,16 +214,19 @@ export function buildLocalOnboardingProfile({
   const name = basic?.fullName?.trim() || [basic?.firstName, basic?.lastName].filter(Boolean).join(" ");
   const cvFields = cv || {};
   const normalizedGoals = goals || {};
-  const normalizedExperienceSignals = normalizeSignalSelection(
-    experienceSignals || basic?.experienceSignals,
-    EXPERIENCE_SIGNAL_OPTIONS,
-    readinessAnswers?.experience
-  );
-  const normalizedLeadershipSignals = normalizeSignalSelection(
-    leadershipSignals || basic?.leadershipSignals,
-    LEADERSHIP_SIGNAL_OPTIONS,
-    readinessAnswers?.leadership
-  );
+  const existingBasic = existing?.basic_profile || {};
+  const normalizedExperienceSignals = resolveExperienceSignalsForPersistence({
+    incoming: experienceSignals,
+    basicValue: basic?.experienceSignals,
+    existing: existingBasic.experienceSignals,
+    benchmark: readinessAnswers?.experience || existing?.career_readiness?.benchmarks?.experience,
+  });
+  const normalizedLeadershipSignals = resolveLeadershipSignalsForPersistence({
+    incoming: leadershipSignals,
+    basicValue: basic?.leadershipSignals,
+    existing: existingBasic.leadershipSignals,
+    benchmark: readinessAnswers?.leadership || existing?.career_readiness?.benchmarks?.leadership,
+  });
   const portfolioLinks = normalizePortfolioLinks({
     ...(basic || {}),
     linkedin,
@@ -320,14 +324,17 @@ export function buildLocalOnboardingProfile({
     career_dna: dna,
     career_readiness: intelligence.career_readiness,
     career_gps: {
+      ...(existing?.career_gps || {}),
       ...(intelligence.career_gps || {}),
       inputs: {
+        ...(existing?.career_gps?.inputs || {}),
         ...(intelligence.career_gps?.inputs || {}),
         educationLocation,
         localCareerIntelligence: basic?.localCareerIntelligence || {
           education: educationLocation,
         },
       },
+      decision_loop: existing?.career_gps?.decision_loop || intelligence.career_gps?.decision_loop || {},
     },
     best_fit_roles: summary.best_fit_roles || [],
     primary_industry: normalizedGoals?.industries?.[0] || "",

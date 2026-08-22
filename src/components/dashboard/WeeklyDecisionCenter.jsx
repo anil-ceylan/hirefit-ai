@@ -20,6 +20,12 @@ import {
 import { trackActivationEvent } from "../../utils/activationEvents.js";
 import { buildDecisionMirrorViewModel } from "../../utils/decisionMirrorAdapter.js";
 import {
+  buildDurableWeeklyActionPayload,
+  getWeekKey,
+  userKey,
+  weeklyActionId,
+} from "../../utils/weeklyActionIdentity.js";
+import {
   completeCareerAction,
   fetchCareerActionOutcome,
   startCareerAction,
@@ -42,15 +48,6 @@ function compact(value, max = 130) {
   const text = String(value || "").replace(/\s+/g, " ").trim();
   if (!text) return "";
   return text.length > max ? `${text.slice(0, max - 1).trim()}...` : text;
-}
-
-function getWeekKey(date = new Date()) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  const dayNum = d.getUTCDay() || 7;
-  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
-  return `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, "0")}`;
 }
 
 function safeJson(value, fallback) {
@@ -83,10 +80,6 @@ function findLocalCompletion(record, user) {
   );
 }
 
-function userKey(user) {
-  return user?.id || user?.email || "local";
-}
-
 function normalizeProfileInput(careerProfile) {
   return careerProfile && typeof careerProfile === "object" ? careerProfile : {};
 }
@@ -107,10 +100,7 @@ function reliableFirstName(careerProfile = {}, user = {}) {
 }
 
 function actionId(user, action) {
-  return `${userKey(user)}:${getWeekKey()}:${String(action || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9ğüşıöçİĞÜŞÖÇ]+/gi, "-")
-    .slice(0, 80)}`;
+  return weeklyActionId(user, action);
 }
 
 function snapshotFromProfile(careerProfile = {}) {
@@ -277,23 +267,7 @@ function buildDecisionExplanation({ decision, tr }) {
 }
 
 function buildDurableActionPayload(decision, user) {
-  return {
-    action_id: decision.id,
-    decision_id: decision.decisionId || decision.id,
-    week_key: getWeekKey(),
-    action_type: "weekly_career_move",
-    title: decision.action,
-    reason: decision.why,
-    blocker: decision.blocker || "",
-    target_dimension: decision.opportunity || "",
-    expected_evidence: decision.opportunity || "",
-    source: "weekly_decision_center",
-    production_snapshot_ref: {
-      week_key: getWeekKey(),
-      user_key: userKey(user),
-    },
-    confidence: decision.confidenceLabel || "",
-  };
+  return buildDurableWeeklyActionPayload(decision, user);
 }
 
 function buildWeeklyDecision({ careerProfile, user, lang = "TR" }) {
@@ -1009,7 +983,7 @@ export default function WeeklyDecisionCenter({
     return () => {
       cancelled = true;
     };
-  }, [decision.id, decision.action, decision.profileComplete, getApiAuthHeaders, user]);
+  }, [decision, decision.id, decision.action, decision.profileComplete, getApiAuthHeaders, user]);
 
   const persistLocalAction = (status) => {
     const now = new Date().toISOString();

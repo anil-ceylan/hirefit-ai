@@ -19,6 +19,12 @@ import {
 } from "../../utils/firstCareerAnalysis.js";
 import { saveLocalCareerProfile } from "../../utils/careerMemoryClient.js";
 import { trackActivationEvent } from "../../utils/activationEvents.js";
+import { upsertRecommendedCareerAction } from "../../utils/careerActionLoopClient.js";
+import {
+  getWeekKey,
+  userKey,
+  weeklyActionId,
+} from "../../utils/weeklyActionIdentity.js";
 import { CareerSnapshotWow } from "../career-os/CareerSnapshotWow.jsx";
 import { CareerProfileCompletion } from "../career-os/CareerProfileCompletion.jsx";
 import {
@@ -119,6 +125,54 @@ function ScoreBreakdown({ breakdown, tr }) {
 
 function isFounderDirection(value) {
   return /founder|kurucu|co[-\s]?founder|girişimci|girisimci/i.test(String(value || ""));
+}
+
+function compact(value, max = 130) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  return text.length > max ? `${text.slice(0, max - 1).trim()}...` : text;
+}
+
+function snapshotFromProfile(profile = {}) {
+  return profile?.career_snapshot || profile?.career_gps?.snapshot || {};
+}
+
+function buildSnapshotWeeklyActionPayload(profile, user, lang = "TR") {
+  const tr = lang === "TR";
+  const snapshot = snapshotFromProfile(profile);
+  const gapTitle =
+    snapshot.gapDetails?.title ||
+    snapshot.biggestGap?.title ||
+    snapshot.biggestGap ||
+    profile?.weak_signals?.[0] ||
+    (tr ? "Eksik kanıt netleşmeli" : "Missing proof needs clarity");
+  const action = compact(
+    snapshot.suggestedNextMove ||
+      snapshot.recommendedNextMove ||
+      snapshot.gapDetails?.action ||
+      profile?.recommended_next_move ||
+      (tr ? `${gapTitle} için tek somut örnek yaz.` : `Write one concrete example for ${gapTitle}.`),
+    105
+  );
+  const weekKey = getWeekKey();
+  const actionId = weeklyActionId(user, action, weekKey);
+  return {
+    action_id: actionId,
+    decision_id: actionId,
+    week_key: weekKey,
+    action_type: "weekly_career_move",
+    title: action,
+    reason: compact(snapshot.gapDetails?.whyItMatters || snapshot.biggestGap?.whyItMatters || snapshot.biggestGapExplanation, 160),
+    blocker: compact(gapTitle, 80),
+    target_dimension: action,
+    expected_evidence: action,
+    source: "weekly_decision_center",
+    production_snapshot_ref: {
+      week_key: weekKey,
+      user_key: userKey(user),
+    },
+    confidence: "",
+  };
 }
 
 function nearestRoleFromSnapshot(snapshot) {
@@ -293,6 +347,7 @@ function HireFitNoticed({ intro, paragraphs, lang, snapshot }) {
 
 export default function FirstCareerAnalysisFlow({
   profile,
+  user = null,
   lang = "TR",
   navigate,
   getApiAuthHeaders,
@@ -306,9 +361,9 @@ export default function FirstCareerAnalysisFlow({
   const [phase, setPhase] = useState("snapshot");
   const [snapshot, setSnapshot] = useState(profile?.career_snapshot || null);
   const [cvMatch, setCvMatch] = useState(profile?.first_analysis?.cvMatch || null);
-  const [teaser, setTeaser] = useState(profile?.first_analysis?.teaser || null);
+  const [, setTeaser] = useState(profile?.first_analysis?.teaser || null);
   const [flowError, setFlowError] = useState("");
-  const [showCvUpload, setShowCvUpload] = useState(false);
+  const [weeklyMoveBusy, setWeeklyMoveBusy] = useState(false);
 
   const summaryRows = buildOnboardingSummaryRows(profile, lang);
   const snapshotForEvent = snapshot || profile?.career_snapshot || null;
@@ -421,6 +476,26 @@ export default function FirstCareerAnalysisFlow({
     });
     await persist(result);
     setPhase("snapshot");
+  };
+
+  const openWeeklyMove = async () => {
+    if (weeklyMoveBusy) return;
+    setWeeklyMoveBusy(true);
+    try {
+      if (profile?.onboarding_completed && getApiAuthHeaders) {
+        await upsertRecommendedCareerAction({
+          getHeaders: getApiAuthHeaders,
+          action: buildSnapshotWeeklyActionPayload(profile, user, lang),
+        });
+      }
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error("[weekly-action:handoff]", error?.message || error);
+      }
+    } finally {
+      setWeeklyMoveBusy(false);
+      navigate("/dashboard");
+    }
   };
 
   if (phase === "analyzing") {
@@ -629,9 +704,9 @@ export default function FirstCareerAnalysisFlow({
       </section>
 
       <div className="hf-first-analysis__footer-actions">
-        <button type="button" className="hf-btn-primary" onClick={() => navigate("/dashboard")}>
-          {tr ? "Haftalık Hamlemi Gör" : "See My Weekly Move"}
-          <ArrowRight size={14} />
+        <button type="button" className="hf-btn-primary" onClick={openWeeklyMove} disabled={weeklyMoveBusy}>
+          {weeklyMoveBusy ? (tr ? "Hamle hazırlanıyor..." : "Preparing move...") : (tr ? "Haftalık Hamlemi Gör" : "See My Weekly Move")}
+          {weeklyMoveBusy ? <Loader2 size={14} className="hf-spin" /> : <ArrowRight size={14} />}
         </button>
         <button type="button" className="hf-first-analysis__ghost-btn" onClick={() => navigate("/app")}>
           {tr ? "CV ile Doğrula" : "Validate with CV"}

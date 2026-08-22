@@ -88,12 +88,12 @@ function waitForGenerationStep(ms = GENERATION_STEP_MS) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
-function loadOnboardingDraft() {
+function loadOnboardingDraft(userId) {
   const primary = parseLocalStorageJson(localStorage.getItem(DRAFT_KEY), null, { label: "onboarding-draft-v9" });
-  if (primary) return primary;
+  if (primary && (!primary.userId || !userId || primary.userId === userId)) return primary;
   for (const key of LEGACY_DRAFT_KEYS) {
     const legacy = parseLocalStorageJson(localStorage.getItem(key), null, { label: key });
-    if (legacy) return legacy;
+    if (legacy && (!legacy.userId || !userId || legacy.userId === userId)) return legacy;
   }
   return null;
 }
@@ -151,19 +151,24 @@ function normalizeBasicLocation(bp = {}) {
   const universityCode = resolveCountryCode(bp.universityCountryCode || bp.universityCountry);
   const educationStatus = inferEducationStatus(bp);
   const cityFields = normalizeUniversityCitiesForProfile(bp);
+  const normalizedExperienceSignals = normalizeSignalSelection(
+    bp.experienceSignals,
+    EXPERIENCE_SIGNAL_OPTIONS,
+    bp.experienceSignal || ""
+  );
+  const normalizedLeadershipSignals = normalizeSignalSelection(
+    bp.leadershipSignals,
+    LEADERSHIP_SIGNAL_OPTIONS,
+    bp.leadershipSignal || ""
+  );
+  const leadershipExperienceStatus =
+    bp.leadershipExperienceStatus ||
+    (normalizedLeadershipSignals.includes("none") ? "no" : normalizedLeadershipSignals.length ? "yes" : "");
   return {
     ...bp,
     ...normalizePortfolioLinks(bp),
-    experienceSignals: normalizeSignalSelection(
-      bp.experienceSignals,
-      EXPERIENCE_SIGNAL_OPTIONS,
-      bp.experienceSignal || ""
-    ),
-    leadershipSignals: normalizeSignalSelection(
-      bp.leadershipSignals,
-      LEADERSHIP_SIGNAL_OPTIONS,
-      bp.leadershipSignal || ""
-    ),
+    experienceSignals: normalizedExperienceSignals,
+    leadershipSignals: normalizedLeadershipSignals,
     cvUploaded: Boolean(bp.cvUploaded || bp.cvFileName),
     cvSignalCount: Number(bp.cvSignalCount || 0),
     analysisSources: Array.isArray(bp.analysisSources) ? [...new Set(bp.analysisSources)] : [],
@@ -184,7 +189,7 @@ function normalizeBasicLocation(bp = {}) {
     universityManual: Boolean(bp.universityManual || bp.universitySource === "manual" || bp.university_source === "manual"),
     livingSituation: bp.livingSituation || "",
     mbtiType: bp.mbtiType || "",
-    leadershipExperienceStatus: bp.leadershipExperienceStatus || (bp.leadershipSignals?.length ? "yes" : ""),
+    leadershipExperienceStatus,
   };
 }
 
@@ -820,10 +825,16 @@ export default function CareerOnboardingPage() {
   const updateReadinessSignals = (key, optionId) => {
     const options = key === "experience" ? EXPERIENCE_SIGNAL_OPTIONS : LEADERSHIP_SIGNAL_OPTIONS;
     const field = key === "experience" ? "experienceSignals" : "leadershipSignals";
-    const nextSignals = toggleSignalSelection(basic[field], optionId, options);
-    const benchmark = strongestSignalBenchmark(nextSignals, options, "");
-    setBasic({ ...basic, [field]: nextSignals });
-    setReadinessAnswers({ ...readinessAnswers, [key]: benchmark });
+    setBasic((current) => {
+      const nextSignals = toggleSignalSelection(current[field], optionId, options);
+      const benchmark = strongestSignalBenchmark(nextSignals, options, "");
+      setReadinessAnswers((answers) => ({ ...answers, [key]: benchmark }));
+      return {
+        ...current,
+        [field]: nextSignals,
+        ...(key === "leadership" && !nextSignals.includes("none") ? { leadershipExperienceStatus: "yes" } : {}),
+      };
+    });
   };
 
   const moveRankedRole = (roleValue, direction) => {
@@ -990,22 +1001,38 @@ export default function CareerOnboardingPage() {
       ...(profile?.career_readiness?.benchmarks || {}),
       ...(d.readinessAnswers || {}),
     };
-    const signalSource = {
-      ...(profile?.basic_profile || {}),
-      ...(d.basic || {}),
-    };
+    const profileExperienceSignals = normalizeSignalSelection(
+      profile?.basic_profile?.experienceSignals,
+      EXPERIENCE_SIGNAL_OPTIONS,
+      profile?.career_readiness?.benchmarks?.experience
+    );
+    const draftExperienceSignals = normalizeSignalSelection(
+      d.basic?.experienceSignals,
+      EXPERIENCE_SIGNAL_OPTIONS,
+      d.readinessAnswers?.experience
+    );
+    const profileLeadershipSignals = normalizeSignalSelection(
+      profile?.basic_profile?.leadershipSignals,
+      LEADERSHIP_SIGNAL_OPTIONS,
+      profile?.career_readiness?.benchmarks?.leadership
+    );
+    const draftLeadershipSignals = normalizeSignalSelection(
+      d.basic?.leadershipSignals,
+      LEADERSHIP_SIGNAL_OPTIONS,
+      d.readinessAnswers?.leadership
+    );
     setBasic((current) => ({
       ...current,
-      experienceSignals: normalizeSignalSelection(
-        signalSource.experienceSignals,
-        EXPERIENCE_SIGNAL_OPTIONS,
-        legacyReadiness.experience
-      ),
-      leadershipSignals: normalizeSignalSelection(
-        signalSource.leadershipSignals,
-        LEADERSHIP_SIGNAL_OPTIONS,
-        legacyReadiness.leadership
-      ),
+      experienceSignals:
+        draftExperienceSignals.length ||
+        !profileExperienceSignals.length
+          ? normalizeSignalSelection(draftExperienceSignals, EXPERIENCE_SIGNAL_OPTIONS, legacyReadiness.experience)
+          : profileExperienceSignals,
+      leadershipSignals:
+        draftLeadershipSignals.length ||
+        !profileLeadershipSignals.length
+          ? normalizeSignalSelection(draftLeadershipSignals, LEADERSHIP_SIGNAL_OPTIONS, legacyReadiness.leadership)
+          : profileLeadershipSignals,
     }));
     if (d.cv) setCv((c) => ({ ...emptyCvProfile(), ...c, ...d.cv }));
     else if (d.hasCv != null) setCv((c) => ({ ...c, cvStatus: d.hasCv ? "current" : "none", cvExists: Boolean(d.hasCv) }));
@@ -1067,14 +1094,15 @@ export default function CareerOnboardingPage() {
       navigate(`/verify-email?email=${encodeURIComponent(user.email || "")}`);
       return;
     }
-    const local = loadOnboardingDraft();
+    const local = loadOnboardingDraft(user?.id);
     (async () => {
       try {
         const data = await fetchCareerOnboarding(apiBase, getApiAuthHeaders, lang);
         setQuestions(data.questions || []);
         setOfflineMode(Boolean(data.offline));
         setProfileExists(Boolean(data.profile?.onboarding_completed));
-        hydrate(local, data.profile);
+        const hydrationDraft = data.profile?.onboarding_completed && !editMode ? null : local;
+        hydrate(hydrationDraft, data.profile);
         if (data.profile?.onboarding_completed && snapshotMode) {
           setSummary(data.profile);
           setStep(5);
@@ -1103,6 +1131,7 @@ export default function CareerOnboardingPage() {
   const persistDraft = async (nextStep) => {
     const draft = {
       schemaVersion: DRAFT_SCHEMA_VERSION,
+      userId: user?.id || null,
       updatedAt: new Date().toISOString(),
       basic,
       goals,
@@ -1124,6 +1153,7 @@ export default function CareerOnboardingPage() {
     const handle = window.setTimeout(() => {
       const draft = {
         schemaVersion: DRAFT_SCHEMA_VERSION,
+        userId: user?.id || null,
         updatedAt: new Date().toISOString(),
         basic,
         goals,
@@ -1142,7 +1172,7 @@ export default function CareerOnboardingPage() {
       }
     }, 250);
     return () => window.clearTimeout(handle);
-  }, [basic, goals, dnaAnswers, readinessAnswers, cv, mbtiAnswers, showMbti, showAllRoles, goalsPanel, readinessPanel, step, loading, draftHydrated]);
+  }, [basic, goals, dnaAnswers, readinessAnswers, cv, mbtiAnswers, showMbti, showAllRoles, goalsPanel, readinessPanel, step, loading, draftHydrated, user?.id]);
 
   const onNext = async () => {
     setError("");
@@ -2378,12 +2408,14 @@ export default function CareerOnboardingPage() {
                               active={status === option.id}
                               label={tr ? option.labelTr : option.labelEn}
                               onClick={() => {
-                                const patch = { ...basic, leadershipExperienceStatus: option.id };
+                                setBasic((current) => ({
+                                  ...current,
+                                  leadershipExperienceStatus: option.id,
+                                  leadershipSignals: option.id === "no" ? ["none"] : current.leadershipSignals,
+                                }));
                                 if (option.id === "no") {
-                                  patch.leadershipSignals = [];
-                                  setReadinessAnswers({ ...readinessAnswers, leadership: "none" });
+                                  setReadinessAnswers((answers) => ({ ...answers, leadership: "none" }));
                                 }
-                                setBasic(patch);
                               }}
                             />
                           ))}
@@ -2496,6 +2528,7 @@ export default function CareerOnboardingPage() {
         {step === 5 && summary ? (
           <FirstCareerAnalysisFlow
             profile={summary}
+            user={user}
             lang={lang}
             navigate={navigate}
             getApiAuthHeaders={getApiAuthHeaders}

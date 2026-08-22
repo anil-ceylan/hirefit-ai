@@ -4923,20 +4923,25 @@ function getNavCareerScore({ careerProfile, careerGrowth, scoreHistory }) {
   let score = null;
   let delta = null;
 
-  if (careerGrowth?.careerScore != null && Number.isFinite(Number(careerGrowth.careerScore))) {
-    score = Math.round(Number(careerGrowth.careerScore));
-    if (careerGrowth.scoreDelta != null && Number.isFinite(Number(careerGrowth.scoreDelta))) {
-      delta = Math.round(Number(careerGrowth.scoreDelta));
+  if (careerProfile) {
+    const potential =
+      careerProfile.career_snapshot?.readinessScore ??
+      careerProfile.career_snapshot?.currentReadiness ??
+      careerProfile.career_gps?.snapshot?.readinessScore ??
+      careerProfile.career_gps?.snapshot?.currentReadiness ??
+      careerProfile.career_readiness?.score;
+    if (potential != null && Number.isFinite(Number(potential)) && Number(potential) > 0) {
+      score = Math.round(Number(potential));
     }
   }
 
-  if (score == null && careerProfile) {
-    const readiness =
-      careerProfile.career_snapshot?.readinessScore ??
-      careerProfile.career_readiness?.score;
-    if (readiness != null && Number.isFinite(Number(readiness))) {
-      score = Math.round(Number(readiness));
-    }
+  if (score == null && careerGrowth?.careerScore != null && Number.isFinite(Number(careerGrowth.careerScore))) {
+    const growthScore = Math.round(Number(careerGrowth.careerScore));
+    if (growthScore > 0) score = growthScore;
+  }
+
+  if (careerGrowth?.scoreDelta != null && Number.isFinite(Number(careerGrowth.scoreDelta))) {
+    delta = Math.round(Number(careerGrowth.scoreDelta));
   }
 
   if (delta == null && Array.isArray(scoreHistory) && scoreHistory.length >= 2) {
