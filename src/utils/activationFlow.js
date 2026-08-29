@@ -58,9 +58,10 @@ export function resolveDashboardRouteState({
   return { state: DASHBOARD_ROUTE_STATES.READY };
 }
 
-export function buildActivationNavItems({ lang = "TR", activationState, careerProfile } = {}) {
+export function buildActivationNavItems({ lang = "TR", activationState, careerProfile, profileStatus } = {}) {
   const tr = lang === "TR";
-  const profileComplete = Boolean(careerProfile?.onboarding_completed);
+  const profilePath = resolveCareerProfilePath({ careerProfile, profileStatus });
+  const profileComplete = profilePath.includes("snapshot=1");
   if (activationState === ACTIVATION_STATES.UNAUTHENTICATED) {
     return [
       { label: tr ? "Analiz" : "Analyze", path: "/analyze", viewKey: "analyze" },
@@ -74,10 +75,16 @@ export function buildActivationNavItems({ lang = "TR", activationState, careerPr
     { label: tr ? "Fiyatlandırma" : "Pricing", path: "/", hash: "#pricing", sectionId: "pricing", viewKey: "pricing" },
     {
       label: tr ? "Profil" : "Profile",
-      path: profileComplete ? "/career-dna?snapshot=1" : "/career-dna",
+      path: profilePath,
       viewKey: profileComplete ? "snapshot" : "careerDna",
     },
   ];
+}
+
+export function resolveCareerProfilePath({ careerProfile = null, profileStatus = "profile_ready" } = {}) {
+  if (careerProfile?.onboarding_completed) return "/career-dna?snapshot=1";
+  if (profileStatus === "idle" || profileStatus === "profile_loading") return "/dashboard";
+  return "/career-dna";
 }
 
 export function getActivationNavHref(item = {}) {

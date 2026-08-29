@@ -7,6 +7,7 @@ import HireFitLayout, {
   LandingPage,
   AnalyzePage,
   AnalyzerPage,
+  AccountSettingsPage,
   DashboardPage,
   LoginPage,
   RoadmapRoute,
@@ -28,6 +29,7 @@ createRoot(document.getElementById('root')).render(
             <Route index element={<LandingPage />} />
             <Route path="analyze" element={<AnalyzePage />} />
             <Route path="app" element={<AnalyzerPage />} />
+            <Route path="settings" element={<AccountSettingsPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="onboarding" element={<CareerOnboardingPage />} />
             <Route path="career-dna" element={<CareerOnboardingPage />} />

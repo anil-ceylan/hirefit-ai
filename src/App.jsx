@@ -70,6 +70,7 @@ import {
   getActivationNavHref,
   getContextualAuthCta,
   getAuthIntentFromNext,
+  resolveCareerProfilePath,
   resolveActivationState,
   resolveDashboardRouteState,
 } from "./utils/activationFlow.js";
@@ -81,7 +82,7 @@ import {
   CheckCircle2, ArrowRight, LogIn, LogOut, Download, Mail,
   Zap, TrendingUp, Crown, Linkedin, Instagram, Link2, Workflow,
   ChevronRight, ChevronDown, Eye, Layers, KeyRound, LineChart,
-  Cpu, FileUp, Lock, Check,
+  Cpu, FileUp, Lock, Check, UserCircle, Settings, MessageSquare,
 } from "lucide-react";
 
 const LazyPersonalizedRoadmapPage = lazy(() => import("./PersonalizedRoadmapPage.jsx"));
@@ -3574,6 +3575,18 @@ const translations = {
     clear: "Clear",
     viewReport: "View Report â†’",
     signOut: "Sign out",
+    myProfile: "My Profile",
+    accountSettings: "Account Settings",
+    sendFeedback: "Send Feedback",
+    account: "Account",
+    fullName: "Full name",
+    emailAddress: "Email",
+    preferences: "Preferences",
+    language: "Language",
+    security: "Security",
+    changePassword: "Change Password",
+    accountData: "Account Data",
+    deleteAccount: "Delete Account",
     login: "Login",
     welcomeBack: "Welcome back to your Career OS",
     signInDesc: "Sign in to access your career dashboard.",
@@ -3948,6 +3961,18 @@ const translations = {
     clear: "Temizle",
     viewReport: "Raporu Gör â†’",
     signOut: "Çıkış Yap",
+    myProfile: "Profilim",
+    accountSettings: "Hesap Ayarları",
+    sendFeedback: "Geri Bildirim Gönder",
+    account: "Hesap",
+    fullName: "İsim Soyisim",
+    emailAddress: "E-posta",
+    preferences: "Tercihler",
+    language: "Dil",
+    security: "Güvenlik",
+    changePassword: "Şifreyi Değiştir",
+    accountData: "Hesap Verileri",
+    deleteAccount: "Hesabı Sil",
     login: "Giriş Yap",
     welcomeBack: "Kariyer Paneline Dön",
     signInDesc: "Kariyer paneline erişmek için giriş yap.",
@@ -4971,8 +4996,10 @@ function NavBar({
   lang,
   setLang,
   careerProfile,
+  profileStatus,
   careerGrowth,
   scoreHistory,
+  onOpenFeedback,
 }) {
   const t = translations[lang];
   const navTab =
@@ -5042,8 +5069,12 @@ function NavBar({
   );
 
   const navItems = useMemo(
-    () => buildActivationNavItems({ lang, activationState, careerProfile }),
-    [lang, activationState, careerProfile]
+    () => buildActivationNavItems({ lang, activationState, careerProfile, profileStatus }),
+    [lang, activationState, careerProfile, profileStatus]
+  );
+  const profilePath = useMemo(
+    () => resolveCareerProfilePath({ careerProfile, profileStatus }),
+    [careerProfile, profileStatus]
   );
 
   const pickLang = (next) => {
@@ -5115,8 +5146,9 @@ function NavBar({
           <button
               type="button"
               className="hf-nav-career-score"
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate(profilePath)}
               title={t.careerScore}
+              aria-label={`${t.careerScore} ${careerScore.score}`}
             >
               <span className="hf-nav-career-score__label">{t.careerScore}</span>
               <span className="hf-nav-career-score__value">{careerScore.score}</span>
@@ -5183,16 +5215,62 @@ function NavBar({
                 <div className="hf-nav-avatar" aria-hidden>
                   {avatarLetter}
               </div>
-                <span className="hf-nav-profile-name">{account.primary || "â€”"}</span>
+                <span className="hf-nav-profile-name">{account.primary || "—"}</span>
                 <ChevronDown size={13} className="hf-nav-profile-chevron" />
               </button>
               {profileMenuOpen ? (
                 <div className="hf-nav-profile-menu" role="menu">
-                  {account.secondary || account.full ? (
-                    <div className="hf-nav-profile-email" title={account.full || undefined}>
-                      {account.secondary || account.full}
+                  <div className="hf-nav-profile-menu-head">
+                    <div className="hf-nav-avatar hf-nav-avatar--menu" aria-hidden>
+                      {avatarLetter}
                     </div>
-                  ) : null}
+                    <div className="hf-nav-profile-menu-identity">
+                      <strong title={account.full || undefined}>{account.primary || "—"}</strong>
+                      {account.secondary || account.full ? (
+                        <span title={account.full || undefined}>
+                          {account.secondary || account.full}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="hf-nav-profile-divider" />
+                  <button
+                    type="button"
+                    className="hf-nav-profile-menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      navigate(profilePath);
+                    }}
+                  >
+                    <UserCircle size={14} />
+                    {t.myProfile}
+                  </button>
+                  <button
+                    type="button"
+                    className="hf-nav-profile-menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      navigate("/settings");
+                    }}
+                  >
+                    <Settings size={14} />
+                    {t.accountSettings}
+                  </button>
+                  <button
+                    type="button"
+                    className="hf-nav-profile-menu-item"
+                    role="menuitem"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      onOpenFeedback?.();
+                    }}
+                  >
+                    <MessageSquare size={14} />
+                    {t.sendFeedback}
+                  </button>
+                  <div className="hf-nav-profile-divider" />
                   <button
                     type="button"
                     className="hf-nav-profile-menu-item"
@@ -5235,6 +5313,141 @@ function NavBar({
 }
 
 const Navbar = NavBar;
+
+const FEEDBACK_CONTACT_EMAIL = "muhammetanilceylann@gmail.com";
+
+function BetaFeedbackModal({ open, lang = "TR", pathname = "/", onClose }) {
+  const tr = lang === "TR";
+  const [category, setCategory] = useState("bug");
+  const [message, setMessage] = useState("");
+  const [notice, setNotice] = useState("");
+  const closeRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (event) => {
+      if (event.key === "Escape") onClose?.();
+    };
+    document.addEventListener("keydown", onKey);
+    window.setTimeout(() => closeRef.current?.focus?.(), 0);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  useEffect(() => {
+    if (!open) {
+      setNotice("");
+      return;
+    }
+    trackActivationEvent("feedback_opened", {
+      surface: "account_menu",
+      route: pathname,
+      lang,
+      beta_cohort: CLOSED_BETA_COHORT,
+    });
+  }, [open, pathname, lang]);
+
+  if (!open) return null;
+
+  const categories = tr
+    ? [
+        { value: "bug", label: "Bug" },
+        { value: "product", label: "Ürün önerisi" },
+        { value: "unclear", label: "Anlaşılmayan bir şey" },
+        { value: "other", label: "Diğer" },
+      ]
+    : [
+        { value: "bug", label: "Bug" },
+        { value: "product", label: "Product suggestion" },
+        { value: "unclear", label: "Something unclear" },
+        { value: "other", label: "Other" },
+      ];
+
+  const selectedLabel = categories.find((item) => item.value === category)?.label || category;
+  const canSubmit = message.trim().length >= 8;
+  const submit = (event) => {
+    event.preventDefault();
+    if (!canSubmit) {
+      setNotice(tr ? "Lütfen kısa bir açıklama yaz." : "Please add a short message.");
+      return;
+    }
+    const subject = `HireFit Closed Beta Feedback - ${selectedLabel}`;
+    const body = [
+      `Category: ${selectedLabel}`,
+      `Page: ${pathname || "/"}`,
+      "",
+      message.trim(),
+    ].join("\n");
+    const href = `mailto:${FEEDBACK_CONTACT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    trackActivationEvent("feedback_mailto_started", {
+      surface: "account_menu",
+      route: pathname,
+      lang,
+      beta_cohort: CLOSED_BETA_COHORT,
+    });
+    window.location.href = href;
+    setNotice(
+      tr
+        ? "E-posta taslağı açıldı. Gönderimi mail uygulamanda tamamlayabilirsin."
+        : "Your email draft opened. You can finish sending it in your mail app."
+    );
+  };
+
+  return (
+    <div className="hf-modal-backdrop" role="presentation" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose?.();
+    }}>
+      <div className="hf-card hf-feedback-modal" role="dialog" aria-modal="true" aria-labelledby="hf-feedback-title">
+        <div className="hf-feedback-modal__header">
+          <div>
+            <p>{tr ? "Closed Beta" : "Closed Beta"}</p>
+            <h2 id="hf-feedback-title">{tr ? "Geri Bildirim Gönder" : "Send Feedback"}</h2>
+          </div>
+          <button ref={closeRef} type="button" className="hf-feedback-modal__close" onClick={onClose} aria-label={tr ? "Kapat" : "Close"}>
+            ×
+          </button>
+        </div>
+        <p className="hf-feedback-modal__copy">
+          {tr
+            ? "Bu sürümde geri bildirim e-posta ile toplanıyor. Mesajın yerel olarak kaydedilmez."
+            : "In this beta, feedback is collected by email. Your message is not stored locally."}
+        </p>
+        <form onSubmit={submit} className="hf-feedback-modal__form">
+          <label>
+            <span>{tr ? "Kategori" : "Category"}</span>
+            <select className="hf-input" value={category} onChange={(event) => setCategory(event.target.value)}>
+              {categories.map((item) => (
+                <option key={item.value} value={item.value}>{item.label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>{tr ? "Mesaj" : "Message"}</span>
+            <textarea
+              className="hf-input"
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              rows={5}
+              placeholder={tr ? "Ne fark ettin? Kısaca yaz." : "What did you notice? Keep it short."}
+            />
+          </label>
+          <div className="hf-feedback-modal__context">
+            {tr ? "Sayfa bağlamı" : "Page context"}: <strong>{pathname || "/"}</strong>
+          </div>
+          {notice ? <div className="hf-feedback-modal__notice" role="status">{notice}</div> : null}
+          <div className="hf-feedback-modal__actions">
+            <button type="button" className="hf-btn-ghost" onClick={onClose}>
+              {tr ? "Vazgeç" : "Cancel"}
+            </button>
+            <button type="submit" className="hf-btn-primary" disabled={!canSubmit}>
+              <Mail size={14} />
+              {tr ? "E-posta Taslağı Aç" : "Open Email Draft"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 function LandingPageAmbient() {
   useEffect(() => {
@@ -6149,6 +6362,7 @@ function HireFitLayout() {
   const [recommendedJobs, setRecommendedJobs] = useState(null);
   const [recommendedJobsLoading, setRecommendedJobsLoading] = useState(false);
   const [showSharePrompt, setShowSharePrompt] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [reanalysisBaseline, setReanalysisBaseline] = useState(null);
   const [reanalysisResult, setReanalysisResult] = useState(null);
   const syncedPlanUserRef = useRef(null);
@@ -7506,8 +7720,10 @@ function HireFitLayout() {
         lang={lang}
         setLang={setLang}
         careerProfile={careerProfile}
+        profileStatus={profileStatus}
         careerGrowth={careerGrowth}
         scoreHistory={scoreHistory}
+        onOpenFeedback={() => setFeedbackOpen(true)}
       />
 
       {showPaywall && (
@@ -7529,6 +7745,12 @@ function HireFitLayout() {
           ""
         }
         onClose={() => setShowSharePrompt(false)}
+      />
+      <BetaFeedbackModal
+        open={feedbackOpen}
+        lang={lang}
+        pathname={location.pathname}
+        onClose={() => setFeedbackOpen(false)}
       />
 
       <Outlet context={hireFitOutletContext} />
@@ -8204,6 +8426,206 @@ export function LoginPage() {
               </div>
             </div>
           </div>
+  );
+}
+
+export function AccountSettingsPage() {
+  const {
+    lang,
+    setLang,
+    user,
+    authStatus,
+    isUserEmailVerified,
+    careerProfile,
+    profileStatus,
+    navigate,
+  } = useOutletContext();
+  const tr = lang === "TR";
+  const [passwordNotice, setPasswordNotice] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const accountLines = useMemo(() => getNavAccountLines(user), [user]);
+  const fullName = String(
+    careerProfile?.basic_profile?.fullName ||
+    careerProfile?.basic_profile?.full_name ||
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    accountLines.primary ||
+    ""
+  ).trim();
+  const emailValue = String(user?.email || "").trim();
+
+  useEffect(() => {
+    if (authStatus === "initializing") return;
+    if (!user) navigate("/login?next=%2Fsettings", { replace: true });
+  }, [authStatus, user, navigate]);
+
+  const sendPasswordReset = async () => {
+    setPasswordNotice("");
+    setPasswordError("");
+    if (!emailValue) {
+      setPasswordError(tr ? "Şifre sıfırlama için e-posta bulunamadı." : "No email address is available for password reset.");
+      return;
+    }
+    if (!isSupabaseConfigured || typeof supabase.auth.resetPasswordForEmail !== "function") {
+      setPasswordError(tr ? "Şifre sıfırlama şu anda kullanılamıyor." : "Password reset is not available right now.");
+      return;
+    }
+    try {
+      setPasswordBusy(true);
+      const redirectTo = typeof window !== "undefined" ? `${window.location.origin}/login` : undefined;
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(emailValue, {
+        redirectTo,
+      });
+      if (resetError) throw resetError;
+      setPasswordNotice(
+        tr
+          ? "Şifre değiştirme bağlantısı e-posta adresine gönderildi."
+          : "A password reset link was sent to your email address."
+      );
+    } catch (error) {
+      setPasswordError(authUserErrorMessage(error, lang, "connection"));
+    } finally {
+      setPasswordBusy(false);
+    }
+  };
+
+  if (authStatus === "initializing" || (user && (profileStatus === "idle" || profileStatus === "profile_loading"))) {
+    return (
+      <div style={{ ...styles.container, padding: "88px 24px" }}>
+        <div className="hf-card" role="status" aria-live="polite" style={{ maxWidth: 560, margin: "0 auto", padding: 28 }}>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", margin: "0 0 8px" }}>
+            {authRestorationMessage(lang)}
+          </h1>
+          <p style={{ color: "#94a3b8", margin: 0 }}>
+            {tr ? "Hesap bilgilerin güvenli şekilde hazırlanıyor." : "Your account details are being prepared safely."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div style={{ ...styles.container, padding: "88px 24px" }}>
+        <div className="hf-card" role="status" aria-live="polite" style={{ maxWidth: 560, margin: "0 auto", padding: 28 }}>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", margin: "0 0 8px" }}>
+            {tr ? "Giriş sayfasına yönlendiriliyorsun..." : "Redirecting to sign in..."}
+          </h1>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isUserEmailVerified) {
+    const targetEmail = encodeURIComponent(emailValue);
+    return (
+      <div style={{ ...styles.container, padding: "88px 24px" }}>
+        <div className="hf-card" style={{ maxWidth: 560, margin: "0 auto", padding: 28 }}>
+          <h1 style={{ fontFamily: "var(--font-display)", fontSize: "var(--text-heading-lg)", margin: "0 0 8px" }}>
+            {tr ? "E-postanı doğrula" : "Verify your email"}
+          </h1>
+          <p style={{ color: "#94a3b8", marginBottom: 18 }}>
+            {tr ? "Hesap ayarlarına erişmeden önce e-posta adresini doğrulaman gerekiyor." : "Please verify your email before opening account settings."}
+          </p>
+          <button type="button" className="hf-btn-primary" onClick={() => navigate(`/verify-email?email=${targetEmail}`)}>
+            {tr ? "Doğrulama Adımına Git" : "Go to Verification"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="hf-settings-page">
+      <div className="hf-settings-shell">
+        <div className="hf-settings-header">
+          <p>{tr ? "Hesap" : "Account"}</p>
+          <h1>{tr ? "Hesap Ayarları" : "Account Settings"}</h1>
+          <span>
+            {tr
+              ? "Kariyer profilin ayrı kalır; burada yalnızca hesap ve tercih ayarların bulunur."
+              : "Your career profile stays separate; this page only contains account and preference settings."}
+          </span>
+        </div>
+
+        <section className="hf-card hf-settings-card" aria-labelledby="account-settings-account">
+          <div className="hf-settings-card__title">
+            <Mail size={16} />
+            <h2 id="account-settings-account">{tr ? "Hesap" : "Account"}</h2>
+          </div>
+          <div className="hf-settings-field-grid">
+            <label>
+              <span>{tr ? "İsim Soyisim" : "Full name"}</span>
+              <input className="hf-input" value={fullName || "—"} readOnly />
+            </label>
+            <label>
+              <span>{tr ? "E-posta" : "Email"}</span>
+              <input className="hf-input" value={emailValue || "—"} readOnly />
+            </label>
+          </div>
+        </section>
+
+        <section className="hf-card hf-settings-card" aria-labelledby="account-settings-preferences">
+          <div className="hf-settings-card__title">
+            <Settings size={16} />
+            <h2 id="account-settings-preferences">{tr ? "Tercihler" : "Preferences"}</h2>
+          </div>
+          <div className="hf-settings-language-row">
+            <div>
+              <strong>{tr ? "Dil" : "Language"}</strong>
+              <span>{tr ? "Header dil seçimiyle aynı ayarı kullanır." : "Uses the same preference as the header language selector."}</span>
+            </div>
+            <div className="hf-settings-segment" role="group" aria-label={tr ? "Dil seçimi" : "Language selection"}>
+              {["TR", "EN"].map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  className={lang === code ? "is-active" : ""}
+                  onClick={() => setLang?.(code)}
+                  aria-pressed={lang === code}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="hf-card hf-settings-card" aria-labelledby="account-settings-security">
+          <div className="hf-settings-card__title">
+            <KeyRound size={16} />
+            <h2 id="account-settings-security">{tr ? "Güvenlik" : "Security"}</h2>
+          </div>
+          <p className="hf-settings-muted">
+            {tr
+              ? "Şifre değiştirme, Supabase güvenli sıfırlama e-postası üzerinden yapılır."
+              : "Password changes use Supabase's secure reset email flow."}
+          </p>
+          <button type="button" className="hf-btn-primary" onClick={sendPasswordReset} disabled={passwordBusy}>
+            <KeyRound size={14} />
+            {passwordBusy ? (tr ? "Gönderiliyor..." : "Sending...") : (tr ? "Şifreyi Değiştir" : "Change Password")}
+          </button>
+          {passwordNotice ? <div className="hf-settings-notice" role="status">{passwordNotice}</div> : null}
+          {passwordError ? <div className="hf-settings-error" role="alert">{passwordError}</div> : null}
+        </section>
+
+        <section className="hf-card hf-settings-card" aria-labelledby="account-settings-data">
+          <div className="hf-settings-card__title">
+            <Lock size={16} />
+            <h2 id="account-settings-data">{tr ? "Hesap Verileri" : "Account Data"}</h2>
+          </div>
+          <p className="hf-settings-muted">
+            {tr
+              ? "Güvenli hesap silme için server-side silme akışı gerekir. Closed beta süresince bu kontrol pasif tutulur."
+              : "Safe account deletion requires a server-side deletion flow. This control is disabled during closed beta."}
+          </p>
+          <button type="button" className="hf-btn-ghost hf-settings-danger" disabled>
+            {tr ? "Hesabı Sil" : "Delete Account"}
+          </button>
+        </section>
+      </div>
+    </div>
   );
 }
 

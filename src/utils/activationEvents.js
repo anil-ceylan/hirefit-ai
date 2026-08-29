@@ -33,6 +33,8 @@ export const ACTIVATION_EVENTS = Object.freeze([
   "decision_mirror_opened",
   "reflection_question_viewed",
   "reflection_journal_started",
+  "feedback_opened",
+  "feedback_mailto_started",
 ]);
 
 const ALLOWED_KEYS = new Set([
