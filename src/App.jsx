@@ -49,6 +49,11 @@ import CareerIntelligenceDashboard from "./components/CareerIntelligenceDashboar
 import RecentAnalysesAccordion from "./components/RecentAnalysesAccordion.jsx";
 import WeeklyDecisionCenter from "./components/dashboard/WeeklyDecisionCenter.jsx";
 import {
+  AccountAvatar,
+  ProfilePhotoControl,
+} from "./components/account/AccountAvatar.jsx";
+import { getAccountDisplayName } from "./utils/accountAvatarModel.js";
+import {
   fetchCareerProfileStatus,
   loadLocalCareerProfile,
   syncCareerMemoryAfterAnalyze,
@@ -4887,21 +4892,15 @@ function navFirstGivenName(displayName) {
 }
 
 /** Navbar: first name (+ email line); tooltip keeps full name when available. */
-function getNavAccountLines(user) {
+function getNavAccountLines(user, careerProfile) {
   if (!user) return { primary: "", secondary: "", full: "" };
   const email = (user.email && String(user.email).trim()) || "";
-  const meta = user.user_metadata || {};
-  const raw =
-    meta.full_name ??
-    meta.name ??
-    meta.display_name ??
-    meta.preferred_username;
-  const name = typeof raw === "string" ? raw.trim() : "";
+  const name = getAccountDisplayName(user, careerProfile);
   if (name && email && name.toLowerCase() !== email.toLowerCase()) {
     return {
       primary: navFirstGivenName(name) || name,
       secondary: email,
-      full: `${name} â€” ${email}`,
+      full: `${name} - ${email}`,
     };
   }
   if (email) {
@@ -5057,8 +5056,7 @@ function NavBar({
     };
   }, []);
 
-  const account = useMemo(() => getNavAccountLines(user), [user]);
-  const avatarLetter = (user?.email?.[0] || account.primary?.[0] || "?").toUpperCase();
+  const account = useMemo(() => getNavAccountLines(user, careerProfile), [user, careerProfile]);
   const careerScore = useMemo(
     () => getNavCareerScore({ careerProfile, careerGrowth, scoreHistory }),
     [careerProfile, careerGrowth, scoreHistory]
@@ -5212,18 +5210,19 @@ function NavBar({
                   setProfileMenuOpen((o) => !o);
                 }}
               >
-                <div className="hf-nav-avatar" aria-hidden>
-                  {avatarLetter}
-              </div>
+                <AccountAvatar user={user} careerProfile={careerProfile} className="hf-nav-avatar" size={28} />
                 <span className="hf-nav-profile-name">{account.primary || "—"}</span>
                 <ChevronDown size={13} className="hf-nav-profile-chevron" />
               </button>
               {profileMenuOpen ? (
                 <div className="hf-nav-profile-menu" role="menu">
                   <div className="hf-nav-profile-menu-head">
-                    <div className="hf-nav-avatar hf-nav-avatar--menu" aria-hidden>
-                      {avatarLetter}
-                    </div>
+                    <AccountAvatar
+                      user={user}
+                      careerProfile={careerProfile}
+                      className="hf-nav-avatar--menu"
+                      size={32}
+                    />
                     <div className="hf-nav-profile-menu-identity">
                       <strong title={account.full || undefined}>{account.primary || "—"}</strong>
                       {account.secondary || account.full ? (
@@ -8439,20 +8438,14 @@ export function AccountSettingsPage() {
     careerProfile,
     profileStatus,
     navigate,
+    getApiAuthHeaders,
+    setCareerProfile,
   } = useOutletContext();
   const tr = lang === "TR";
   const [passwordNotice, setPasswordNotice] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
-  const accountLines = useMemo(() => getNavAccountLines(user), [user]);
-  const fullName = String(
-    careerProfile?.basic_profile?.fullName ||
-    careerProfile?.basic_profile?.full_name ||
-    user?.user_metadata?.full_name ||
-    user?.user_metadata?.name ||
-    accountLines.primary ||
-    ""
-  ).trim();
+  const fullName = getAccountDisplayName(user, careerProfile);
   const emailValue = String(user?.email || "").trim();
 
   useEffect(() => {
@@ -8554,15 +8547,26 @@ export function AccountSettingsPage() {
             <Mail size={16} />
             <h2 id="account-settings-account">{tr ? "Hesap" : "Account"}</h2>
           </div>
-          <div className="hf-settings-field-grid">
-            <label>
-              <span>{tr ? "İsim Soyisim" : "Full name"}</span>
-              <input className="hf-input" value={fullName || "—"} readOnly />
-            </label>
-            <label>
-              <span>{tr ? "E-posta" : "Email"}</span>
-              <input className="hf-input" value={emailValue || "—"} readOnly />
-            </label>
+          <div className="hf-settings-account-row">
+            <ProfilePhotoControl
+              user={user}
+              careerProfile={careerProfile}
+              apiBase={HF_API_BASE}
+              getApiAuthHeaders={getApiAuthHeaders}
+              setCareerProfile={setCareerProfile}
+              lang={lang}
+              compact
+            />
+            <div className="hf-settings-field-grid">
+              <label>
+                <span>{tr ? "İsim Soyisim" : "Full name"}</span>
+                <input className="hf-input" value={fullName || "—"} readOnly />
+              </label>
+              <label>
+                <span>{tr ? "E-posta" : "Email"}</span>
+                <input className="hf-input" value={emailValue || "—"} readOnly />
+              </label>
+            </div>
           </div>
         </section>
 

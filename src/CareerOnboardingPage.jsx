@@ -68,6 +68,7 @@ import FirstCareerAnalysisFlow from "./components/onboarding/FirstCareerAnalysis
 import HFMultiSignalSelect from "./components/onboarding/HFMultiSignalSelect.jsx";
 import CareerSignalLinks from "./components/onboarding/CareerSignalLinks.jsx";
 import CareerIdentityBuilder from "./components/onboarding/CareerIdentityBuilder.jsx";
+import { ProfilePhotoControl } from "./components/account/AccountAvatar.jsx";
 import { buildCareerPreview } from "../lib/careerOnboarding/careerSnapshot.js";
 import { getRecentProfileProgress } from "../lib/careerOnboarding/profileProgress.js";
 import {
@@ -573,7 +574,17 @@ function CareerPreviewPanel({ preview, lang }) {
   );
 }
 
-function ProfileProgressPanel({ profile, lang, navigate, onEdit }) {
+function ProfileProgressPanel({
+  profile,
+  lang,
+  navigate,
+  onEdit,
+  user,
+  apiBase,
+  getApiAuthHeaders,
+  setCareerProfile,
+  onProfileUpdate,
+}) {
   const tr = lang === "TR";
   const history = Array.isArray(profile?.career_gps?.profile_history)
     ? profile.career_gps.profile_history
@@ -609,7 +620,19 @@ function ProfileProgressPanel({ profile, lang, navigate, onEdit }) {
               : "Only saved real changes appear here. Scores update only when the underlying evidence truly changes."}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+          <ProfilePhotoControl
+            user={user}
+            careerProfile={profile}
+            apiBase={apiBase}
+            getApiAuthHeaders={getApiAuthHeaders}
+            setCareerProfile={(updatedProfile) => {
+              setCareerProfile?.(updatedProfile);
+              onProfileUpdate?.(updatedProfile);
+            }}
+            lang={lang}
+            compact
+          />
           <button type="button" className="hf-btn-secondary" onClick={onEdit} style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
             <Pencil size={15} /> {tr ? "Profili Düzenle" : "Edit Profile"}
           </button>
@@ -2674,6 +2697,11 @@ export default function CareerOnboardingPage() {
               lang={lang}
               navigate={navigate}
               onEdit={() => navigate("/career-dna?edit=1")}
+              user={user}
+              apiBase={apiBase}
+              getApiAuthHeaders={getApiAuthHeaders}
+              setCareerProfile={setCareerProfile}
+              onProfileUpdate={setSummary}
             />
             <FirstCareerAnalysisFlow
               profile={summary}

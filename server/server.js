@@ -24,6 +24,7 @@ import { registerJobDiscoveryRoutes } from "../lib/jobDiscovery/jobDiscoveryRout
 import { registerOnboardingRoutes } from "../lib/careerOnboarding/onboardingRoutes.js";
 import { registerCareerIntelligenceRoutes } from "../lib/careerIntelligence/routes.js";
 import { registerCareerActionLoopRoutes } from "../lib/careerActionLoop/index.js";
+import { registerAccountRoutes } from "../lib/account/accountRoutes.js";
 import { loadCareerProfile } from "../lib/careerMemory/persistence.js";
 
 process.on("uncaughtException", (err) => {
@@ -63,7 +64,7 @@ const corsOptions = {
     }
     callback(new Error("Not allowed by CORS"));
   },
-  methods: ["GET", "POST", "PATCH", "OPTIONS"],
+  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "x-user-id", "x-requested-with"],
   credentials: true,
   optionsSuccessStatus: 204,
@@ -80,7 +81,7 @@ app.use((req, res, next) => {
     res.header("Access-Control-Allow-Origin", origin);
     res.header("Access-Control-Allow-Credentials", "true");
   }
-  res.header("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, x-user-id, x-requested-with");
   if (req.method === "OPTIONS") {
     return res.sendStatus(204);
@@ -706,6 +707,7 @@ registerJobDiscoveryRoutes(app);
 registerOnboardingRoutes(app);
 registerCareerIntelligenceRoutes(app);
 registerCareerActionLoopRoutes(app);
+registerAccountRoutes(app);
 
 const PORT = Number(process.env.PORT) || 3000;
 
