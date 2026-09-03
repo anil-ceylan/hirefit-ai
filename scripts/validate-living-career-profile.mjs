@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { mergeProfileSectionPreservingExisting } from "../lib/careerOnboarding/stateIntegrity.js";
+import {
+  mergeOnboardingDraft,
+  mergeProfileSectionPreservingExisting,
+} from "../lib/careerOnboarding/stateIntegrity.js";
 import {
   buildProfileChangeEvents,
   mergeProfileProgressIntoCareerGps,
@@ -65,6 +68,69 @@ function testSafeMerge() {
   assert.equal(merged.university, "Existing University", "empty UI default must not erase existing university");
   assert.deepEqual(merged.targetRoles, ["business_analyst"], "empty multiselect must not erase existing target roles");
   assert.equal(merged.linkedin, "https://linkedin.example/safe", "empty link default must not erase existing link");
+
+  const explicitResidenceClear = mergeProfileSectionPreservingExisting(
+    {
+      residenceCountryCode: "TR",
+      residenceCountry: "TR",
+      countryCode: "TR",
+      country: "TR",
+      residenceCity: "Istanbul",
+      city: "Istanbul",
+      homeCity: "Istanbul",
+    },
+    {
+      residenceCountryCode: "",
+      residenceCountry: "",
+      countryCode: "",
+      country: "",
+      residenceCity: "",
+      city: "",
+      homeCity: "",
+    },
+    {
+      clearFields: [
+        "residenceCountryCode",
+        "residenceCountry",
+        "countryCode",
+        "country",
+        "residenceCity",
+        "city",
+        "homeCity",
+      ],
+    }
+  );
+  assert.equal(explicitResidenceClear.residenceCountryCode, "", "intentional residence country clear must persist");
+  assert.equal(explicitResidenceClear.countryCode, "", "legacy country alias must clear with residence country");
+  assert.equal(explicitResidenceClear.residenceCity, "", "dependent residence city must clear");
+  assert.equal(explicitResidenceClear.city, "", "legacy city alias must clear with residence city");
+
+  const remoteDraftClear = mergeOnboardingDraft(
+    {
+      basic: {
+        residenceCountryCode: "TR",
+        countryCode: "TR",
+        residenceCity: "Istanbul",
+        city: "Istanbul",
+      },
+    },
+    {
+      basic: {
+        residenceCountryCode: "",
+        countryCode: "",
+        residenceCity: "",
+        city: "",
+      },
+    },
+    {
+      step: 1,
+      clearFields: {
+        basic: ["residenceCountryCode", "countryCode", "residenceCity", "city"],
+      },
+    }
+  );
+  assert.equal(remoteDraftClear.basic.residenceCountryCode, "", "remote draft merge must preserve cleared country");
+  assert.equal(remoteDraftClear.basic.city, "", "remote draft merge must preserve cleared city");
 }
 
 function testChangeHistory() {
@@ -93,11 +159,14 @@ function testChangeHistory() {
 
 function testCompletedProfileRouteSource() {
   const onboardingSource = readFileSync("src/CareerOnboardingPage.jsx", "utf8");
+  assert.match(onboardingSource, /function selectHydrationDraft/, "hydration should use an explicit draft precedence helper");
   assert.match(
     onboardingSource,
-    /const hydrationDraft = data\.profile\?\.onboarding_completed \? null : local;/,
-    "completed server profile must not be overwritten by stale local onboarding draft"
+    /localTime >= serverTime \? localDraft : null/,
+    "local drafts must not beat newer persisted server drafts"
   );
+  assert.match(onboardingSource, /if \(loading \|\| !draftHydrated\) return;/, "draft persistence must wait for definitive hydration");
+  assert.match(onboardingSource, /mode: editMode \? "edit" : "create"/, "drafts should record whether they belong to an active edit flow");
   assert.match(
     onboardingSource,
     /data\.profile\?\.onboarding_completed && \(snapshotMode \|\| !editMode\)/,
@@ -106,6 +175,17 @@ function testCompletedProfileRouteSource() {
   assert.match(onboardingSource, /Profili Düzenle/, "saved profile surface should expose edit action");
   assert.match(onboardingSource, /Değişiklikleri Kaydet/, "edit mode should use explicit save language");
   assert.match(onboardingSource, /Yeni Gelişme Ekle/, "profile should expose new development entry point");
+  assert.match(onboardingSource, /buildOnboardingClearFields/, "onboarding should send explicit clear metadata");
+  assert.match(
+    onboardingSource,
+    /onResidenceCountryChange=\{\(code\) =>\s*\n\s*setBasic\(\(current\) =>/s,
+    "residence country changes must use functional state to avoid stale batched restores"
+  );
+  assert.match(
+    onboardingSource,
+    /onResidenceCityChange=\{\(c\) => setBasic\(\(current\) =>/,
+    "residence city changes must use functional state"
+  );
 }
 
 testSafeMerge();

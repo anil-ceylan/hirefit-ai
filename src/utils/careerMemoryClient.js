@@ -49,6 +49,18 @@ export async function fetchCareerProfileStatus(apiBase, getHeaders, { allowLocal
           : "Your career profile could not be loaded right now. Please try again.",
       };
     }
+    if (data?.authenticated === false) {
+      return {
+        exists: null,
+        profile: localProfile,
+        onboarding_completed: Boolean(localProfile?.onboarding_completed),
+        authenticated: false,
+        offline: false,
+        error: lang === "TR"
+          ? "Oturum doğrulanırken kariyer profilin bekletiliyor."
+          : "Your career profile is waiting while your session is verified.",
+      };
+    }
     if (data?.profile) {
       saveLocalCareerProfile(data.profile);
       return {
@@ -75,7 +87,7 @@ export async function fetchCareerProfileStatus(apiBase, getHeaders, { allowLocal
       authenticated: Boolean(data?.authenticated),
       offline: false,
     };
-  } catch (e) {
+  } catch {
     return {
       exists: null,
       profile: localProfile,

@@ -101,6 +101,33 @@ function loadOnboardingDraft(userId) {
   return null;
 }
 
+function getDraftTimestamp(value) {
+  const time = Date.parse(value || "");
+  return Number.isFinite(time) ? time : 0;
+}
+
+function hasDraftContent(draft) {
+  return Boolean(draft && typeof draft === "object" && Object.keys(draft).length);
+}
+
+function selectHydrationDraft({ localDraft, profile, editMode }) {
+  const serverDraft = hasDraftContent(profile?.onboarding_draft) ? profile.onboarding_draft : null;
+  if (profile?.onboarding_completed) {
+    if (!editMode || localDraft?.mode !== "edit") return null;
+    const localTime = getDraftTimestamp(localDraft.updatedAt);
+    const serverProfileTime = getDraftTimestamp(profile.updated_at || profile.updatedAt);
+    return localTime && (!serverProfileTime || localTime >= serverProfileTime) ? localDraft : null;
+  }
+
+  if (!localDraft) return null;
+  if (!serverDraft) return localDraft;
+
+  const localTime = getDraftTimestamp(localDraft.updatedAt);
+  const serverTime = getDraftTimestamp(serverDraft.updatedAt || profile?.updated_at || profile?.updatedAt);
+  if (!localTime && serverTime) return null;
+  return localTime >= serverTime ? localDraft : null;
+}
+
 function buildGenerationSteps({ analysisSources, cvSignalCount, lang }) {
   const tr = lang === "TR";
   const hasCvEvidence = (analysisSources || []).includes("cv") && Number(cvSignalCount || 0) > 0;
@@ -193,6 +220,23 @@ function normalizeBasicLocation(bp = {}) {
     livingSituation: bp.livingSituation || "",
     mbtiType: bp.mbtiType || "",
     leadershipExperienceStatus,
+  };
+}
+
+function buildOnboardingClearFields({ basic = {} } = {}) {
+  const basicFields = [];
+  const residenceCode = getResidenceCountryCode(basic);
+  const residenceCity = String(basic.residenceCity || basic.city || "").trim();
+
+  if (!residenceCode) {
+    basicFields.push("residenceCountry", "residenceCountryCode", "country", "countryCode");
+  }
+  if (!residenceCode || !residenceCity) {
+    basicFields.push("residenceCity", "city", "homeCity");
+  }
+
+  return {
+    basic: [...new Set(basicFields)],
   };
 }
 
@@ -1257,7 +1301,7 @@ export default function CareerOnboardingPage() {
         setQuestions(data.questions || []);
         setOfflineMode(Boolean(data.offline));
         setProfileExists(Boolean(data.profile?.onboarding_completed));
-        const hydrationDraft = data.profile?.onboarding_completed ? null : local;
+        const hydrationDraft = selectHydrationDraft({ localDraft: local, profile: data.profile, editMode });
         hydrate(hydrationDraft, data.profile);
         if (data.profile?.onboarding_completed && (snapshotMode || !editMode)) {
           setSummary(data.profile);
@@ -1283,9 +1327,11 @@ export default function CareerOnboardingPage() {
   }, [lang, profileExists]);
 
   const persistDraft = async (nextStep) => {
+    if (loading || !draftHydrated) return;
     const draft = {
       schemaVersion: DRAFT_SCHEMA_VERSION,
       userId: user?.id || null,
+      mode: editMode ? "edit" : "create",
       updatedAt: new Date().toISOString(),
       basic,
       goals,
@@ -1297,6 +1343,7 @@ export default function CareerOnboardingPage() {
       ui: { showAllRoles, goalsPanel, readinessPanel },
       lastStep: nextStep,
     };
+    draft.clearFields = buildOnboardingClearFields({ basic });
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     const result = await saveOnboardingDraft(apiBase, getApiAuthHeaders, { step: nextStep, draft, lang });
     if (result?.offline) setOfflineMode(true);
@@ -1308,6 +1355,7 @@ export default function CareerOnboardingPage() {
       const draft = {
         schemaVersion: DRAFT_SCHEMA_VERSION,
         userId: user?.id || null,
+        mode: editMode ? "edit" : "create",
         updatedAt: new Date().toISOString(),
         basic,
         goals,
@@ -1319,6 +1367,7 @@ export default function CareerOnboardingPage() {
         ui: { showAllRoles, goalsPanel, readinessPanel },
         lastStep: step,
       };
+      draft.clearFields = buildOnboardingClearFields({ basic });
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
       } catch {
@@ -1326,7 +1375,7 @@ export default function CareerOnboardingPage() {
       }
     }, 250);
     return () => window.clearTimeout(handle);
-  }, [basic, goals, dnaAnswers, readinessAnswers, cv, mbtiAnswers, showMbti, showAllRoles, goalsPanel, readinessPanel, step, loading, draftHydrated, user?.id]);
+  }, [basic, goals, dnaAnswers, readinessAnswers, cv, mbtiAnswers, showMbti, showAllRoles, goalsPanel, readinessPanel, step, loading, draftHydrated, user?.id, editMode]);
 
   useEffect(() => {
     if (!editMode || loading || step >= 5) return undefined;
@@ -1627,6 +1676,7 @@ export default function CareerOnboardingPage() {
         cvUploaded,
         cvSignalCount,
         analysisSources,
+        clearFields: buildOnboardingClearFields({ basic: payloadBasic }),
         lang,
       });
       if (result.error && !result.offline) {
@@ -1680,6 +1730,7 @@ export default function CareerOnboardingPage() {
       await completeGenerationStep("career_snapshot");
       localStorage.removeItem(DRAFT_KEY);
       setCareerProfile?.(profile);
+      saveLocalCareerProfile(profile);
       setProfileExists(true);
       setSummary(profile);
       setStep(5);
@@ -1798,17 +1849,18 @@ export default function CareerOnboardingPage() {
                 universityCity={basic.universityCity}
                 universityCities={basic.universityCities}
                 onResidenceCountryChange={(code) =>
-                  setBasic({
-                    ...basic,
+                  setBasic((current) => ({
+                    ...current,
                     residenceCountryCode: code,
                     residenceCountry: code,
                     countryCode: code,
                     country: code,
-                    residenceCity: !code ? "" : basic.residenceCity || basic.city,
-                    city: !code ? "" : basic.residenceCity || basic.city,
-                  })
+                    residenceCity: !code ? "" : current.residenceCity || current.city,
+                    city: !code ? "" : current.residenceCity || current.city,
+                    homeCity: !code ? "" : current.homeCity || current.residenceCity || current.city,
+                  }))
                 }
-                onResidenceCityChange={(c) => setBasic({ ...basic, residenceCity: c, city: c })}
+                onResidenceCityChange={(c) => setBasic((current) => ({ ...current, residenceCity: c, city: c, homeCity: c }))}
                 onUniversityCountryChange={(code) =>
                   setBasic({
                     ...basic,

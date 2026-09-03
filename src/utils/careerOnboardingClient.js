@@ -86,7 +86,7 @@ export async function saveOnboardingDraft(apiBase, getHeaders, { step, draft, la
     const res = await fetch(apiUrl("/api/career-onboarding/draft"), {
       method: "PATCH",
       headers: await getHeaders({ requireSession: true }),
-      body: JSON.stringify({ step, draft, lang }),
+      body: JSON.stringify({ step, draft, lang, clearFields: draft?.clearFields || {} }),
     });
     const body = await parseJsonSafe(res);
     if (!res.ok) return { ok: false, offline: false };

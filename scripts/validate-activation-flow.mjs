@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   ACTIVATION_STATES,
   DASHBOARD_ROUTE_STATES,
@@ -163,10 +164,20 @@ function testDashboardRouteGuard() {
   );
 }
 
+function testProfileFetchSafetySource() {
+  const memoryClient = readFileSync("src/utils/careerMemoryClient.js", "utf8");
+  assert.match(
+    memoryClient,
+    /data\?\.authenticated === false[\s\S]*exists: null/,
+    "Unauthenticated career-profile responses must not be interpreted as authoritative missing profiles."
+  );
+}
+
 testActivationStates();
 testNavigation();
 testAuthCtas();
 testLoadingCopy();
 testDashboardRouteGuard();
+testProfileFetchSafetySource();
 
 process.stdout.write("Activation flow regression checks passed.\n");
