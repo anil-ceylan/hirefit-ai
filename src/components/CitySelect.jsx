@@ -1,9 +1,7 @@
-﻿import { useEffect, useId, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { X } from "lucide-react";
 import {
   filterCities,
-  getCitiesForCountry,
-  getCountryLabel,
   hasCityCatalog,
   resolveCountryCode,
 } from "../data/locationData.js";
@@ -39,12 +37,12 @@ export default function CitySelect({
 
   const options = code && !allowCustom ? filterCities(code, query) : [];
 
-  const commit = (city) => {
+  const commit = useCallback((city) => {
     const v = String(city || "").trim();
     setQuery(v);
     onChange?.(v);
     setOpen(false);
-  };
+  }, [onChange]);
 
   const clear = () => {
     setQuery("");
@@ -63,7 +61,7 @@ export default function CitySelect({
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [query, value, allowCustom, isDisabled]);
+  }, [query, value, allowCustom, isDisabled, commit]);
 
   useEffect(() => {
     setHighlight(0);
@@ -100,17 +98,11 @@ export default function CitySelect({
           : "Search or select city");
 
   const showChip = Boolean(value?.trim()) && !open;
-  const countryLabel = code ? getCountryLabel(code, lang) : "";
 
   return (
     <div ref={wrapRef} className={`hf-city-select${isDisabled ? " hf-city-select--disabled" : ""}`}>
       {groupLabel ? <div className="hf-city-select__group-label">{groupLabel}</div> : null}
       <div className="hf-city-select__chips">
-        {countryLabel && (showChip || open) ? (
-          <span className="hf-city-select__chip hf-city-select__chip--country">
-            {countryLabel}
-          </span>
-        ) : null}
         {showChip ? (
           <span className="hf-city-select__chip">
             {value}

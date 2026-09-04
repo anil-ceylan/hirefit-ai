@@ -83,6 +83,7 @@ const DRAFT_SCHEMA_VERSION = 10;
 const DRAFT_KEY = "hirefit-onboarding-draft-v10";
 const LEGACY_DRAFT_KEYS = ["hirefit-onboarding-draft-v9", "hirefit-onboarding-draft-v8"];
 const INITIAL_ROLE_VISIBLE = 10;
+const MAX_PRIORITY_COUNTRIES = 5;
 const GENERATION_STEP_MS = 0;
 const GOALS_PANEL_ORDER = ["target", "environment", "roles"];
 
@@ -132,15 +133,15 @@ function buildGenerationSteps({ analysisSources, cvSignalCount, lang }) {
   const tr = lang === "TR";
   const hasCvEvidence = (analysisSources || []).includes("cv") && Number(cvSignalCount || 0) > 0;
   return [
-    { id: "preferences", label: tr ? "Tercihlerin haz\u0131rlan\u0131yor" : "Preparing preferences" },
-    { id: "experience", label: tr ? "Deneyimlerin de\u011ferlendiriliyor" : "Reviewing experience" },
+    { id: "preferences", label: tr ? "Profil tercihlerin d\u00fczenleniyor" : "Organizing profile preferences" },
+    { id: "experience", label: tr ? "Deneyim sinyallerin d\u00fczenleniyor" : "Organizing experience signals" },
     {
       id: "evidence",
-      label: tr ? "Kariyer kan\u0131tlar\u0131n inceleniyor" : "Reviewing career evidence",
+      label: tr ? "Kay\u0131tl\u0131 kaynaklar\u0131n birle\u015ftiriliyor" : "Combining saved sources",
       detail: hasCvEvidence ? (tr ? `${cvSignalCount} CV sinyali bulundu` : `${cvSignalCount} CV signals found`) : "",
     },
-    { id: "role_matches", label: tr ? "Rol y\u00f6nlerin kar\u015f\u0131la\u015ft\u0131r\u0131l\u0131yor" : "Comparing role directions" },
-    { id: "career_snapshot", label: tr ? "Kariyer \u00f6zetin haz\u0131rlan\u0131yor" : "Preparing your career snapshot" },
+    { id: "role_matches", label: tr ? "Rol y\u00f6nlerin hesaplan\u0131yor" : "Calculating role directions" },
+    { id: "career_snapshot", label: tr ? "Career Snapshot olu\u015fturuluyor" : "Building Career Snapshot" },
   ];
 }
 
@@ -816,6 +817,7 @@ export default function CareerOnboardingPage() {
   const [industryLimitNotice, setIndustryLimitNotice] = useState("");
   const [lookingForLimitNotice, setLookingForLimitNotice] = useState("");
   const [companyIndustryLimitNotice, setCompanyIndustryLimitNotice] = useState("");
+  const [targetCountryLimitNotice, setTargetCountryLimitNotice] = useState("");
   const primaryIndustry = goals.primaryIndustry || goals.industries?.[0] || "";
 
   const toggleIndustry = (industryId) => {
@@ -926,12 +928,23 @@ export default function CareerOnboardingPage() {
   };
 
   const toggleInternationalCountry = (country) => {
-    setGoals((g) =>
-      normalizeGoalsLocation({
+    setGoals((g) => {
+      const current = [...new Set((g.targetCountries || []).filter(Boolean))];
+      const isSelected = current.includes(country);
+      if (!isSelected && current.length >= MAX_PRIORITY_COUNTRIES) {
+        setTargetCountryLimitNotice(
+          lang === "TR"
+            ? "En fazla 5 ülke seçebilirsin. Yeni ülke eklemek için önce birini kaldır."
+            : "You can select up to 5 countries. Remove one before adding another."
+        );
+        return g;
+      }
+      setTargetCountryLimitNotice("");
+      return normalizeGoalsLocation({
         ...g,
-        targetCountries: toggleMulti(g.targetCountries || [], country),
-      })
-    );
+        targetCountries: isSelected ? current.filter((item) => item !== country) : [...current, country],
+      });
+    });
   };
 
   const moveRankedInternationalCountry = (country, direction) => {
@@ -1022,10 +1035,6 @@ export default function CareerOnboardingPage() {
     [goals.industries, primaryIndustry]
   );
 
-  const allRoleOptions = useMemo(
-    () => getRolesForIndustries(selectedIndustries || []),
-    [selectedIndustries]
-  );
   const topRoleOptions = useMemo(
     () => getTopRolesForIndustries(selectedIndustries || [], INITIAL_ROLE_VISIBLE),
     [selectedIndustries]
@@ -1035,9 +1044,11 @@ export default function CareerOnboardingPage() {
     [selectedIndustries]
   );
   const visibleRoleOptions = useMemo(() => {
-    const source = showAllRoles ? allRoleOptions : [...topRoleOptions, ...(goals.targetRoles || [])];
+    const source = showAllRoles
+      ? [...topRoleOptions, ...extraRoleOptions, ...(goals.targetRoles || [])]
+      : [...topRoleOptions, ...(goals.targetRoles || [])];
     return [...new Set(source.filter(Boolean))];
-  }, [showAllRoles, allRoleOptions, topRoleOptions, goals.targetRoles]);
+  }, [showAllRoles, topRoleOptions, extraRoleOptions, goals.targetRoles]);
   const hasCreativeDirection = useMemo(() => {
     const directionText = [
       ...(goals.targetRoles || []),
@@ -1734,7 +1745,6 @@ export default function CareerOnboardingPage() {
       setProfileExists(true);
       setSummary(profile);
       setStep(5);
-      await waitForGenerationStep(100);
       setGenerationState(null);
     } catch {
       setGenerationState(null);
@@ -2199,17 +2209,38 @@ export default function CareerOnboardingPage() {
                         <div key={group.id} className="hf-international-fields__group">
                           <span>{tr ? group.labelTr : group.labelEn}</span>
                           <div className="hf-onboard-looking-chips">
-                            {group.countries.map((country) => (
-                              <Chip
-                                key={country}
-                                active={(goals.targetCountries || []).includes(country)}
-                                label={country}
-                                onClick={() => toggleInternationalCountry(country)}
-                              />
-                            ))}
+                            {group.countries.map((country) => {
+                              const selected = (goals.targetCountries || []).includes(country);
+                              const atLimit = (goals.targetCountries || []).length >= MAX_PRIORITY_COUNTRIES;
+                              return (
+                                <Chip
+                                  key={country}
+                                  active={selected}
+                                  label={country}
+                                  onClick={() => toggleInternationalCountry(country)}
+                                  disabled={atLimit && !selected}
+                                  title={
+                                    atLimit && !selected
+                                      ? tr
+                                        ? "En fazla 5 ülke seçebilirsin"
+                                        : "Maximum 5 countries"
+                                      : ""
+                                  }
+                                />
+                              );
+                            })}
                           </div>
                         </div>
                       ))}
+                      <div className="hf-onboard-role-limit" aria-live="polite">
+                        <span>{(goals.targetCountries || []).length}/{MAX_PRIORITY_COUNTRIES}</span>
+                        <p>
+                          {targetCountryLimitNotice ||
+                            (tr
+                              ? "En fazla 5 ülke seçebilirsin."
+                              : "You can select up to 5 countries.")}
+                        </p>
+                      </div>
                       {(goals.targetCountries || []).length ? (
                         <RankedPriorityList
                           items={goals.targetCountries || []}
@@ -2327,16 +2358,18 @@ export default function CareerOnboardingPage() {
                       active={(goals.experienceLevels || []).includes(o.id)}
                       label={tr ? o.labelTr : o.labelEn}
                       onClick={() => {
-                        const experienceLevels = toggleMulti(goals.experienceLevels || [], o.id);
-                        const primary = primaryExperienceLevel(experienceLevels);
-                        setGoals(
+                        setGoals((current) => {
+                          const experienceLevels = toggleMulti(current.experienceLevels || [], o.id);
+                          const primary = primaryExperienceLevel(experienceLevels);
+                          return (
                           normalizeGoalsLocation({
-                            ...goals,
+                            ...current,
                             experienceLevels,
                             experienceLevel: primary,
                             seniority: primary,
                           })
-                        );
+                          );
+                        });
                       }}
                     />
                   ))}
@@ -2362,13 +2395,16 @@ export default function CareerOnboardingPage() {
                       active={(goals.companyStages || []).includes(option.id)}
                       label={tr ? option.labelTr : option.labelEn}
                       onClick={() => {
-                        const companyStages = toggleMulti(goals.companyStages || [], option.id);
-                        setGoals(
+                        setGoals((current) => {
+                          const companyStages = toggleMulti(current.companyStages || [], option.id);
+                          return (
                           normalizeGoalsLocation({
-                            ...goals,
+                            ...current,
                             companyStages,
+                            companyTypes: companyStages,
                           })
-                        );
+                          );
+                        });
                       }}
                     />
                   ))}

@@ -7,8 +7,6 @@
 import { apiUrl } from "./apiBase.js";
 import { estimateCvSignalCount } from "../../lib/careerOnboarding/careerSignalSchema.js";
 
-const MIN_ANALYSIS_MS = 1800;
-
 async function parseJsonSafe(res) {
   try {
     return await res.json();
@@ -40,7 +38,6 @@ export async function runFirstCareerAnalysis({
   }
 
   const jd = buildSyntheticJobDescription(profile, lang);
-  const started = Date.now();
   let v2 = null;
 
   try {
@@ -58,11 +55,6 @@ export async function runFirstCareerAnalysis({
     v2 = await parseJsonSafe(res);
   } catch {
     v2 = null;
-  }
-
-  const elapsed = Date.now() - started;
-  if (elapsed < MIN_ANALYSIS_MS) {
-    await new Promise((r) => window.setTimeout(r, MIN_ANALYSIS_MS - elapsed));
   }
 
   const teaser = v2 ? extractAnalysisTeaser(v2, profile, lang) : null;

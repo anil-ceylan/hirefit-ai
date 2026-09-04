@@ -18,11 +18,11 @@ export default function CareerIdentityBuilder({ state, lang = "TR" }) {
         <Sparkles size={22} />
       </div>
       <span className="hf-identity-builder__eyebrow">HireFit Career Intelligence</span>
-      <h2>{tr ? "Kariyer Kimliğin oluşturuluyor..." : "Building your Career Identity..."}</h2>
+      <h2>{tr ? "Career Snapshot hazırlanıyor..." : "Preparing your Career Snapshot..."}</h2>
       <p>
         {tr
-          ? "Deneyimin, hedeflerin ve mevcut kanıtların kişisel kariyer profiline dönüştürülüyor."
-          : "Your experience, goals, and available evidence are being turned into a personal career profile."}
+          ? "Kaydettiğin profil bilgileri, Career DNA cevapların ve mevcut CV sinyallerin bir araya getiriliyor."
+          : "Your saved profile details, Career DNA answers, and available CV signals are being combined."}
       </p>
       <div className="hf-identity-builder__steps">
         {steps.map((step) => {

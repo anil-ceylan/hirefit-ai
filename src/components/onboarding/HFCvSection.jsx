@@ -13,12 +13,9 @@ const MAX_BYTES = 8 * 1024 * 1024;
 
 function cvUploadStages(tr) {
   return [
-    { id: "selected", label: tr ? "Dosya seçiliyor" : "Selecting file" },
-    { id: "uploaded", label: tr ? "Dosya yüklendi" : "File received" },
-    { id: "reading", label: tr ? "CV okunuyor" : "Reading CV" },
-    { id: "extracting", label: tr ? "Deneyimler ve beceriler ayrıştırılıyor" : "Extracting experience and skills" },
-    { id: "ready", label: tr ? "Kariyer kanıtları hazırlanıyor" : "Preparing career evidence" },
-    { id: "complete", label: tr ? "Analize hazır" : "Ready for analysis" },
+    { id: "selected", label: tr ? "Dosya seçildi" : "File selected" },
+    { id: "uploading", label: tr ? "CV dosyası yükleniyor" : "Uploading CV file" },
+    { id: "recorded", label: tr ? "Dosya kaydedildi" : "File recorded" },
   ];
 }
 
@@ -104,43 +101,42 @@ export default function HFCvSection({
     setUploadStatus("uploading");
     setUploadStage("selected");
     onCvFileSelected?.(file);
-    setUploadStage("uploaded");
+    setUploadStage("uploading");
 
     let result;
     try {
-      setUploadStage("reading");
       result = await uploadOnboardingCv(null, getApiAuthHeaders, file);
-      setUploadStage("extracting");
     } catch {
       result = { success: false };
     }
 
     if (result.success) {
-      setUploadStage("ready");
+      setUploadStage("recorded");
       patchCv({
         cvFileUrl: result.fileUrl || null,
         cvFileName: result.fileName || file.name,
         cvUploaded: true,
       });
       setUploadStatus("done");
-      setUploadStage("complete");
-      if (result.mock || !result.fileUrl) {
-        setUploadNotice(
-          tr
-        ? "CV yerel olarak yüklendi. Daha güvenilir analiz için CV’mi Analiz Et butonuyla işle."
-            : "CV recorded. Full storage sync when the connection is ready."
-        );
-      }
+      setUploadNotice(
+        result.mock || !result.fileUrl
+          ? tr
+            ? "CV yerel olarak kaydedildi. Ayrıntılı CV analizi için CV ile Doğrula ekranında CV’mi Analiz Et’i çalıştır."
+            : "CV was recorded locally. Run Analyze My CV on the CV validation screen for detailed CV analysis."
+          : tr
+            ? "CV dosyan kaydedildi. Ayrıntılı CV analizi için CV ile Doğrula ekranında CV’mi Analiz Et’i çalıştır."
+            : "Your CV file was saved. Run Analyze My CV on the CV validation screen for detailed CV analysis."
+      );
       return;
     }
 
     patchCv({ cvFileUrl: null, cvFileName: file.name, cvUploaded: true });
     setUploadStatus("skipped");
-    setUploadStage("complete");
+    setUploadStage("recorded");
     setUploadNotice(
       tr
-        ? "CV yerel olarak yüklendi. Daha güvenilir analiz için CV’mi Analiz Et butonuyla işle."
-        : "CV was saved locally. It needs to be processed again for analysis."
+        ? "CV yerel olarak kaydedildi. Ayrıntılı CV analizi için CV ile Doğrula ekranında CV’mi Analiz Et’i çalıştır."
+        : "CV was recorded locally. Run Analyze My CV on the CV validation screen for detailed CV analysis."
     );
   };
 
@@ -166,7 +162,6 @@ export default function HFCvSection({
 
   const stages = cvUploadStages(tr);
   const stageIndex = stages.findIndex((stage) => stage.id === uploadStage);
-  const visibleStages = uploadStatus === "uploading" || hasFileLabel;
 
   return (
     <div className="hf-cv-section">
@@ -187,19 +182,17 @@ export default function HFCvSection({
       {showUpload ? (
         <>
           <div style={{ fontSize: 12, fontWeight: 700, color: "#94a3b8", marginBottom: 4 }}>
-            {tr ? "AI kişiselleştirmesini güçlendirmek için CV ekle" : "Add your CV to significantly improve AI personalization"}
+            {tr ? "CV kanıtını profilinle birlikte sakla" : "Save CV proof with your profile"}
           </div>
           <p className="hf-onboard-helper" style={{ marginBottom: 8 }}>
             {tr
-              ? "CV’ni yükleyerek çok daha kişisel bir Career Snapshot aç."
-              : "Upload your CV to unlock a significantly more personalized Career Snapshot."}
+              ? "Dosya burada kaydedilir; ayrıntılı CV analizi için CV ile Doğrula ekranında CV’mi Analiz Et’i çalıştır."
+              : "The file is recorded here; run Analyze My CV on the CV validation screen for detailed CV analysis."}
           </p>
           <ul className="hf-cv-benefits">
-            <li>{tr ? "Daha doğru Kariyer Kimliği" : "Better Career Identity"}</li>
-            <li>{tr ? "Daha güçlü recruiter analizi" : "Better Recruiter Analysis"}</li>
-            <li>{tr ? "Daha isabetli rol eşleşmesi" : "Better Role Match"}</li>
-            <li>{tr ? "Daha net eksik analizi" : "Better Gap Detection"}</li>
-            <li>{tr ? "Daha güvenilir Career Score" : "Better Career Score"}</li>
+            <li>{tr ? "Dosya yükleme: CV kaydı" : "File upload: CV record"}</li>
+            <li>{tr ? "CV ile Doğrula: ayrıntılı analiz" : "CV validation: detailed analysis"}</li>
+            <li>{tr ? "Analiz sonrası: CV sinyalleri ve kanıt kontrolü" : "After analysis: CV signals and evidence check"}</li>
           </ul>
 
           <input
@@ -260,11 +253,15 @@ export default function HFCvSection({
                         : "Uploading…"
                       : uploadStatus === "skipped"
                         ? tr
-                          ? "CV yerel olarak yüklendi. Analiz bekliyor."
-                          : "CV saved locally. Analysis pending."
+                          ? "CV yerel olarak kaydedildi. Analiz bekliyor."
+                          : "CV recorded locally. Analysis pending."
+                        : Number(cv?.cvSignalCount || 0) > 0
+                          ? tr
+                            ? "CV analiz edildi"
+                            : "CV analyzed"
                         : tr
-                          ? "CV yüklendi"
-                          : "CV uploaded"}
+                          ? "CV dosyası kaydedildi. Analiz bekliyor."
+                          : "CV file recorded. Analysis pending."}
                   </span>
                 </div>
               </div>
@@ -290,7 +287,7 @@ export default function HFCvSection({
             </p>
           ) : null}
 
-          {visibleStages ? (
+          {uploadStatus === "uploading" ? (
             <ol className="hf-cv-upload-stages" role="status" aria-live="polite">
               {stages.map((stage, index) => (
                 <li

@@ -129,6 +129,12 @@
   transform: translateY(-1px);
 }
 
+.hf-weekly-btn:disabled {
+  cursor: wait;
+  opacity: 0.72;
+  transform: none;
+}
+
 .hf-weekly-btn:focus-visible,
 .hf-weekly-shortcut button:focus-visible,
 .hf-explain-toggle:focus-visible {
@@ -147,6 +153,36 @@
   gap: 12px;
   padding: 20px;
   border-radius: 18px;
+}
+
+.hf-weekly-status {
+  border-color: rgba(96, 165, 250, 0.22);
+}
+
+.hf-weekly-status strong {
+  color: #e2e8f0;
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.hf-weekly-status--error {
+  border-color: rgba(248, 113, 113, 0.24);
+}
+
+.hf-weekly-status--error strong {
+  color: #fecaca;
+}
+
+.hf-weekly-retry {
+  justify-self: start;
+  min-height: 38px;
+  padding: 9px 13px;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-radius: 11px;
+  background: rgba(96, 165, 250, 0.1);
+  color: #dbeafe;
+  font-weight: 800;
+  cursor: pointer;
 }
 
 .hf-weekly-decision-grid {

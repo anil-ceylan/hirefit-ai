@@ -5,6 +5,7 @@ import {
   buildDecisionId,
   findActionOutcome,
   getWeekKey,
+  normalizeDecisionLoop,
   transitionAction,
   upsertActionOutcome,
   upsertRecommendedAction,
@@ -58,11 +59,17 @@ assert.equal(recommended.career_gps.snapshot.readinessScore, 63, "upsert must pr
 assert.deepEqual(recommended.career_gps.decision_loop.outcomes, [], "upsert must not create outcomes");
 assert.deepEqual(recommended.career_gps.decision_loop.evidence_candidates, [], "upsert must not create evidence");
 
+const refreshedLoop = normalizeDecisionLoop(recommended.career_gps);
+const refreshedCurrent = refreshedLoop.actions.find((action) => action.week_key === weekKey);
+assert.equal(refreshedCurrent?.action_id, recommended.action.action_id, "Weekly Action must survive refresh as current action");
+
 const duplicate = upsertRecommendedAction(recommended.career_gps, { ...baseAction, decision_id: decisionIdA }, {
   userId,
   now: "2026-08-10T12:01:00.000Z",
 });
 assert.equal(duplicate.career_gps.decision_loop.actions.length, 1, "duplicate recommended upsert must be idempotent");
+assert.equal(duplicate.created, false, "existing weekly action should be reused instead of duplicated");
+assert.equal(duplicate.action.action_id, recommended.action.action_id, "reused weekly action keeps stable identity");
 
 const started = transitionAction(duplicate.career_gps, duplicate.action.action_id, "started", {
   now: "2026-08-10T12:02:00.000Z",
@@ -281,10 +288,16 @@ assert.equal(/evaluateEvidenceSet|observeDecisionRun|runShadowReasoning/.test(ac
 assert.equal(/verified_outcome|accepted|trusted/.test(actionModelSource), false, "candidate model must not use verified/accepted/trusted status language");
 
 const dashboardSource = readFileSync("src/components/dashboard/WeeklyDecisionCenter.jsx", "utf8");
+const firstAnalysisSource = readFileSync("src/components/onboarding/FirstCareerAnalysisFlow.jsx", "utf8");
 assert.ok(
   dashboardSource.includes("Sonucun kaydedildi ve değerlendirilmek üzere bir kanıt adayı oluşturuldu."),
   "dashboard should show candidate-created copy"
 );
 assert.ok(dashboardSource.includes("Sonucun kaydedildi."), "dashboard should show neutral insufficient copy");
+assert.ok(dashboardSource.includes("fetchCurrentCareerAction"), "dashboard should fetch current weekly action before creating one");
+assert.ok(dashboardSource.includes("Haftalık hamlen hazırlanıyor"), "dashboard should expose weekly action loading state");
+assert.ok(dashboardSource.includes("Haftalık hamle yüklenemedi"), "dashboard should expose recoverable weekly action failure state");
+assert.ok(firstAnalysisSource.includes("buildSnapshotWeeklyActionPayload"), "Snapshot CTA should hand off the current recommendation as a weekly action");
+assert.ok(firstAnalysisSource.includes('navigate("/dashboard")'), "Snapshot CTA should route to the existing dashboard action experience");
 
 process.stdout.write("Career action loop validation passed: Sprint 6.3 checks passed\n");

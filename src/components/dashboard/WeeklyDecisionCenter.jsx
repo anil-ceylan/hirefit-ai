@@ -27,6 +27,7 @@ import {
 } from "../../utils/weeklyActionIdentity.js";
 import {
   completeCareerAction,
+  fetchCurrentCareerAction,
   fetchCareerActionOutcome,
   startCareerAction,
   upsertCareerActionOutcome,
@@ -397,7 +398,7 @@ function buildProgressDeltas(lang) {
     .slice(0, 3);
 }
 
-function WeeklyDecisionHero({ decision, completed, onComplete, onPrimary }) {
+function WeeklyDecisionHero({ decision, completed, loading, onComplete, onPrimary }) {
   return (
     <section className="hf-weekly-hero">
       <div className="hf-weekly-hero__copy">
@@ -422,11 +423,18 @@ function WeeklyDecisionHero({ decision, completed, onComplete, onPrimary }) {
           <span>{decision.timeLabel}</span>
           <strong>{decision.time}</strong>
         </div>
-        <button type="button" className={completed ? "hf-weekly-btn is-complete" : "hf-weekly-btn"} onClick={completed ? onPrimary : onComplete}>
+        <button
+          type="button"
+          className={completed ? "hf-weekly-btn is-complete" : "hf-weekly-btn"}
+          onClick={completed ? onPrimary : onComplete}
+          disabled={loading}
+        >
           {completed ? (
             <>
               <CheckCircle2 size={16} /> {decision.doneLabel}
             </>
+          ) : loading ? (
+            <>{decision.loadingLabel}</>
           ) : (
             <>
               {decision.completeLabel} <ArrowRight size={16} />
@@ -922,6 +930,9 @@ export default function WeeklyDecisionCenter({
   const tr = lang === "TR";
   const [completedActions, setCompletedActions] = useState(() => getCompletions());
   const [durableAction, setDurableAction] = useState(null);
+  const [actionLoadState, setActionLoadState] = useState("idle");
+  const [actionLoadError, setActionLoadError] = useState("");
+  const [actionRetryNonce, setActionRetryNonce] = useState(0);
   const [actionBusy, setActionBusy] = useState(false);
   const decision = useMemo(() => {
     const base = buildWeeklyDecision({ careerProfile, user, lang });
@@ -933,11 +944,24 @@ export default function WeeklyDecisionCenter({
       completeLabel: tr ? "Tamamladım" : "Mark Complete",
       startLabel: tr ? "Kariyer Profilini Tamamla" : "Complete Career Profile",
       doneLabel: tr ? "Bu hafta tamamlandı" : "Completed this week",
+      loadingLabel: tr ? "Hamle hazırlanıyor..." : "Preparing move...",
     };
   }, [careerProfile, user, lang, tr]);
-  const localRecord = completedActions[decision.id];
+  const visibleDecision = useMemo(() => {
+    if (!durableAction?.action_id) return decision;
+    return {
+      ...decision,
+      id: durableAction.action_id,
+      action: durableAction.title || decision.action,
+      why: durableAction.reason || decision.why,
+      blocker: durableAction.blocker || decision.blocker,
+      opportunity: durableAction.expected_evidence || durableAction.target_dimension || decision.opportunity,
+    };
+  }, [decision, durableAction]);
+  const localRecord = completedActions[visibleDecision.id] || completedActions[decision.id];
   const actionStatus = durableAction?.status || localRecord?.status || (localRecord ? "completed" : "recommended");
   const completed = actionStatus === "completed";
+  const actionLoading = actionLoadState === "loading" || actionBusy;
   const deltas = useMemo(() => buildProgressDeltas(lang), [lang]);
 
   useEffect(() => {
@@ -958,40 +982,62 @@ export default function WeeklyDecisionCenter({
     let cancelled = false;
     const payload = buildDurableActionPayload(decision, user);
     (async () => {
+      setActionLoadState("loading");
+      setActionLoadError("");
       try {
-        const upserted = await upsertRecommendedCareerAction({ getHeaders: getApiAuthHeaders, action: payload });
+        const current = await fetchCurrentCareerAction({
+          getHeaders: getApiAuthHeaders,
+          weekKey: payload.week_key || getWeekKey(),
+        });
         if (cancelled) return;
-        if (upserted?.action) setDurableAction(upserted.action);
+        if (current?.storageUnavailable) throw new Error("current_action_unavailable");
+        let ensured = current?.action || null;
+        if (!ensured) {
+          const upserted = await upsertRecommendedCareerAction({ getHeaders: getApiAuthHeaders, action: payload });
+          if (cancelled) return;
+          if (upserted?.storageUnavailable || !upserted?.action) throw new Error("action_generation_unavailable");
+          ensured = upserted.action;
+        }
+        setDurableAction(ensured);
         const localCompleted = findLocalCompletion({
-          id: decision.id,
+          id: ensured?.action_id || decision.id,
           week: getWeekKey(),
-          action: decision.action,
+          action: ensured?.title || decision.action,
         }, user);
-        if (localCompleted && upserted?.action && upserted.action.status !== "completed") {
-          const started = await startCareerAction({ getHeaders: getApiAuthHeaders, actionId: upserted.action.action_id });
+        if (localCompleted && ensured && ensured.status !== "completed") {
+          const started = await startCareerAction({ getHeaders: getApiAuthHeaders, actionId: ensured.action_id });
           const completedResult = await completeCareerAction({
             getHeaders: getApiAuthHeaders,
-            actionId: started?.action?.action_id || upserted.action.action_id,
+            actionId: started?.action?.action_id || ensured.action_id,
           });
           if (!cancelled && completedResult?.action) setDurableAction(completedResult.action);
         }
+        if (!cancelled) setActionLoadState("ready");
       } catch {
         // Durable action persistence is the source of truth when available.
         // Local storage remains a non-authoritative fallback for offline or unavailable backend cases.
+        if (!cancelled) {
+          setActionLoadState("error");
+          setActionLoadError(
+            tr
+              ? "Haftalık hamle sunucudan alınamadı. Sayfayı yenilemeden tekrar deneyebilirsin."
+              : "Your weekly move could not be loaded from the server. You can retry without refreshing."
+          );
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [decision, decision.id, decision.action, decision.profileComplete, getApiAuthHeaders, user]);
+  }, [decision, decision.id, decision.action, decision.profileComplete, getApiAuthHeaders, user, tr, actionRetryNonce]);
 
   const persistLocalAction = (status) => {
     const now = new Date().toISOString();
     saveCompletion({
-      id: decision.id,
+      id: visibleDecision.id,
       userId: userKey(user),
       week: getWeekKey(),
-      action: decision.action,
+      action: visibleDecision.action,
       status,
       startedAt: status === "started" ? now : localRecord?.startedAt || now,
       completedAt: status === "completed" ? now : localRecord?.completedAt || null,
@@ -1010,7 +1056,7 @@ export default function WeeklyDecisionCenter({
       if (getApiAuthHeaders && user?.id) {
         const ensured = durableAction || (await upsertRecommendedCareerAction({
           getHeaders: getApiAuthHeaders,
-          action: buildDurableActionPayload(decision, user),
+          action: buildDurableActionPayload(visibleDecision, user),
         }))?.action;
         if (ensured && actionStatus === "recommended") {
           const result = await startCareerAction({ getHeaders: getApiAuthHeaders, actionId: ensured.action_id });
@@ -1051,17 +1097,33 @@ export default function WeeklyDecisionCenter({
     <div className="hf-weekly-center">
       <WeeklyDecisionHero
         decision={{
-          ...decision,
+          ...visibleDecision,
           completeLabel: heroCompleteLabel,
         }}
         completed={completed}
+        loading={actionLoading}
         onComplete={handleActionButton}
         onPrimary={() => navigate?.("/dashboard")}
       />
+      {decision.profileComplete && actionLoadState === "loading" ? (
+        <div className="hf-weekly-card hf-weekly-status" role="status" aria-live="polite">
+          <strong>{tr ? "Haftalık hamlen hazırlanıyor" : "Preparing your weekly move"}</strong>
+          <p>{tr ? "Mevcut profilinden bu haftanın aksiyonunu getiriyoruz." : "We are loading this week's action from your current profile."}</p>
+        </div>
+      ) : null}
+      {decision.profileComplete && actionLoadError ? (
+        <div className="hf-weekly-card hf-weekly-status hf-weekly-status--error" role="alert">
+          <strong>{tr ? "Haftalık hamle yüklenemedi" : "Weekly move could not load"}</strong>
+          <p>{actionLoadError}</p>
+          <button type="button" className="hf-weekly-retry" onClick={() => setActionRetryNonce((n) => n + 1)}>
+            {tr ? "Tekrar Dene" : "Retry"}
+          </button>
+        </div>
+      ) : null}
       {decision.profileComplete && completed ? (
         <OutcomeCaptureCard
-          actionId={durableAction?.action_id || decision.id}
-          decision={decision}
+          actionId={durableAction?.action_id || visibleDecision.id}
+          decision={visibleDecision}
           getApiAuthHeaders={getApiAuthHeaders}
           lang={lang}
           user={user}
@@ -1069,19 +1131,19 @@ export default function WeeklyDecisionCenter({
       ) : null}
       {decision.profileComplete ? (
         <div className="hf-weekly-decision-grid">
-          <DecisionConfidenceCard decision={decision} tr={tr} />
-          <OpportunityCard decision={decision} tr={tr} />
+          <DecisionConfidenceCard decision={visibleDecision} tr={tr} />
+          <OpportunityCard decision={visibleDecision} tr={tr} />
         </div>
       ) : (
-        <DecisionConfidenceCard decision={decision} tr={tr} />
+        <DecisionConfidenceCard decision={visibleDecision} tr={tr} />
       )}
-      <ExplainDecision decision={decision} tr={tr} />
-      {decision.profileComplete ? <DecisionMirror decision={decision} lang={lang} /> : null}
+      <ExplainDecision decision={visibleDecision} tr={tr} />
+      {decision.profileComplete ? <DecisionMirror decision={visibleDecision} lang={lang} /> : null}
       {decision.profileComplete ? (
         <>
           <ProgressRow deltas={deltas} tr={tr} />
-          <BlockerCard decision={decision} tr={tr} />
-          <RoleCard decision={decision} tr={tr} />
+          <BlockerCard decision={visibleDecision} tr={tr} />
+          <RoleCard decision={visibleDecision} tr={tr} />
           <div className="hf-weekly-shortcuts">
             <ShortcutCard
               title="Career Snapshot"

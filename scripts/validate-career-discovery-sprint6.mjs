@@ -70,12 +70,15 @@ assert.equal(new Set(mergedHealthcare).size, mergedHealthcare.length, "Merged ro
 
 const careerPage = fs.readFileSync("src/CareerOnboardingPage.jsx", "utf8");
 assert.ok(careerPage.includes("aria-expanded={showAllRoles}"), "Show more roles button must expose aria-expanded");
+assert.ok(careerPage.includes("[...topRoleOptions, ...extraRoleOptions, ...(goals.targetRoles || [])]"), "Expanded roles must reveal the remaining role catalog");
 assert.ok(careerPage.includes("[...topRoleOptions, ...(goals.targetRoles || [])]"), "Collapsed roles must preserve selected expanded roles");
 assert.ok(careerPage.includes("leadershipExperienceStatus"), "Leadership progressive disclosure state missing");
 assert.ok(careerPage.includes("hirefit-onboarding-draft-v9"), "Draft schema key must be updated for Sprint 6 persistence");
 
 const cvSection = fs.readFileSync("src/components/onboarding/HFCvSection.jsx", "utf8");
-assert.ok(cvSection.includes("Dosya seçiliyor"), "CV upload stages missing Turkish labels");
+assert.ok(cvSection.includes("Dosya seçildi"), "CV upload stages should reflect real file selection");
+assert.ok(cvSection.includes("CV dosyası yükleniyor"), "CV upload stages should reflect real upload work");
+assert.ok(!cvSection.includes("Deneyimler ve beceriler ayrıştırılıyor"), "CV upload must not imply parsing during file receipt");
 assert.ok(cvSection.includes("role=\"status\""), "CV upload progress must be announced accessibly");
 
 process.stdout.write("Sprint 6 Career Discovery validation passed.\n");

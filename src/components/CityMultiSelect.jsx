@@ -1,8 +1,7 @@
-﻿import { useCallback, useEffect, useId, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import {
   filterCities,
-  getCountryLabel,
   hasCityCatalog,
   resolveCountryCode,
 } from "../data/locationData.js";
@@ -26,7 +25,10 @@ export default function CityMultiSelect({
   const allowCustom = Boolean(code) && !hasCityCatalog(code);
   const isDisabled = disabled || !code;
 
-  const selected = [...new Set((Array.isArray(value) ? value : value ? [value] : []).map((c) => String(c || "").trim()).filter(Boolean))];
+  const selected = useMemo(
+    () => [...new Set((Array.isArray(value) ? value : value ? [value] : []).map((c) => String(c || "").trim()).filter(Boolean))],
+    [value]
+  );
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -100,12 +102,9 @@ export default function CityMultiSelect({
           ? "Şehir seç veya ara"
           : "Search or select city");
 
-  const countryLabel = code ? getCountryLabel(code, lang) : "";
-
   return (
     <div ref={wrapRef} className={`hf-city-select hf-city-multi-select${isDisabled ? " hf-city-select--disabled" : ""}`}>
       <div className="hf-city-select__chips">
-        {countryLabel ? <span className="hf-city-select__chip hf-city-select__chip--country">{countryLabel}</span> : null}
         {selected.map((city) => (
           <span key={city} className="hf-city-select__chip">
             {city}

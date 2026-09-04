@@ -32,6 +32,7 @@ const careerPageRendered = careerPage.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) =
 );
 const snapshotPage = read("src/components/career-os/CareerSnapshotWow.jsx");
 const loadingComponent = read("src/components/onboarding/CareerIdentityBuilder.jsx");
+const firstAnalysis = read("src/utils/firstCareerAnalysis.js");
 const css = read("src/components/career-os/career-os.css");
 const trustLayer = read("lib/careerOnboarding/trustLayer.js");
 const snapshotWow = read("lib/careerOnboarding/snapshotWow.js");
@@ -50,11 +51,11 @@ assert.ok(careerPage.includes("internationalIndustries"), "International sector 
 assert.ok(careerPage.includes("goalsPanel, readinessPanel"), "Tabbed UI state must persist in local draft");
 
 const expectedLoadingLabels = [
-  "Tercihlerin hazırlanıyor",
-  "Deneyimlerin değerlendiriliyor",
-  "Kariyer kanıtların inceleniyor",
-  "Rol yönlerin karşılaştırılıyor",
-  "Kariyer özetin hazırlanıyor",
+  "Profil tercihlerin düzenleniyor",
+  "Deneyim sinyallerin düzenleniyor",
+  "Kayıtlı kaynakların birleştiriliyor",
+  "Rol yönlerin hesaplanıyor",
+  "Career Snapshot oluşturuluyor",
 ];
 
 for (const label of expectedLoadingLabels) {
@@ -63,6 +64,9 @@ for (const label of expectedLoadingLabels) {
 
 assert.ok(careerPage.includes("activateGenerationStep"), "Live loading stage activation missing");
 assert.ok(careerPage.includes("if (!ms) return Promise.resolve();"), "Loading flow must not force artificial delay");
+assert.equal(careerPage.includes("waitForGenerationStep(100)"), false, "Snapshot completion must not add artificial post-generation delay");
+assert.equal(firstAnalysis.includes("MIN_ANALYSIS_MS"), false, "First analysis must not use an artificial minimum delay");
+assert.equal(firstAnalysis.includes("setTimeout"), false, "First analysis must not slow results with fake waiting");
 assert.ok(!loadingComponent.includes("width: `${progress}%`"), "Loading component must not show fake percentage progress");
 assert.ok(!loadingComponent.includes("completedCount"), "Loading component should not expose checklist-style completion math");
 

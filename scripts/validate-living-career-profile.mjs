@@ -4,6 +4,8 @@ import {
   mergeOnboardingDraft,
   mergeProfileSectionPreservingExisting,
 } from "../lib/careerOnboarding/stateIntegrity.js";
+import { normalizeCareerGoals } from "../lib/careerOnboarding/industries.js";
+import { filterCities, getCitiesForCountry } from "../src/data/locationData.js";
 import {
   buildProfileChangeEvents,
   mergeProfileProgressIntoCareerGps,
@@ -159,6 +161,8 @@ function testChangeHistory() {
 
 function testCompletedProfileRouteSource() {
   const onboardingSource = readFileSync("src/CareerOnboardingPage.jsx", "utf8");
+  const citySelectSource = readFileSync("src/components/CitySelect.jsx", "utf8");
+  const cityMultiSelectSource = readFileSync("src/components/CityMultiSelect.jsx", "utf8");
   assert.match(onboardingSource, /function selectHydrationDraft/, "hydration should use an explicit draft precedence helper");
   assert.match(
     onboardingSource,
@@ -186,10 +190,59 @@ function testCompletedProfileRouteSource() {
     /onResidenceCityChange=\{\(c\) => setBasic\(\(current\) =>/,
     "residence city changes must use functional state"
   );
+  assert.match(onboardingSource, /const MAX_PRIORITY_COUNTRIES = 5/, "priority countries should have a five-country cap");
+  assert.match(
+    onboardingSource,
+    /targetCountries: isSelected \? current\.filter\(\(item\) => item !== country\) : \[\.\.\.current, country\]/,
+    "priority countries should remain removable at the selection limit"
+  );
+  assert.match(
+    onboardingSource,
+    /setGoals\(\(current\) => \{\s*\n\s*const experienceLevels = toggleMulti\(current\.experienceLevels/s,
+    "experience level selection must use functional multi-select state"
+  );
+  assert.match(
+    onboardingSource,
+    /setGoals\(\(current\) => \{\s*\n\s*const companyStages = toggleMulti\(current\.companyStages/s,
+    "company stage selection must use functional toggle state"
+  );
+  assert.match(
+    onboardingSource,
+    /companyTypes: companyStages/,
+    "company stage deselection must update legacy companyTypes alias so removed stages are not rehydrated"
+  );
+  assert.match(
+    onboardingSource,
+    /\[\.\.\.topRoleOptions, \.\.\.extraRoleOptions, \.\.\.\(goals\.targetRoles \|\| \[\]\)\]/,
+    "show more roles should reveal additional catalog roles"
+  );
+  assert.equal(citySelectSource.includes("hf-city-select__chip--country"), false, "single city chip should not redundantly render country");
+  assert.equal(cityMultiSelectSource.includes("hf-city-select__chip--country"), false, "multi-city chips should not redundantly render country");
+}
+
+function testProfileInteractionRules() {
+  const goals = normalizeCareerGoals({
+    experienceLevels: ["intern", "entry", "mid"],
+    companyStages: ["startup", "enterprise"],
+    targetCountries: ["Germany", "Netherlands", "United Kingdom", "Canada", "United States", "Australia"],
+    industries: ["technology"],
+  });
+  assert.ok(goals.experienceLevels.length >= 2, "experience level must preserve multiple selected values");
+  assert.deepEqual(goals.companyStages, ["startup", "enterprise"], "company stages must preserve multiple selected values");
+  assert.equal(goals.targetCountries.length, 6, "legacy >5 target countries must not be silently truncated during unrelated normalization");
+
+  const turkeyCities = getCitiesForCountry("TR");
+  assert.equal(turkeyCities.length, 81, "Türkiye city catalog must expose all 81 provinces");
+  for (const province of ["İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Gaziantep", "Şanlıurfa", "Diyarbakır", "Mersin", "Adana"]) {
+    assert.ok(turkeyCities.includes(province), `Türkiye city catalog missing ${province}`);
+  }
+  assert.ok(filterCities("TR", "sanli").includes("Şanlıurfa"), "Turkish city search should match normalized ASCII input");
+  assert.ok(filterCities("TR", "istanbul").includes("İstanbul"), "Turkish city search should match dotted/dotless variants");
 }
 
 testSafeMerge();
 testChangeHistory();
 testCompletedProfileRouteSource();
+testProfileInteractionRules();
 
 process.stdout.write("Living Career Profile validation passed.\n");

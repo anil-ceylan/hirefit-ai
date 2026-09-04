@@ -261,8 +261,15 @@ export const RESIDENCE_CITY_REQUIRED_CODES = ["TR", "CY"];
 /** @type {Record<string, string[]>} */
 export const CITIES_BY_COUNTRY = {
   TR: [
-    "İstanbul", "Ankara", "İzmir", "Bursa", "Antalya", "Adana", "Konya", "Gaziantep", "Kocaeli", "Mersin",
-    "Kayseri", "Eskişehir", "Trabzon", "Samsun", "Diyarbakır",
+    "Adana", "Adıyaman", "Afyonkarahisar", "Ağrı", "Aksaray", "Amasya", "Ankara", "Antalya", "Ardahan", "Artvin",
+    "Aydın", "Balıkesir", "Bartın", "Batman", "Bayburt", "Bilecik", "Bingöl", "Bitlis", "Bolu", "Burdur",
+    "Bursa", "Çanakkale", "Çankırı", "Çorum", "Denizli", "Diyarbakır", "Düzce", "Edirne", "Elazığ", "Erzincan",
+    "Erzurum", "Eskişehir", "Gaziantep", "Giresun", "Gümüşhane", "Hakkari", "Hatay", "Iğdır", "Isparta", "İstanbul",
+    "İzmir", "Kahramanmaraş", "Karabük", "Karaman", "Kars", "Kastamonu", "Kayseri", "Kırıkkale", "Kırklareli", "Kırşehir",
+    "Kilis", "Kocaeli", "Konya", "Kütahya", "Malatya", "Manisa", "Mardin", "Mersin", "Muğla", "Muş",
+    "Nevşehir", "Niğde", "Ordu", "Osmaniye", "Rize", "Sakarya", "Samsun", "Siirt", "Sinop", "Sivas",
+    "Şanlıurfa", "Şırnak", "Tekirdağ", "Tokat", "Trabzon", "Tunceli", "Uşak", "Van", "Yalova", "Yozgat",
+    "Zonguldak",
   ],
   CY: ["Lefkoşa", "Gazimağusa", "Girne", "Güzelyurt", "İskele", "Lefke"],
   US: ["New York", "San Francisco", "Los Angeles", "Seattle", "Boston", "Chicago", "Austin", "Miami"],
@@ -617,10 +624,10 @@ export function getCitiesForCountry(countryCode) {
 
 export function filterCities(countryCode, query) {
   const catalog = getCitiesForCountry(countryCode);
-  const q = String(query || "").trim().toLocaleLowerCase("tr-TR");
+  const q = normalizeSearchText(query);
   if (!catalog.length) return [];
   if (!q) return catalog;
-  return catalog.filter((city) => city.toLocaleLowerCase("tr-TR").includes(q));
+  return catalog.filter((city) => normalizeSearchText(city).includes(q));
 }
 
 export function getUniversitiesForLocation(countryCode, city) {
