@@ -53,7 +53,6 @@ import {
   completeCareerOnboarding,
   fetchCareerOnboarding,
   saveOnboardingDraft,
-  buildLocalOnboardingProfile,
 } from "./utils/careerOnboardingClient.js";
 import { getApiBase } from "./utils/apiBase.js";
 import { saveLocalCareerProfile } from "./utils/careerMemoryClient.js";
@@ -75,6 +74,14 @@ import {
   getCountryLabel,
   resolveCountryCode,
 } from "./data/locationData.js";
+import {
+  educationLevelFromStatus,
+  getProfileBasicHydrationPayload,
+  getResidenceCountryCode,
+  getUniversityCities,
+  normalizeBasicLocation,
+  normalizeProfileBasicForForm,
+} from "./utils/careerProfileFormHydration.js";
 import { getCareerDiscoveryLoadingCopy } from "./utils/activationFlow.js";
 import { trackActivationEvent } from "./utils/activationEvents.js";
 import "./components/career-os/career-os.css";
@@ -143,85 +150,6 @@ function buildGenerationSteps({ analysisSources, cvSignalCount, lang }) {
     { id: "role_matches", label: tr ? "Rol y\u00f6nlerin hesaplan\u0131yor" : "Calculating role directions" },
     { id: "career_snapshot", label: tr ? "Career Snapshot olu\u015fturuluyor" : "Building Career Snapshot" },
   ];
-}
-
-function getResidenceCountryCode(basic) {
-  return resolveCountryCode(
-    basic?.residenceCountryCode || basic?.countryCode || basic?.residenceCountry || basic?.country
-  );
-}
-
-function inferEducationStatus(basic = {}) {
-  if (basic.educationStatus) return basic.educationStatus;
-  const degreeText = String(basic.degree || basic.department || "").toLowerCase();
-  if (/phd|doctor|doktora/.test(degreeText)) return "phd_student";
-  if (/master|yüksek lisans|yuksek lisans/.test(degreeText)) return "masters_student";
-  if (basic.educationLevel === "new_graduate" || basic.classYear === "graduate") return "graduate";
-  if (basic.educationLevel === "university_student") return "currently_studying";
-  if (basic.educationLevel === "working_professional") return "graduate";
-  return "";
-}
-
-function educationLevelFromStatus(status, fallback = "") {
-  if (status === "graduate") return "new_graduate";
-  if (["currently_studying", "masters_student", "phd_student"].includes(status)) {
-    return "university_student";
-  }
-  return fallback;
-}
-
-function getUniversityCities(basic = {}) {
-  const normalized = normalizeUniversityCitiesForProfile(basic);
-  return normalized.universityCities;
-}
-
-function normalizeBasicLocation(bp = {}) {
-  const residenceCode = resolveCountryCode(
-    bp.residenceCountryCode || bp.countryCode || bp.residenceCountry || bp.country
-  );
-  const universityCode = resolveCountryCode(bp.universityCountryCode || bp.universityCountry);
-  const educationStatus = inferEducationStatus(bp);
-  const cityFields = normalizeUniversityCitiesForProfile(bp);
-  const normalizedExperienceSignals = normalizeSignalSelection(
-    bp.experienceSignals,
-    EXPERIENCE_SIGNAL_OPTIONS,
-    bp.experienceSignal || ""
-  );
-  const normalizedLeadershipSignals = normalizeSignalSelection(
-    bp.leadershipSignals,
-    LEADERSHIP_SIGNAL_OPTIONS,
-    bp.leadershipSignal || ""
-  );
-  const leadershipExperienceStatus =
-    bp.leadershipExperienceStatus ||
-    (normalizedLeadershipSignals.includes("none") ? "no" : normalizedLeadershipSignals.length ? "yes" : "");
-  return {
-    ...bp,
-    ...normalizePortfolioLinks(bp),
-    experienceSignals: normalizedExperienceSignals,
-    leadershipSignals: normalizedLeadershipSignals,
-    cvUploaded: Boolean(bp.cvUploaded || bp.cvFileName),
-    cvSignalCount: Number(bp.cvSignalCount || 0),
-    analysisSources: Array.isArray(bp.analysisSources) ? [...new Set(bp.analysisSources)] : [],
-    educationStatus,
-    educationLevel: educationLevelFromStatus(educationStatus, bp.educationLevel || ""),
-    expectedGraduationYear:
-      bp.expectedGraduationYear ||
-      (educationStatus !== "graduate" ? bp.graduationYear || "" : ""),
-    residenceCountryCode: residenceCode,
-    residenceCountry: residenceCode,
-    countryCode: residenceCode,
-    country: residenceCode,
-    city: bp.residenceCity || bp.city || "",
-    homeCity: bp.homeCity || bp.residenceCity || bp.city || "",
-    universityCountryCode: universityCode,
-    universityCountry: universityCode,
-    ...cityFields,
-    universityManual: Boolean(bp.universityManual || bp.universitySource === "manual" || bp.university_source === "manual"),
-    livingSituation: bp.livingSituation || "",
-    mbtiType: bp.mbtiType || "",
-    leadershipExperienceStatus,
-  };
 }
 
 function buildOnboardingClearFields({ basic = {} } = {}) {
@@ -1192,7 +1120,7 @@ export default function CareerOnboardingPage() {
     const d = draft || profile?.onboarding_draft || {};
     if (d.basic) {
       setBasic((b) => {
-        const merged = normalizeBasicLocation({ ...b, ...d.basic });
+        const merged = normalizeBasicLocation({ ...b, ...d.basic }, lang, b);
         merged.languages = normalizeLanguagesArray(
           merged.languages?.length ? merged.languages : b.languages,
           lang
@@ -1247,12 +1175,13 @@ export default function CareerOnboardingPage() {
     }));
     if (d.cv) setCv((c) => ({ ...emptyCvProfile(), ...c, ...d.cv }));
     else if (d.hasCv != null) setCv((c) => ({ ...c, cvStatus: d.hasCv ? "current" : "none", cvExists: Boolean(d.hasCv) }));
-    if (profile?.basic_profile) {
-      setCv((c) => ({ ...emptyCvProfile(), ...c, ...profile.basic_profile }));
+    const profileBasicPayload = getProfileBasicHydrationPayload(profile);
+    if (profileBasicPayload && Object.keys(profileBasicPayload).length) {
+      setCv((c) => ({ ...emptyCvProfile(), ...c, ...profileBasicPayload }));
     }
-    if (profile?.basic_profile && Object.keys(profile.basic_profile).length) {
+    if (profileBasicPayload && Object.keys(profileBasicPayload).length) {
       setBasic((b) => {
-        const merged = normalizeBasicLocation({ ...b, ...profile.basic_profile });
+        const merged = normalizeProfileBasicForForm(b, profile, lang);
         merged.languages = normalizeLanguagesArray(
           merged.languages?.length ? merged.languages : b.languages,
           lang
@@ -1690,8 +1619,9 @@ export default function CareerOnboardingPage() {
         clearFields: buildOnboardingClearFields({ basic: payloadBasic }),
         lang,
       });
-      if (result.error && !result.offline) {
+      if (!result.success || result.offline || !result.profile) {
         setGenerationState(null);
+        setOfflineMode(Boolean(result.offline));
         setError(
           tr
             ? "Profil sunucuya kaydedilemedi. Bağlantını kontrol edip tekrar dene."
@@ -1700,27 +1630,8 @@ export default function CareerOnboardingPage() {
         return;
       }
       let profile = result.profile;
-      if (result.offline || !profile) {
-        profile = buildLocalOnboardingProfile({
-          basic: payloadBasic,
-          goals: payloadGoals,
-          dnaAnswers,
-          readinessAnswers: normalizedReadinessAnswers,
-          cv: { ...cv, cvUploaded, cvSignalCount },
-          experienceSignals,
-          leadershipSignals,
-          ...portfolioLinks,
-          cvUploaded,
-          cvSignalCount,
-          analysisSources,
-          lang,
-        });
-        saveLocalCareerProfile(profile);
-        setOfflineMode(true);
-      } else {
-        saveLocalCareerProfile(profile);
-        setOfflineMode(false);
-      }
+      saveLocalCareerProfile(profile);
+      setOfflineMode(false);
       profile = {
         ...profile,
         analysis_sources: analysisSources,

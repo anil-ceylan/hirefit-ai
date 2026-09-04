@@ -152,21 +152,19 @@ export async function completeCareerOnboarding(apiBase, getHeaders, payload) {
     });
     const body = await parseJsonSafe(res);
     if (!res.ok) {
-      const localProfile = buildLocalOnboardingProfile(payload);
       return {
-        success: true,
-        mode: "local",
-        profile: localProfile,
-        offline: true,
+        success: false,
+        mode: "server_error",
+        profile: null,
+        offline: false,
         error: friendlyApiMessage(res.status, body?.error, payload?.lang || "TR"),
       };
     }
     if (body?.storageUnavailable) {
-      const localProfile = buildLocalOnboardingProfile(payload);
       return {
-        success: true,
-        mode: "local",
-        profile: localProfile,
+        success: false,
+        mode: "storage_unavailable",
+        profile: null,
         offline: true,
         error: friendlyApiMessage(500, "storage unavailable", payload?.lang || "TR"),
       };
@@ -178,11 +176,10 @@ export async function completeCareerOnboarding(apiBase, getHeaders, payload) {
       offline: false,
     };
   } catch (e) {
-    const localProfile = buildLocalOnboardingProfile(payload);
     return {
-      success: true,
-      mode: "local",
-      profile: localProfile,
+      success: false,
+      mode: "network_error",
+      profile: null,
       offline: true,
       error: friendlyApiMessage(0, e, payload?.lang || "TR"),
     };
