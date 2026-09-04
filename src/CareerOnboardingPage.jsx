@@ -30,6 +30,7 @@ import {
   INTERNATIONAL_COUNTRY_GROUPS,
   READINESS_PILLAR_KEYS,
   READINESS_BENCHMARKS,
+  isReadinessComplete,
   emptyReadinessAnswers,
   getReadinessPillarLabel,
   MAX_TARGET_ROLES,
@@ -93,6 +94,7 @@ const INITIAL_ROLE_VISIBLE = 10;
 const MAX_PRIORITY_COUNTRIES = 5;
 const GENERATION_STEP_MS = 0;
 const GOALS_PANEL_ORDER = ["target", "environment", "roles"];
+const READINESS_PANEL_ORDER = ["evidence", "experience", "final"];
 
 function waitForGenerationStep(ms = GENERATION_STEP_MS) {
   if (!ms) return Promise.resolve();
@@ -167,6 +169,30 @@ function buildOnboardingClearFields({ basic = {} } = {}) {
   return {
     basic: [...new Set(basicFields)],
   };
+}
+
+function resolveCompletionTargetFromMissing(missing = [], lang = "TR") {
+  const text = missing.join(" | ").toLowerCase();
+  const tr = lang === "TR";
+  if (/ad soyad|full name|yaş|age|üniversite|university|bölüm|department|eğitim durumu|education status|ikamet|residence|eğitim şehri|education city|yaşam|living|dil bilgileri|language details/.test(text)) {
+    return { step: 1 };
+  }
+  if (/sektör|sector|hedef rol|target role|birincil hedef rol|primary target role|deneyim seviyesi|experience level|ne arıyorsun|what you're looking/.test(text)) {
+    return { step: 2 };
+  }
+  if (/dna/.test(text)) {
+    return { step: 3 };
+  }
+  if (/cv/.test(text)) {
+    return { step: 4, readinessPanel: "evidence" };
+  }
+  if (
+    text.includes(tr ? "kariyer hazırlığı benchmarkları" : "career readiness benchmarks") ||
+    /deneyim|experience|liderlik|leadership|ingilizce|english|network|proje|project/.test(text)
+  ) {
+    return { step: 4, readinessPanel: "experience" };
+  }
+  return { step: 4, readinessPanel: "final" };
 }
 
 function normalizeGoalsLocation(g = {}) {
@@ -1034,6 +1060,45 @@ export default function CareerOnboardingPage() {
     return true;
   };
 
+  const moveReadinessPanel = async (direction) => {
+    const currentIndex = READINESS_PANEL_ORDER.indexOf(readinessPanel);
+    const nextPanel = READINESS_PANEL_ORDER[currentIndex + direction];
+    if (!nextPanel) return false;
+    setSaving(true);
+    await persistDraft(4);
+    setReadinessPanel(nextPanel);
+    setSaving(false);
+    return true;
+  };
+
+  const validateReadinessPanelBeforeNext = () => {
+    if (readinessPanel === "evidence") {
+      if (!cv?.cvStatus) {
+        setError(tr ? "CV durumunu seç." : "Select your CV status.");
+        return false;
+      }
+      if (cv.cvStatus !== "none" && !(cv.cvLastUpdatedRange || cv.cvLastUpdated)) {
+        setError(tr ? "CV güncelliğini seç." : "Select CV recency.");
+        return false;
+      }
+    }
+    if (readinessPanel === "experience" && !isReadinessComplete(readinessAnswers)) {
+      setError(
+        tr
+          ? "Deneyim, liderlik, İngilizce, network ve proje kanıtlarını tamamla."
+          : "Complete experience, leadership, English, network, and project evidence."
+      );
+      return false;
+    }
+    setError("");
+    return true;
+  };
+
+  const onReadinessNext = async () => {
+    if (!validateReadinessPanelBeforeNext()) return;
+    await moveReadinessPanel(1);
+  };
+
   useEffect(() => {
     if (!selectedIndustries.length) return;
     const available = new Set(getRolesForIndustries(selectedIndustries));
@@ -1454,6 +1519,9 @@ export default function CareerOnboardingPage() {
       lang,
     });
     if (!validation.ok) {
+      const target = resolveCompletionTargetFromMissing(validation.missing, lang);
+      if (target.step) setStep(target.step);
+      if (target.readinessPanel) setReadinessPanel(target.readinessPanel);
       setError(
         tr
           ? `Eksik alanlar: ${validation.missing.join(", ")}`
@@ -2729,6 +2797,10 @@ export default function CareerOnboardingPage() {
                   await moveGoalsPanel(-1);
                   return;
                 }
+                if (step === 4 && readinessPanel !== "evidence") {
+                  await moveReadinessPanel(-1);
+                  return;
+                }
                 setStep((s) => Math.max(1, s - 1));
               }}
               style={{
@@ -2768,6 +2840,10 @@ export default function CareerOnboardingPage() {
           </div>
           {step < 4 ? (
             <button type="button" className="hf-btn-primary" disabled={saving} onClick={onNext} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              {labels.next} <ChevronRight size={14} />
+            </button>
+          ) : readinessPanel !== "final" ? (
+            <button type="button" className="hf-btn-primary" disabled={saving} onClick={onReadinessNext} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
               {labels.next} <ChevronRight size={14} />
             </button>
           ) : (
