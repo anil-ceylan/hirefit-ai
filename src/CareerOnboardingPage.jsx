@@ -986,10 +986,12 @@ export default function CareerOnboardingPage() {
   const [generationState, setGenerationState] = useState(null);
   const [draftHydrated, setDraftHydrated] = useState(false);
 
-  const selectedIndustries = useMemo(
-    () => (goals.industries?.length > 0 ? goals.industries : primaryIndustry ? [primaryIndustry] : []),
-    [goals.industries, primaryIndustry]
+  // Normalization recreates arrays; only a change in sector values should
+  // retrigger role reconciliation, not a role click or draft hydration.
+  const selectedIndustriesKey = JSON.stringify(
+    goals.industries?.length > 0 ? goals.industries : primaryIndustry ? [primaryIndustry] : []
   );
+  const selectedIndustries = useMemo(() => JSON.parse(selectedIndustriesKey), [selectedIndustriesKey]);
 
   const topRoleOptions = useMemo(
     () => getTopRolesForIndustries(selectedIndustries || [], INITIAL_ROLE_VISIBLE),
@@ -1118,7 +1120,6 @@ export default function CareerOnboardingPage() {
         tertiaryRole,
       });
     });
-    setShowAllRoles(false);
   }, [selectedIndustries]);
 
   useEffect(() => {
