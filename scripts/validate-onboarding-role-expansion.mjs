@@ -2,6 +2,9 @@ import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import * as constants from "../lib/careerOnboarding/constants.js";
+import React from "react";
+import { transformSync } from "esbuild";
+import { mergeOnboardingDraft } from "../lib/careerOnboarding/stateIntegrity.js";
 
 // Execute the actual page handlers and memo/effect dependency lifecycle with the
 // real role catalogue and normalizers. No network or database is involved.
@@ -108,4 +111,164 @@ render();
 assert.equal(context.showAllRoles, true);
 assert.ok(context.visible.includes(extra));
 assert.deepEqual(plain(context.goals.targetRoles), finalRoles);
+// Render the actual selected-card component and invoke its remove/rank buttons.
+const componentCode = between("function RankedPriorityList", "function OnboardingSubnav");
+const labelsCode = between("function rankSlotLabel", "function RecommendedBadge");
+const RankedPriorityList = runInNewContext(
+  `${transformSync(`${labelsCode}\n${componentCode}`, { loader: "jsx", jsx: "transform" }).code}\nRankedPriorityList`,
+  { React, ArrowUp: () => null, ArrowDown: () => null }
+);
+assert.match(source, /onMove=\{moveRankedRole\}\s+onRemove=\{toggleTargetRole\}/, "selected roles wire removal to the existing controlled handler");
+const moveCode = between("  const moveRankedRole", "  const [dnaAnswers");
+function nodes(node) {
+  if (!node || typeof node !== "object") return [];
+  return [node, ...React.Children.toArray(node.props?.children).flatMap(nodes)];
+}
+function cards(lang = "TR") {
+  return nodes(RankedPriorityList({
+    items: context.goals.targetRoles, getItemLabel: (role) => constants.getRoleLabel(role, lang),
+    onMove: (roleValue, direction) => {
+      context.roleValue = roleValue;
+      context.direction = direction;
+      runInNewContext(`(() => { ${moveCode}; moveRankedRole(roleValue, direction); })()`, context);
+      render();
+    },
+    onRemove: toggle, lang, kind: "role",
+  })).filter((node) => node.props?.className === "hf-onboard-role-rank-row");
+}
+function assertRanking(expected) {
+  assert.deepEqual(plain(context.goals.targetRoles), expected);
+  assert.deepEqual([context.goals.primaryRole, context.goals.secondaryRole, context.goals.tertiaryRole],
+    [expected[0] || "", expected[1] || "", expected[2] || ""]);
+  cards().forEach((row, index) => {
+    assert.equal(nodes(row).find((n) => n.props?.className === "hf-onboard-role-rank-index").props.children, index + 1);
+    assert.equal(nodes(row).find((n) => n.type === "small").props.children,
+      ["En güçlü rol yönün", "Yedek rol yönün", "Keşif rol yönün"][index]);
+  });
+}
+for (const removedIndex of [0, 1, 2]) {
+  const original = initial.slice(0, 3);
+  context.setGoals(context.normalizeGoalsLocation({ industries, targetRoles: original }));
+  render();
+  const rows = cards();
+  assert.equal(rows.length, 3);
+  for (const row of rows) {
+    const buttons = nodes(row).filter((n) => n.type === "button");
+    assert.equal(buttons.length, 3, "each card has two rank controls and a distinct remove button");
+    const remove = buttons.find((n) => n.props.children === "Kaldır");
+    assert.equal(remove.props.type, "button");
+    assert.ok(remove.props["aria-label"].endsWith("kaldır"));
+    assert.ok(!remove.props.disabled);
+  }
+  nodes(rows[removedIndex]).find((n) => n.props?.children === "Kaldır").props.onClick();
+  const remaining = original.filter((_, index) => index !== removedIndex);
+  assertRanking(remaining);
+  assert.equal(context.goals.targetRoles.length, 2, "count frees a slot immediately");
+  assert.equal(runInNewContext(disabled, { goals: context.goals, MAX_TARGET_ROLES: 3, role: extra }), false);
+  toggle(extra);
+  const replacement = [...remaining, extra];
+  assertRanking(replacement);
+  toggle(original[removedIndex]);
+  assertRanking(replacement); // fourth selection remains blocked
+  await runInNewContext(`(async () => { ${nextCode}; await onNext(); })()`, context);
+  assert.equal(context.step, 3);
+  await runInNewContext(`(async () => { ${backCode} })()`, context);
+  render();
+  assertRanking(replacement);
+  // Local JSON and server draft merge retain order through real goal normalization.
+  for (const draft of [plain(context.saved), mergeOnboardingDraft({}, context.saved, { step: 2 })]) {
+    context.setGoals(context.normalizeGoalsLocation(draft.goals));
+    render();
+    assertRanking(replacement);
+  }
+  assert.equal(context.showAllRoles, true);
+  const up = nodes(cards()[2]).find((n) => n.type === "button" && n.props["aria-label"]?.endsWith("yukarı taşı"));
+  up.props.onClick();
+  assertRanking([replacement[0], replacement[2], replacement[1]]);
+  const down = nodes(cards()[1]).find((n) => n.type === "button" && n.props["aria-label"]?.endsWith("aşağı taşı"));
+  down.props.onClick();
+  assertRanking(replacement);
+}
+assert.equal(nodes(cards("EN")[0]).filter((n) => n.props?.children === "Remove").length, 1);
+assert.equal(nodes(RankedPriorityList({ items: ["sector"], getItemLabel: (v) => v, onMove: () => {}, lang: "TR", kind: "industry" })).filter((n) => n.type === "button").length, 2, "other ranked lists are unchanged");
+process.stdout.write("Selected role removal: all ranks, controls, priorities, replacement, cap, navigation, draft order and ranking passed.\n");
+// All other ranked sections use the same rendered control and their existing
+// toggle/reorder handlers. Exercise each rank at its real selection cap.
+const handlers = between("  const toggleIndustry", "  const toggleInternationalIndustry");
+const movePanelCode = between("  const moveGoalsPanel", "  const moveReadinessPanel");
+context.MAX_PRIORITY_COUNTRIES = 5;
+context.GOALS_PANEL_ORDER = ["target", "environment", "roles"];
+context.setGoalsPanel = (panel) => { context.goalsPanel = panel; };
+for (const name of ["Industry", "CompanyIndustry", "LookingFor", "TargetCountry"]) {
+  context[`set${name}LimitNotice`] = () => {};
+}
+const sections = [
+  { field: "industries", toggle: "toggleIndustry", move: "moveRankedIndustry", options: constants.INDUSTRIES.map((o) => o.id), cap: 3, kind: "industry" },
+  { field: "lookingFor", toggle: "toggleLookingFor", move: "moveRankedLookingFor", options: constants.LOOKING_FOR_OPTIONS.map((o) => o.id), cap: 3, kind: "looking" },
+  { field: "companyIndustries", toggle: "toggleCompanyIndustry", move: "moveRankedCompanyIndustry", options: constants.COMPANY_INDUSTRY_OPTIONS.map((o) => o.id), cap: 3, kind: "companyIndustry" },
+  { field: "targetCountries", toggle: "toggleInternationalCountry", move: "moveRankedInternationalCountry", options: constants.INTERNATIONAL_COUNTRY_GROUPS.flatMap((g) => g.countries), cap: 5, kind: "companyIndustry" },
+];
+for (const section of sections) {
+  assert.ok(source.includes(`onRemove={${section.toggle}}`), `${section.field} wires remove`);
+  const options = [...new Set(section.options)];
+  assert.ok(options.length > section.cap);
+  function invoke(name, item, direction) {
+    context.item = item;
+    context.direction = direction;
+    runInNewContext(`(() => { ${handlers}; ${name}(item, direction); })()`, context);
+    render();
+  }
+  function sectionRows() {
+    return nodes(RankedPriorityList({
+      items: context.goals[section.field], getItemLabel: (item) => item, lang: "TR", kind: section.kind,
+      onMove: (item, direction) => invoke(section.move, item, direction),
+      onRemove: (item) => invoke(section.toggle, item),
+    })).filter((n) => n.props?.className === "hf-onboard-role-rank-row");
+  }
+  function check(expected) {
+    assert.deepEqual(plain(context.goals[section.field]), expected, section.field);
+    if (section.field === "industries") {
+      assert.deepEqual([context.goals.primaryIndustry, context.goals.secondaryIndustry, context.goals.tertiaryIndustry],
+        [expected[0] || "", expected[1] || "", expected[2] || ""]);
+    }
+    sectionRows().forEach((row, index) => {
+      assert.equal(nodes(row).find((n) => n.props?.className === "hf-onboard-role-rank-index").props.children, index + 1);
+      assert.equal(nodes(row).filter((n) => n.props?.children === "Kaldır").length, 1);
+    });
+  }
+  for (let rank = 0; rank < section.cap; rank += 1) {
+    const original = options.slice(0, section.cap);
+    context.setGoals(context.normalizeGoalsLocation({ industries, [section.field]: original }));
+    render();
+    check(original);
+    nodes(sectionRows()[rank]).find((n) => n.props?.children === "Kaldır").props.onClick();
+    const remaining = original.filter((_, index) => index !== rank);
+    check(remaining);
+    invoke(section.toggle, options[section.cap]);
+    const replacement = [...remaining, options[section.cap]];
+    check(replacement);
+    invoke(section.toggle, original[rank]);
+    check(replacement); // cap still blocks an additional selection
+    context.step = 2;
+    context.goalsPanel = "environment";
+    context.selectedIndustries = context.goals.industries;
+    context.moveGoalsPanel = runInNewContext(`(() => { ${movePanelCode}; return moveGoalsPanel; })()`, context);
+    await runInNewContext(`(async () => { ${nextCode}; await onNext(); })()`, context);
+    assert.equal(context.goalsPanel, "roles");
+    await runInNewContext(`(async () => { ${backCode} })()`, context);
+    assert.equal(context.goalsPanel, "environment");
+    check(replacement);
+    for (const draft of [plain(context.saved), mergeOnboardingDraft({}, context.saved, { step: 2 })]) {
+      context.setGoals(context.normalizeGoalsLocation(draft.goals));
+      render();
+      check(replacement);
+    }
+    nodes(sectionRows()[1]).find((n) => n.type === "button" && n.props["aria-label"]?.endsWith("yukarı taşı")).props.onClick();
+    check([replacement[1], replacement[0], ...replacement.slice(2)]);
+    nodes(sectionRows()[0]).find((n) => n.type === "button" && n.props["aria-label"]?.endsWith("aşağı taşı")).props.onClick();
+    check(replacement);
+  }
+}
+assert.equal((source.match(/<RankedPriorityList/g) || []).length, sections.length + 1, "every ranked section is audited");
+process.stdout.write("Ranked sectors, employment preferences, company industries and countries: removal at every rank, caps, replacement, navigation, restoration and reorder passed.\n");
 process.stdout.write("Role expansion: subset, click, cap, replacement, Next/Back, draft restoration and effect stability passed.\n");

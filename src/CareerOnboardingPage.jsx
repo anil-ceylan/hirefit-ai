@@ -302,7 +302,7 @@ function RecommendedBadge({ lang }) {
   );
 }
 
-function RankedPriorityList({ items, getItemLabel, onMove, lang, kind }) {
+function RankedPriorityList({ items, getItemLabel, onMove, onRemove, lang, kind }) {
   if (!items?.length) return null;
   return (
     <div className="hf-onboard-priority-block">
@@ -331,6 +331,16 @@ function RankedPriorityList({ items, getItemLabel, onMove, lang, kind }) {
               >
                 <ArrowDown size={15} />
               </button>
+              {onRemove ? (
+                <button
+                  type="button"
+                  onClick={() => onRemove(item)}
+                  aria-label={`${getItemLabel(item)} ${lang === "TR" ? "seçimini kaldır" : "remove selection"}`}
+                  style={{ width: "auto", padding: "0 8px", marginLeft: 6 }}
+                >
+                  {lang === "TR" ? "Kaldır" : "Remove"}
+                </button>
+              ) : null}
             </div>
           </div>
         ))}
@@ -2080,6 +2090,7 @@ export default function CareerOnboardingPage() {
                   items={selectedIndustries}
                   getItemLabel={(id) => getIndustryLabel(id, lang)}
                   onMove={moveRankedIndustry}
+                  onRemove={toggleIndustry}
                   lang={lang}
                   kind="industry"
                 />
@@ -2133,6 +2144,7 @@ export default function CareerOnboardingPage() {
                     return row ? (tr ? row.labelTr : row.labelEn) : id;
                   }}
                   onMove={moveRankedLookingFor}
+                  onRemove={toggleLookingFor}
                   lang={lang}
                   kind="looking"
                 />
@@ -2240,6 +2252,7 @@ export default function CareerOnboardingPage() {
                           items={goals.targetCountries || []}
                           getItemLabel={(country) => country}
                           onMove={moveRankedInternationalCountry}
+                          onRemove={toggleInternationalCountry}
                           lang={lang}
                           kind="companyIndustry"
                         />
@@ -2329,6 +2342,7 @@ export default function CareerOnboardingPage() {
                     items={goals.targetRoles}
                     getItemLabel={(role) => getRoleLabel(role, lang)}
                     onMove={moveRankedRole}
+                    onRemove={toggleTargetRole}
                     lang={lang}
                     kind="role"
                   />
@@ -2457,6 +2471,7 @@ export default function CareerOnboardingPage() {
                         return row ? (tr ? row.labelTr : row.labelEn) : id;
                       }}
                       onMove={moveRankedCompanyIndustry}
+                      onRemove={toggleCompanyIndustry}
                       lang={lang}
                       kind="companyIndustry"
                     />
