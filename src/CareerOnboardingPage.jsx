@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOutletContext, useSearchParams } from "react-router-dom";
 import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, History, Info, Pencil, PlusCircle, Sparkles, Shield } from "lucide-react";
@@ -30,7 +30,6 @@ import {
   INTERNATIONAL_COUNTRY_GROUPS,
   READINESS_PILLAR_KEYS,
   READINESS_BENCHMARKS,
-  isReadinessComplete,
   emptyReadinessAnswers,
   getReadinessPillarLabel,
   MAX_TARGET_ROLES,
@@ -58,7 +57,7 @@ import {
 import { getApiBase } from "./utils/apiBase.js";
 import { saveLocalCareerProfile } from "./utils/careerMemoryClient.js";
 import { emptyCvProfile } from "../lib/careerOnboarding/cvOptions.js";
-import { validateOnboardingForComplete } from "../lib/careerOnboarding/validateOnboarding.js";
+import { isOnboardingReadinessComplete, validateOnboardingForComplete } from "../lib/careerOnboarding/validateOnboarding.js";
 import HFCvSection from "./components/onboarding/HFCvSection.jsx";
 import HFLanguageSection from "./components/onboarding/HFLanguageSection.jsx";
 import { parseLocalStorageJson } from "./utils/safeJson.js";
@@ -682,6 +681,8 @@ function ProfileProgressPanel({
 
 export default function CareerOnboardingPage() {
   const { lang, navigate, getApiAuthHeaders, setCareerProfile, user, isUserEmailVerified, authStatus } = useOutletContext();
+  const userId = user?.id;
+  const userEmail = user?.email || "";
   const [searchParams] = useSearchParams();
   const editMode = searchParams.get("edit") === "1";
   const snapshotMode = searchParams.get("snapshot") === "1";
@@ -976,6 +977,7 @@ export default function CareerOnboardingPage() {
     });
   };
   const [dnaAnswers, setDnaAnswers] = useState({});
+  const dnaOwnerRef = useRef(userId);
   const [readinessAnswers, setReadinessAnswers] = useState(emptyReadinessAnswers);
   const [cv, setCv] = useState(emptyCvProfile);
   const [pendingCvFile, setPendingCvFile] = useState(null);
@@ -1082,7 +1084,7 @@ export default function CareerOnboardingPage() {
         return false;
       }
     }
-    if (readinessPanel === "experience" && !isReadinessComplete(readinessAnswers)) {
+    if (readinessPanel === "experience" && !isOnboardingReadinessComplete(readinessAnswers, basic)) {
       setError(
         tr
           ? "Deneyim, liderlik, İngilizce, network ve proje kanıtlarını tamamla."
@@ -1183,6 +1185,14 @@ export default function CareerOnboardingPage() {
 
   const hydrate = useCallback((draft, profile) => {
     const d = draft || profile?.onboarding_draft || {};
+    const preserveCurrentDna = dnaOwnerRef.current === userId;
+    dnaOwnerRef.current = userId;
+    // Saved answers are a baseline; the selected draft and live edits take precedence.
+    setDnaAnswers((current) => ({
+      ...(profile?.career_dna?.answers || {}),
+      ...(d.dnaAnswers || {}),
+      ...(preserveCurrentDna ? current : {}),
+    }));
     if (d.basic) {
       setBasic((b) => {
         const merged = normalizeBasicLocation({ ...b, ...d.basic }, lang, b);
@@ -1196,7 +1206,6 @@ export default function CareerOnboardingPage() {
     if (d.goals) setGoals((g) => normalizeGoalsLocation({ ...g, ...d.goals }));
     if (d.mbtiAnswers) setMbtiAnswers(d.mbtiAnswers);
     if (d.showMbti != null) setShowMbti(Boolean(d.showMbti));
-    if (d.dnaAnswers) setDnaAnswers(d.dnaAnswers);
     if (d.readinessAnswers) setReadinessAnswers((r) => ({ ...emptyReadinessAnswers(), ...r, ...d.readinessAnswers }));
     if (profile?.career_readiness?.benchmarks) {
       setReadinessAnswers((r) => ({ ...emptyReadinessAnswers(), ...r, ...profile.career_readiness.benchmarks }));
@@ -1281,28 +1290,29 @@ export default function CareerOnboardingPage() {
         })
       );
     }
-    if (profile?.career_dna?.answers) setDnaAnswers(profile.career_dna.answers);
     if (d.lastStep) setStep(Number(d.lastStep) || 1);
     if (d.ui?.showAllRoles != null) setShowAllRoles(Boolean(d.ui.showAllRoles));
     if (d.ui?.goalsPanel) setGoalsPanel(d.ui.goalsPanel);
     if (d.ui?.readinessPanel) setReadinessPanel(d.ui.readinessPanel);
     if (profile?.onboarding_completed) setProfileExists(true);
-  }, [lang]);
+  }, [lang, userId]);
 
   useEffect(() => {
     if (authStatus === "initializing") return;
-    if (!user) {
+    if (!userId) {
       navigate(`/login?next=${encodeURIComponent("/career-dna")}`);
       return;
     }
     if (!isUserEmailVerified) {
-      navigate(`/verify-email?email=${encodeURIComponent(user.email || "")}`);
+      navigate(`/verify-email?email=${encodeURIComponent(userEmail)}`);
       return;
     }
-    const local = loadOnboardingDraft(user?.id);
+    let active = true;
+    const local = loadOnboardingDraft(userId);
     (async () => {
       try {
         const data = await fetchCareerOnboarding(apiBase, getApiAuthHeaders, lang);
+        if (!active) return;
         setQuestions(data.questions || []);
         setOfflineMode(Boolean(data.offline));
         setProfileExists(Boolean(data.profile?.onboarding_completed));
@@ -1313,14 +1323,18 @@ export default function CareerOnboardingPage() {
           setStep(5);
         }
       } catch {
+        if (!active) return;
         if (local) hydrate(local, null);
         setOfflineMode(true);
       } finally {
-        setDraftHydrated(true);
-        setLoading(false);
+        if (active) {
+          setDraftHydrated(true);
+          setLoading(false);
+        }
       }
     })();
-  }, [authStatus, user, isUserEmailVerified, editMode, snapshotMode, navigate, getApiAuthHeaders, lang, hydrate, apiBase]);
+    return () => { active = false; };
+  }, [authStatus, userId, userEmail, isUserEmailVerified, editMode, snapshotMode, navigate, getApiAuthHeaders, lang, hydrate, apiBase]);
 
   useEffect(() => {
     trackActivationEvent("career_discovery_started", {
@@ -2478,7 +2492,7 @@ export default function CareerOnboardingPage() {
                           key={n}
                           type="button"
                           className={`hf-likert-btn${Number(dnaAnswers[q.id]) === n ? " hf-likert-btn--active" : ""}`}
-                          onClick={() => setDnaAnswers({ ...dnaAnswers, [q.id]: n })}
+                          onClick={() => setDnaAnswers((current) => ({ ...current, [q.id]: n }))}
                           title={q.scaleLabels?.[n - 1]}
                         >
                           {n}
@@ -2491,7 +2505,7 @@ export default function CareerOnboardingPage() {
                         <button
                           key={oi}
                           type="button"
-                          onClick={() => setDnaAnswers({ ...dnaAnswers, [q.id]: oi })}
+                          onClick={() => setDnaAnswers((current) => ({ ...current, [q.id]: oi }))}
                           style={{
                             textAlign: "left",
                             padding: "9px 10px",
