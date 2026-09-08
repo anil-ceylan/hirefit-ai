@@ -90,6 +90,7 @@ function testVercelEntryFiles() {
     "api/admin/pro-access.js",
     "api/auth/signup-status.js",
     "api/career-actions/[...rest].js",
+    "api/career-actions/[actionId]/outcome.js",
     "api/career-memory/sync.js",
     "api/career-onboarding/[...rest].js",
     "api/career-progress/record.js",
