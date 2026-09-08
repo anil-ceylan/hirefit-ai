@@ -6690,8 +6690,12 @@ function HireFitLayout() {
     fetchAnalyses(user.id);
   }, [user?.id, fetchAnalyses]);
 
+  const careerProfileUserId = user?.id;
+  const careerProfileRequestRef = useRef(0);
   const loadAuthenticatedCareerProfile = useCallback(async ({ silent = false } = {}) => {
-    if (!user?.id) return;
+    if (!careerProfileUserId) return;
+    const requestId = ++careerProfileRequestRef.current;
+    const isCurrent = () => requestId === careerProfileRequestRef.current;
     if (!silent) {
       setProfileStatus("profile_loading");
       setProfileError("");
@@ -6701,6 +6705,7 @@ function HireFitLayout() {
         allowLocalFallback: false,
         lang,
       });
+      if (!isCurrent()) return;
       if (profileState.exists === true && profileState.profile) {
         setCareerProfile(profileState.profile);
         setProfileStatus("profile_ready");
@@ -6715,19 +6720,22 @@ function HireFitLayout() {
       }
 
       try {
-        const progress = await fetchCareerProgress(HF_API_BASE, getApiAuthHeaders, lang, user);
+        const progress = await fetchCareerProgress(HF_API_BASE, getApiAuthHeaders, lang, { id: careerProfileUserId });
+        if (!isCurrent()) return;
         setCareerGrowth(progress.growth || null);
       } catch (progressError) {
+        if (!isCurrent()) return;
         console.error("[career-progress:load]", progressError?.message || progressError);
         setCareerGrowth(null);
       }
     } catch (e) {
+      if (!isCurrent()) return;
       console.error("[career-profile:load]", e?.message || e);
       setProfileStatus("profile_error");
       setProfileError(profileLoadErrorMessage(lang));
       setCareerGrowth(null);
     }
-  }, [user, getApiAuthHeaders, lang]);
+  }, [careerProfileUserId, getApiAuthHeaders, lang]);
 
   const retryCareerProfileLoad = useCallback(() => {
     return loadAuthenticatedCareerProfile({ silent: false });
@@ -6744,13 +6752,9 @@ function HireFitLayout() {
       );
       return;
     }
-    let cancelled = false;
-    (async () => {
-      await loadAuthenticatedCareerProfile({ silent: false });
-      if (cancelled) return;
-    })();
+    void loadAuthenticatedCareerProfile({ silent: false });
     return () => {
-      cancelled = true;
+      careerProfileRequestRef.current += 1;
     };
   }, [user?.id, loadAuthenticatedCareerProfile, lang]);
 
