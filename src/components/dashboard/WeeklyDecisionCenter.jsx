@@ -934,6 +934,7 @@ export default function WeeklyDecisionCenter({
   const [actionLoadError, setActionLoadError] = useState("");
   const [actionRetryNonce, setActionRetryNonce] = useState(0);
   const [actionBusy, setActionBusy] = useState(false);
+  const [actionSaveError, setActionSaveError] = useState("");
   const decision = useMemo(() => {
     const base = buildWeeklyDecision({ careerProfile, user, lang });
     return {
@@ -1052,15 +1053,17 @@ export default function WeeklyDecisionCenter({
     }
     if (completed || actionBusy) return;
     setActionBusy(true);
+    setActionSaveError("");
     try {
-      if (getApiAuthHeaders && user?.id) {
+      if (user?.id) {
+        if (!getApiAuthHeaders) throw new Error("action_save_unavailable");
         const ensured = durableAction || (await upsertRecommendedCareerAction({
           getHeaders: getApiAuthHeaders,
           action: buildDurableActionPayload(visibleDecision, user),
         }))?.action;
         if (ensured && actionStatus === "recommended") {
           const result = await startCareerAction({ getHeaders: getApiAuthHeaders, actionId: ensured.action_id });
-          if (result?.action) {
+          if (!result?.storageUnavailable && result?.success !== false && ["started", "completed"].includes(result?.action?.status)) {
             setDurableAction(result.action);
             trackActivationEvent("weekly_action_started", { route: "/dashboard", lang, actionStatus: "started", storage: "durable" });
             return;
@@ -1068,13 +1071,14 @@ export default function WeeklyDecisionCenter({
         }
         if (ensured && actionStatus === "started") {
           const result = await completeCareerAction({ getHeaders: getApiAuthHeaders, actionId: ensured.action_id });
-          if (result?.action) {
+          if (!result?.storageUnavailable && result?.success !== false && result?.action?.status === "completed") {
             setDurableAction(result.action);
             persistLocalAction("completed");
             trackActivationEvent("weekly_action_completed", { route: "/dashboard", lang, actionStatus: "completed", storage: "durable" });
             return;
           }
         }
+        throw new Error("action_save_unavailable");
       }
       const nextStatus = actionStatus === "started" ? "completed" : "started";
       persistLocalAction(nextStatus);
@@ -1082,6 +1086,10 @@ export default function WeeklyDecisionCenter({
         nextStatus === "completed" ? "weekly_action_completed" : "weekly_action_started",
         { route: "/dashboard", lang, actionStatus: nextStatus, storage: "local_fallback" }
       );
+    } catch {
+      setActionSaveError(tr
+        ? "Hamlen kaydedilemedi. Son kaydedilen durum korundu. Lütfen tekrar dene."
+        : "Your move could not be saved. Your last saved status was preserved. Please retry.");
     } finally {
       setActionBusy(false);
     }
@@ -1109,6 +1117,14 @@ export default function WeeklyDecisionCenter({
         <div className="hf-weekly-card hf-weekly-status" role="status" aria-live="polite">
           <strong>{tr ? "Haftalık hamlen hazırlanıyor" : "Preparing your weekly move"}</strong>
           <p>{tr ? "Mevcut profilinden bu haftanın aksiyonunu getiriyoruz." : "We are loading this week's action from your current profile."}</p>
+        </div>
+      ) : null}
+      {actionSaveError ? (
+        <div className="hf-weekly-card hf-weekly-status hf-weekly-status--error" role="alert">
+          <p>{actionSaveError}</p>
+          <button type="button" className="hf-weekly-retry" disabled={actionBusy} onClick={handleActionButton}>
+            {tr ? "Tekrar Dene" : "Retry"}
+          </button>
         </div>
       ) : null}
       {decision.profileComplete && actionLoadError ? (
