@@ -8,8 +8,10 @@ import { parseLocalStorageJson } from "./safeJson.js";
 
 const LOCAL_KEY = "hirefit-career-profile-v1";
 
-export function loadLocalCareerProfile() {
-  return parseLocalStorageJson(localStorage.getItem(LOCAL_KEY), null, { label: "career-profile-local" });
+export function loadLocalCareerProfile(userId) {
+  if (!userId) return null;
+  const profile = parseLocalStorageJson(`${LOCAL_KEY}:${userId}`, null);
+  return profile?.user_id === userId ? profile : null;
 }
 
 export function saveLocalCareerProfile(profile) {
@@ -17,7 +19,7 @@ export function saveLocalCareerProfile(profile) {
     localStorage.removeItem(LOCAL_KEY);
     return;
   }
-  localStorage.setItem(LOCAL_KEY, JSON.stringify(profile));
+  if (profile.user_id) localStorage.setItem(`${LOCAL_KEY}:${profile.user_id}`, JSON.stringify(profile));
 }
 
 export async function fetchCareerProfileStatus(apiBase, getHeaders, { allowLocalFallback = true, lang = "TR" } = {}) {

@@ -25,7 +25,8 @@ async function parseJsonSafe(res) {
 export async function fetchCareerOnboarding(apiBase, getHeaders, lang) {
   const langParam = lang === "TR" ? "tr" : "en";
   const url = apiUrl(`/api/career-onboarding?lang=${langParam}`);
-  const localProfile = loadLocalCareerProfile();
+  // Authenticated restoration must be confirmed by the server, never by cache.
+  const localProfile = null;
   try {
     const res = await fetch(url, {
       headers: await getHeaders({ requireSession: true }),
@@ -41,7 +42,8 @@ export async function fetchCareerOnboarding(apiBase, getHeaders, lang) {
         error: friendlyApiMessage(res.status, body?.error, lang),
       };
     }
-    if (body?.profileFetchFailed || body?.exists == null) {
+    if (body?.profileFetchFailed || body?.authenticated === false || body?.success === false ||
+        body?.exists == null || (body.exists === true && !body.profile)) {
       return {
         profile: localProfile,
         questions: body.questions || getCareerDnaQuestions(lang),

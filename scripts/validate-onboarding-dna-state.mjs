@@ -1,6 +1,7 @@
 import { strict as assert } from "node:assert";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
+import { parseLocalStorageJson } from "../src/utils/safeJson.js";
 import { getCareerDnaQuestions } from "../lib/careerOnboarding/careerDna.js";
 import { emptyReadinessAnswers } from "../lib/careerOnboarding/readinessBenchmarks.js";
 import { EXPERIENCE_SIGNAL_OPTIONS, LEADERSHIP_SIGNAL_OPTIONS, normalizeSignalSelection } from "../lib/careerOnboarding/careerSignalSchema.js";
@@ -16,6 +17,20 @@ function between(start, end) {
   return source.slice(from, to);
 }
 const hydrateCode = between("  const hydrate = useCallback(", "\n\n  useEffect(");
+const loadDraftCode = between("function loadOnboardingDraft", "function getDraftTimestamp");
+const priorStorage = globalThis.localStorage;
+try {
+  let draft = { userId: "owner", dnaAnswers: { likert_1: 4 } };
+  globalThis.localStorage = { getItem: () => JSON.stringify(draft) };
+  const load = runInNewContext(`${loadDraftCode};loadOnboardingDraft`, { parseLocalStorageJson, DRAFT_KEY: "draft", LEGACY_DRAFT_KEYS: [] });
+  assert.equal(load("owner").dnaAnswers.likert_1, 4);
+  assert.equal(load("other"), null);
+  assert.equal(load(null), null);
+  draft = { dnaAnswers: { likert_1: 4 } };
+  assert.equal(load("owner"), null, "unowned legacy draft must not cross accounts");
+} finally {
+  if (priorStorage === undefined) delete globalThis.localStorage; else globalThis.localStorage = priorStorage;
+}
 const effectCode = between("  useEffect(() => {\n    if (authStatus ===", "\n\n  useEffect(");
 const persistenceCode = between("  const persistDraft = async", "\n\n  useEffect(");
 const localSaveCode = between("  useEffect(() => {\n    if (loading || !draftHydrated || step >= 5)", "\n\n  useEffect(");
@@ -42,7 +57,7 @@ function page({ userId = "dna-test-user", storedDraft = null } = {}) {
     dnaAnswers: {}, dnaOwnerRef: { current: userId },
     basic: {}, goals: {}, readinessAnswers: {}, cv: {}, mbtiAnswers: {},
     showMbti: false, showAllRoles: false, goalsPanel: "target", readinessPanel: "evidence",
-    step: 3, loading: false, draftHydrated: true, saving: false,
+    step: 3, loading: false, draftHydrated: true, saving: false, profileLoadRetry: 0,
     editMode: false, snapshotMode: false, apiBase: "", DRAFT_KEY: "test-draft", DRAFT_SCHEMA_VERSION: 10,
     EXPERIENCE_SIGNAL_OPTIONS, LEADERSHIP_SIGNAL_OPTIONS, normalizeSignalSelection,
     emptyReadinessAnswers, getCareerDnaQuestions,
@@ -66,7 +81,7 @@ function page({ userId = "dna-test-user", storedDraft = null } = {}) {
       return { offline: false };
     },
   };
-  for (const key of ["dnaAnswers", "basic", "goals", "readinessAnswers", "cv", "mbtiAnswers", "showMbti", "step", "showAllRoles", "goalsPanel", "readinessPanel", "profileExists", "questions", "offlineMode", "summary", "draftHydrated", "loading", "saving", "error"]) {
+  for (const key of ["dnaAnswers", "basic", "goals", "readinessAnswers", "cv", "mbtiAnswers", "showMbti", "step", "showAllRoles", "goalsPanel", "readinessPanel", "profileExists", "questions", "offlineMode", "summary", "draftHydrated", "loading", "saving", "error", "profileLoadError"]) {
     context[`set${key[0].toUpperCase()}${key.slice(1)}`] = (update) => {
       context[key] = typeof update === "function" ? update(context[key]) : update;
     };
@@ -172,7 +187,7 @@ inFlight.fetchCareerOnboarding = () => new Promise((resolve) => { finishRequest 
 runInNewContext(effectCode, inFlight);
 const stopRequest = inFlight.effect();
 for (const q of questions) click(inFlight, q, answers[q.id]);
-finishRequest({ profile: { career_dna: { answers: {} } }, questions });
+finishRequest({ exists: true, profile: { career_dna: { answers: {} } }, questions });
 await new Promise(setImmediate);
 assertSelected(inFlight, answers, "active slow hydration cannot replace live clicks");
 stopRequest();
@@ -198,4 +213,31 @@ for (const rejectRequest of [false, true]) {
 }
 
 assert.deepEqual(getCareerDnaQuestions("TR").map((q) => q.id), getCareerDnaQuestions("EN").map((q) => q.id), "question IDs remain stable across languages");
+// Slow/failed reads never enable draft writes or expose the onboarding form.
+for (const failure of [{ offline: true, exists: null }, { exists: null }, new Error("unauthorized")]) {
+  const failed = page();
+  failed.fetchCareerOnboarding = async () => { if (failure instanceof Error) throw failure; return failure; };
+  runInNewContext(effectCode, failed);
+  failed.effect();
+  assert.equal(failed.loading, true);
+  assert.equal(failed.draftHydrated, false);
+  await new Promise(setImmediate);
+  assert.equal(failed.profileLoadError, true);
+  await failed.persistDraft(2);
+  assert.equal(failed.saved, undefined);
+}
+for (const profile of [null, { onboarding_completed: false, onboarding_draft: { lastStep: 3, dnaAnswers: answers } }, { onboarding_completed: true, career_dna: { answers } }]) {
+  const fresh = page();
+  fresh.step = 1;
+  fresh.dnaAnswers = {};
+  fresh.fetchCareerOnboarding = async () => ({ exists: Boolean(profile), profile });
+  runInNewContext(effectCode, fresh);
+  fresh.effect();
+  await new Promise(setImmediate);
+  assert.equal(fresh.profileLoadError, false);
+  assert.equal(fresh.draftHydrated, true);
+  assert.equal(fresh.step, profile?.onboarding_completed ? 5 : profile ? 3 : 1);
+  if (profile) assertSelected(fresh, answers, "fresh server-only restoration");
+}
+assert.match(source, /<CareerOnboardingPage key=\{user\?\.id \|\| "signed-out"\}/, "account changes remount all form state");
 process.stdout.write("Career DNA state: navigation, draft restoration, live-edit precedence, batching, account isolation and cancelled hydration passed.\n");

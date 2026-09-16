@@ -101,11 +101,12 @@ function waitForGenerationStep(ms = GENERATION_STEP_MS) {
 }
 
 function loadOnboardingDraft(userId) {
-  const primary = parseLocalStorageJson(localStorage.getItem(DRAFT_KEY), null, { label: "onboarding-draft-v9" });
-  if (primary && (!primary.userId || !userId || primary.userId === userId)) return primary;
+  if (!userId) return null;
+  const primary = parseLocalStorageJson(DRAFT_KEY, null);
+  if (primary?.userId === userId) return primary;
   for (const key of LEGACY_DRAFT_KEYS) {
-    const legacy = parseLocalStorageJson(localStorage.getItem(key), null, { label: key });
-    if (legacy && (!legacy.userId || !userId || legacy.userId === userId)) return legacy;
+    const legacy = parseLocalStorageJson(key, null);
+    if (legacy?.userId === userId) return legacy;
   }
   return null;
 }
@@ -689,7 +690,12 @@ function ProfileProgressPanel({
   );
 }
 
-export default function CareerOnboardingPage() {
+export default function CareerOnboardingAccountBoundary() {
+  const { user } = useOutletContext();
+  return <CareerOnboardingPage key={user?.id || "signed-out"} />;
+}
+
+function CareerOnboardingPage() {
   const { lang, navigate, getApiAuthHeaders, setCareerProfile, user, isUserEmailVerified, authStatus } = useOutletContext();
   const userId = user?.id;
   const userEmail = user?.email || "";
@@ -702,6 +708,8 @@ export default function CareerOnboardingPage() {
 
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [profileLoadError, setProfileLoadError] = useState(false);
+  const [profileLoadRetry, setProfileLoadRetry] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [offlineMode, setOfflineMode] = useState(false);
@@ -1319,33 +1327,38 @@ export default function CareerOnboardingPage() {
       return;
     }
     let active = true;
+    setLoading(true);
+    setDraftHydrated(false);
+    setProfileLoadError(false);
     const local = loadOnboardingDraft(userId);
     (async () => {
       try {
         const data = await fetchCareerOnboarding(apiBase, getApiAuthHeaders, lang);
         if (!active) return;
+        if (data.offline || data.exists == null ||
+            (data.profile?.user_id && data.profile.user_id !== userId)) throw new Error("profile_load_failed");
         setQuestions(data.questions || []);
         setOfflineMode(Boolean(data.offline));
         setProfileExists(Boolean(data.profile?.onboarding_completed));
         const hydrationDraft = selectHydrationDraft({ localDraft: local, profile: data.profile, editMode });
         hydrate(hydrationDraft, data.profile);
+        setDraftHydrated(true);
         if (data.profile?.onboarding_completed && (snapshotMode || !editMode)) {
           setSummary(data.profile);
           setStep(5);
         }
       } catch {
         if (!active) return;
-        if (local) hydrate(local, null);
+        setProfileLoadError(true);
         setOfflineMode(true);
       } finally {
         if (active) {
-          setDraftHydrated(true);
           setLoading(false);
         }
       }
     })();
     return () => { active = false; };
-  }, [authStatus, userId, userEmail, isUserEmailVerified, editMode, snapshotMode, navigate, getApiAuthHeaders, lang, hydrate, apiBase]);
+  }, [authStatus, userId, userEmail, isUserEmailVerified, editMode, snapshotMode, navigate, getApiAuthHeaders, lang, hydrate, apiBase, profileLoadRetry]);
 
   useEffect(() => {
     trackActivationEvent("career_discovery_started", {
@@ -1762,7 +1775,18 @@ export default function CareerOnboardingPage() {
     }
   };
 
-  if (loading) {
+  if (profileLoadError) {
+    return (
+      <div className="hf-onboarding-page hf-page" role="alert">
+        <p>{tr ? "Kariyer profilin yüklenemedi. Kaydedilmiş profilini korumak için lütfen tekrar dene." : "Your career profile could not be loaded. Please retry to safely restore your saved profile."}</p>
+        <button type="button" className="hf-btn-primary" onClick={() => setProfileLoadRetry((n) => n + 1)}>
+          {tr ? "Tekrar Dene" : "Retry"}
+        </button>
+      </div>
+    );
+  }
+
+  if (loading || !draftHydrated) {
     const hasLocalDraft =
       typeof localStorage !== "undefined" &&
       Boolean(localStorage.getItem(DRAFT_KEY) || LEGACY_DRAFT_KEYS.some((key) => localStorage.getItem(key)));
