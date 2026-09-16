@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { normalizeCaseInput, validateGuidanceOutput, validateOutcome } from "../lib/careerCompanion/validation.js";
+const input = { title: "Promotion discussion", what_happened: "I have taken on team ownership.", desired_outcome: "Discuss promotion and compensation.", role_context: "Senior analyst, 2 years in role.", achievements: "Reduced reporting time by 30%.", urgency: "medium", manager_context: "Review cycle next month." };
+assert.equal(normalizeCaseInput(input).ok, true);
+assert.equal(normalizeCaseInput({ ...input, what_happened: "" }).ok, false);
+assert.equal(validateGuidanceOutput({ situation_summary: "s", known_facts: ["f"], assumptions_unknowns: ["u"], recommended_next_step: "n", conversation_plan: ["p"], suggested_wording: "w", evidence_checklist: ["e"], decision_criteria: ["d"], risks_tradeoffs: ["r"] }).ok, true);
+assert.equal(validateGuidanceOutput({}).ok, false);
+assert.equal(validateOutcome({ manager_response: "Manager agreed to review.", outcome_date: "2026-09-16" }).ok, true);
+assert.equal(validateOutcome({ manager_response: "", outcome_date: "bad" }).ok, false);
+process.stdout.write("Career Companion focused validation passed.\n");

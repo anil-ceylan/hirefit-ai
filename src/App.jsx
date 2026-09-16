@@ -8755,6 +8755,11 @@ export function DashboardPage() {
         navigate={navigate}
         getApiAuthHeaders={getApiAuthHeaders}
       />
+      <div className="hf-card" style={{ padding: 20, marginTop: 20 }}>
+        <h3>{lang === "TR" ? "Career Companion" : "Career Companion"}</h3>
+        <p>{lang === "TR" ? "Terfi veya zam konuşmanı planla." : "Plan your promotion or raise conversation."}</p>
+        <button className="hf-btn-primary" onClick={() => navigate("/career-companion")}>{lang === "TR" ? "Terfi / Zam için başla" : "Start Promotion / Raise"}</button>
+      </div>
 
       <details className="hf-card hf-dashboard-secondary">
         <summary>{lang === "TR" ? "Geçmiş ve detaylar" : "History and details"}</summary>

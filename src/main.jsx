@@ -18,6 +18,7 @@ import HireFitLayout, {
 import CareerOnboardingPage from './CareerOnboardingPage.jsx'
 import VerifyEmailPage from './VerifyEmailPage.jsx'
 import ReportPage from './ReportPage.jsx'
+import CareerCompanionPage from './CareerCompanionPage.jsx'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 
 createRoot(document.getElementById('root')).render(
@@ -31,6 +32,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="app" element={<AnalyzerPage />} />
             <Route path="settings" element={<AccountSettingsPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="career-companion" element={<CareerCompanionPage />} />
             <Route path="onboarding" element={<CareerOnboardingPage />} />
             <Route path="career-dna" element={<CareerOnboardingPage />} />
             <Route path="login" element={<LoginPage />} />

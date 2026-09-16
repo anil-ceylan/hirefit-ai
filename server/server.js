@@ -25,6 +25,7 @@ import { registerOnboardingRoutes } from "../lib/careerOnboarding/onboardingRout
 import { registerCareerIntelligenceRoutes } from "../lib/careerIntelligence/routes.js";
 import { registerCareerActionLoopRoutes } from "../lib/careerActionLoop/index.js";
 import { registerAccountRoutes } from "../lib/account/accountRoutes.js";
+import { registerCareerCompanionRoutes } from "../lib/careerCompanion/routes.js";
 import { loadCareerProfile } from "../lib/careerMemory/persistence.js";
 
 process.on("uncaughtException", (err) => {
@@ -708,6 +709,7 @@ registerOnboardingRoutes(app);
 registerCareerIntelligenceRoutes(app);
 registerCareerActionLoopRoutes(app);
 registerAccountRoutes(app);
+registerCareerCompanionRoutes(app);
 
 const PORT = Number(process.env.PORT) || 3000;
 
