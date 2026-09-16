@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/api/career-actions/:actionId/outcome", "destination": "/api/career-actions/outcome?outcomeActionId=:actionId" },
     { "source": "/health", "destination": "/api/health" },
     { "source": "/optimize", "destination": "/api/optimize" },
     { "source": "/roadmap", "destination": "/api/roadmap" },

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import "./validate-vercel-route-conflicts.mjs";
 
 import accountAvatarHandler from "../api/account/avatar.js";
 import careerActionsHandler from "../api/career-actions/[...rest].js";
@@ -90,7 +91,6 @@ function testVercelEntryFiles() {
     "api/admin/pro-access.js",
     "api/auth/signup-status.js",
     "api/career-actions/[...rest].js",
-    "api/career-actions/[actionId]/outcome.js",
     "api/career-memory/sync.js",
     "api/career-onboarding/[...rest].js",
     "api/career-progress/record.js",

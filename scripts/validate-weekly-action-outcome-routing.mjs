@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { registerHooks } from "node:module";
-import { readdirSync } from "node:fs";
+import { registerHooks, createRequire } from "node:module";
+import { readdirSync, readFileSync } from "node:fs";
 
 const root = new URL("../", import.meta.url);
 const routerUrl = new URL("lib/vercelApi/careerApiRouter.js", root).href;
@@ -27,7 +27,7 @@ const hooks = registerHooks({ resolve(specifier, context, next) {
   return next(specifier, context);
 } });
 try {
-  const { default: handler } = await import("../api/career-actions/[actionId]/outcome.js");
+  const { default: handler } = await import("../api/career-actions/[...rest].js");
   const { default: existing } = await import("../api/career-actions/[...rest].js");
   const payload = { outcome_type: "COMPLETED_WITH_RESULT", summary: "Closed Beta test sonucu", measurable_result: "", proof_reference: "", source: "weekly_decision_center" };
   async function invoke(entry, method, url, query = {}, authorized = true) {
@@ -40,14 +40,30 @@ try {
     "063381ae-2184-4814-9000-eca6f9b89c9e:2026-W37:bir-ürün-strateji-kararını-problem-seçenekler-karar-sonuç-formatında-tek-ö",
     "test:2026-W37:literal-%3A-İstanbul",
   ];
+  const rewrite = JSON.parse(readFileSync("vercel.json", "utf8")).rewrites.find((r) => r.source === "/api/career-actions/:actionId/outcome");
+  assert.equal(rewrite?.destination, "/api/career-actions/outcome?outcomeActionId=:actionId");
+  let compiledRewrite;
+  if (process.env.HIREFIT_ROUTE_UTILS) {
+    const { getTransformedRoutes } = createRequire(import.meta.url)(process.env.HIREFIT_ROUTE_UTILS);
+    const compiled = getTransformedRoutes(JSON.parse(readFileSync("vercel.json", "utf8")));
+    assert.equal(compiled.error, null);
+    compiledRewrite = compiled.routes.find((r) => r.dest?.includes("outcomeActionId="));
+    assert.ok(compiledRewrite);
+  }
   for (const id of ids) {
     for (const method of ["POST", "GET"]) {
-      for (const url of [`/api/career-actions/${encodeURIComponent(id)}/outcome`, "/api/career-actions/[actionId]/outcome"]) {
+      const publicPath = `/api/career-actions/${encodeURIComponent(id)}/outcome`;
+      const destination = compiledRewrite
+        ? compiledRewrite.dest.replace(/\$(\d+)/g, (_, n) => publicPath.match(new RegExp(compiledRewrite.src))[Number(n)])
+        : rewrite.destination.replace(":actionId", encodeURIComponent(id));
+      const rewritten = new URL(destination, "https://test.invalid");
+      for (const url of [`/api/career-actions/${encodeURIComponent(id)}/outcome`, rewritten.pathname, "/api/career-actions/[...rest]"]) {
         calls.length = 0;
-        const denied = await invoke(handler, method, url, { actionId: id }, false);
+        const query = { ...Object.fromEntries(rewritten.searchParams), rest: "outcome" };
+        const denied = await invoke(handler, method, url, query, false);
         assert.equal(denied.statusCode, 401);
         assert.equal(calls.length, 0);
-        const res = await invoke(handler, method, url, { actionId: id });
+        const res = await invoke(handler, method, url, query);
         assert.equal(res.statusCode, 200);
         assert.equal(res.json.success, true);
         assert.equal(calls.length, 1);
@@ -65,9 +81,9 @@ try {
     assert.equal(calls[0].name, name);
   }
   const functions = readdirSync("api", { recursive: true }).filter((file) => file.endsWith(".js"));
-  assert.equal(functions.length, 11);
+  assert.equal(functions.length, 10);
   assert.ok(functions.length <= 12);
-  process.stdout.write("Outcome routing: GET/POST, unauthorized 401, authenticated persistence dispatch, exact Unicode/colon/percent decoding, existing routes and 11-function budget passed.\n");
+  process.stdout.write("Outcome routing: rewrite GET/POST, unauthorized 401, authenticated persistence dispatch, exact Unicode/colon/percent decoding, existing routes and 10-function budget passed.\n");
 } finally {
   hooks.deregister();
   if (previous === undefined) delete globalThis[key]; else globalThis[key] = previous;
