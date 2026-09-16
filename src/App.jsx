@@ -5140,7 +5140,7 @@ function NavBar({
         </div>
 
         <div className="hf-nav-right-cluster">
-          {user && careerScore.score != null ? (
+          {user && profileStatus === "profile_ready" && careerScore.score != null ? (
           <button
               type="button"
               className="hf-nav-career-score"
