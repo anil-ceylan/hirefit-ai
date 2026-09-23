@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { createCareerCompanionCase, generateCareerCompanionGuidance, normalizeCareerCompanionCase, requestCareerCompanion } from "../src/utils/careerCompanionClient.js";
+import { parseGuidancePayload } from "../lib/careerCompanion/aiGuidance.js";
 import { readFile } from "node:fs/promises";
 
 const originalFetch = globalThis.fetch;
@@ -22,6 +23,8 @@ try {
   assert.match(calls[1].url, /\/cases\/case-1\/guidance$/);
   assert.deepEqual(JSON.parse(calls[1].body), { lang: "TR" });
   assert.deepEqual(normalizeCareerCompanionCase({ ...caseRecord, guidance: JSON.stringify(guidedRecord.guidance) }).guidance, guidedRecord.guidance);
+  assert.deepEqual(parseGuidancePayload("```json\n{\"guidance\":{\"situation_summary\":\"ok\"}}\n```"), { situation_summary: "ok" });
+  assert.equal(parseGuidancePayload("{\"situation_summary\":\"unterminated"), null);
 
   globalThis.fetch = (_url, options) => new Promise((_resolve, reject) => {
     options.signal.addEventListener("abort", () => reject(Object.assign(new Error("aborted"), { name: "AbortError" })), { once: true });
