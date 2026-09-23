@@ -6,6 +6,8 @@ const migration = fs.readFileSync(new URL("../supabase/migrations/20260916100000
 
 assert.match(persistence, /select\("id, user_id"\).*eq\("id", value\.id\)/s);
 assert.match(persistence, /if \(!existing \|\| existing\.user_id !== userId\) throw ownershipError/);
+assert.match(persistence, /\.update\(updates\)\.eq\("id", value\.id\)\.eq\("user_id", userId\)/);
+assert.match(persistence, /value\[field\] !== null && value\[field\] !== undefined/);
 assert.match(persistence, /select\("id, user_id"\).*eq\("id", caseId\)\.eq\("user_id", userId\)/s);
 assert.match(persistence, /if \(!ownedCase\) throw ownershipError/);
 assert.match(persistence, /onConflict: "case_id"/);

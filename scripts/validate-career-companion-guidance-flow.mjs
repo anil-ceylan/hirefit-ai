@@ -32,10 +32,14 @@ try {
   await assert.rejects(() => requestCareerCompanion("/api/career-companion/cases/case-1/guidance", headers, { method: "POST" }, { timeoutMs: 10 }), (error) => error.code === "CAREER_COMPANION_TIMEOUT" && error.message.includes("Kaydın korunuyor"));
 
   const page = await readFile(new URL("../src/CareerCompanionPage.jsx", import.meta.url), "utf8");
+  const persistence = await readFile(new URL("../lib/careerCompanion/persistence.js", import.meta.url), "utf8");
   assert.match(page, /if \(busy\) return/);
   assert.match(page, /replaceCase\(data\.case\)/);
   assert.match(page, /selected\?\.id && !selected\.guidance/);
   assert.match(page, /finally \{ setBusy\(false\); \}/);
+  assert.match(persistence, /\.update\(updates\)\.eq\("id", value\.id\)\.eq\("user_id", userId\)/);
+  assert.match(persistence, /value\[field\] !== null && value\[field\] !== undefined/);
+  assert.match(persistence, /onConflict: "id"/);
   process.stdout.write("Career Companion guidance-flow validation passed.\n");
 } finally {
   globalThis.fetch = originalFetch;
