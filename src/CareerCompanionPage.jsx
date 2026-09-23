@@ -19,6 +19,7 @@ const outcomeFields = [
   { key: "outcome_date", tr: "Sonuç tarihi", en: "Outcome date", required: false, kind: "input", type: "date", placeholderTr: "", placeholderEn: "" },
 ];
 function listValue(value) { return Array.isArray(value) ? value : [value]; }
+function displayStatus(status) { return { draft: "Taslak", guided: "Rehberlik hazır", outcome_recorded: "Sonuç kaydedildi" }[status] || status || "—"; }
 function Field({ definition, value, onChange, tr, error }) {
   const id = "companion-" + definition.key;
   const label = tr ? definition.tr : definition.en;
@@ -64,6 +65,6 @@ export default function CareerCompanionPage() {
       </form>
     </section>
     {selected?.guidance ? <section className="hf-card hf-companion-card hf-companion-guidance"><div className="hf-companion-section-heading"><div><p className="hf-companion-eyebrow">{tr ? "Kişisel rehberlik" : "Personal guidance"}</p><h2>{tr ? "Bir sonraki konuşmana hazırlan" : "Prepare for your next conversation"}</h2></div></div>{Object.entries(selected.guidance).map(([key, value]) => <div key={key} className="hf-companion-guidance-block"><h3>{key.replaceAll("_", " ")}</h3><ul>{listValue(value).map((item, index) => <li key={key + "-" + index}>{item}</li>)}</ul></div>)}<form onSubmit={record} noValidate className="hf-companion-form hf-companion-outcome-form"><h2>{tr ? "Yönetici yanıtını kaydet" : "Record manager response"}</h2>{outcomeFields.map((field) => <Field key={field.key} definition={field} value={outcome[field.key]} onChange={updateOutcome(field.key)} tr={tr} error={outcomeErrors[field.key]} />)}<div className="hf-companion-form-actions"><button type="submit" disabled={busy} className="hf-btn-primary">{tr ? "Sonucu kaydet" : "Save outcome"}</button></div></form></section> : null}
-    <section className="hf-companion-saved"><div className="hf-companion-section-heading"><h2>{tr ? "Kayıtlı vakalar" : "Saved cases"}</h2></div>{cases.length ? <div className="hf-companion-case-list">{cases.map((item) => <button type="button" className="hf-companion-case" key={item.id} onClick={() => reopen(item)}><span>{item.title || (tr ? "Terfi / Zam vakası" : "Promotion / Raise case")}</span><span>{item.status}</span></button>)}</div> : <p className="hf-companion-empty">{tr ? "Henüz kayıt yok. İlk görüşmeni yukarıdaki formdan planla." : "No saved cases yet. Plan your first conversation above."}</p>}</section>
+    <section className="hf-companion-saved"><div className="hf-companion-section-heading"><h2>{tr ? "Kayıtlı vakalar" : "Saved cases"}</h2></div>{cases.length ? <div className="hf-companion-case-list">{cases.map((item) => <button type="button" className="hf-companion-case" key={item.id} onClick={() => reopen(item)}><span>{item.title || (tr ? "Terfi / Zam vakası" : "Promotion / Raise case")}</span><span>{displayStatus(item.status)}</span></button>)}</div> : <p className="hf-companion-empty">{tr ? "Henüz kayıt yok. İlk görüşmeni yukarıdaki formdan planla." : "No saved cases yet. Plan your first conversation above."}</p>}</section>
   </div></main>;
 }

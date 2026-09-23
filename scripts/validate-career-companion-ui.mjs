@@ -9,6 +9,12 @@ const { chromium } = require(process.env.HIREFIT_PLAYWRIGHT || "playwright");
 const base = "http://127.0.0.1:5173";
 const phase = process.env.HIREFIT_UI_PHASE || "after";
 const output = resolve(process.env.HIREFIT_UI_OUTPUT || "test-results/companion-ui");
+const pageSource = readFileSync(resolve("src/CareerCompanionPage.jsx"), "utf8");
+assert.match(pageSource, /function displayStatus\(status\)/);
+assert.match(pageSource, /draft: "Taslak"/);
+assert.match(pageSource, /guided: "Rehberlik hazır"/);
+assert.match(pageSource, /outcome_recorded: "Sonuç kaydedildi"/);
+assert.doesNotMatch(pageSource, /<span>\{item\.status\}<\/span>/);
 mkdirSync(output, { recursive: true });
 // Read only the public project URL to seed an isolated browser's synthetic session.
 const env = [".env", ".env.local"].map(file => { try { return readFileSync(file, "utf8"); } catch { return ""; } }).join("\n");
