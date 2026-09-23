@@ -1,5 +1,9 @@
 {
   "rewrites": [
+    { "source": "/api/career-companion/cases", "destination": "/api/career-companion?companionEndpoint=cases" },
+    { "source": "/api/career-companion/cases/:id/guidance", "destination": "/api/career-companion?companionEndpoint=guidance&companionCaseId=:id" },
+    { "source": "/api/career-companion/cases/:id/outcome", "destination": "/api/career-companion?companionEndpoint=outcome&companionCaseId=:id" },
+    { "source": "/api/career-companion/cases/:id", "destination": "/api/career-companion?companionEndpoint=detail&companionCaseId=:id" },
     { "source": "/api/career-actions/:actionId/outcome", "destination": "/api/career-actions/outcome?outcomeActionId=:actionId" },
     { "source": "/health", "destination": "/api/health" },
     { "source": "/optimize", "destination": "/api/optimize" },
