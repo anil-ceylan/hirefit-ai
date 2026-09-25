@@ -40,6 +40,7 @@ try {
   assert.match(persistence, /\.update\(updates\)\.eq\("id", value\.id\)\.eq\("user_id", userId\)/);
   assert.match(persistence, /value\[field\] !== null && value\[field\] !== undefined/);
   assert.match(persistence, /onConflict: "id"/);
+  assert.match(persistence, /export async function deleteCase/);
   process.stdout.write("Career Companion guidance-flow validation passed.\n");
 } finally {
   globalThis.fetch = originalFetch;

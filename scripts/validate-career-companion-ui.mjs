@@ -15,6 +15,9 @@ assert.match(pageSource, /draft: "Taslak"/);
 assert.match(pageSource, /guided: "Rehberlik hazır"/);
 assert.match(pageSource, /outcome_recorded: "Sonuç kaydedildi"/);
 assert.doesNotMatch(pageSource, /<span>\{item\.status\}<\/span>/);
+assert.match(pageSource, /item\.status === "draft"/);
+assert.match(pageSource, /Bu taslağı kaldırmak istediğine emin misin\?/);
+assert.match(pageSource, /deleteCareerCompanionCase/);
 mkdirSync(output, { recursive: true });
 // Read only the public project URL to seed an isolated browser's synthetic session.
 const env = [".env", ".env.local"].map(file => { try { return readFileSync(file, "utf8"); } catch { return ""; } }).join("\n");
