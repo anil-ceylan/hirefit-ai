@@ -48,6 +48,7 @@ import {
 import CareerIntelligenceDashboard from "./components/CareerIntelligenceDashboard.jsx";
 import RecentAnalysesAccordion from "./components/RecentAnalysesAccordion.jsx";
 import WeeklyDecisionCenter from "./components/dashboard/WeeklyDecisionCenter.jsx";
+import OpportunityRadarPreview from "./components/opportunity-radar/OpportunityRadarPreview.jsx";
 import {
   AccountAvatar,
   ProfilePhotoControl,
@@ -8755,6 +8756,7 @@ export function DashboardPage() {
         navigate={navigate}
         getApiAuthHeaders={getApiAuthHeaders}
       />
+      {profileStatus === "profile_ready" && <OpportunityRadarPreview key={`${user.id}:${lang}`} lang={lang} getApiAuthHeaders={getApiAuthHeaders} />}
       <div className="hf-card" style={{ padding: 20, marginTop: 20 }}>
         <h3>{lang === "TR" ? "Career Companion" : "Career Companion"}</h3>
         <p>{lang === "TR" ? "Terfi veya zam konuşmanı planla." : "Plan your promotion or raise conversation."}</p>

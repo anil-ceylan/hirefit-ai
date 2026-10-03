@@ -52,7 +52,7 @@ const root = new URL("../", import.meta.url);
 const moduleSource = names => names.map(name => `export const ${name} = (...args) => globalThis.${key}('${name}', ...args);`).join("\n");
 const mocks = new Map([
   ["lib/auth/verifySupabaseJwt.js", "export async function getUserFromRequest(req) { return req.headers.authorization === 'Bearer fixture' ? {ok:true,user:{id:'owner'}} : {ok:false,status:401,error:'Missing bearer token'}; }"],
-  ["lib/careerCompanion/persistence.js", moduleSource(["getCase", "listCases", "saveCase", "saveOutcome"])],
+  ["lib/careerCompanion/persistence.js", moduleSource(["deleteCase", "getCase", "listCases", "saveCase", "saveOutcome"])],
   ["lib/careerMemory/persistence.js", moduleSource(["loadCareerProfile", "saveCareerProfile", "getServiceClient"])],
   ["lib/careerCompanion/aiGuidance.js", moduleSource(["generatePromotionRaiseGuidance"]) + "export const PROMOTION_RAISE_PROMPT_VERSION='fixture';"],
   ["lib/careerActionLoop/persistence.js", moduleSource(["completeCareerAction", "getCareerActionOutcome", "getCurrentCareerAction", "startCareerAction", "upsertCareerActionOutcome", "upsertRecommendedCareerAction"])],

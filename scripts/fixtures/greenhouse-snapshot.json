@@ -1,0 +1,21 @@
+{
+  "meta": { "total": 2 },
+  "jobs": [
+    {
+      "id": 101,
+      "internal_job_id": 1001,
+      "title": "TEST FIXTURE — Data Internship",
+      "absolute_url": "https://jobs.fixture.invalid/jobs/101?utm_source=fixture",
+      "content": "<p>Development example only. <strong>SQL</strong> practice.</p>",
+      "location": { "name": "Istanbul, Turkey" },
+      "metadata": [{ "name": "Employment Type", "value": "Internship" }, { "name": "Workplace", "value": "Hybrid" }]
+    },
+    {
+      "id": 102,
+      "internal_job_id": null,
+      "title": "TEST FIXTURE — General Interest",
+      "absolute_url": "https://jobs.fixture.invalid/jobs/102",
+      "content": "Not a concrete vacancy."
+    }
+  ]
+}

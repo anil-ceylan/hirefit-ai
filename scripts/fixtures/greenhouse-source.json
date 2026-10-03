@@ -1,0 +1,22 @@
+{
+  "key": "greenhouse:development-fixture",
+  "adapter": "greenhouse",
+  "employer": "Development Fixture Employer",
+  "board": "development-fixture",
+  "permittedHosts": ["boards-api.greenhouse.io", "jobs.fixture.invalid"],
+  "enabled": false,
+  "developmentOnly": true,
+  "permission": {
+    "technicalFetch": { "status": "unreviewed", "notes": "Synthetic test input only" },
+    "republication": { "status": "denied", "notes": "No live employer permission" },
+    "descriptionAllowed": true
+  },
+  "attribution": "Development fixture, not a live opportunity",
+  "retentionNotes": "Test data only; never import into a live catalog",
+  "subtypeField": "Employment Type",
+  "workModeField": "Workplace",
+  "subtypeMappings": { "Full-time": "full-time", "Part-time": "part-time", "Internship": "internship", "Freelance": "freelance" },
+  "locationMappings": { "Istanbul, Turkey": { "country": "TR", "city": "İstanbul" } },
+  "freshnessHours": 48,
+  "maxImportSize": 20
+}

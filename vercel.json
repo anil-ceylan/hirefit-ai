@@ -1,5 +1,6 @@
 {
   "rewrites": [
+    { "source": "/api/opportunity-radar/:id/state", "destination": "/api/opportunity-radar?radarEndpoint=state&opportunityId=:id" },
     { "source": "/api/career-companion/cases", "destination": "/api/career-companion?companionEndpoint=cases" },
     { "source": "/api/career-companion/cases/:id/guidance", "destination": "/api/career-companion?companionEndpoint=guidance&companionCaseId=:id" },
     { "source": "/api/career-companion/cases/:id/outcome", "destination": "/api/career-companion?companionEndpoint=outcome&companionCaseId=:id" },
