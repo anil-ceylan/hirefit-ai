@@ -78,7 +78,8 @@ try {
     const route = resolve(path);
     assert.equal(route.target, "/api/[...route].js");
     const { default: handler } = await import(new URL(route.target.slice(1), root));
-    for (const url of [path, route.url.pathname, route.target.replace(/\.js$/, "")]) {
+    const search = method === "GET" ? new URL(path, "https://www.hirefit.co").search : "";
+    for (const url of [path, route.url.pathname + search, route.target.replace(/\.js$/, "") + search]) {
       for (const authorized of [false, true]) {
         calls.length = 0;
         const req = { method, url, query: route.query, body, headers: authorized ? { authorization: "Bearer fixture" } : {} };

@@ -72,12 +72,21 @@ assert.equal(result.status, 200);
 assert.equal(result.body.opportunities.length, 1);
 assert.equal(result.body.opportunities[0].match_score, 100);
 // Production Vercel metadata must never enter semantic query validation.
-for (const route of ['opportunity-radar', ['opportunity-radar']]) {
+for (const metadata of [
+  { route: 'opportunity-radar' },
+  { route: ['opportunity-radar'], lang: ['TR'], limit: ['20'], radarEndpoint: undefined, opportunityId: undefined, someVercelTransportField: ['internal'] },
+  { lang: ['EN', 'XX'], limit: 0, state: 'dismissed', unknown: { nested: true } },
+  { lang: undefined, limit: null, state: false },
+  null,
+]) {
   const req = request('GET', 'owner-a', undefined, '/api/opportunity-radar?lang=TR&limit=20');
-  req.query = { route, lang: 'TR', limit: '20', radarEndpoint: ['internal'], opportunityId: ['internal'] };
-  assert.equal((await handle(req, '/api/opportunity-radar')).status, 200);
+  req.query = metadata;
+  const response = await handle(req, '/api/opportunity-radar');
+  assert.equal(response.status, 200);
+  assert.equal(response.body.meta.limit, 20);
+  assert.deepEqual(response.body, (await handle(request('GET', 'owner-a', undefined, req.url), '/api/opportunity-radar')).body);
   await handle(request('PATCH', 'owner-a', { state: 'saved' }), statePath);
-  req.url += '&state=saved'; req.query.state = 'saved';
+  req.url += '&state=saved';
   const saved = await handle(req, '/api/opportunity-radar');
   assert.equal(saved.status, 200);
   assert.equal(saved.body.opportunities[0].current_user_state, 'saved');
@@ -85,7 +94,7 @@ for (const route of ['opportunity-radar', ['opportunity-radar']]) {
 for (const [key, value] of [['lang', 'TR'], ['limit', '20'], ['state', 'saved']]) {
   for (const values of [[value], [value, value]]) {
     const req = request('GET'); req.query = { route: ['opportunity-radar'], [key]: values };
-    assert.equal((await handle(req, '/api/opportunity-radar')).body.error, 'INVALID_QUERY');
+    assert.equal((await handle(req, '/api/opportunity-radar')).status, 200);
   }
   const duplicate = request('GET', 'owner-a', undefined, `/api/opportunity-radar?${key}=${value}&${key}=${value}`);
   duplicate.query = { [key]: value }; // Flattening must not hide URL duplicates.
@@ -94,15 +103,20 @@ for (const [key, value] of [['lang', 'TR'], ['limit', '20'], ['state', 'saved']]
 for (const [url, query] of [
   ['/api/opportunity-radar?lang=XX', { lang: 'TR' }],
   ['/api/opportunity-radar?limit=0', { limit: '20' }],
-  ['/api/opportunity-radar?lang=TR', { lang: 'EN' }],
   ['/api/opportunity-radar?state=invalid', {}],
   ['/api/opportunity-radar?unexpected=value', {}],
-  ['/api/opportunity-radar', { unexpected: 'value' }],
-  ['/api/opportunity-radar', { limit: 20 }],
+  ['/api/opportunity-radar?route=opportunity-radar', {}],
+  ['/api/opportunity-radar?radarEndpoint=state', {}],
+  ['/api/opportunity-radar?opportunityId=internal', {}],
+  ['/api/opportunity-radar?lang[]=TR', {}],
+  ['/api/opportunity-radar?limit=51', {}],
 ]) {
   const req = request('GET', 'owner-a', undefined, url); req.query = query;
   assert.deepEqual(await handle(req, '/api/opportunity-radar'), { status: 400, body: { success: false, error: 'INVALID_QUERY' } });
 }
+const unreadTransport = request('GET');
+Object.defineProperty(unreadTransport, 'query', { get() { throw new Error('List must not read req.query'); } });
+assert.deepEqual(await handle(unreadTransport, '/api/opportunity-radar'), await handle(request('GET'), '/api/opportunity-radar'));
 const routedState = request('PATCH', 'owner-a', { state: 'saved' });
 routedState.query = { route: ['opportunity-radar'], radarEndpoint: 'state', opportunityId: live.id };
 assert.equal((await handle(routedState, statePath)).status, 200);
