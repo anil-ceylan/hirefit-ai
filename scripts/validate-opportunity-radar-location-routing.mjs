@@ -47,5 +47,11 @@ try {
   }
   assert.equal(normalizeVercelApiPath({ url: '/api/opportunity-radar?lang=TR&limit=20&...route=opportunity-radar', query: { route: ['opportunity-radar'] } }), '/api/opportunity-radar');
   assert.equal(normalizeVercelApiPath({ url: '/api/opportunity-radar', query: { route: ['opportunity-radar'], radarEndpoint: 'state', opportunityId: user } }), `/api/opportunity-radar/${user}/state`);
+  const nearbyReq = { method: 'GET', url: '/api/opportunity-radar?lang=TR&limit=20&view=nearby&...route=opportunity-radar',
+    query: { route: ['opportunity-radar'], view: ['ignored'] }, headers: { authorization: 'Bearer fixture' } };
+  const nearbyRes = { setHeader() {}, end(raw) { this.body = JSON.parse(raw); } };
+  await handler(nearbyReq, nearbyRes);
+  assert.equal(nearbyRes.statusCode, 409);
+  assert.equal(nearbyRes.body.error, 'LOCATION_PREFERENCE_REQUIRED');
   process.stdout.write('PASS: exact preference rewrite + real Vercel adapter/dispatcher/handler GET/PUT/PATCH/DELETE, array metadata, JSON auth isolation, list/state normalization and 10 functions. Official compilation is separate.\n');
 } finally { hooks.deregister(); delete globalThis[key]; }

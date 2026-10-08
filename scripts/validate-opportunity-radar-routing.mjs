@@ -58,6 +58,7 @@ globalThis[key] = {
     async setState(userId, opportunityId, state) { calls.push(["set", userId, opportunityId, state]); return { opportunity_id: opportunityId, state, updated_at: "2026-09-25T00:00:00Z" }; },
   },
   locationRepository: {
+    async getForEvaluation(userId) { calls.push(["preference", userId]); return null; },
     async get(userId) { calls.push(["location", userId]); return null; },
     async upsert(userId) { calls.push(["location", userId]); return { enabled: true }; },
     async setEnabled(userId) { calls.push(["location", userId]); return { enabled: false }; },

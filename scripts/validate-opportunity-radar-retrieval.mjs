@@ -47,6 +47,7 @@ const client = { from(table) {
 } };
 const repository = createOpportunityRepository(() => client);
 const handler = createOpportunityRadarHandler({ repository, clock: () => now,
+  locationRepository: { getForEvaluation: async () => null },
   authenticate: async req => ({ ok: true, user: { id: req.user } }), loadProfile: async () => profile });
 const get = (user = 'A', query = '') => handler({ method: 'GET', url: `/api/opportunity-radar${query}`, user }, '/api/opportunity-radar');
 let result = await get();

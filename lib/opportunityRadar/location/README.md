@@ -1,9 +1,62 @@
-# Location foundation and preference API — slices 1–2
+# Location Intelligence — slices 1–3 (unreleased)
 
-Slice 2 adds authenticated preference CRUD and a client library, but no UI,
-browser permission, ranking/retrieval, ingestion or catalog writer integration.
-Existing All/Saved ranking continues using Career Memory alone. The new table
-remains UNAPPLIED: do not call these preference endpoints against production yet.
+Slice 3 adds shared location evaluation, catalog-location reads, location-aware
+ranking and server-side Nearby. No UI, browser permission, ingestion/writer,
+notifications or new opportunity types. The migration remains UNAPPLIED.
+
+**RELEASE GATE:** Every authenticated valid Radar list request now reads the
+preference table once. Missing table/storage failure is 503, not no preference.
+Release order: isolated migration acceptance -> authorized migration apply ->
+schema verification -> app deployment -> authenticated All/Saved/Nearby smoke.
+Deploying this app before migration WOULD break All/Saved. No silent fallback.
+
+## Slice 3 evaluation and reads
+
+Absent/disabled preference preserves the old Career Memory location signal and
+`jobs-v1` version. Enabled preference uses `jobs-location-v1`, same weights and
+`profile_alignment` semantics. Profile/preference are never client supplied.
+`getForEvaluation` is internal, distinct from the safe public preference GET.
+
+Up to 1000 eligible compact rows -> owner-state exclusion -> bounded location
+reads -> one shared evaluator -> Nearby filter if requested -> sort/best 200 ->
+hydrate + visibility/state recheck -> fresh location read -> same evaluator and
+Nearby recheck -> detailed rank -> 20/default, 50/max. No user-state writes.
+
+Location repository uses parent ID batches of 100 and FK embedding of location
+rows, so each response includes both completeness and the child set. Parent UUID
+keysets drain even pages smaller than requested. Child results request 11 rows
+to detect/reject exceeding the 10-record cap. Invalid/unrelated rows and DB errors
+fail closed. Matching fields only; no evidence references or unrelated catalog.
+At normal page sizes each nonempty batch takes one data + one drain query; at
+1000 candidates + 200 hydrated: up to 24 such requests, plus one preference read.
+Lower server page caps require additional bounded keyset reads, never per-item
+N+1. Parent/child reads are type-neutral; the existing feed stays jobs-only.
+
+The unapplied migration now adds `opportunities.location_set_complete boolean
+NOT NULL DEFAULT false`. This explicit assertion is required for an all-outside
+negative; row count alone cannot establish complete coverage. No code sets it
+here. A future approved writer must atomically maintain the flag with its child
+set; unresolved/deleted/unverified alternatives require false. Existing rows
+remain incomplete by default. Base migration remains unchanged.
+
+Within or same reviewed city without coordinates scores 1; complete/all-outside
+scores 0; boundary or unknown/partial evidence scores null. One positive is enough.
+There is NO fallback/geocoding from legacy city text when enabled. Remote always
+has null physical-location score; include_remote only controls Nearby inclusion.
+Work-mode scoring is untouched. Unknown work mode is not inferred as remote.
+
+`view=nearby` cannot combine with any state filter. It requires enabled preference
+(409 LOCATION_PREFERENCE_REQUIRED). Includes within/same-city/boundary candidates
+and optionally remote; unknown/outside remain available in All/Saved. Current
+city-only pilot entries enable canonical-city evidence, not fabricated distances.
+Browser uncertainty is still null, so coordinates alone cannot confirm radius
+membership; this is a deliberate limitation until defensible error evidence exists.
+
+`location_match` is added only when enabled: kind, radius_relation, reason, and
+when supported whole-km approximate_distance_km plus distance_basis (source_point
+or city_centroid). No user coordinates or hidden evidence. Same-city/unknown use
+radius_relation=unknown; remote uses null and has no distance. Distances are to
+the selected supporting reviewed point/centroid, not an asserted office/commute.
 
 ## Preference API
 
@@ -35,7 +88,8 @@ Manual display facts are derived from the reviewed vocabulary. A generic
 “Paylaşılan yaklaşık konum” label is sufficient for browser preference status.
 Full browser PUT replacement requires newly supplied coordinates; this slice
 does not add partial radius editing or a UI that would need retained coordinates.
-No localStorage or location history is used. No migration adjustment is required.
+No localStorage or location history is used. Slice 2 itself required no migration
+adjustment; Slice 3 adds the completeness assertion described above.
 
 ## Pure contracts
 

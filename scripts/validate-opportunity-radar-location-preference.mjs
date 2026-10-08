@@ -92,11 +92,23 @@ for (const action of [() => repository.get(null), () => repository.upsert(null, 
 await repository.upsert(a, { ...validateLocationPreference(manual), user_id: b, city: "forged", created_at: "forged" });
 assert.equal(db.rows.get(a).city, PILOT_PLACES[0].city);
 assert.equal(db.rows.get(a).created_at, undefined);
-// New table must never be accessed by existing All/Saved evaluation.
+// Slice 3 loads preference once; absent preference preserves legacy All/Saved.
+let preferenceReads = 0;
 const oldFeed = createOpportunityRadarHandler({ authenticate, loadProfile: async () => ({}),
   repository: { list: async () => ({ opportunities: [] }), states: async () => [], hydrate: async () => [] },
-  locationRepository: new Proxy({}, { get() { throw new Error("List accessed location preferences"); } }) });
+  locationRepository: { getForEvaluation: async () => { preferenceReads++; return null; } } });
 for (const state of ["", "&state=saved"]) assert.equal((await oldFeed({ owner: a, method: "GET", url: `/api/opportunity-radar?lang=TR&limit=20&...route=opportunity-radar${state}`, query: { lang: ["wrong"] } }, "/api/opportunity-radar")).status, 200);
+assert.equal(preferenceReads, 2);
+assert.equal((await repository.getForEvaluation(a)).place_id, manual.place_id);
+await repository.setEnabled(a, false);
+assert.deepEqual(await repository.getForEvaluation(a), { enabled: false });
+await repository.remove(a);
+assert.equal(await repository.getForEvaluation(a), null);
+await repository.upsert(a, validateLocationPreference(browser));
+assert.equal((await repository.getForEvaluation(a)).approximate_latitude, 41.01);
+db.fail = 'get';
+await assert.rejects(repository.getForEvaluation(a), error => error.code === 'RADAR_UNAVAILABLE');
+db.fail = null;
 for (const file of ["preferenceValidation.js", "preferencePersistence.js"]) {
   const source = readFileSync(new URL(`../lib/opportunityRadar/location/${file}`, import.meta.url), "utf8");
   assert.doesNotMatch(source, /console\.|localStorage|watchPosition|reverseGeocode/);

@@ -22,6 +22,7 @@ assert.match(sql, /REFERENCES public\.opportunities\(id\) ON DELETE CASCADE/);
 assert.match(sql, /PRIMARY KEY \(opportunity_id, location_key\)/);
 assert.match(sql, /uncertainty_km < 'Infinity'::numeric/);
 assert.doesNotMatch(statements, /employer_source_point|type\s*=\s*'job'/);
+assert.match(statements, /ALTER TABLE public\.opportunities ADD COLUMN location_set_complete boolean NOT NULL DEFAULT false/);
 assert.doesNotMatch(statements, /country_code IS NOT NULL/);
 assert.equal((statements.match(/place_id IS NOT NULL AND city IS NOT NULL/g) || []).length, 3);
 process.stdout.write('PASS: additive migration structural checks, transaction/conflict guards, ownership, neutral evidence, default-deny RLS/grants.\n');
@@ -47,6 +48,7 @@ try {
     INSERT INTO public.opportunities(id,type,subtype,title,source,source_type,source_item_id,url)
     VALUES ('${oid}','event','program','Existing','fixture','fixture','one','https://example.invalid/one');`);
   await db.exec(sql);
+  assert.equal((await db.query('SELECT location_set_complete FROM opportunities')).rows[0].location_set_complete, false);
   assert.equal((await db.query('SELECT count(*)::int AS n FROM opportunities')).rows[0].n, 1);
   await db.exec(`INSERT INTO opportunity_location_preferences(user_id,source,place_id,country_code,city,location_precision,radius_km,consent_version)
     VALUES ('${uid}','manual','hf:place:0002',NULL,'Lefkoşa','city_only',25,'v1');

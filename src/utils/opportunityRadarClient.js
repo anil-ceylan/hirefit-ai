@@ -26,6 +26,7 @@ export async function requestOpportunityRadar(path, getHeaders, { signal, timeou
       throw failure(safeErrors[body?.error] === response.status ? body.error : "RADAR_UNAVAILABLE");
     }
     if (response.status === 409 && body?.error === "CAREER_PROFILE_REQUIRED") throw failure("CAREER_PROFILE_REQUIRED");
+    if (response.status === 409 && body?.error === "LOCATION_PREFERENCE_REQUIRED") throw failure("LOCATION_PREFERENCE_REQUIRED");
     if (response.status === 404) throw failure("OPPORTUNITY_NOT_FOUND");
     if (!response.ok || body?.success !== true) throw failure("RADAR_UNAVAILABLE");
     return body;
@@ -39,10 +40,28 @@ export async function requestOpportunityRadar(path, getHeaders, { signal, timeou
 }
 
 export async function listOpportunities(getHeaders, { lang = "TR", filter = "all", limit = 20, ...settings } = {}) {
+  if (!["all", "nearby", "saved"].includes(filter)) throw failure("INVALID_QUERY");
   const query = new URLSearchParams({ lang, limit: String(limit) });
   if (filter === "saved") query.set("state", "saved");
+  if (filter === "nearby") query.set("view", "nearby");
   const body = await requestOpportunityRadar(`/api/opportunity-radar?${query}`, getHeaders, settings);
   if (!Array.isArray(body.opportunities)) throw failure("INVALID_RESPONSE");
+  for (const item of body.opportunities) {
+    const match = item?.location_match;
+    if (match === undefined && filter !== "nearby") continue;
+    if (!match || typeof match !== "object" || Array.isArray(match) ||
+        !["approximate_distance", "same_city", "boundary_uncertain", "outside", "remote", "unknown"].includes(match.kind) ||
+        !["within", "outside", "boundary_uncertain", "unknown", null].includes(match.radius_relation) ||
+        typeof match.reason !== "string" || match.reason.length > 80 ||
+        Object.keys(match).some(key => !["kind", "radius_relation", "reason", "approximate_distance_km", "distance_basis"].includes(key)) ||
+        (match.approximate_distance_km !== undefined && (!Number.isInteger(match.approximate_distance_km) || match.approximate_distance_km < 0 || match.approximate_distance_km > 20016)) ||
+        (match.distance_basis !== undefined && !["city_centroid", "source_point"].includes(match.distance_basis)) ||
+        (["remote", "same_city", "unknown"].includes(match.kind) && match.approximate_distance_km !== undefined) ||
+        (match.kind === "remote" && match.radius_relation !== null) ||
+        ((match.approximate_distance_km !== undefined) !== (match.distance_basis !== undefined)) ||
+        (filter === "nearby" && !["same_city", "boundary_uncertain", "remote"].includes(match.kind) &&
+          !(match.kind === "approximate_distance" && match.radius_relation === "within"))) throw failure("INVALID_RESPONSE");
+  }
   return { ...body, opportunities: body.opportunities.filter(item =>
     isVisibleJob(item) && typeof item.id === "string" && typeof item.title === "string" &&
     (filter === "saved" ? item.current_user_state === "saved" : item.current_user_state !== "dismissed")) };
@@ -57,6 +76,7 @@ export async function updateOpportunityState(getHeaders, id, state, settings = {
 
 export function radarErrorMessage(error, lang = "TR", mutation = false) {
   const tr = lang === "TR";
+  if (error?.code === "LOCATION_PREFERENCE_REQUIRED") return tr ? "Konum tercihi gerekiyor. Yakındaki fırsatlar için arama konumunu etkinleştir." : "Enable a search location to see nearby opportunities.";
   if (error?.code === "AUTH_REQUIRED") return tr ? "Oturumunu doğrulayamadık. Devam etmek için tekrar giriş yap." : "We could not verify your session. Please sign in again.";
   if (error?.code === "OPPORTUNITY_NOT_FOUND") return tr ? "Bu fırsat artık erişilebilir olmayabilir. Listeyi yenileyebilirsin." : "This opportunity may no longer be available. Refresh the list.";
   if (mutation) return tr ? "İşlemin sonucu doğrulanamadı. Kartı koruduk; listeyi yenileyerek durumunu kontrol edebilirsin." : "We could not confirm the update. The card is preserved; refresh to check its status.";

@@ -12,6 +12,11 @@ BEGIN
   END IF;
 END $$;
 
+-- Required to distinguish a complete reviewed set from partial alternatives.
+-- Default false never asserts completeness for existing catalog records. Future
+-- approved writers must update this flag atomically with the location set.
+ALTER TABLE public.opportunities ADD COLUMN location_set_complete boolean NOT NULL DEFAULT false;
+
 CREATE TABLE public.opportunity_location_preferences (
   user_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   enabled boolean NOT NULL DEFAULT false,

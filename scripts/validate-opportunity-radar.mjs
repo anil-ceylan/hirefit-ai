@@ -59,7 +59,8 @@ const repository = {
 };
 const authenticate = async req => req.headers?.authorization ? { ok: true, user: { id: req.headers.authorization } } : { ok: false, status: 401 };
 const loadProfile = async user => { calls.push(["profile", user]); return profile; };
-const handle = createOpportunityRadarHandler({ authenticate, repository, loadProfile, clock: () => now });
+const locationRepository = { getForEvaluation: async () => null };
+const handle = createOpportunityRadarHandler({ authenticate, repository, loadProfile, clock: () => now, locationRepository });
 const request = (method, user = "owner-a", body, url = "/api/opportunity-radar") => ({ method, url, headers: user ? { authorization: user } : {}, body });
 const statePath = `/api/opportunity-radar/${live.id}/state`;
 for (const [method, path] of [["GET", "/api/opportunity-radar"], ["PATCH", statePath]]) {
@@ -156,13 +157,13 @@ assert.equal((await handle(request("PATCH", "owner-a", "x".repeat(2049)), stateP
 const stream = Readable.from([JSON.stringify({ state: "saved" })]);
 Object.assign(stream, { method: "PATCH", headers: { authorization: "owner-a" } });
 assert.equal((await handle(stream, statePath)).status, 200);
-const noProfile = createOpportunityRadarHandler({ authenticate, loadProfile: async () => null, repository });
+const noProfile = createOpportunityRadarHandler({ authenticate, loadProfile: async () => null, repository, locationRepository });
 assert.equal((await noProfile(request("GET"), "/api/opportunity-radar")).status, 409);
-const failed = createOpportunityRadarHandler({ authenticate, loadProfile: async () => { throw new Error("private details must not escape"); } });
+const failed = createOpportunityRadarHandler({ authenticate, locationRepository, loadProfile: async () => { throw new Error("private details must not escape"); } });
 assert.deepEqual(await failed(request("GET"), "/api/opportunity-radar"), { status: 503, body: { success: false, error: "RADAR_UNAVAILABLE" } });
 for (const failingMethod of ["list", "states", "hydrate", "setState"]) {
   const failingRepository = { ...repository, [failingMethod]: async () => { throw new Error("private database diagnostics"); } };
-  const failingHandler = createOpportunityRadarHandler({ authenticate, loadProfile, repository: failingRepository, clock: () => now });
+  const failingHandler = createOpportunityRadarHandler({ authenticate, loadProfile, repository: failingRepository, clock: () => now, locationRepository });
   const isWrite = failingMethod === "setState";
   const stateBefore = JSON.stringify([...states]);
   const failure = await failingHandler(request(isWrite ? "PATCH" : "GET", "owner-a", isWrite ? { state: "dismissed" } : undefined), isWrite ? statePath : "/api/opportunity-radar");
