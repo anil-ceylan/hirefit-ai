@@ -62,6 +62,31 @@ const loadProfile = async user => { calls.push(["profile", user]); return profil
 const handle = createOpportunityRadarHandler({ authenticate, repository, loadProfile, clock: () => now });
 const request = (method, user = "owner-a", body, url = "/api/opportunity-radar") => ({ method, url, headers: user ? { authorization: user } : {}, body });
 const statePath = `/api/opportunity-radar/${live.id}/state`;
+// Diagnostics are observational, GET-list-only, and never emit values/secrets.
+{
+  const logs = [];
+  const deps = { authenticate, repository, loadProfile, clock: () => now };
+  const logged = createOpportunityRadarHandler({ ...deps, diagnosticLogger: (...args) => logs.push(args) });
+  const silent = createOpportunityRadarHandler({ ...deps, diagnosticLogger: () => {} });
+  const broken = createOpportunityRadarHandler({ ...deps, diagnosticLogger: () => { throw new Error("logger failed"); } });
+  for (const url of ['/api/opportunity-radar?lang=TR&limit=20', '/api/opportunity-radar?lang=TR&lang=EN', '/api/opportunity-radar?token=private-token']) {
+    const make = () => ({ ...request('GET', 'private-user', { privateBody: 'private-body' }, url),
+      query: { route: ['private-route'], lang: 'private-lang', absent: undefined, extra: { secret: 'private-nested' } } });
+    assert.deepEqual(await logged(make(), '/api/opportunity-radar'), await silent(make(), '/api/opportunity-radar'));
+    assert.deepEqual(await broken(make(), '/api/opportunity-radar'), await silent(make(), '/api/opportunity-radar'));
+  }
+  assert.deepEqual(logs[0], ['[opportunity-radar:runtime-shape]', {
+    reqUrlRedacted: '/api/opportunity-radar?lang=[REDACTED]&limit=[REDACTED]', pathname: '/api/opportunity-radar',
+    urlQueryNames: ['lang', 'limit'], reqQueryKeys: ['route', 'lang', 'absent', 'extra'],
+    reqQueryTypes: { route: 'array', lang: 'string', absent: 'undefined', extra: 'other' }, normalizedPath: '/api/opportunity-radar',
+  }]);
+  assert.ok(!JSON.stringify(logs).includes('private-'));
+  const count = logs.length;
+  await logged(request('PATCH', 'owner-a', { state: 'saved' }), statePath);
+  await logged(request('POST'), '/api/opportunity-radar');
+  assert.equal(logs.length, count);
+  states.clear();
+}
 for (const [method, path] of [["GET", "/api/opportunity-radar"], ["PATCH", statePath]]) {
   calls.length = 0;
   assert.equal((await handle(request(method, null), path)).status, 401);
