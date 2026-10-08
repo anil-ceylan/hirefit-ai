@@ -1,5 +1,6 @@
 import { apiUrl } from "./apiBase.js";
 import { isVisibleJob } from "../../lib/opportunityRadar/validation.js";
+import { LOCATION_PREFERENCE_PATH } from "../../lib/opportunityRadar/location/preferenceValidation.js";
 
 const failure = code => Object.assign(new Error(code), { code });
 
@@ -19,6 +20,11 @@ export async function requestOpportunityRadar(path, getHeaders, { signal, timeou
     const response = await fetch(apiUrl(path), { ...options, signal: controller.signal, headers: { ...headers, "Content-Type": "application/json" } });
     const body = await response.json().catch(() => null);
     if (response.status === 401 || response.status === 403) throw failure("AUTH_REQUIRED");
+    if (path === LOCATION_PREFERENCE_PATH && !response.ok) {
+      const safeErrors = { INVALID_LOCATION_PREFERENCE: 400, INVALID_JSON: 400, INPUT_TOO_LARGE: 413,
+        LOCATION_PREFERENCE_NOT_FOUND: 404, METHOD_NOT_ALLOWED: 405, NOT_FOUND: 404 };
+      throw failure(safeErrors[body?.error] === response.status ? body.error : "RADAR_UNAVAILABLE");
+    }
     if (response.status === 409 && body?.error === "CAREER_PROFILE_REQUIRED") throw failure("CAREER_PROFILE_REQUIRED");
     if (response.status === 404) throw failure("OPPORTUNITY_NOT_FOUND");
     if (!response.ok || body?.success !== true) throw failure("RADAR_UNAVAILABLE");

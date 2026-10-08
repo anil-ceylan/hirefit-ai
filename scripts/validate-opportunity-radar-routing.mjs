@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { createRequire, registerHooks } from "node:module";
 import { opportunityFixtures } from "./fixtures/opportunity-radar.mjs";
+import { LOCATION_CONSENT_VERSION } from "../lib/opportunityRadar/location/preferenceValidation.js";
 
 // Official Vercel compilers are required. A Vite build alone is not a route test.
 const require = createRequire(import.meta.url);
@@ -40,8 +41,10 @@ function resolve(publicUrl, rewrites = compiled.routes) {
 const id = opportunityFixtures[0].id;
 const owner = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const statePath = `/api/opportunity-radar/${id}/state`;
+const preferencePath = "/api/opportunity-radar/location-preference";
 const withoutRewrite = getTransformedRoutes({ ...config, rewrites: config.rewrites.filter(route => !route.source.startsWith("/api/opportunity-radar/")) });
 assert.equal(resolve(statePath, withoutRewrite.routes), null, "Generic Vercel adapter does not match nested state path without the narrow rewrite");
+assert.equal(resolve(preferencePath, withoutRewrite.routes), null);
 assert.equal(resolve("/api/opportunity-radar/id/unsupported"), null);
 const calls = [];
 const key = "__radarRoutingFixture";
@@ -54,12 +57,19 @@ globalThis[key] = {
     async states(userId) { calls.push(["states", userId]); return []; },
     async setState(userId, opportunityId, state) { calls.push(["set", userId, opportunityId, state]); return { opportunity_id: opportunityId, state, updated_at: "2026-09-25T00:00:00Z" }; },
   },
+  locationRepository: {
+    async get(userId) { calls.push(["location", userId]); return null; },
+    async upsert(userId) { calls.push(["location", userId]); return { enabled: true }; },
+    async setEnabled(userId) { calls.push(["location", userId]); return { enabled: false }; },
+    async remove(userId) { calls.push(["location", userId]); return { removed: true }; },
+  },
 };
 const root = new URL("../", import.meta.url);
 const mocks = new Map([
   ["lib/auth/verifySupabaseJwt.js", `export async function getUserFromRequest(req) { return req.headers.authorization === 'Bearer fixture' ? {ok:true,user:{id:'${owner}'}} : {ok:false,status:401}; }`],
   ["lib/careerMemory/persistence.js", `export const loadCareerProfile=(id)=>globalThis.${key}.loadCareerProfile(id); export const saveCareerProfile=()=>{throw new Error('Profile must not be written')}; export const getServiceClient=()=>{throw new Error('No live DB in test')};`],
   ["lib/opportunityRadar/persistence.js", `export const createOpportunityRepository=()=>globalThis.${key}.repository;`],
+  ["lib/opportunityRadar/location/preferencePersistence.js", `export const createLocationPreferenceRepository=()=>globalThis.${key}.locationRepository;`],
 ].map(([path, source]) => [new URL(path, root).href, `data:text/javascript,${encodeURIComponent(source)}`]));
 const hooks = registerHooks({ resolve(specifier, context, next) {
   if (specifier.startsWith(".")) {
@@ -74,6 +84,10 @@ try {
     ["PATCH", statePath, { state: "saved" }, "set"],
     ["PATCH", statePath, { state: "dismissed" }, "set"],
     ["PATCH", statePath, { state: "acted_on" }, "set"],
+    ["GET", preferencePath, undefined, "location"],
+    ["PUT", preferencePath, { source: "manual", place_id: "hf:place:0001", radius_km: 25, enabled: true, include_remote: false, consent_version: LOCATION_CONSENT_VERSION }, "location"],
+    ["PATCH", preferencePath, { enabled: false }, "location"],
+    ["DELETE", preferencePath, undefined, "location"],
   ]) {
     const route = resolve(path);
     assert.equal(route.target, "/api/[...route].js");
@@ -92,7 +106,7 @@ try {
         assert.ok(calls.some(call => call[0] === expected));
         assert.ok(calls.every(call => call[1] === owner));
         if (expected === "set") assert.deepEqual(calls[0], ["set", owner, id, body.state]);
-        else {
+        else if (expected === "list") {
           assert.equal(res.body.meta.limit, 1);
           assert.equal(res.body.opportunities[0].match_score, 100);
           assert.match(res.body.opportunities[0].recommended_next_action.text, /^Open the source/);

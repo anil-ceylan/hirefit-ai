@@ -9,6 +9,7 @@ export function normalizeVercelApiPath(req) {
   const segments = splitVercelRouteParam(req?.query?.route);
   if (pathname === "/api/opportunity-radar" ||
       (pathname.includes("[") && segments.length === 1 && segments[0] === "opportunity-radar")) {
+    if (req?.query?.radarEndpoint === "location-preference") return "/api/opportunity-radar/location-preference";
     if (req?.query?.radarEndpoint === "state" && typeof req?.query?.opportunityId === "string") {
       return `/api/opportunity-radar/${encodeURIComponent(req.query.opportunityId)}/state`;
     }

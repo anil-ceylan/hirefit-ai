@@ -1,7 +1,41 @@
-# Location foundation — disconnected slice 1
+# Location foundation and preference API — slices 1–2
 
-Nothing in this folder is imported by production Radar. No API, UI, browser
-permission, ranking/retrieval, ingestion or catalog writer integration exists.
+Slice 2 adds authenticated preference CRUD and a client library, but no UI,
+browser permission, ranking/retrieval, ingestion or catalog writer integration.
+Existing All/Saved ranking continues using Career Memory alone. The new table
+remains UNAPPLIED: do not call these preference endpoints against production yet.
+
+## Preference API
+
+GET/PUT/PATCH/DELETE `/api/opportunity-radar/location-preference` uses the existing
+shared handler and narrow Vercel alias `radarEndpoint=location-preference`.
+Authentication is required; completed Career Profile is not. Missing GET returns
+null; failed storage returns RADAR_UNAVAILABLE, never a fabricated empty result.
+PATCH only accepts `{enabled:boolean}`; a missing row returns
+LOCATION_PREFERENCE_NOT_FOUND. DELETE is owner-scoped and idempotent.
+
+PUT requires enabled/source/radius_km/include_remote/consent_version plus either
+place_id (manual) or approximate_latitude/approximate_longitude (browser). Unknown
+fields fail closed. Consent uses the exported LOCATION_CONSENT_VERSION constant.
+Every explicit PUT renews consented_at using the server clock; enable/disable
+does not change consented_at. Both source paths replace all normalized fields,
+so switching to manual clears old browser coordinates. The repository re-derives
+the allowlisted write and injects authenticated ownership, even for internal
+callers. Reads/updates/deletes filter user_id; upsert injects it, uses the unique
+user_id conflict key and filters the returned row by the same owner.
+
+The existing 2048-byte mutation reader is reused. No Supabase/SQL error details
+are returned or logged. Clients reuse auth, abort and timeout handling; browser
+coordinates are coarsened before transmission and again before persistence.
+Browser uncertainty stays null: grid displacement cannot bound unknown sensor
+error. Country/city remain null, with no reverse geocoding.
+
+Public responses omit coordinates, uncertainty, user IDs, consent and timestamps.
+Manual display facts are derived from the reviewed vocabulary. A generic
+“Paylaşılan yaklaşık konum” label is sufficient for browser preference status.
+Full browser PUT replacement requires newly supplied coordinates; this slice
+does not add partial radius editing or a UI that would need retained coordinates.
+No localStorage or location history is used. No migration adjustment is required.
 
 ## Pure contracts
 
@@ -61,9 +95,9 @@ validation must resolve IDs server-side; never trust client labels/coordinates.
 base tables/update trigger function and auth.users. New object/type conflicts
 abort the transaction. One-time only, not an idempotent rerun. No seeds/backfill.
 PK indexes suffice. Both tables default-deny all client access, including reads.
-Only service_role has CRUD; future preference helpers MUST scope every operation
+Only service_role has CRUD; preference helpers scope every operation
 to authenticated user ID because service_role bypasses RLS. Timestamps are
-server/default managed; the future API must reject client ownership/timestamps.
+server/default managed; the API rejects client ownership/timestamps.
 Manual reviewed-ID membership is application-enforced, not a SQL allowlist.
 Manual anchors and reviewed city mappings require place_id + city, not a country
 assertion. The optional country still has its uppercase two-letter constraint.
