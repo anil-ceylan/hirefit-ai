@@ -143,9 +143,11 @@ reviewed dataset/version and attribution; no paid/external geocoder is selected.
 `getPilotPlace()` rejects unknown IDs by returning null. Future manual-preference
 validation must resolve IDs server-side; never trust client labels/coordinates.
 
-## Prepared schema (NOT APPLIED)
+## Historical schema migration (archived; do not apply)
 
-`20261008120000_opportunity_radar_location_v1.sql` requires the existing Radar
+`supabase/archive/migrations-pre-baseline-20261010/20261008120000_opportunity_radar_location_v1.sql`
+is historical evidence and an isolated regression fixture, not an active migration.
+Its original additive design requires the existing Radar
 base tables/update trigger function and auth.users. New object/type conflicts
 abort the transaction. One-time only, not an idempotent rerun. No seeds/backfill.
 PK indexes suffice. Both tables default-deny all client access, including reads.
@@ -164,7 +166,10 @@ and Career Memory tables are untouched. The future writer's module/capability
 must not expose preference operations; service_role itself is not a least-
 privilege writer credential and this migration does not create one.
 
-Validate locally, review target/schema separately, then obtain explicit migration
-authorization. Do not run this file automatically. Without PostgreSQL tooling,
-the schema validator reports structural checks separately from unavailable SQL
-execution. Production acceptance remains gated on real database validation.
+Do not replay this archived file. The sole active package baseline is
+`supabase/migrations/20261010120000_production_state_baseline.sql`; see
+`supabase/baseline/20261010120000/ADOPTION.md` and `REPLAY.md`. Production history
+repair is NOT AUTHORIZED; production adoption must NEVER execute baseline SQL.
+Unattended `db reset` / normal fresh migration-runner replay is not supported.
+The historical schema validator retains its original assertions; its database
+execution is not part of local adoption-package preparation.

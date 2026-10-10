@@ -2,18 +2,17 @@
 
 No UI, live ingestion, LLM, scheduled job, production seed, profile write, or deployment is included.
 
-## Database and application procedure
+## Historical database migration (archived; do not apply)
 
-Migration: `supabase/migrations/20260925120000_opportunity_radar.sql`.
+Historical migration: `supabase/archive/migrations-pre-baseline-20261010/20260925120000_opportunity_radar.sql`.
 
-This is an additive **one-time** migration, not an idempotent SQL script. Before
-applying via the project's normal Supabase migration workflow, confirm the target
-project and inspect `to_regclass('public.opportunities')` and
-`to_regclass('public.opportunity_user_states')`. If either exists, stop and compare
-its schema/policies before preparing a reviewed follow-up migration. Do not drop
-or overwrite it. The transaction deliberately refuses existing tables, including
-when this migration is run twice. A failed SQL Editor transaction may need a
-`ROLLBACK`; no existing rows are changed. This implementation has not applied it.
+This additive **one-time** migration is retained byte-for-byte as historical evidence
+and an isolated regression fixture, not an active migration. Do not replay it.
+Its table-existence refusal and other original assertions remain unchanged.
+The sole active package baseline is `supabase/migrations/20261010120000_production_state_baseline.sql`.
+See `supabase/baseline/20261010120000/ADOPTION.md` and `REPLAY.md`: production adoption
+must NEVER execute baseline SQL, and history repair is NOT AUTHORIZED. Unattended
+`db reset` / normal fresh migration-runner replay is not supported by this package.
 
 Prerequisites are the existing Supabase `auth.users`, `auth.uid()`, `anon`,
 `authenticated`, `service_role`, and PostgreSQL `gen_random_uuid()`.

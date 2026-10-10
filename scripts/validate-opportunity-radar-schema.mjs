@@ -7,7 +7,7 @@ import { createOpportunityRepository, OPPORTUNITY_COLUMNS } from "../lib/opportu
 // Real, isolated PostgreSQL engine, not a production Supabase connection.
 // Install outside the repo and set HIREFIT_PGLITE_MODULE if not available locally.
 const { PGlite } = createRequire(import.meta.url)(process.env.HIREFIT_PGLITE_MODULE || "@electric-sql/pglite");
-const migration = readFileSync(new URL("../supabase/migrations/20260925120000_opportunity_radar.sql", import.meta.url), "utf8");
+const migration = readFileSync(new URL("../supabase/archive/migrations-pre-baseline-20261010/20260925120000_opportunity_radar.sql", import.meta.url), "utf8");
 const db = new PGlite();
 const userA = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const userB = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 
-const sql = readFileSync(new URL('../supabase/migrations/20261008120000_opportunity_radar_location_v1.sql', import.meta.url), 'utf8');
+const sql = readFileSync(new URL('../supabase/archive/migrations-pre-baseline-20261010/20261008120000_opportunity_radar_location_v1.sql', import.meta.url), 'utf8');
 const statements = sql.replace(/--[^\n]*/g, '');
 assert.match(statements, /^\s*BEGIN;/);
 assert.match(statements, /COMMIT;\s*$/);
@@ -42,7 +42,7 @@ try {
   await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
     CREATE SCHEMA auth; CREATE TABLE auth.users(id uuid PRIMARY KEY);
     CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql AS $$ SELECT NULL::uuid $$;`);
-  const base = readFileSync(new URL('../supabase/migrations/20260925120000_opportunity_radar.sql', import.meta.url), 'utf8');
+  const base = readFileSync(new URL('../supabase/archive/migrations-pre-baseline-20261010/20260925120000_opportunity_radar.sql', import.meta.url), 'utf8');
   await db.exec(base);
   await db.exec(`INSERT INTO auth.users VALUES ('${uid}');
     INSERT INTO public.opportunities(id,type,subtype,title,source,source_type,source_item_id,url)

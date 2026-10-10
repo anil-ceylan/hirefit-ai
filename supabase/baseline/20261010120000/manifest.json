@@ -1,0 +1,130 @@
+{
+  "format_version": 1,
+  "baseline_version": "20261010120000",
+  "prepared_date": "2026-10-10",
+  "status": "LOCAL_PACKAGE_PREPARED_PENDING_HUMAN_REVIEW",
+  "production_history_repair_authorized": false,
+  "production_sql_execution_authorized": false,
+  "production_rule": "Production baseline SQL must NEVER be executed during adoption. History-only registration requires separate explicit approval.",
+  "production_project_ref": "inmcvfyhsrwhznbjlnit",
+  "production_contacted_during_preparation": false,
+  "disposable_project_ref": null,
+  "disposable_project_note": "Separate project; exact ref must be independently verified before any future isolated operation.",
+  "source_head_commit": "b16cfe36e42058995304715c1277c495a33fe628",
+  "evidence": {
+    "capture_path": "hirefit-prod-schema-capture-20261008.txt",
+    "capture_sha256": "ebc478eeb47398a67f802e3379cc490a5875c687750c48182194819932e7f791",
+    "prior_verification_status": "USER_REPORTED_PASS; not rerun during package preparation",
+    "prior_passed_gates": [
+      "static baseline review",
+      "bootstrap equivalence",
+      "isolated baseline replay",
+      "structural inventory equivalence",
+      "full metadata equivalence",
+      "rollback-only runtime subset",
+      "RLS/ACL/FK/timestamp behavior",
+      "successful own/free-plan RPC path",
+      "synthetic-row rollback cleanup",
+      "bootstrap integrity"
+    ],
+    "disposable_sequence_residue": {
+      "accepted": true,
+      "scope": "DISPOSABLE ONLY; not baseline data or production instructions",
+      "sequence": "public.user_plans_id_seq",
+      "before": {
+        "last_value": "1",
+        "is_called": false
+      },
+      "after": {
+        "last_value": "2",
+        "is_called": true
+      }
+    },
+    "accepted_platform_drift": [
+      "isolated PostgreSQL 17.11 vs captured production 17.6",
+      "reviewed additional fresh-project supabase_realtime_admin memberships"
+    ]
+  },
+  "artifacts": [
+    {
+      "target_path": "supabase/migrations/20261010120000_production_state_baseline.sql",
+      "sha256": "ed6a2878faaf90d9f500d29b19bdfb3950b9f67c685f1d1d1c847e68d786f103",
+      "bytes": 46347,
+      "raw_git_blob": "816ba9b671877888fdc5e17354afa9c415e6b0cb",
+      "filtered_git_blob": "816ba9b671877888fdc5e17354afa9c415e6b0cb",
+      "source_path": "docs/database/baseline-draft-20261008/production-state.DRAFT.sql",
+      "source_sha256": "ed6a2878faaf90d9f500d29b19bdfb3950b9f67c685f1d1d1c847e68d786f103",
+      "verification_status": "PASS: exact reviewed-source copy; no SQL changes"
+    },
+    {
+      "target_path": "supabase/bootstrap/production-compatibility/rls-auto-enable.sql",
+      "sha256": "a71ce8982b848fd1c3bee24a6d7909f1a27952837eb713ab5cb3074d2514e567",
+      "bytes": 7051,
+      "raw_git_blob": "ba3ec93e45a4abd585c4e316798b7063b1906e3e",
+      "filtered_git_blob": "ba3ec93e45a4abd585c4e316798b7063b1906e3e",
+      "source_path": "docs/database/baseline-draft-20261008/rls-bootstrap.DRAFT.sql",
+      "source_sha256": "a71ce8982b848fd1c3bee24a6d7909f1a27952837eb713ab5cb3074d2514e567",
+      "verification_status": "PASS: exact reviewed-source copy; no SQL changes"
+    }
+  ],
+  "archive": {
+    "path": "supabase/archive/migrations-pre-baseline-20261010",
+    "checksum_manifest": "supabase/archive/migrations-pre-baseline-20261010/SHA256SUMS.json",
+    "count": 11,
+    "versions": [
+      "20260406120000",
+      "20260416093000",
+      "20260527120000",
+      "20260528120000",
+      "20260529120000",
+      "20260530120000",
+      "20260531120000",
+      "20260532120000",
+      "20260916100000",
+      "20260925120000",
+      "20261008120000"
+    ],
+    "verification_status": "PASS: exact pre-move byte preservation"
+  },
+  "active_migrations": [
+    "supabase/migrations/20261010120000_production_state_baseline.sql"
+  ],
+  "bootstrap": {
+    "active_migration": false,
+    "provenance": "UNCERTAIN",
+    "treatment": "Separate explicitly reviewed compatibility prerequisite; preserve equivalent existing pair; absent requires separate authorization; different stops."
+  },
+  "replay": {
+    "unattended_db_reset_supported": false,
+    "normal_fresh_migration_runner_supported": false,
+    "sql_guards_unchanged": true,
+    "procedure": "supabase/baseline/20261010120000/REPLAY.md"
+  },
+  "excluded": [
+    "production data/users/files",
+    "sequence current value",
+    "career-cvs bucket",
+    "profile-avatars bucket",
+    "absent future-profile tables",
+    "Supabase-managed internals",
+    "runtime-test scripts",
+    "security remediation"
+  ],
+  "local_checks": {
+    "inventory_and_hashes": "PASS",
+    "git_filter_byte_preservation": "PASS",
+    "script_reference_assertions": "UNCHANGED",
+    "ownership_validator": "PASS",
+    "focused_eslint_changed_mjs": "PASS",
+    "changed_mjs_syntax": "PASS",
+    "whitespace_check": "PASS for tracked edits and new package files; archived SQL retains pre-existing CRLF/EOF whitespace diagnostics to preserve exact bytes",
+    "sql_execution": "NOT RUN / PROHIBITED",
+    "supabase_commands": "NOT RUN / PROHIBITED"
+  },
+  "tooling": {
+    "supabase_cli_required": "2.120.0",
+    "supabase_config_toml_present": false,
+    "configuration_note": "No config.toml existed at preparation; none created. Review pinned CLI prerequisites separately before any future operation."
+  },
+  "git_status": "Unstaged local changes; not committed or pushed"
+}

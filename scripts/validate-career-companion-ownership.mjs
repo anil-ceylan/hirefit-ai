@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const persistence = fs.readFileSync(new URL("../lib/careerCompanion/persistence.js", import.meta.url), "utf8");
-const migration = fs.readFileSync(new URL("../supabase/migrations/20260916100000_career_companion.sql", import.meta.url), "utf8");
+const migration = fs.readFileSync(new URL("../supabase/archive/migrations-pre-baseline-20261010/20260916100000_career_companion.sql", import.meta.url), "utf8");
 
 assert.match(persistence, /select\("id, user_id"\).*eq\("id", value\.id\)/s);
 assert.match(persistence, /if \(!existing \|\| existing\.user_id !== userId\) throw ownershipError/);

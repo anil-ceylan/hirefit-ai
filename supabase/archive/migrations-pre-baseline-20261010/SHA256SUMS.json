@@ -1,0 +1,208 @@
+{
+  "format_version": 1,
+  "prepared_date": "2026-10-10",
+  "status": "LOCAL_REVIEW_ONLY_NOT_AUTHORIZED_FOR_PRODUCTION_HISTORY_REPAIR",
+  "byte_authority": "Original pre-move working-tree bytes, including original line endings. HEAD/index Git blob identities are recorded separately.",
+  "warning": "Historical evidence/regression fixtures only. Do not execute or return these files to the active migration directory.",
+  "historical_unusual_version_preserved": "20260532120000",
+  "files": [
+    {
+      "version": "20260406120000",
+      "filename": "20260406120000_user_plans_unique_increment_rpc.sql",
+      "source_path": "supabase/migrations/20260406120000_user_plans_unique_increment_rpc.sql",
+      "target_path": "supabase/archive/migrations-pre-baseline-20261010/20260406120000_user_plans_unique_increment_rpc.sql",
+      "source_sha256": "6f2e28b70a1b66a21dc5779e7da5e810e55690776c88291c60ba454ffd9ce916",
+      "archive_sha256": "6f2e28b70a1b66a21dc5779e7da5e810e55690776c88291c60ba454ffd9ce916",
+      "bytes": 1312,
+      "git": {
+        "source_head_commit": "b16cfe36e42058995304715c1277c495a33fe628",
+        "source_head_blob": "c3711181864b43b91613ce5918042ca8c11a13e0",
+        "source_index_entry": "100644 c3711181864b43b91613ce5918042ca8c11a13e0 0\tsupabase/migrations/20260406120000_user_plans_unique_increment_rpc.sql",
+        "source_raw_blob": "c3711181864b43b91613ce5918042ca8c11a13e0",
+        "archive_raw_blob": "c3711181864b43b91613ce5918042ca8c11a13e0",
+        "archive_filtered_blob": "c3711181864b43b91613ce5918042ca8c11a13e0"
+      },
+      "verification_status": "PASS: pre-move and archive bytes/SHA-256/raw Git blob match; target Git filters preserve bytes"
+    },
+    {
+      "version": "20260416093000",
+      "filename": "20260416093000_enable_rls_user_owned_tables.sql",
+      "source_path": "supabase/migrations/20260416093000_enable_rls_user_owned_tables.sql",
+      "target_path": "supabase/archive/migrations-pre-baseline-20261010/20260416093000_enable_rls_user_owned_tables.sql",
+      "source_sha256": "643150b25fe716df8731aaad9ba25b35ee247678c0c13505a0a95dc7b7320cad",
+      "archive_sha256": "643150b25fe716df8731aaad9ba25b35ee247678c0c13505a0a95dc7b7320cad",
+      "bytes": 1541,
+      "git": {
+        "source_head_commit": "b16cfe36e42058995304715c1277c495a33fe628",
+        "source_head_blob": "8f8db539033d9878e159785ed1109ac0fe9565e8",
+        "source_index_entry": "100644 8f8db539033d9878e159785ed1109ac0fe9565e8 0\tsupabase/migrations/20260416093000_enable_rls_user_owned_tables.sql",
+        "source_raw_blob": "7bcb0cf04977f8bc323f9605b547cdc383d0ea10",
+        "archive_raw_blob": "7bcb0cf04977f8bc323f9605b547cdc383d0ea10",
+        "archive_filtered_blob": "7bcb0cf04977f8bc323f9605b547cdc383d0ea10"
+      },
+      "verification_status": "PASS: pre-move and archive bytes/SHA-256/raw Git blob match; target Git filters preserve bytes"
+    },
+    {
+      "version": "20260527120000",
+      "filename": "20260527120000_career_profiles.sql",
+      "source_path": "supabase/migrations/20260527120000_career_profiles.sql",
+      "target_path": "supabase/archive/migrations-pre-baseline-20261010/20260527120000_career_profiles.sql",
+      "source_sha256": "9752363041308be42e41b5a6cd41f47de949242e1e6331a1b5003a6d29c5c31f",
+      "archive_sha256": "9752363041308be42e41b5a6cd41f47de949242e1e6331a1b5003a6d29c5c31f",
+      "bytes": 1945,
+      "git": {
+        "source_head_commit": "b16cfe36e42058995304715c1277c495a33fe628",
+        "source_head_blob": "fbbc3cd6067f02b4f508460f916af5a40fe5376e",
+        "source_index_entry": "100644 fbbc3cd6067f02b4f508460f916af5a40fe5376e 0\tsupabase/migrations/20260527120000_career_profiles.sql",
+        "source_raw_blob": "fbbc3cd6067f02b4f508460f916af5a40fe5376e",
+        "archive_raw_blob": "fbbc3cd6067f02b4f508460f916af5a40fe5376e",
+        "archive_filtered_blob": "fbbc3cd6067f02b4f508460f916af5a40fe5376e"
+      },
+      "verification_status": "PASS: pre-move and archive bytes/SHA-256/raw Git blob match; target Git filters preserve bytes"
+    },
+    {
+      "version": "20260528120000",
+      "filename": "20260528120000_career_progress.sql",
+      "source_path": "supabase/migrations/20260528120000_career_progress.sql",
+      "target_path": "supabase/archive/migrations-pre-baseline-20261010/20260528120000_career_progress.sql",
+      "source_sha256": "cd3c6a61de42c5350d60cad9b67c28c0aca3e858801a62124488146a8518ce09",
+      "archive_sha256": "cd3c6a61de42c5350d60cad9b67c28c0aca3e858801a62124488146a8518ce09",
+      "bytes": 1558,
+      "git": {
+        "source_head_commit": "b16cfe36e42058995304715c1277c495a33fe628",
+        "source_head_blob": "a6a0aee0f6e53ed646158e34705ada6ac23ae6e0",
+        "source_index_entry": "100644 a6a0aee0f6e53ed646158e34705ada6ac23ae6e0 0\tsupabase/migrations/20260528120000_career_progress.sql",
+        "source_raw_blob": "a6a0aee0f6e53ed646158e34705ada6ac23ae6e0",
+        "archive_raw_blob": "a6a0aee0f6e53ed646158e34705ada6ac23ae6e0",
+        "archive_filtered_blob": "a6a0aee0f6e53ed646158e34705ada6ac23ae6e0"
+      },
+      "verification_status": "PASS: pre-move and archive bytes/SHA-256/raw Git blob match; target Git filters preserve bytes"
+    },
+    {
+      "version": "20260529120000",
+      "filename": "20260529120000_career_onboarding.sql",
+      "source_path": "supabase/migrations/20260529120000_career_onboarding.sql",
+      "target_path": "supabase/archive/migrations-pre-baseline-20261010/20260529120000_career_onboarding.sql",
+      "source_sha256": "89b537e36d63f284901b0450772ad8fbee8e5b76e793c3c99692706554efc35e",
+      "archive_sha256": "89b537e36d63f284901b0450772ad8fbee8e5b76e793c3c99692706554efc35e",
+      "bytes": 835,
+      "git": {
+        "source_head_commit": "b16cfe36e42058995304715c1277c495a33fe628",
+        "source_head_blob": "c1d7a2b0a5ba779c6b473d78679dfd893fecb1f6",
+        "source_index_entry": "100644 c1d7a2b0a5ba779c6b473d78679dfd893fecb1f6 0\tsupabase/migrations/20260529120000_career_onboarding.sql",
+        "source_raw_blob": "c1d7a2b0a5ba779c6b473d78679dfd893fecb1f6",
+        "archive_raw_blob": "c1d7a2b0a5ba779c6b473d78679dfd893fecb1f6",
+        "archive_filtered_blob": "c1d7a2b0a5ba779c6b473d78679dfd893fecb1f6"
+      },
+      "verification_status": "PASS: pre-move and archive bytes/SHA-256/raw Git blob match; target Git filters preserve bytes"
+    },
+    {
+      "version": "20260530120000",
+      "filename": "20260530120000_career_intelligence.sql",
+      "source_path": "supabase/migrations/20260530120000_career_intelligence.sql",
+      "target_path": "supabase/archive/migrations-pre-baseline-20261010/20260530120000_career_intelligence.sql",
+      "source_sha256": "d13130b4406fb3d9611f8c4a6d339b21ed191a1c921ebbc714776d62442c3174",
+      "archive_sha256": "d13130b4406fb3d9611f8c4a6d339b21ed191a1c921ebbc714776d62442c3174",
+      "bytes": 428,
+      "git": {
+        "source_head_commit": "b16cfe36e42058995304715c1277c495a33fe628",
+        "source_head_blob": "9da8e36a3ded1bc98ff3d79371faa374db0bb186",
+        "source_index_entry": "100644 9da8e36a3ded1bc98ff3d79371faa374db0bb186 0\tsupabase/migrations/20260530120000_career_intelligence.sql",
+        "source_raw_blob": "9da8e36a3ded1bc98ff3d79371faa374db0bb186",
+        "archive_raw_blob": "9da8e36a3ded1bc98ff3d79371faa374db0bb186",
+        "archive_filtered_blob": "9da8e36a3ded1bc98ff3d79371faa374db0bb186"
+      },
+      "verification_status": "PASS: pre-move and archive bytes/SHA-256/raw Git blob match; target Git filters preserve bytes"
+    },
+    {
+      "version": "20260531120000",
+      "filename": "20260531120000_career_os_future_schema.sql",
+      "source_path": "supabase/migrations/20260531120000_career_os_future_schema.sql",
+      "target_path": "supabase/archive/migrations-pre-baseline-20261010/20260531120000_career_os_future_schema.sql",
+      "source_sha256": "98aeb87b434311c819ebefeeeee91f7946d0b0726ad84cf03fe973bd228587c3",
+      "archive_sha256": "98aeb87b434311c819ebefeeeee91f7946d0b0726ad84cf03fe973bd228587c3",
+      "bytes": 3924,
+      "git": {
+        "source_head_commit": "b16cfe36e42058995304715c1277c495a33fe628",
+        "source_head_blob": "f540add8371904ee400f8e90e77fe59aa0082163",
+        "source_index_entry": "100644 f540add8371904ee400f8e90e77fe59aa0082163 0\tsupabase/migrations/20260531120000_career_os_future_schema.sql",
+        "source_raw_blob": "f540add8371904ee400f8e90e77fe59aa0082163",
+        "archive_raw_blob": "f540add8371904ee400f8e90e77fe59aa0082163",
+        "archive_filtered_blob": "f540add8371904ee400f8e90e77fe59aa0082163"
+      },
+      "verification_status": "PASS: pre-move and archive bytes/SHA-256/raw Git blob match; target Git filters preserve bytes"
+    },
+    {
+      "version": "20260532120000",
+      "filename": "20260532120000_career_cv_storage.sql",
+      "source_path": "supabase/migrations/20260532120000_career_cv_storage.sql",
+      "target_path": "supabase/archive/migrations-pre-baseline-20261010/20260532120000_career_cv_storage.sql",
+      "source_sha256": "eef1873516c87e0ca28289003dba61cd0976a63bf19617468dc0cc4bef2fd940",
+      "archive_sha256": "eef1873516c87e0ca28289003dba61cd0976a63bf19617468dc0cc4bef2fd940",
+      "bytes": 489,
+      "git": {
+        "source_head_commit": "b16cfe36e42058995304715c1277c495a33fe628",
+        "source_head_blob": "277888eb73cc86c7bcf1cdcfc5a9a94dc38633b8",
+        "source_index_entry": "100644 277888eb73cc86c7bcf1cdcfc5a9a94dc38633b8 0\tsupabase/migrations/20260532120000_career_cv_storage.sql",
+        "source_raw_blob": "4b708576f2f01340c3941ca27d3a11d66fc220b1",
+        "archive_raw_blob": "4b708576f2f01340c3941ca27d3a11d66fc220b1",
+        "archive_filtered_blob": "4b708576f2f01340c3941ca27d3a11d66fc220b1"
+      },
+      "verification_status": "PASS: pre-move and archive bytes/SHA-256/raw Git blob match; target Git filters preserve bytes"
+    },
+    {
+      "version": "20260916100000",
+      "filename": "20260916100000_career_companion.sql",
+      "source_path": "supabase/migrations/20260916100000_career_companion.sql",
+      "target_path": "supabase/archive/migrations-pre-baseline-20261010/20260916100000_career_companion.sql",
+      "source_sha256": "0b3ca8a5cf9897db1d2dc4ef63cd84c1366d795201a7d07a63414b7688d90c1c",
+      "archive_sha256": "0b3ca8a5cf9897db1d2dc4ef63cd84c1366d795201a7d07a63414b7688d90c1c",
+      "bytes": 2784,
+      "git": {
+        "source_head_commit": "b16cfe36e42058995304715c1277c495a33fe628",
+        "source_head_blob": "ba8e2eb95d8fba907691889ac22151942e7386e5",
+        "source_index_entry": "100644 ba8e2eb95d8fba907691889ac22151942e7386e5 0\tsupabase/migrations/20260916100000_career_companion.sql",
+        "source_raw_blob": "ba8e2eb95d8fba907691889ac22151942e7386e5",
+        "archive_raw_blob": "ba8e2eb95d8fba907691889ac22151942e7386e5",
+        "archive_filtered_blob": "ba8e2eb95d8fba907691889ac22151942e7386e5"
+      },
+      "verification_status": "PASS: pre-move and archive bytes/SHA-256/raw Git blob match; target Git filters preserve bytes"
+    },
+    {
+      "version": "20260925120000",
+      "filename": "20260925120000_opportunity_radar.sql",
+      "source_path": "supabase/migrations/20260925120000_opportunity_radar.sql",
+      "target_path": "supabase/archive/migrations-pre-baseline-20261010/20260925120000_opportunity_radar.sql",
+      "source_sha256": "86945b40b2532c2dbfc2a8f2322cca269f15ec3c3dc59f9e2e783a517706d807",
+      "archive_sha256": "86945b40b2532c2dbfc2a8f2322cca269f15ec3c3dc59f9e2e783a517706d807",
+      "bytes": 5959,
+      "git": {
+        "source_head_commit": "b16cfe36e42058995304715c1277c495a33fe628",
+        "source_head_blob": "c9062571cf4fc53bba85dd1800d547b20596f953",
+        "source_index_entry": "100644 c9062571cf4fc53bba85dd1800d547b20596f953 0\tsupabase/migrations/20260925120000_opportunity_radar.sql",
+        "source_raw_blob": "d8875179b1372af3ed61fcdbd22088cffad06363",
+        "archive_raw_blob": "d8875179b1372af3ed61fcdbd22088cffad06363",
+        "archive_filtered_blob": "d8875179b1372af3ed61fcdbd22088cffad06363"
+      },
+      "verification_status": "PASS: pre-move and archive bytes/SHA-256/raw Git blob match; target Git filters preserve bytes"
+    },
+    {
+      "version": "20261008120000",
+      "filename": "20261008120000_opportunity_radar_location_v1.sql",
+      "source_path": "supabase/migrations/20261008120000_opportunity_radar_location_v1.sql",
+      "target_path": "supabase/archive/migrations-pre-baseline-20261010/20261008120000_opportunity_radar_location_v1.sql",
+      "source_sha256": "4acfbc3b0caba21cd0b5d258b1e1650168da0cdae5f643958b9008477238801a",
+      "archive_sha256": "4acfbc3b0caba21cd0b5d258b1e1650168da0cdae5f643958b9008477238801a",
+      "bytes": 6399,
+      "git": {
+        "source_head_commit": "b16cfe36e42058995304715c1277c495a33fe628",
+        "source_head_blob": "b18bbd763ab3c73bf961d33467c3ef970420f954",
+        "source_index_entry": "100644 b18bbd763ab3c73bf961d33467c3ef970420f954 0\tsupabase/migrations/20261008120000_opportunity_radar_location_v1.sql",
+        "source_raw_blob": "b18bbd763ab3c73bf961d33467c3ef970420f954",
+        "archive_raw_blob": "b18bbd763ab3c73bf961d33467c3ef970420f954",
+        "archive_filtered_blob": "b18bbd763ab3c73bf961d33467c3ef970420f954"
+      },
+      "verification_status": "PASS: pre-move and archive bytes/SHA-256/raw Git blob match; target Git filters preserve bytes"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+# Preserve reviewed SQL bytes only; no repository-wide line-ending policy change.
+supabase/archive/migrations-pre-baseline-20261010/*.sql -text
+supabase/migrations/20261010120000_production_state_baseline.sql -text
+supabase/bootstrap/production-compatibility/rls-auto-enable.sql -text
