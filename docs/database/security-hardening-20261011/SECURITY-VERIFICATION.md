@@ -1,5 +1,7 @@
 # Security hardening verification plan — NOT EXECUTED
 
+> **Historical artifact:** This file preserves the original v1 verification plan and its then-current NOT EXECUTED status. It is not the current entitlement rollout status. The later entitlement authority Phase A/Phase B production rollout completed and was verified on 2026-10-11. See `ENTITLEMENT-AUTHORITY.md` and `ENTITLEMENT-VERIFICATION.md` for current status.
+
 Static review only today. No runnable runtime fixture script is authorized here.
 All future tests target a separately verified disposable Supabase-compatible PostgreSQL 17
 project, never production inmcvfyhsrwhznbjlnit. No real users/data or credentials in logs.

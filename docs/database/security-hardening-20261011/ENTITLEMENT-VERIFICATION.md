@@ -1,6 +1,6 @@
 # Entitlement verification: disposable execution package
 
-Prepared 2026-10-11. Disposable verification was authorized and executed only against hirefit-baseline-replay (nddfpwqrfgcddzjwjrsw). Phase A installation, rollback-only sequential verification, the reviewed two-session concurrency suite, Phase B installation, Phase B privilege postchecks, repeated sequential verification, and post-cutover local regressions all completed successfully. Cleanup and final post-state verification passed. Production was not changed; no active entitlement migration has been created.
+Prepared 2026-10-11. Disposable verification was first authorized and executed against hirefit-baseline-replay (nddfpwqrfgcddzjwjrsw). Phase A installation, rollback-only sequential verification, the reviewed two-session concurrency suite, Phase B installation, Phase B privilege postchecks, repeated sequential verification, and post-cutover local regressions all completed successfully. Cleanup and final post-state verification passed. A separately reviewed production rollout was subsequently completed on hirefit-ai (inmcvfyhsrwhznbjlnit) using active migrations 20261011225000 and 20261011233000, followed by read-only database postchecks and authenticated runtime smoke tests.
 
 ## Local evidence and limits
 
@@ -22,7 +22,7 @@ The returning-profile fixture now uses real UUID shapes and a mocked lifecycle R
 6. COMPLETED on the reviewed disposable project: Phase A metadata/privileges were inspected and the rollback-only sequential subset passed. Local validators exercised the shared server/runtime/client paths with isolated fixtures; no production environment was used.
 7. COMPLETED on the reviewed disposable project using two real PostgreSQL connections. Cases A-F passed: final Free slot, same idempotency key, onboarding race, close-vs-settle, reset-while-pending, and grant-vs-reserve. Synthetic fixtures were cleaned up and post-clean verification confirmed zero synthetic auth, authority-account, authority-request, and legacy-plan rows.
 8. COMPLETED on the reviewed disposable project: app/runtime cutover evidence was reviewed, the isolated and cutover-review markers were set, and Phase B committed the reviewed privilege changes.
-9. COMPLETED on the reviewed disposable project: Phase B postconditions passed, rollback-only sequential verification passed again, local entitlement/runtime/client/profile regressions passed, production build passed, and final synthetic-fixture checks remained clean. Production approval remains a separate later gate.
+9. COMPLETED on the reviewed disposable project: Phase B postconditions passed, rollback-only sequential verification passed again, local entitlement/runtime/client/profile regressions passed, production build passed, and final synthetic-fixture checks remained clean. A separately reviewed production rollout was later approved, executed and verified.
 
 All three SQL drafts verify the exact history row before and after their work using SELECT only. Manual Phase A/Phase B testing does not register either draft as a migration. No history INSERT/UPDATE/DELETE, migration repair or baseline replay is part of this test package. Phase A has no requirement for empty existing application tables; the rollback-only sequential test separately requires empty application row sets and absent synthetic identities to protect its fixture assumptions. Keep those safeguards and all schema/object/ACL checks unchanged.
 
@@ -147,4 +147,4 @@ Do not keep a PostgreSQL transaction open while invoking AI. To demonstrate lock
 
 ## Remaining gates
 
-Real PostgreSQL tests have NOT run. Provider source validation/historical reconciliation, production migration guards, all-backend/cache cutover and operational monitoring remain release blockers. The authority lifecycle, stale recovery, retry and accepted reset rules now have local acceptance coverage. Production remains NO until independent approval and execution evidence.
+Real PostgreSQL verification has completed on the disposable target, including the reviewed two-session concurrency suite, and the separately reviewed production Phase A/Phase B rollout has completed. Production migration guards, privilege/RLS postchecks, authenticated /api/entitlements smoke testing and authenticated server-side /api/career-profile smoke testing passed. Provider source validation and historical payment/Pro reconciliation remain separate unresolved work; this rollout does not convert legacy plan state into trusted payment evidence. Operational monitoring remains ongoing.

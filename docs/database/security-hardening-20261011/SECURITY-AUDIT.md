@@ -1,5 +1,7 @@
 # Security hardening v1 — audit and non-active draft
 
+> **Historical artifact:** This file preserves the pre-entitlement-authority v1 review state and is intentionally not rewritten as if that earlier review had executed. The later entitlement authority Phase A/Phase B production rollout completed and was verified on 2026-10-11. See `ENTITLEMENT-AUTHORITY.md` and `ENTITLEMENT-VERIFICATION.md` for current status.
+
 Date: 2026-10-11. Safe for static review: YES. Ready for production: **NO**.
 No SQL, Supabase command, production connection, migration execution, commit or push
 was performed. This is a partial privilege-reduction proposal, not a claim that
