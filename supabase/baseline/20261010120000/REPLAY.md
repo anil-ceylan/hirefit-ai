@@ -7,9 +7,9 @@ Do not remove these guards for convenience or claim normal CLI reset reproducibi
 
 ## Existing production
 
-Do NOT execute the baseline or bootstrap. Verify equivalence read-only and follow the
-separately authorized history-only process in ADOPTION.md. Production baseline SQL
-must NEVER be executed during adoption.
+Do NOT execute the baseline or bootstrap. History-only adoption is COMPLETE; see
+ADOPTION.md and PRODUCTION-ADOPTION-COMPLETION.md. Do not repeat repair.
+Production baseline SQL must NEVER be executed during adoption.
 
 ## Fresh disposable Supabase-compatible PostgreSQL 17 project
 

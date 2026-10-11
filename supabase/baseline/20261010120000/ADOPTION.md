@@ -1,4 +1,26 @@
-# Production-state baseline adoption — LOCAL REVIEW PACKAGE
+# Production-state baseline adoption — COMPLETE
+
+## Completion supersedes the historical preparation plan below
+
+Operator-supplied verified evidence confirms that the separately authorized one-time
+history repair completed. Its authorization is consumed: **DO NOT rerun repair**.
+See `PRODUCTION-ADOPTION-COMPLETION.md` for the immutable-style execution record.
+No production connection was made during this documentation closeout.
+
+Approved package commit: `023c57cdb16e52a58570305e4005795a075db3a0`.
+Only `20261010120000` is registered remotely, with one history row named
+`production_state_baseline`; all eleven archived legacy versions remain absent.
+Pre/post semantic fingerprint: `84eabb2aa7f0cf161bfdc0c83ddab171`, 323 objects, PASS.
+Bootstrap post-check and excluded bucket/future-table absence checks passed.
+Production baseline/bootstrap SQL were never executed; only history metadata was added.
+Future schema/security changes must be NEW separately reviewed forward migrations.
+Unattended db reset / normal fresh migration-runner replay remains unsupported.
+
+## Historical preparation record (not current instructions)
+
+The following text preserves the package's pre-approval safety context verbatim.
+Its pending gates and commands are historical, NOT authorization or instructions to
+repeat the now-completed adoption. No further production action is authorized.
 
 **NOT AUTHORIZED FOR PRODUCTION HISTORY REPAIR.**
 **Production baseline SQL must NEVER be executed during adoption.**
