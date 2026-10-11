@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { registerHooks } from "node:module";
+const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+const B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const rows = new Map();
 let readError = false;
 let writes = 0;
 const clone = (v) => v == null ? v : structuredClone(v);
-const client = { auth: { getUser: async () => ({ data: { user: { id: "account-a" } }, error: null }) }, from(table) {
+const client = { async rpc(name,args) {
+  assert.equal(name,"hirefit_analysis_entitlement");
+  assert.equal(args.p_user_id,A);
+  assert(["snapshot","close"].includes(args.p_action));
+  return {data:{onboarding_state:"closed"},error:null};
+}, auth: { getUser: async () => ({ data: { user: { id: A } }, error: null }) }, from(table) {
   assert.equal(table, "career_profiles");
   let id;
   let value;
@@ -35,27 +42,27 @@ try {
   const { fetchCareerOnboarding, resolvePostLoginPath } = await import("../src/utils/careerOnboardingClient.js");
   const { saveLocalCareerProfile, loadLocalCareerProfile, fetchCareerProfileStatus } = await import("../src/utils/careerMemoryClient.js");
   const input = { basic: { fullName: "Fixture User", department: "Economics" }, goals: { industries: ["finance"], targetRoles: ["financial_analyst"] }, dnaAnswers: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`likert_${i + 1}`, 4])), readinessAnswers: {}, lang: "TR" };
-  const result = await completeOnboarding("account-a", input);
+  const result = await completeOnboarding(A, input);
   assert.equal(result.storageUnavailable, false);
   assert.equal(result.profile.onboarding_completed, true);
   for (const read of [loadFullCareerProfile, loadCareerProfile]) {
-    const fresh = await read("account-a");
-    assert.equal(fresh.user_id, "account-a");
+    const fresh = await read(A);
+    assert.equal(fresh.user_id, A);
     assert.equal(fresh.onboarding_completed, true);
     assert.equal(fresh.basic_profile.fullName, input.basic.fullName);
     assert.deepEqual(fresh.career_dna.answers, input.dnaAnswers);
     assert.equal(await read("new-account"), null);
   }
-  const stored = JSON.stringify(rows.get("account-a"));
+  const stored = JSON.stringify(rows.get(A));
   const writeCount = writes;
   readError = true;
-  await assert.rejects(loadFullCareerProfile("account-a"), /storage unavailable/);
-  await assert.rejects(loadCareerProfile("account-a"), /storage unavailable/);
-  await assert.rejects(upsertOnboardingDraft("account-a", { step: 1, draft: {} }), /storage unavailable/);
-  await assert.rejects(saveCareerProfile("account-a", {}), /storage unavailable/);
-  await assert.rejects(completeOnboarding("account-a", input), /storage unavailable/);
+  await assert.rejects(loadFullCareerProfile(A), /storage unavailable/);
+  await assert.rejects(loadCareerProfile(A), /storage unavailable/);
+  await assert.rejects(upsertOnboardingDraft(A, { step: 1, draft: {} }), /storage unavailable/);
+  await assert.rejects(saveCareerProfile(A, {}), /storage unavailable/);
+  await assert.rejects(completeOnboarding(A, input), /storage unavailable/);
   assert.equal(writes, writeCount, "failed reads cannot overwrite completed profile or claim save success");
-  assert.equal(JSON.stringify(rows.get("account-a")), stored);
+  assert.equal(JSON.stringify(rows.get(A)), stored);
   const oldAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
   const oldError = console.error;
   process.env.VITE_SUPABASE_ANON_KEY = "synthetic";
@@ -82,13 +89,13 @@ try {
   for (const context of ["hard-refresh", "logout-login", "fresh-browser"]) {
     const storage = new Map();
     globalThis.localStorage = { getItem: (k) => storage.get(k) || null, setItem: (k, v) => storage.set(k, v), removeItem: (k) => storage.delete(k) };
-    response = { status: 200, body: { success: true, exists: true, authenticated: true, profile: await loadFullCareerProfile("account-a"), onboarding_completed: true } };
+    response = { status: 200, body: { success: true, exists: true, authenticated: true, profile: await loadFullCareerProfile(A), onboarding_completed: true } };
     assert.equal((await fetchCareerOnboarding("", async () => ({}), "TR")).profile.onboarding_completed, true, context);
     assert.equal(await resolvePostLoginPath("", async () => ({})), "/dashboard");
     assert.equal((await fetchCareerProfileStatus("", async () => ({}), { allowLocalFallback: false })).profile.basic_profile.fullName, input.basic.fullName);
     saveLocalCareerProfile(response.body.profile);
-    assert.equal(loadLocalCareerProfile("account-a").user_id, "account-a");
-    assert.equal(loadLocalCareerProfile("account-b"), null);
+    assert.equal(loadLocalCareerProfile(A).user_id, A);
+    assert.equal(loadLocalCareerProfile(B), null);
     assert.equal(loadLocalCareerProfile(), null);
   }
   for (const failure of [{ status: 401, body: {} }, { status: 200, body: { exists: null, profileFetchFailed: true } }, new Error("Failed to fetch"), { status: 200, body: { exists: false, authenticated: false } }]) {
@@ -100,7 +107,7 @@ try {
   }
   response = { status: 200, body: { exists: false, profile: null } };
   assert.equal(await resolvePostLoginPath("", async () => ({})), "/onboarding");
-  assert.equal(JSON.stringify(rows.get("account-a")), stored);
+  assert.equal(JSON.stringify(rows.get(A)), stored);
   process.stdout.write("Returning profile: real save/read functions, completion fields, fail-closed writes, fresh browser/session fixtures, error routing and account-scoped cache passed.\n");
 } finally {
   hooks.deregister();

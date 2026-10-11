@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
 import rateLimit from "express-rate-limit";
-import { runAnalyzeV2WithCompanyIntel } from "../lib/analyze-v2/withCompanyIntel.js";
+import { registerEntitlementRoutes, setTrustedPlan } from "../lib/entitlements/authority.js";
 import { requireAuthExpress } from "../lib/auth/verifySupabaseJwt.js";
 import {
   EXTRACT_JOB_SYSTEM,
@@ -27,7 +27,6 @@ import { registerCareerActionLoopRoutes } from "../lib/careerActionLoop/index.js
 import { registerAccountRoutes } from "../lib/account/accountRoutes.js";
 import { registerCareerCompanionRoutes } from "../lib/careerCompanion/routes.js";
 import { registerOpportunityRadarRoutes } from "../lib/opportunityRadar/routes.js";
-import { loadCareerProfile } from "../lib/careerMemory/persistence.js";
 
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err.message, err.stack);
@@ -67,7 +66,7 @@ const corsOptions = {
     callback(new Error("Not allowed by CORS"));
   },
   methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "x-user-id", "x-requested-with"],
+  allowedHeaders: ["Content-Type", "Authorization", "Idempotency-Key", "x-user-id", "x-requested-with"],
   credentials: true,
   optionsSuccessStatus: 204,
 };
@@ -84,7 +83,7 @@ app.use((req, res, next) => {
     res.header("Access-Control-Allow-Credentials", "true");
   }
   res.header("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, x-user-id, x-requested-with");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key, x-user-id, x-requested-with");
   if (req.method === "OPTIONS") {
     return res.sendStatus(204);
   }
@@ -129,87 +128,7 @@ app.get("/test", (_req, res) => {
   return res.status(200).json({ status: "ok" });
 });
 
-app.post("/api/analyze-v2", requireAuthExpress, async (req, res) => {
-  try {
-    // eslint-disable-next-line no-console -- production stability tracing
-    console.log("[STEP] analyze-v2:start");
-    const { cvText, jobDescription, cv, jd, isPro, sector, careerArea, lang, careerMemory } = req.body || {};
-    const c = String(cvText ?? cv ?? "").trim();
-    const j = String(jobDescription ?? jd ?? "").trim();
-    if (!c || !j) {
-      return res
-        .status(400)
-        .json({ error: "Missing cvText or jobDescription" });
-    }
-    let effectiveCareerMemory = careerMemory || null;
-    if (!effectiveCareerMemory && req.authUser?.id) {
-      try {
-        effectiveCareerMemory = await loadCareerProfile(req.authUser.id);
-      } catch (memErr) {
-        console.error("[analyze-v2:career-memory]", memErr?.message || memErr);
-      }
-    }
-    // eslint-disable-next-line no-console -- production stability tracing
-    console.log("[STEP] analyze-v2:pipeline:start");
-    const payload = await runAnalyzeV2WithCompanyIntel({
-      cvText: c,
-      jobDescription: j,
-      isPro: Boolean(isPro),
-      sector,
-      careerArea,
-      lang,
-      careerMemory: effectiveCareerMemory,
-    });
-    // eslint-disable-next-line no-console -- production stability tracing
-    console.log("[STEP] analyze-v2:pipeline:done");
-    // eslint-disable-next-line no-console -- production stability tracing
-    console.log("[STEP] analyze-v2:response:done");
-    return res.status(200).json(payload);
-  } catch (e) {
-    console.error("[ANALYZE_V2_FATAL]", e?.message || e, e?.stack || "");
-    const fallbackRecruiter = {
-      first_perception: "Profil tamamen disarida degil; ilk bakista bazi soru isaretleri var.",
-      internal_monologue: "Guclu yanlarin var ama bu ilanin net actigi beklentiyle tam oturmuyor.",
-      core_concern: "Bu role baglanan somut teslimi CV'de yeterince net goremiyorum.",
-      persuasion_tip: "Bu role baglanan bir is satirini CV'de daha gorunur yaz.",
-      signal_tags: ["Fallback"],
-    };
-    return res.status(200).json({
-      success: false,
-      degraded: true,
-      error: "Analysis temporarily degraded.",
-      recruiter: fallbackRecruiter,
-      Recruiter: {
-        recruiter_verdict: "maybe",
-        reasoning: fallbackRecruiter.internal_monologue,
-        strengths: [],
-        weaknesses: [],
-        red_flags: [],
-        structured_analysis: fallbackRecruiter,
-      },
-      Output: {
-        verdict: "MAYBE",
-        tier: "free",
-        score_label: "MAYBE",
-        confidence_label: "MEDIUM",
-        confidence_pct: 50,
-        confidence_delta: 0,
-        confidence_icon: "⚖️",
-        confidence_text: "Analysis temporarily degraded.",
-        one_sentence: fallbackRecruiter.first_perception,
-        why: [fallbackRecruiter.core_concern],
-        what_to_fix_first: [fallbackRecruiter.persuasion_tip],
-        role_suggestions: [],
-        role_suggestion_reason: "",
-        role_suggestion_signal: "",
-        role_suggestion_recruiter_view: "",
-        role_suggestion_tension: "",
-        core_problem: fallbackRecruiter.core_concern,
-        first_action: fallbackRecruiter.persuasion_tip,
-      },
-    });
-  }
-});
+registerEntitlementRoutes(app);
 
 app.post("/api/extract-job", requireAuthExpress, async (req, res) => {
   try {
@@ -589,7 +508,7 @@ app.post("/api/admin/pro-access", async (req, res) => {
     if (requesterError || !requester) {
       return res.status(401).json({ error: "Invalid session token" });
     }
-    if (!isAdminEmail(requester.email)) {
+    if (!requester.email_confirmed_at || !isAdminEmail(requester.email)) {
       return res.status(403).json({ error: "Only admin can update user access" });
     }
 
@@ -604,9 +523,7 @@ app.post("/api/admin/pro-access", async (req, res) => {
     }
 
     const plan = grantPro ? "pro" : "free";
-    const { error: upsertError } = await adminClient
-      .from("user_plans")
-      .upsert({ user_id: targetUser.id, plan }, { onConflict: "user_id" });
+    const { error: upsertError } = await setTrustedPlan(adminClient, targetUser.id, plan, "admin");
     if (upsertError) {
       return res.status(500).json({
         error: "An error occurred. Please try again.",
@@ -681,7 +598,7 @@ const lemonWebhookHandler = async (req, res) => {
     const { data: users } = await supabase.auth.admin.listUsers();
     const user = users?.users?.find(u => u.email === userEmail);
     if (user) {
-      const { error } = await supabase.from("user_plans").upsert({ user_id: user.id, plan: targetPlan }, { onConflict: "user_id" });
+      const { error } = await setTrustedPlan(supabase, user.id, targetPlan, "payment");
       if (error) {
         console.error(`[lemon-webhook] Supabase update error (${targetPlan}):`, error.message);
         return res.status(500).json({

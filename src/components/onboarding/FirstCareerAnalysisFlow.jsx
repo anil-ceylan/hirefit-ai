@@ -357,11 +357,12 @@ export default function FirstCareerAnalysisFlow({
   const tr = lang === "TR";
   const inputId = useId();
   const fileRef = useRef(null);
+  const analysisAttemptRef = useRef(null);
   const snapshotEventRef = useRef(false);
   const [phase, setPhase] = useState("snapshot");
   const [snapshot, setSnapshot] = useState(profile?.career_snapshot || null);
   const [cvMatch, setCvMatch] = useState(profile?.first_analysis?.cvMatch || null);
-  const [, setTeaser] = useState(profile?.first_analysis?.teaser || null);
+  const [teaser, setTeaser] = useState(profile?.first_analysis?.teaser || null);
   const [flowError, setFlowError] = useState("");
   const [weeklyMoveBusy, setWeeklyMoveBusy] = useState(false);
 
@@ -379,10 +380,9 @@ export default function FirstCareerAnalysisFlow({
   }, [snapshotForEvent, lang, profile?.onboarding_completed]);
 
   const persist = useCallback(
-    async (result) => {
+    async (result, completionKind = "completed") => {
       let merged = mergeFirstAnalysisIntoProfile(profile, result);
-      saveLocalCareerProfile(merged);
-      const remote = await persistFirstAnalysisRemote(getApiAuthHeaders, merged);
+      const remote = await persistFirstAnalysisRemote(getApiAuthHeaders, merged, completionKind);
       if (remote) merged = remote;
       saveLocalCareerProfile(merged);
       onProfileUpdate?.(merged);
@@ -417,9 +417,11 @@ export default function FirstCareerAnalysisFlow({
           profile,
           lang,
           getApiAuthHeaders,
+          attemptRef: analysisAttemptRef,
         });
-        await persist(result);
-        setPhase("snapshot");
+        try { await persist(result); }
+        catch { setFlowError(tr ? "İşlem kaydedilemedi. Lütfen tekrar dene." : "Could not save this step. Please retry."); }
+        finally { setPhase("snapshot"); }
         return;
       }
 
@@ -429,6 +431,7 @@ export default function FirstCareerAnalysisFlow({
           profile,
           lang,
           getApiAuthHeaders,
+          attemptRef: analysisAttemptRef,
         });
         await persist(result);
         setPhase("snapshot");
@@ -438,13 +441,6 @@ export default function FirstCareerAnalysisFlow({
             ? "Analiz tamamlanamadı — Career Snapshot hazır."
             : "Analysis could not finish — your Career Snapshot is ready."
         );
-        const result = await runFirstCareerAnalysis({
-          cvText: text || "",
-          profile,
-          lang,
-          getApiAuthHeaders,
-        });
-        await persist(result);
         setPhase("snapshot");
       }
     },
@@ -474,13 +470,37 @@ export default function FirstCareerAnalysisFlow({
       lang,
       getApiAuthHeaders,
     });
-    await persist(result);
-    setPhase("snapshot");
+    try {
+      await persist(result, "skipped");
+    } catch {
+      setFlowError(tr ? "İşlem kaydedilemedi. Lütfen tekrar dene." : "Could not save this step. Please retry.");
+    } finally { setPhase("snapshot"); }
+  };
+
+  const closeBeforeExit = () => persist({
+    snapshot: snapshot || profile?.career_snapshot,
+    cvMatch,
+    teaser,
+    cvSignalCount: profile?.first_analysis?.cvSignalCount || 0,
+  });
+
+  const openNormalAnalysis = async () => {
+    if (weeklyMoveBusy) return;
+    setWeeklyMoveBusy(true);
+    try { await closeBeforeExit(); navigate("/app"); }
+    catch { setFlowError(tr ? "İşlem kaydedilemedi. Lütfen tekrar dene." : "Could not save this step. Please retry."); }
+    finally { setWeeklyMoveBusy(false); }
   };
 
   const openWeeklyMove = async () => {
     if (weeklyMoveBusy) return;
     setWeeklyMoveBusy(true);
+    try { await closeBeforeExit(); }
+    catch {
+      setFlowError(tr ? "İşlem kaydedilemedi. Lütfen tekrar dene." : "Could not save this step. Please retry.");
+      setWeeklyMoveBusy(false);
+      return;
+    }
     try {
       if (profile?.onboarding_completed && getApiAuthHeaders) {
         await upsertRecommendedCareerAction({
@@ -708,7 +728,7 @@ export default function FirstCareerAnalysisFlow({
           {weeklyMoveBusy ? (tr ? "Hamle hazırlanıyor..." : "Preparing move...") : (tr ? "Haftalık Hamlemi Gör" : "See My Weekly Move")}
           {weeklyMoveBusy ? <Loader2 size={14} className="hf-spin" /> : <ArrowRight size={14} />}
         </button>
-        <button type="button" className="hf-first-analysis__ghost-btn" onClick={() => navigate("/app")}>
+        <button type="button" className="hf-first-analysis__ghost-btn" onClick={openNormalAnalysis} disabled={weeklyMoveBusy}>
           {tr ? "CV ile Doğrula" : "Validate with CV"}
         </button>
       </div>

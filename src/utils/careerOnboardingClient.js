@@ -147,7 +147,9 @@ export async function uploadOnboardingCv(_apiBase, getHeaders, file) {
 
 export async function completeCareerOnboarding(apiBase, getHeaders, payload) {
   try {
-    const res = await fetch(apiUrl("/api/career-onboarding/complete"), {
+    // Core profile preparation precedes the optional one-time analysis. Final closure
+    // happens at first-analysis persistence; the legacy /complete path closes directly.
+    const res = await fetch(apiUrl("/api/career-onboarding/prepare"), {
       method: "POST",
       headers: await getHeaders({ requireSession: true }),
       body: JSON.stringify(payload),

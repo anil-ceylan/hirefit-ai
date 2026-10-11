@@ -6,6 +6,7 @@
 } from "../../lib/careerOnboarding/careerSnapshot.js";
 import { apiUrl } from "./apiBase.js";
 import { estimateCvSignalCount } from "../../lib/careerOnboarding/careerSignalSchema.js";
+import { analysisAttempt, isDefinitiveAnalysisResponse } from "./entitlementClient.js";
 
 async function parseJsonSafe(res) {
   try {
@@ -24,6 +25,7 @@ export async function runFirstCareerAnalysis({
   profile,
   lang = "TR",
   getApiAuthHeaders,
+  attemptRef = { current: null },
 }) {
   const snapshot = buildCareerSnapshot(profile, lang);
   const trimmed = String(cvText || "").trim();
@@ -39,22 +41,22 @@ export async function runFirstCareerAnalysis({
 
   const jd = buildSyntheticJobDescription(profile, lang);
   let v2 = null;
+  const payload = { cvText: trimmed, jobDescription: jd, lang: lang === "TR" ? "tr" : "en" };
+  const attempt = analysisAttempt(attemptRef.current, payload);
+  attemptRef.current = attempt;
 
   try {
-    const res = await fetch(apiUrl("/api/analyze-v2"), {
+    const res = await fetch(apiUrl("/api/onboarding-analysis"), {
       method: "POST",
-      headers: await getApiAuthHeaders({ requireSession: false }),
-      body: JSON.stringify({
-        cvText: trimmed,
-        jobDescription: jd,
-        lang: lang === "TR" ? "tr" : "en",
-        isPro: false,
-        careerMemory: profile,
-      }),
+      headers: { ...await getApiAuthHeaders({ requireSession: true }), "Idempotency-Key": attempt.key },
+      body: JSON.stringify(payload),
     });
-    v2 = await parseJsonSafe(res);
+    const result = await parseJsonSafe(res);
+    if (isDefinitiveAnalysisResponse(res.status, result) && attemptRef.current === attempt) attemptRef.current = null;
+    if (!res.ok && ![502, 504].includes(res.status)) throw new Error("ONBOARDING_ANALYSIS_UNAVAILABLE");
+    v2 = res.ok && result?.success !== false ? result : null;
   } catch {
-    v2 = null;
+    throw new Error("ONBOARDING_ANALYSIS_UNAVAILABLE");
   }
 
   const teaser = v2 ? extractAnalysisTeaser(v2, profile, lang) : null;
@@ -99,7 +101,7 @@ export function mergeFirstAnalysisIntoProfile(profile, { snapshot, cvMatch, teas
   };
 }
 
-export async function persistFirstAnalysisRemote(getApiAuthHeaders, mergedProfile) {
+export async function persistFirstAnalysisRemote(getApiAuthHeaders, mergedProfile, completionKind = "completed") {
   try {
     const res = await fetch(apiUrl("/api/career-onboarding/first-analysis"), {
       method: "PATCH",
@@ -109,12 +111,14 @@ export async function persistFirstAnalysisRemote(getApiAuthHeaders, mergedProfil
         firstAnalysis: mergedProfile.first_analysis,
         basicProfile: mergedProfile.basic_profile,
         analysisSources: mergedProfile.analysis_sources,
+        completionKind,
       }),
     });
     const body = await res.json().catch(() => ({}));
-    return body?.profile || null;
+    if (!res.ok || body?.success !== true || !body.profile) throw new Error("ONBOARDING_COMPLETION_UNAVAILABLE");
+    return body.profile;
   } catch {
-    return null;
+    throw new Error("ONBOARDING_COMPLETION_UNAVAILABLE");
   }
 }
 

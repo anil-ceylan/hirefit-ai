@@ -1,3 +1,4 @@
+import { analysisAttempt, isDefinitiveAnalysisResponse, loadEntitlements } from "./utils/entitlementClient.js";
 import "./App.css";
 import "./landing-ambient.css";
 import { parseActionPlan, enrichActionPlan, pickDoThisNextStep } from "../lib/analyze-v2/actionPlanNormalize.js";
@@ -113,16 +114,6 @@ const landingScrollSectionProps = {
   viewport: { once: false, amount: 0.14, margin: "0px 0px -7% 0px" },
   transition: { duration: 0.56, ease: [0.22, 1, 0.36, 1] },
 };
-
-/** 30-day rolling window for free-tier analysis_count reset (user_plans.last_reset_at). */
-const USER_PLAN_RESET_MS = 30 * 24 * 60 * 60 * 1000;
-
-function userPlanNeedsReset(lastResetAt) {
-  if (lastResetAt == null || lastResetAt === "") return false;
-  const t = new Date(lastResetAt).getTime();
-  if (Number.isNaN(t)) return false;
-  return Date.now() - t >= USER_PLAN_RESET_MS;
-}
 
 function isAdmin(user) {
   if (!user?.email || !ADMIN_EMAIL) return false;
@@ -6301,6 +6292,8 @@ function HireFitLayout() {
   const [authStatus, setAuthStatus] = useState("initializing");
   const [authInitError, setAuthInitError] = useState(null);
   const [isPro, setIsPro] = useState(false);
+  const analysisAttemptRef = useRef(null);
+  const analysisInFlightRef = useRef(false);
   const [plan] = useState("Free");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -6338,7 +6331,7 @@ function HireFitLayout() {
   const [careerAreaOverride, setCareerAreaOverride] = useState("");
   const [lang, setLang] = useState("TR");
   const [showPaywall, setShowPaywall] = useState(false);
-  /** Logged-in users: row from user_plans (analysis_count, last_reset_at, plan). */
+  /** Server-authoritative entitlement snapshot; never a browser-writable plan row. */
   const [userPlanRow, setUserPlanRow] = useState(null);
   const [adminTargetEmail, setAdminTargetEmail] = useState("");
   const [adminGrantBusy, setAdminGrantBusy] = useState(false);
@@ -6380,7 +6373,7 @@ function HireFitLayout() {
   const t = translations[lang];
   const isAdminUser = useMemo(() => isAdmin(user), [user]);
   const isUserEmailVerified = Boolean(user?.email_confirmed_at);
-  const hasProAccess = Boolean(isPro || isAdminUser);
+  const hasProAccess = Boolean(isPro); // presentation only; server owns entitlement decisions
   const cvLoaded = cvText.trim().length > 24;
   const jdLoaded = jdText.trim().length > 40;
   const jobUrlIsLinkedIn = useMemo(() => isLinkedInJobUrl(jobUrl), [jobUrl]);
@@ -6456,65 +6449,6 @@ function HireFitLayout() {
     }
   }, [learningPlan, roleType, seniority]);
 
-  const syncUserPlanForUser = useCallback(async (userId) => {
-    if (!userId || !isSupabaseConfigured) return null;
-    try {
-      const nowIso = new Date().toISOString();
-      let { data: row, error } = await supabase
-        .from("user_plans")
-        .select("id, user_id, plan, analysis_count, last_reset_at")
-        .eq("user_id", userId)
-        .order("id", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error && error.code !== "PGRST116") {
-        if (isSupabaseNetworkError(error)) await handleSupabaseAuthFailure(error);
-        else console.error("[user_plans]", error?.message || error);
-        return null;
-      }
-      if (!row) {
-        const { error: upErr } = await supabase.from("user_plans").upsert(
-          { user_id: userId, plan: "free", analysis_count: 0, last_reset_at: nowIso },
-          { onConflict: "user_id", ignoreDuplicates: true }
-        );
-        if (upErr) {
-          if (isSupabaseNetworkError(upErr)) await handleSupabaseAuthFailure(upErr);
-          else console.error("[user_plans upsert]", upErr?.message || upErr);
-          return null;
-        }
-        const { data: fetched, error: fetchErr } = await supabase
-          .from("user_plans")
-          .select("id, user_id, plan, analysis_count, last_reset_at")
-          .eq("user_id", userId)
-          .order("id", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (fetchErr || !fetched) {
-          if (isSupabaseNetworkError(fetchErr)) await handleSupabaseAuthFailure(fetchErr);
-          else if (fetchErr) console.error("[user_plans refetch]", fetchErr?.message || fetchErr);
-          return null;
-        }
-        row = fetched;
-      }
-      if (!row) return null;
-
-      if (!row.last_reset_at) {
-        await supabase.from("user_plans").update({ last_reset_at: nowIso }).eq("user_id", userId);
-        row = { ...row, last_reset_at: nowIso };
-      } else if (userPlanNeedsReset(row.last_reset_at)) {
-        await supabase.from("user_plans").update({ analysis_count: 0, last_reset_at: nowIso }).eq("user_id", userId);
-        row = { ...row, analysis_count: 0, last_reset_at: nowIso };
-      }
-
-      setUserPlanRow(row);
-      setIsPro(row.plan === "pro");
-      return row;
-    } catch (err) {
-      if (isSupabaseNetworkError(err)) await handleSupabaseAuthFailure(err);
-      else console.error("[user_plans:sync]", err?.message || err);
-      return null;
-    }
-  }, []);
 
   const extractDataFromReport = (text) => {
     const scoreMatch = text.match(/Final Alignment Score:\s*(\d+)/i);
@@ -6609,6 +6543,20 @@ function HireFitLayout() {
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     return headers;
   }, [lang]);
+
+  const syncUserPlanForUser = useCallback(async (userId) => {
+    if (!userId || !isSupabaseConfigured) return null;
+    try {
+      const row = await loadEntitlements(getApiAuthHeaders);
+      setUserPlanRow(row);
+      setIsPro(row.is_pro);
+      return row;
+    } catch {
+      setUserPlanRow(null);
+      setIsPro(false);
+      return null;
+    }
+  }, [getApiAuthHeaders]);
 
   useEffect(() => {
     let active = true;
@@ -6835,6 +6783,9 @@ function HireFitLayout() {
   };
 
   const analyze = async (opts = {}) => {
+    if (analysisInFlightRef.current) return;
+    analysisInFlightRef.current = true;
+    try {
     const jdOverride = String(opts?.jobDescriptionOverride || "").trim();
     const effectiveJd = jdOverride || String(jdText || "").trim();
     if (!cvText.trim() || !effectiveJd) { setError(lang === "TR" ? "Lütfen hem CV'yi hem de iş ilanını yapıştırın." : "Please paste both the CV and the Job Description."); return; }
@@ -6850,17 +6801,13 @@ function HireFitLayout() {
         setError(lang === "TR" ? "Plan bilgisi yüklenemedi. Tekrar dene." : "Could not load your plan. Try again.");
         return;
       }
-      const hasPaidOrAdminAccess = row.plan === "pro" || isAdmin(user);
-      if (!hasPaidOrAdminAccess && (row.analysis_count ?? 0) >= 2) {
+      if (!row.allowed && !analysisAttemptRef.current) {
         setShowPaywall(true);
         return;
       }
     } else {
-      const anonCount = Number(localStorage.getItem("hirefit-anon-count") || 0);
-      if (anonCount >= 2) {
-        setShowPaywall(true);
-        return;
-      }
+      setShowSignupPrompt(true);
+      return;
     }
 
     setShowAnonSavePrompt(false);
@@ -6911,23 +6858,18 @@ function HireFitLayout() {
     setLastDetectedSector("");
 
     let v2Ok = false;
-    let creditConsumed = false;
     const jdDerivedTitle = extractJobTitleFromJd(effectiveJd);
     try {
       const analyzeController = new AbortController();
+      const analysisBody = { cvText, jobDescription: effectiveJd, sector,
+        careerArea: effectiveCareerArea || undefined, lang: lang === "TR" ? "tr" : "en" };
+      const attempt = analysisAttempt(analysisAttemptRef.current, analysisBody, user?.id);
+      analysisAttemptRef.current = attempt;
       const v2Res = await fetch(`${HF_API_BASE}/api/analyze-v2`, {
         method: "POST",
-        headers: await getApiAuthHeaders({ requireSession: false }),
+        headers: { ...await getApiAuthHeaders({ requireSession: true }), "Idempotency-Key": attempt.key },
         signal: analyzeController.signal,
-        body: JSON.stringify({
-          cvText,
-          jobDescription: effectiveJd,
-          sector,
-          careerArea: effectiveCareerArea || undefined,
-          lang: lang === "TR" ? "tr" : "en",
-          isPro: hasProAccess,
-          careerMemory: careerProfile || undefined,
-        }),
+        body: JSON.stringify(analysisBody),
       });
       const responseText = await v2Res.text();
       const v2PayloadFallback = {
@@ -6939,7 +6881,14 @@ function HireFitLayout() {
         Context: {},
       };
       const v2Payload = safeJsonParse(responseText, v2PayloadFallback, { label: "analyze-v2-response" });
+      if (isDefinitiveAnalysisResponse(v2Res.status, v2Payload) && analysisAttemptRef.current === attempt) analysisAttemptRef.current = null;
       if (!v2Res.ok) {
+        if (v2Payload?.error === "ANALYSIS_LIMIT_EXHAUSTED") {
+          setShowPaywall(true);
+          await syncUserPlanForUser(user?.id);
+          await finalizeAnalyzeLoading();
+          return;
+        }
         const serverErr =
           typeof v2Payload?.error === "string" ? v2Payload.error : "";
         const authDenied =
@@ -6951,7 +6900,7 @@ function HireFitLayout() {
           return;
         }
         const msg =
-          serverErr === "analysis_failed"
+          ["analysis_failed", "ANALYSIS_FAILED"].includes(serverErr)
             ? (lang === "TR"
               ? "Analiz sunucuda tamamlanamadı. Biraz sonra tekrar dene."
               : "The analysis could not be completed. Try again in a moment.")
@@ -7102,7 +7051,6 @@ function HireFitLayout() {
           console.error("[career-memory:sync]", memErr?.message || memErr);
         }
         setShowSharePrompt(true);
-        creditConsumed = true;
     } catch (e) {
       if (e?.name === "AbortError") {
         await finalizeAnalyzeLoading();
@@ -7121,21 +7069,10 @@ function HireFitLayout() {
 
     await finalizeAnalyzeLoading();
 
-    if (creditConsumed) {
-      if (user?.id) {
-        const { error: rpcErr } = await supabase.rpc("increment_user_plan_analysis", {
-          p_user_id: user.id,
-        });
-        if (rpcErr) console.error("[increment_user_plan_analysis]", rpcErr);
-        await syncUserPlanForUser(user.id);
-      } else {
-        const c = Number(localStorage.getItem("hirefit-anon-count") || 0);
-        localStorage.setItem("hirefit-anon-count", String(c + 1));
-        setShowAnonSavePrompt(true);
-      }
-    }
+    if (user?.id) await syncUserPlanForUser(user.id);
 
     setDecisionLoading(false);
+    } finally { analysisInFlightRef.current = false; }
   };
 
   const applyFix = async (fix, index) => {
