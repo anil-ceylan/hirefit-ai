@@ -1,6 +1,6 @@
 # Entitlement verification: disposable execution package
 
-Prepared 2026-10-11. Disposable verification was authorized and executed only against hirefit-baseline-replay (nddfpwqrfgcddzjwjrsw). Phase A installation, rollback-only sequential verification, and the reviewed two-session concurrency suite completed successfully. Cleanup and post-clean verification also passed. Production was not changed; Phase B remains unexecuted; no active entitlement migration has been created.
+Prepared 2026-10-11. Disposable verification was authorized and executed only against hirefit-baseline-replay (nddfpwqrfgcddzjwjrsw). Phase A installation, rollback-only sequential verification, the reviewed two-session concurrency suite, Phase B installation, Phase B privilege postchecks, repeated sequential verification, and post-cutover local regressions all completed successfully. Cleanup and final post-state verification passed. Production was not changed; no active entitlement migration has been created.
 
 ## Local evidence and limits
 
@@ -21,8 +21,8 @@ The returning-profile fixture now uses real UUID shapes and a mocked lifecycle R
 5. After separate approval, set the session marker for this reviewed disposable target, then apply Phase A only. Phase A intentionally COMMITs schema creation in the disposable project. Do not run baseline again.
 6. COMPLETED on the reviewed disposable project: Phase A metadata/privileges were inspected and the rollback-only sequential subset passed. Local validators exercised the shared server/runtime/client paths with isolated fixtures; no production environment was used.
 7. COMPLETED on the reviewed disposable project using two real PostgreSQL connections. Cases A-F passed: final Free slot, same idempotency key, onboarding race, close-vs-settle, reset-while-pending, and grant-vs-reserve. Synthetic fixtures were cleaned up and post-clean verification confirmed zero synthetic auth, authority-account, authority-request, and legacy-plan rows.
-8. Review app cutover evidence, then separately authorize Phase B with the isolated marker and cutover-review marker. Phase B intentionally COMMITs privilege changes in the disposable schema.
-9. Repeat sequential tests and Phase B client-denial checks, all application regressions, metadata comparison and rollback cleanup checks. Production approval is a later gate.
+8. COMPLETED on the reviewed disposable project: app/runtime cutover evidence was reviewed, the isolated and cutover-review markers were set, and Phase B committed the reviewed privilege changes.
+9. COMPLETED on the reviewed disposable project: Phase B postconditions passed, rollback-only sequential verification passed again, local entitlement/runtime/client/profile regressions passed, production build passed, and final synthetic-fixture checks remained clean. Production approval remains a separate later gate.
 
 All three SQL drafts verify the exact history row before and after their work using SELECT only. Manual Phase A/Phase B testing does not register either draft as a migration. No history INSERT/UPDATE/DELETE, migration repair or baseline replay is part of this test package. Phase A has no requirement for empty existing application tables; the rollback-only sequential test separately requires empty application row sets and absent synthetic identities to protect its fixture assumptions. Keep those safeguards and all schema/object/ACL checks unchanged.
 

@@ -1,6 +1,6 @@
 # Entitlement authority: reviewed local model
 
-Local implementation and non-active SQL drafts, 2026-10-11. Phase A was installed and verified only on the reviewed disposable project hirefit-baseline-replay (nddfpwqrfgcddzjwjrsw). Sequential and two-session concurrency verification passed there; production was not changed. Phase B has not been executed. Production readiness remains NO.
+Local implementation and non-active SQL drafts, 2026-10-11. Phase A and Phase B were installed and verified only on the reviewed disposable project hirefit-baseline-replay (nddfpwqrfgcddzjwjrsw). Sequential verification, two-session concurrency verification, Phase B privilege postconditions, and post-cutover local regressions passed there. Production was not changed. Production readiness remains NO pending a separately reviewed production rollout.
 
 ## Accepted product semantics
 
